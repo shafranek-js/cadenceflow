@@ -18,7 +18,7 @@ importers:
         specifier: ^19.2.0
         version: 19.2.8(react@19.2.8)
       spessasynth_lib:
-        specifier: ^4.3.0
+        specifier: 4.3.14
         version: 4.3.14
       vexflow:
         specifier: ^5.0.0
