@@ -1,5 +1,5 @@
 export interface SampleCacheOptions {
-  readonly maxEntries?: number;
+  readonly maxEntries?: number | undefined;
   readonly fetchAudioBuffer: (assetPath: string) => Promise<AudioBuffer>;
 }
 
