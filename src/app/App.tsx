@@ -95,18 +95,20 @@ export function App() {
   const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!project.temporaryBranch) {
-      setSelectedBranchStepIds(Object.freeze([]));
+    const branch = project.temporaryBranch;
+    if (!branch) {
+      setSelectedBranchStepIds((prev) => (prev.length === 0 ? prev : Object.freeze([])));
       return;
     }
-    const existing = new Set(selectedBranchStepIds);
-    const next = project.temporaryBranch.steps.map((step) => step.id);
-    if (
-      next.some((id) => !existing.has(id)) ||
-      selectedBranchStepIds.some((id) => !next.includes(id))
-    )
-      setSelectedBranchStepIds(Object.freeze(next));
-  }, [project.temporaryBranch?.steps]);
+    const next = branch.steps.map((step) => step.id);
+    setSelectedBranchStepIds((prev) => {
+      const existing = new Set(prev);
+      if (next.length === prev.length && next.every((id) => existing.has(id))) {
+        return prev;
+      }
+      return Object.freeze(next);
+    });
+  }, [project.temporaryBranch]);
 
   const vocabulary = recommendationVocabulary(project.activeModule);
   const baselineIds = new Set(
