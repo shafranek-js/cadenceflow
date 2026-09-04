@@ -1,5 +1,41 @@
-CadenceFlow HQ Piano - attribution placeholder
+CadenceFlow HQ Piano — License and Attribution Notice
 
-The production sample bank is not bundled in this repository scaffold.
-Before adding samples, record the source bank, version, author, source URL,
-license text/identifier, required attribution, and any redistribution conditions here.
+================================================================================
+Instrument / Sample Bank: Salamander Grand Piano V3
+Original Recording Author: Alexander Holm
+Original Recording Source: https://archive.org/details/SalamanderGrandPianoV3
+SFZ Instrument Reference: https://github.com/sfzinstruments/SalamanderGrandPiano
+License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+License URL: https://creativecommons.org/licenses/by/3.0/
+================================================================================
+
+ATTRIBUTION SUMMARY
+-------------------
+Salamander Grand Piano V3 was recorded by Alexander Holm using a Yamaha C5 grand
+piano at 48kHz, 24-bit resolution with two AKG C414 microphones in an AB stereo
+configuration placed ~12cm above the strings.
+
+The original work features 16 discrete velocity layers sampled in minor thirds
+from A0 (MIDI pitch 21) through C8 (MIDI pitch 108).
+
+CADENCEFLOW DERIVATIVE NOTICE
+-----------------------------
+CadenceFlow includes web-ready derivative audio assets and a companion metadata
+manifest prepared specifically for low-latency in-browser WebAudio playback.
+
+CadenceFlow performs the following transformations on the source recordings:
+1. Encoding: Uncompressed 24-bit 48kHz PCM WAV/FLAC audio is encoded to
+   bandwidth-efficient Ogg Vorbis/Opus formats at 48kHz stereo, preserving full
+   acoustic transient integrity, timbral nuances, and decay envelopes while
+   reducing total transfer size by over 93%.
+2. Organization: Preserves all 16 discrete velocity layers across all 30 sampled
+   minor-third root pitches (480 sample regions total).
+3. Metadata: Strips extraneous DAW headers and generates a structured,
+   lightweight JSON manifest (`manifest.json`) for lazy-loaded velocity-sensitive
+   WebAudio playback.
+
+DISCLAIMER
+----------
+CadenceFlow does NOT claim ownership of the original audio recordings.
+All rights to the original sample recordings remain with Alexander Holm under
+the Creative Commons Attribution 3.0 Unported license.

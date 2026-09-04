@@ -20,13 +20,14 @@ export interface ISpessaSynth {
 }
 
 export interface SpessaSoundFontProviderOptions {
-  readonly id?: string;
-  readonly soundFontUrl?: string;
-  readonly soundFontBuffer?: ArrayBuffer;
-  readonly audioContext?: BaseAudioContext;
-  readonly destination?: AudioNode;
-  readonly synthFactory?: (ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth;
-  readonly fetchFn?: typeof fetch;
+  readonly id?: string | undefined;
+  readonly soundFontUrl?: string | undefined;
+  readonly soundFontBuffer?: ArrayBuffer | undefined;
+  readonly audioContext?: BaseAudioContext | undefined;
+  readonly destination?: AudioNode | undefined;
+  readonly synthFactory?:
+    ((ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth) | undefined;
+  readonly fetchFn?: typeof fetch | undefined;
 }
 
 interface ScheduledNoteTimer {
@@ -39,10 +40,11 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
   private providerState: AudioProviderState = "idle";
   private synth: ISpessaSynth | null = null;
   private audioContext: BaseAudioContext | null = null;
-  private readonly soundFontUrl?: string;
-  private readonly soundFontBuffer?: ArrayBuffer;
-  private readonly destinationNode?: AudioNode;
-  private readonly synthFactory?: (ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth;
+  private readonly soundFontUrl?: string | undefined;
+  private readonly soundFontBuffer?: ArrayBuffer | undefined;
+  private readonly destinationNode?: AudioNode | undefined;
+  private readonly synthFactory?:
+    ((ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth) | undefined;
   private readonly fetchImpl: typeof fetch;
 
   private activeTimers: ScheduledNoteTimer[] = [];

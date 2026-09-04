@@ -9,11 +9,12 @@ import type {
 export interface LookAheadSchedulerOptions {
   readonly clock: AudioClock;
   readonly provider: InstrumentAudioProvider;
-  readonly lookAheadHorizonSeconds?: number;
-  readonly tickIntervalMs?: number;
-  readonly onEventScheduled?: (event: AudioNoteEvent, targetAudioTime: number) => void;
-  readonly onPlaybackEnded?: () => void;
-  readonly onError?: (error: unknown) => void;
+  readonly lookAheadHorizonSeconds?: number | undefined;
+  readonly tickIntervalMs?: number | undefined;
+  readonly onEventScheduled?:
+    ((event: AudioNoteEvent, targetAudioTime: number) => void) | undefined;
+  readonly onPlaybackEnded?: (() => void) | undefined;
+  readonly onError?: ((error: unknown) => void) | undefined;
 }
 
 export type SchedulerState = "idle" | "running" | "paused" | "disposed";
@@ -28,9 +29,10 @@ export class LookAheadScheduler {
   private readonly provider: InstrumentAudioProvider;
   private readonly lookAheadHorizon: number;
   private readonly tickIntervalMs: number;
-  private readonly onEventScheduled?: (event: AudioNoteEvent, targetAudioTime: number) => void;
-  private readonly onPlaybackEnded?: () => void;
-  private readonly onError?: (error: unknown) => void;
+  private readonly onEventScheduled?:
+    ((event: AudioNoteEvent, targetAudioTime: number) => void) | undefined;
+  private readonly onPlaybackEnded?: (() => void) | undefined;
+  private readonly onError?: ((error: unknown) => void) | undefined;
 
   private state: SchedulerState = "idle";
   private timerId: ReturnType<typeof setInterval> | null = null;

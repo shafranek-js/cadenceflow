@@ -10,13 +10,13 @@ import { type HqPianoManifest, resolveSampleRegion, validatePianoManifest } from
 import { SampleCache } from "./sampleCache";
 
 export interface HqSamplePianoProviderOptions {
-  readonly id?: string;
-  readonly manifestUrl?: string;
-  readonly manifestData?: HqPianoManifest;
-  readonly audioContext?: AudioContext;
-  readonly sampleCache?: SampleCache;
-  readonly fetchFn?: typeof fetch;
-  readonly destination?: AudioNode;
+  readonly id?: string | undefined;
+  readonly manifestUrl?: string | undefined;
+  readonly manifestData?: HqPianoManifest | undefined;
+  readonly audioContext?: AudioContext | undefined;
+  readonly sampleCache?: SampleCache | undefined;
+  readonly fetchFn?: typeof fetch | undefined;
+  readonly destination?: AudioNode | undefined;
 }
 
 interface ActiveNodeEntry {
@@ -37,9 +37,9 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
   private providerState: AudioProviderState = "idle";
   private manifest: HqPianoManifest | null = null;
   private readonly manifestUrl: string;
-  private readonly initialManifestData?: HqPianoManifest;
+  private readonly initialManifestData?: HqPianoManifest | undefined;
   private audioContext: AudioContext | null = null;
-  private readonly destinationNode?: AudioNode;
+  private readonly destinationNode?: AudioNode | undefined;
   private readonly fetchImpl: typeof fetch;
 
   private sampleCache: SampleCache | null = null;

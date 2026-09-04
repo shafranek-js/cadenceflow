@@ -14,13 +14,14 @@ export interface AudioClock {
 }
 
 export interface PlaybackScope {
-  readonly sessionId?: string;
-  readonly stepIds?: readonly string[];
+  readonly sessionId?: string | undefined;
+  readonly stepIds?: readonly string[] | undefined;
 }
 
 export interface ScheduledPlayback {
   readonly id: string;
   cancel(): void;
+  readonly ready?: Promise<void> | undefined;
 }
 
 export interface InstrumentAudioProvider {
