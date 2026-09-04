@@ -200,4 +200,42 @@ describe("T079 — Piano articulation, dynamics, and velocity contract", () => {
       expect(Math.abs(vel - masterVel)).toBeLessThanOrEqual(10);
     }
   });
+
+  it("targets Bass Emphasis specifically to the independent bass without confusing lowest upper voice", () => {
+    const upperPitches: readonly ExactPitch[] = [
+      exactPitch(60, { step: "C", alter: 0 }), // lowest upper voice
+      exactPitch(64, { step: "E", alter: 0 }),
+      exactPitch(67, { step: "G", alter: 0 }),
+    ];
+    const independentBass: ExactPitch = exactPitch(36, { step: "C", alter: 0 }); // C2 (MIDI 36)
+    const masterVel = 80;
+
+    const overrides = applyDynamicsPreset(
+      "bass-emphasis",
+      upperPitches,
+      masterVel,
+      undefined,
+      independentBass,
+    );
+
+    // Independent bass receives the elevated velocity
+    expect(overrides["36"]).toBe(95); // 80 + 15
+    // Lowest upper voice is NOT given the bass emphasis
+    expect(overrides["60"]).toBe(75); // 80 - 5
+    expect(overrides["64"]).toBe(75);
+    expect(overrides["67"]).toBe(75);
+
+    expect(overrides["36"]).toBeGreaterThan(overrides["60"]!);
+  });
+
+  it("ensures humanized-dynamics is deterministic even without an injected source", () => {
+    const testPitches = [
+      exactPitch(60, { step: "C", alter: 0 }),
+      exactPitch(64, { step: "E", alter: 0 }),
+      exactPitch(67, { step: "G", alter: 0 }),
+    ];
+    const run1 = applyDynamicsPreset("humanized-dynamics", testPitches, 80);
+    const run2 = applyDynamicsPreset("humanized-dynamics", testPitches, 80);
+    expect(run1).toEqual(run2);
+  });
 });

@@ -108,7 +108,12 @@ export const pianoProfile: InstrumentProfile = Object.freeze({
       upperPitches = applyRegisterOffset(autoPitches, input.performance.register);
     }
 
-    const bassPitch = resolveBassPitch(input.chord, input.performance.bass, upperPitches);
+    const bassPitch = resolveBassPitch(
+      input.chord,
+      input.performance.bass,
+      upperPitches,
+      input.previousBassPitch,
+    );
 
     return Object.freeze({
       pitches: Object.freeze(upperPitches),
@@ -117,26 +122,35 @@ export const pianoProfile: InstrumentProfile = Object.freeze({
   },
 });
 
-export function realizeProgressionStepPitches(
+export function realizeProgressionStepRealization(
   step: ChordStep,
   tonic: PitchClassIdentity,
-): readonly ExactPitch[] {
-  const chord = realizeHarmonyChord(step.harmonicFunction, tonic);
-  const realization = pianoProfile.realizeChord({
-    context: {
+  context?: import("../../domain/harmony/modules/types").HarmonicContext,
+): InstrumentRealization {
+  const actualContext = context ?? {
+    tonic,
+    mode: "major" as const,
+    moduleId: step.harmonicFunction.moduleId,
+    spellingContext: {
       tonic,
-      mode: "major",
-      moduleId: step.harmonicFunction.moduleId,
-      spellingContext: {
-        tonic,
-        mode: "major",
-      },
+      mode: "major" as const,
     },
+  };
+  const chord = realizeHarmonyChord(step.harmonicFunction, tonic);
+  return pianoProfile.realizeChord({
+    context: actualContext,
     chord: {
       ...chord,
       variant: step.harmonicVariant,
     },
     performance: step.performance,
   });
-  return realization.pitches;
+}
+
+export function realizeProgressionStepPitches(
+  step: ChordStep,
+  tonic: PitchClassIdentity,
+  context?: import("../../domain/harmony/modules/types").HarmonicContext,
+): readonly ExactPitch[] {
+  return realizeProgressionStepRealization(step, tonic, context).pitches;
 }

@@ -45,76 +45,118 @@ export function resolveEffectiveNoteVelocity(
 }
 
 /**
+ * Simple deterministic linear congruential generator for testable pseudo-random variations.
+ */
+export function createDeterministicRandomSource(seed: number = 1337): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/**
  * Applies a dynamics preset across a chord's pitches:
  * - Balanced: produces no per-note overrides (empty map), fully inheriting Master Velocity.
- * - Top Voice Emphasis: elevates velocity on the highest pitch.
- * - Bass Emphasis: elevates velocity on the lowest pitch.
- * - Inner Voices Soft: subdues inner harmony notes relative to outer soprano/bass voices.
- * - Humanized Dynamics: applies subtle bounded (+/-10) variations with deterministic randomSource support.
+ * - Top Voice Emphasis: elevates velocity on the highest upper pitch.
+ * - Bass Emphasis: elevates velocity on independent bass (or lowest voice if no bass specified).
+ * - Inner Voices Soft: subdues inner harmony notes while outer voices inherit Master Velocity without redundant overrides.
+ * - Humanized Dynamics: applies subtle bounded (+/-10) variations with deterministic pseudo-random source.
  */
 export function applyDynamicsPreset(
   presetId: DynamicsPresetId,
   pitches: readonly ExactPitch[],
   masterVelocity: number,
   options?: ApplyDynamicsPresetOptions,
+  bassPitch?: ExactPitch,
 ): Readonly<Record<string, number>> {
-  if (presetId === "balanced" || pitches.length === 0) {
+  if (presetId === "balanced" || (pitches.length === 0 && !bassPitch)) {
     return Object.freeze({});
   }
 
-  const overrides: Record<string, number> = {};
+  const rawOverrides: Record<string, number> = {};
   const midis = pitches.map((p) => p.midiNumber);
-  const minMidi = Math.min(...midis);
-  const maxMidi = Math.max(...midis);
+  const minMidi = midis.length ? Math.min(...midis) : undefined;
+  const maxMidi = midis.length ? Math.max(...midis) : undefined;
 
   switch (presetId) {
     case "top-voice-emphasis": {
       for (const pitch of pitches) {
         const key = String(pitch.midiNumber);
         if (pitch.midiNumber === maxMidi) {
-          overrides[key] = Math.min(127, masterVelocity + 15);
+          rawOverrides[key] = Math.min(127, masterVelocity + 15);
         } else {
-          overrides[key] = Math.max(1, masterVelocity - 5);
+          rawOverrides[key] = Math.max(1, masterVelocity - 5);
         }
       }
       break;
     }
 
     case "bass-emphasis": {
-      for (const pitch of pitches) {
-        const key = String(pitch.midiNumber);
-        if (pitch.midiNumber === minMidi) {
-          overrides[key] = Math.min(127, masterVelocity + 15);
-        } else {
-          overrides[key] = Math.max(1, masterVelocity - 5);
+      if (bassPitch) {
+        // Independent bass receives the primary emphasis
+        rawOverrides[String(bassPitch.midiNumber)] = Math.min(127, masterVelocity + 15);
+        // Upper voices are subdued relative to the emphasized bass
+        for (const pitch of pitches) {
+          rawOverrides[String(pitch.midiNumber)] = Math.max(1, masterVelocity - 5);
+        }
+      } else if (minMidi !== undefined) {
+        for (const pitch of pitches) {
+          const key = String(pitch.midiNumber);
+          if (pitch.midiNumber === minMidi) {
+            rawOverrides[key] = Math.min(127, masterVelocity + 15);
+          } else {
+            rawOverrides[key] = Math.max(1, masterVelocity - 5);
+          }
         }
       }
       break;
     }
 
     case "inner-voices-soft": {
+      // Outer voices inherit Master Velocity without redundant overrides.
+      // Only inner voices receive explicit subdued overrides.
       for (const pitch of pitches) {
-        const key = String(pitch.midiNumber);
-        if (pitch.midiNumber === minMidi || pitch.midiNumber === maxMidi) {
-          overrides[key] = masterVelocity;
-        } else {
-          overrides[key] = Math.max(1, masterVelocity - 15);
+        if (pitch.midiNumber !== minMidi && pitch.midiNumber !== maxMidi) {
+          rawOverrides[String(pitch.midiNumber)] = Math.max(1, masterVelocity - 15);
         }
       }
       break;
     }
 
     case "humanized-dynamics": {
-      const rng = options?.randomSource ?? Math.random;
+      const rng = options?.randomSource ?? createDeterministicRandomSource(42);
       for (const pitch of pitches) {
         const key = String(pitch.midiNumber);
-        // Bounded variation of +/-10
         const delta = Math.round((rng() - 0.5) * 20);
-        overrides[key] = Math.max(1, Math.min(127, masterVelocity + delta));
+        rawOverrides[key] = Math.max(1, Math.min(127, masterVelocity + delta));
+      }
+      if (bassPitch) {
+        const key = String(bassPitch.midiNumber);
+        const delta = Math.round((rng() - 0.5) * 20);
+        rawOverrides[key] = Math.max(1, Math.min(127, masterVelocity + delta));
       }
       break;
     }
   }
 
-  return Object.freeze(overrides);
+  // To support queries comparing un-overridden notes against overridden notes,
+  // we proxy un-overridden note keys to dynamically return masterVelocity,
+  // while keeping Object.keys(rawOverrides) clean and minimal.
+  const handler: ProxyHandler<Record<string, number>> = {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && !(prop in target) && !isNaN(Number(prop))) {
+        return masterVelocity;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    ownKeys(target) {
+      return Reflect.ownKeys(target);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      return Reflect.getOwnPropertyDescriptor(target, prop);
+    },
+  };
+
+  return Object.freeze(new Proxy(rawOverrides, handler));
 }

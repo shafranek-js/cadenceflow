@@ -14,6 +14,7 @@ export interface RealizeStepEventsInput {
   readonly tempoBpm: number;
   readonly stepStartSeconds?: number;
   readonly previousPitches?: readonly ExactPitch[] | undefined;
+  readonly previousBassPitch?: ExactPitch | undefined;
   readonly randomSource?: (() => number) | undefined;
 }
 
@@ -45,6 +46,7 @@ export function realizeStepAudioEvents(input: RealizeStepEventsInput): RealizedS
     tempoBpm,
     stepStartSeconds = 0,
     previousPitches,
+    previousBassPitch,
     randomSource,
   } = input;
 
@@ -65,6 +67,7 @@ export function realizeStepAudioEvents(input: RealizeStepEventsInput): RealizedS
     chord,
     performance: step.performance,
     ...(previousPitches ? { previousPitches } : {}),
+    ...(previousBassPitch ? { previousBassPitch } : {}),
   });
 
   const timingIntents = resolveArticulationTiming(
@@ -118,7 +121,7 @@ export interface RealizeProgressionEventsInput {
 
 /**
  * Realizes canonical performance AudioNoteEvents across an entire sequence of progression steps.
- * Chains contextual voice leading between neighboring chord steps.
+ * Chains contextual voice leading between neighboring chord steps for both upper and bass voices.
  */
 export function realizeProgressionAudioEvents(
   input: RealizeProgressionEventsInput,
@@ -127,7 +130,8 @@ export function realizeProgressionAudioEvents(
 
   const allEvents: AudioNoteEvent[] = [];
   let currentStartSeconds = initialStartSeconds;
-  let previousPitches: readonly ExactPitch[] | undefined;
+  let previousUpperPitches: readonly ExactPitch[] | undefined;
+  let previousBassPitch: ExactPitch | undefined;
 
   for (const step of steps) {
     if (step.kind === "rest") {
@@ -137,6 +141,9 @@ export function realizeProgressionAudioEvents(
         tempoBpm,
       );
       currentStartSeconds += restDuration;
+      // Note: RestStep advances time without generating audio events.
+      // In CadenceFlow, a Rest preserves previousUpperPitches and previousBassPitch
+      // so voice leading continues naturally across pauses without an artificial reset.
       continue;
     }
 
@@ -147,13 +154,15 @@ export function realizeProgressionAudioEvents(
         context,
         tempoBpm,
         stepStartSeconds: currentStartSeconds,
-        ...(previousPitches ? { previousPitches } : {}),
+        ...(previousUpperPitches ? { previousPitches: previousUpperPitches } : {}),
+        ...(previousBassPitch ? { previousBassPitch } : {}),
         ...(randomSource ? { randomSource } : {}),
       });
 
       allEvents.push(...stepResult.events);
       currentStartSeconds += stepResult.stepDurationSeconds;
-      previousPitches = stepResult.upperPitches;
+      previousUpperPitches = stepResult.upperPitches;
+      previousBassPitch = stepResult.bassPitch;
     }
   }
 

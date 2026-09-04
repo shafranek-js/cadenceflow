@@ -132,4 +132,23 @@ describe("T089 — Canonical performance-event realization", () => {
       expect(events[i]!.startSeconds).toBeLessThanOrEqual(events[i + 1]!.startSeconds);
     }
   });
+
+  it("chains both previousUpperPitches and previousBassPitch across progression steps independently", () => {
+    // Step 1: IV (F Major). Realizes bass as F
+    const step1 = createStep("step-1", "IV");
+    // Step 2: I (C Major) with auto bass. Should choose 3rd (E) due to previous bass F
+    const step2 = createStep("step-2", "I", { bass: { choice: "auto", octaveOffset: "auto" } });
+
+    const events = realizeProgressionAudioEvents({
+      steps: [step1, step2],
+      tonic: 0,
+      context: C_MAJOR_CONTEXT,
+      tempoBpm: 120,
+    });
+
+    const step2BassEvent = events.find((e) => e.startSeconds >= 2.0 && e.channelRole === "bass");
+    expect(step2BassEvent).toBeDefined();
+    // Step 2 Auto bass chooses E (4) because previous bass was F (5)
+    expect(step2BassEvent!.pitch % 12).toBe(4); // E
+  });
 });

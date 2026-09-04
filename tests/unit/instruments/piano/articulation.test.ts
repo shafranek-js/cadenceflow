@@ -107,4 +107,32 @@ describe("T086 — Piano articulation timing and note order", () => {
       expect(intent.durationSeconds).toBeGreaterThan(0);
     }
   });
+
+  it("ensures humanized articulation is deterministic even without an injected source", () => {
+    const run1 = resolveArticulationTiming("humanized", upperPitches, totalDuration, bassPitch);
+    const run2 = resolveArticulationTiming("humanized", upperPitches, totalDuration, bassPitch);
+    expect(run1).toEqual(run2);
+  });
+
+  it("guarantees every event stays strictly inside step boundary even for very short steps/high BPM", () => {
+    const articulations = ["block", "arp-up", "arp-down", "broken-chord", "humanized"] as const;
+    // Deliberately short musical durations: 0.05s (e.g. 16th note at 300 BPM) and 0.02s (e.g. 32nd note at 375 BPM)
+    const shortDurations = [0.1, 0.05, 0.02];
+
+    for (const art of articulations) {
+      for (const dur of shortDurations) {
+        const intents = resolveArticulationTiming(art, upperPitches, dur, bassPitch);
+
+        expect(intents.length).toBeGreaterThan(0);
+        for (const intent of intents) {
+          expect(intent.startOffsetSeconds).toBeGreaterThanOrEqual(0);
+          expect(intent.durationSeconds).toBeGreaterThan(0);
+          // Required Invariant: startOffset + duration <= stepDuration
+          expect(intent.startOffsetSeconds + intent.durationSeconds).toBeLessThanOrEqual(
+            dur + 1e-6, // tolerance for floating point rounding
+          );
+        }
+      }
+    }
+  });
 });

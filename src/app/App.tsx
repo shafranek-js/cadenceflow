@@ -31,6 +31,7 @@ import { createDefaultProject } from "../domain/project/factory";
 import { recommend } from "../domain/recommendations/engine";
 import {
   baselineFunctionIdentities,
+  getHarmonicModule,
   recommendationVocabulary,
 } from "../domain/harmony/moduleRegistry";
 import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/moduleSwitch";
@@ -414,6 +415,15 @@ export function App() {
             <PianoPerformanceInspector
               step={selectedProgressionStep}
               tonic={project.tonic}
+              context={{
+                tonic: project.tonic,
+                mode: getHarmonicModule(project.activeModule).mode,
+                moduleId: project.activeModule,
+                spellingContext: {
+                  tonic: project.tonic,
+                  mode: getHarmonicModule(project.activeModule).mode,
+                },
+              }}
               onPerformanceChange={(perf) =>
                 editProgressionPerformance(selectedProgressionStep.id, perf)
               }

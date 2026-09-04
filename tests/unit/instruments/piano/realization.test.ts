@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { realizeChord as realizeHarmonyChord } from "../../../../src/domain/harmony/realization";
-import { pianoProfile } from "../../../../src/instruments/piano/profile";
+import {
+  pianoProfile,
+  realizeProgressionStepRealization,
+} from "../../../../src/instruments/piano/profile";
 import { PIANO_RANGE_MIN_MIDI, PIANO_RANGE_MAX_MIDI } from "../../../../src/instruments/contracts";
 import { exactPitch, type ExactPitch } from "../../../../src/domain/harmony/pitch";
+import { EMPTY_HARMONIC_VARIANT } from "../../../../src/domain/harmony/chord";
+import { musicalDuration } from "../../../../src/domain/timing/duration";
+import { rational } from "../../../../src/domain/timing/rational";
 import type { HarmonicContext } from "../../../../src/domain/harmony/modules/types";
 import type {
+  ChordStep,
   StepPerformance,
   RegisterOffset,
   BassChoice,
@@ -405,5 +412,122 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
         }
       }
     }
+  });
+
+  it("proves contextual Auto bass chooses a smoother chord tone (Auto !== Root) based on previous bass", () => {
+    // Chord: C Major (Root C=0, 3rd E=4, 5th G=7).
+    // When previous bass is F (pitch class 5, e.g. from IV chord):
+    // Distance to Root C is 5 semitones (leap).
+    // Distance to 3rd E is 1 semitone (stepwise).
+    // Contextual Auto chooses 3rd (E) to avoid leap, while explicit Root strictly chooses C.
+    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const previousBassF = exactPitch(53, { step: "F", alter: 0 }); // F3
+
+    const autoRealization = pianoProfile.realizeChord({
+      context: C_MAJOR_CONTEXT,
+      chord,
+      performance: createDefaultPerformance({ bass: { choice: "auto", octaveOffset: "auto" } }),
+      previousBassPitch: previousBassF,
+    });
+
+    const rootRealization = pianoProfile.realizeChord({
+      context: C_MAJOR_CONTEXT,
+      chord,
+      performance: createDefaultPerformance({ bass: { choice: "root", octaveOffset: "auto" } }),
+      previousBassPitch: previousBassF,
+    });
+
+    expect(autoRealization.bassPitch).toBeDefined();
+    expect(rootRealization.bassPitch).toBeDefined();
+
+    // Auto bass chooses 3rd (E) for stepwise voice leading from F
+    expect(autoRealization.bassPitch!.pitchClassIdentity).toBe(4); // E
+    // Explicit Root strictly resolves to C
+    expect(rootRealization.bassPitch!.pitchClassIdentity).toBe(0); // C
+    // Auto !== Root
+    expect(autoRealization.bassPitch!.pitchClassIdentity).not.toBe(
+      rootRealization.bassPitch!.pitchClassIdentity,
+    );
+    // Upper voicing remains completely unaffected
+    expect(autoRealization.pitches.map((p) => p.midiNumber)).toEqual(
+      rootRealization.pitches.map((p) => p.midiNumber),
+    );
+  });
+
+  it("validates Custom bass range explicitly (preserves valid, rejects < 21 and > 108)", () => {
+    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+
+    // Valid Custom bass within 21..108 is preserved exactly
+    const validCustom = exactPitch(36, { step: "C", alter: 0 }); // C2
+    const validRealization = pianoProfile.realizeChord({
+      context: C_MAJOR_CONTEXT,
+      chord,
+      performance: createDefaultPerformance({
+        bass: { choice: "custom", octaveOffset: "auto", customPitch: validCustom },
+      }),
+    });
+    expect(validRealization.bassPitch).toEqual(validCustom);
+
+    // Sub-A0 (< 21) Custom bass is rejected explicitly
+    const tooLowCustom = exactPitch(20, { step: "G", alter: 1 }); // G#0
+    expect(() =>
+      pianoProfile.realizeChord({
+        context: C_MAJOR_CONTEXT,
+        chord,
+        performance: createDefaultPerformance({
+          bass: { choice: "custom", octaveOffset: "auto", customPitch: tooLowCustom },
+        }),
+      }),
+    ).toThrow(RangeError);
+
+    // Supra-C8 (> 108) Custom bass is rejected explicitly
+    const tooHighCustom = exactPitch(109, { step: "C", alter: 1 }); // C#8
+    expect(() =>
+      pianoProfile.realizeChord({
+        context: C_MAJOR_CONTEXT,
+        chord,
+        performance: createDefaultPerformance({
+          bass: { choice: "custom", octaveOffset: "auto", customPitch: tooHighCustom },
+        }),
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("realizes Dark Harmony steps consistently using actual project HarmonicContext", () => {
+    const darkContext: HarmonicContext = Object.freeze({
+      tonic: 0, // C
+      mode: "minor",
+      moduleId: "dark-harmony",
+      spellingContext: {
+        tonic: 0,
+        mode: "minor",
+      },
+    });
+
+    // In Dark Harmony with C tonic: i is C minor (C, Eb, G)
+    const chordStep: ChordStep = Object.freeze({
+      id: "step-dark-1",
+      kind: "chord",
+      harmonicFunction: Object.freeze({
+        moduleId: "dark-harmony",
+        functionId: "i",
+      }),
+      harmonicVariant: EMPTY_HARMONIC_VARIANT,
+      duration: musicalDuration(rational(4, 1)),
+      performance: createDefaultPerformance(),
+      cardView: "piano",
+    });
+
+    const realization = realizeProgressionStepRealization(chordStep, 0, darkContext);
+    expect(realization.pitches.length).toBeGreaterThanOrEqual(3);
+    expect(realization.bassPitch).toBeDefined();
+
+    // Bass resolves to C (0)
+    expect(realization.bassPitch!.pitchClassIdentity).toBe(0);
+
+    // Upper pitches contain minor 3rd (Eb = 3), not major 3rd (E = 4)
+    const pcs = realization.pitches.map((p) => p.pitchClassIdentity);
+    expect(pcs).toContain(3); // Eb
+    expect(pcs).not.toContain(4); // E natural must not be present
   });
 });

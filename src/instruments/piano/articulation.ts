@@ -1,6 +1,8 @@
 import type { ExactPitch } from "../../domain/harmony/pitch";
 import type { PianoArticulation } from "../../domain/progression/step";
 
+import { createDeterministicRandomSource } from "./dynamics";
+
 export interface NoteTimingIntent {
   readonly pitch: ExactPitch;
   readonly startOffsetSeconds: number;
@@ -16,14 +18,18 @@ export interface ArticulationOptions {
  * Transforms realized chord and bass pitches into note timing and duration intents
  * according to the requested piano articulation.
  *
+ * Invariant:
+ * For every generated event:
+ * - startOffsetSeconds >= 0
+ * - durationSeconds > 0
+ * - startOffsetSeconds + durationSeconds <= totalDurationSeconds
+ *
  * Articulations supported:
  * - Block: all upper voices sound synchronously at t = 0
  * - Arp Up: pitches ascend in pitch order with staggered onset
  * - Arp Down: pitches descend in pitch order with staggered onset
  * - Broken Chord: notes alternate across the duration
- * - Humanized: subtle, bounded timing micro-deviations (-15ms..+15ms)
- *
- * Testable with an injected deterministic pseudo-random source.
+ * - Humanized: subtle, bounded timing micro-deviations with deterministic pseudo-random fallback
  */
 export function resolveArticulationTiming(
   articulation: PianoArticulation,
@@ -33,7 +39,7 @@ export function resolveArticulationTiming(
   options?: ArticulationOptions,
 ): readonly NoteTimingIntent[] {
   const intents: NoteTimingIntent[] = [];
-  const baseDuration = Math.max(0.05, totalDurationSeconds * 0.95);
+  const baseDuration = totalDurationSeconds * 0.95;
 
   // 1. Bass voice (if present): foundation on beat 0
   if (bassPitch) {
@@ -70,12 +76,12 @@ export function resolveArticulationTiming(
     }
 
     case "arp-up": {
-      // Sort ascending by pitch
       const sorted = [...upperPitches].sort((a, b) => a.midiNumber - b.midiNumber);
-      const stepDelay = Math.min(0.045, (totalDurationSeconds * 0.35) / Math.max(1, n));
+      const maxSpread = totalDurationSeconds * 0.4;
+      const stepDelay = n > 1 ? Math.min(0.045, maxSpread / (n - 1)) : 0;
       for (let i = 0; i < n; i++) {
         const start = i * stepDelay;
-        const dur = Math.max(0.1, baseDuration - start);
+        const dur = (totalDurationSeconds - start) * 0.95;
         intents.push(
           Object.freeze({
             pitch: sorted[i]!,
@@ -89,12 +95,12 @@ export function resolveArticulationTiming(
     }
 
     case "arp-down": {
-      // Sort descending by pitch
       const sorted = [...upperPitches].sort((a, b) => b.midiNumber - a.midiNumber);
-      const stepDelay = Math.min(0.045, (totalDurationSeconds * 0.35) / Math.max(1, n));
+      const maxSpread = totalDurationSeconds * 0.4;
+      const stepDelay = n > 1 ? Math.min(0.045, maxSpread / (n - 1)) : 0;
       for (let i = 0; i < n; i++) {
         const start = i * stepDelay;
-        const dur = Math.max(0.1, baseDuration - start);
+        const dur = (totalDurationSeconds - start) * 0.95;
         intents.push(
           Object.freeze({
             pitch: sorted[i]!,
@@ -108,15 +114,14 @@ export function resolveArticulationTiming(
     }
 
     case "broken-chord": {
-      // Split into lower half and upper half
       const sorted = [...upperPitches].sort((a, b) => a.midiNumber - b.midiNumber);
       const half = Math.ceil(n / 2);
-      const halfDelay = Math.min(0.12, totalDurationSeconds * 0.25);
+      const halfDelay = Math.min(0.08, totalDurationSeconds * 0.25);
 
       for (let i = 0; i < n; i++) {
         const isUpperHalf = i >= half;
         const start = isUpperHalf ? halfDelay : 0;
-        const dur = Math.max(0.1, baseDuration - start);
+        const dur = (totalDurationSeconds - start) * 0.95;
         intents.push(
           Object.freeze({
             pitch: sorted[i]!,
@@ -130,14 +135,14 @@ export function resolveArticulationTiming(
     }
 
     case "humanized": {
-      const rng = options?.randomSource ?? Math.random;
+      const rng = options?.randomSource ?? createDeterministicRandomSource(101);
+      const maxJitter = Math.min(0.015, totalDurationSeconds * 0.1);
       for (const p of upperPitches) {
-        // Bounded micro-jitter: -0.015s..+0.015s
-        const jitter = (rng() - 0.5) * 0.03;
+        const jitter = (rng() - 0.5) * 2 * maxJitter;
         const start = Math.max(0, jitter);
-        // Slight duration variation: 0.95..1.05
-        const durFactor = 0.95 + rng() * 0.1;
-        const dur = Math.max(0.1, baseDuration * durFactor);
+        const maxDur = totalDurationSeconds - start;
+        const durFactor = 0.88 + rng() * 0.08;
+        const dur = maxDur * durFactor;
         intents.push(
           Object.freeze({
             pitch: p,

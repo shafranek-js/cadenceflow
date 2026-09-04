@@ -32,7 +32,16 @@ export function resolveBassPitch(
   const rootSpelling = chord.spelling.root;
 
   // 1. Custom Bass
-  if (bassSettings.choice === "custom" && bassSettings.customPitch) {
+  if (bassSettings.choice === "custom") {
+    if (!bassSettings.customPitch) {
+      throw new Error("Custom bass pitch is required when bass choice is 'custom'");
+    }
+    const midi = bassSettings.customPitch.midiNumber;
+    if (midi < PIANO_RANGE_MIN_MIDI || midi > PIANO_RANGE_MAX_MIDI) {
+      throw new RangeError(
+        `Custom bass pitch MIDI ${midi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
+      );
+    }
     return bassSettings.customPitch;
   }
 

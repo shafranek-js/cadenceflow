@@ -585,3 +585,147 @@
 .step-actions button {
   font-size: 0.68rem;
 }
+
+/* Piano Performance Inspector */
+.piano-performance-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.performance-inspector-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.performance-inspector-header span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.inspector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inspector-group h4 {
+  margin: 4px 0 2px 0;
+  font-size: 0.85rem;
+}
+.subgroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.custom-bass-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.custom-bass-readout {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.view-preference-toggle {
+  display: flex;
+  gap: 4px;
+}
+.view-preference-toggle button {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.view-preference-toggle button.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.per-note-velocity-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.per-note-velocity-editor h5 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.per-note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.per-note-velocity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.note-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.note-name {
+  font-weight: 600;
+}
+.note-midi {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.note-role-badge {
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-3, #333);
+}
+.note-role-badge.role-bass {
+  background: #2a4365;
+  color: #90cdf4;
+}
+.note-velocity-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.status-badge {
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+.status-badge.inherit {
+  background: var(--surface-3, #2d3748);
+  color: var(--text-muted);
+}
+.status-badge.override {
+  background: #742a2a;
+  color: #feb2b2;
+  font-weight: 600;
+}
+.override-active-controls,
+.inherit-active-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.override-active-controls input[type="number"] {
+  width: 50px;
+}

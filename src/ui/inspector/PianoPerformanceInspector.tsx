@@ -1,4 +1,11 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
+import type { HarmonicContext } from "../../domain/harmony/modules/types";
+import {
+  exactPitch,
+  midiToPitchClass,
+  type ExactPitch,
+  type PitchSpelling,
+} from "../../domain/harmony/pitch";
 import type {
   BassChoice,
   BassOctaveOffset,
@@ -9,6 +16,8 @@ import type {
 } from "../../domain/progression/step";
 import {
   PIANO_DYNAMICS_PRESETS,
+  PIANO_RANGE_MAX_MIDI,
+  PIANO_RANGE_MIN_MIDI,
   type DynamicsPresetId,
   type MusicalDynamicLabel,
 } from "../../instruments/contracts";
@@ -17,7 +26,7 @@ import {
   musicalDynamicToVelocity,
   velocityToMusicalDynamic,
 } from "../../instruments/piano/dynamics";
-import { realizeProgressionStepPitches } from "../../instruments/piano/profile";
+import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { RegisterControl } from "./RegisterControl";
 
 const ARTICULATIONS: readonly { readonly value: PianoArticulation; readonly label: string }[] =
@@ -47,9 +56,25 @@ const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label:
 
 const MUSICAL_DYNAMICS: readonly MusicalDynamicLabel[] = ["pp", "p", "mp", "mf", "f", "ff"];
 
+const PC_TO_DEFAULT_SPELLING: Readonly<Record<number, PitchSpelling>> = {
+  0: { step: "C", alter: 0 },
+  1: { step: "C", alter: 1 },
+  2: { step: "D", alter: 0 },
+  3: { step: "E", alter: -1 },
+  4: { step: "E", alter: 0 },
+  5: { step: "F", alter: 0 },
+  6: { step: "F", alter: 1 },
+  7: { step: "G", alter: 0 },
+  8: { step: "A", alter: -1 },
+  9: { step: "A", alter: 0 },
+  10: { step: "B", alter: -1 },
+  11: { step: "B", alter: 0 },
+};
+
 export interface PianoPerformanceInspectorProps {
   readonly step: ChordStep;
   readonly tonic: number;
+  readonly context: HarmonicContext;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onOpenVoicingEditor: () => void;
 }
@@ -57,12 +82,18 @@ export interface PianoPerformanceInspectorProps {
 export function PianoPerformanceInspector({
   step,
   tonic,
+  context,
   onPerformanceChange,
   onOpenVoicingEditor,
 }: PianoPerformanceInspectorProps) {
   const perf = step.performance;
   const isManual = perf.voicingMode === "manual";
   const overrideCount = Object.keys(perf.perNoteVelocityOverrides || {}).length;
+
+  const [customBassError, setCustomBassError] = useState<string | null>(null);
+
+  // Realize current full chord step (upper voices + bass voice) within actual harmonic context
+  const realization = realizeProgressionStepRealization(step, tonic, context);
 
   const handleArticulationChange = (e: ChangeEvent<HTMLSelectElement>) => {
     onPerformanceChange({ articulation: e.target.value as PianoArticulation });
@@ -74,10 +105,13 @@ export function PianoPerformanceInspector({
   };
 
   const handleBassChoiceChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const choice = e.target.value as BassChoice;
+    const defaultCustom = perf.bass.customPitch ?? exactPitch(36, { step: "C", alter: 0 }); // C2 (MIDI 36)
     onPerformanceChange({
       bass: {
         ...perf.bass,
-        choice: e.target.value as BassChoice,
+        choice,
+        ...(choice === "custom" && !perf.bass.customPitch ? { customPitch: defaultCustom } : {}),
       },
     });
   };
@@ -88,6 +122,26 @@ export function PianoPerformanceInspector({
       bass: {
         ...perf.bass,
         octaveOffset: val === "auto" ? "auto" : (Number(val) as BassOctaveOffset),
+      },
+    });
+  };
+
+  const handleCustomBassMidiChange = (rawMidi: number) => {
+    if (isNaN(rawMidi)) return;
+    if (rawMidi < PIANO_RANGE_MIN_MIDI || rawMidi > PIANO_RANGE_MAX_MIDI) {
+      setCustomBassError(
+        `Custom bass pitch MIDI ${rawMidi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
+      );
+      return;
+    }
+    setCustomBassError(null);
+    const pc = midiToPitchClass(rawMidi);
+    const spelling = PC_TO_DEFAULT_SPELLING[pc] ?? { step: "C", alter: 0 };
+    const nextPitch = exactPitch(rawMidi, spelling);
+    onPerformanceChange({
+      bass: {
+        ...perf.bass,
+        customPitch: nextPitch,
       },
     });
   };
@@ -107,14 +161,63 @@ export function PianoPerformanceInspector({
   };
 
   const handleApplyPreset = (presetId: DynamicsPresetId) => {
-    const pitches = realizeProgressionStepPitches(step, tonic);
-    const overrides = applyDynamicsPreset(presetId, pitches, perf.masterVelocity);
+    const overrides = applyDynamicsPreset(
+      presetId,
+      realization.pitches,
+      perf.masterVelocity,
+      undefined,
+      realization.bassPitch,
+    );
     onPerformanceChange({ perNoteVelocityOverrides: overrides });
   };
 
   const handleClearOverrides = () => {
     onPerformanceChange({ perNoteVelocityOverrides: {} });
   };
+
+  const handleSetNoteOverride = (noteKey: string, velocity: number) => {
+    const clamped = Math.max(1, Math.min(127, Math.round(velocity)));
+    const updated = {
+      ...perf.perNoteVelocityOverrides,
+      [noteKey]: clamped,
+    };
+    onPerformanceChange({ perNoteVelocityOverrides: updated });
+  };
+
+  const handleResetNoteToInherit = (noteKey: string) => {
+    const updated = { ...perf.perNoteVelocityOverrides };
+    delete updated[noteKey];
+    onPerformanceChange({ perNoteVelocityOverrides: updated });
+  };
+
+  // Compile full note list for per-note velocity editor
+  const notesToDisplay: {
+    readonly noteKey: string;
+    readonly label: string;
+    readonly role: "bass" | "upper";
+    readonly pitch: ExactPitch;
+  }[] = [];
+
+  if (realization.bassPitch) {
+    const b = realization.bassPitch;
+    const alterStr = b.spelling.alter === 1 ? "#" : b.spelling.alter === -1 ? "b" : "";
+    notesToDisplay.push({
+      noteKey: String(b.midiNumber),
+      label: `Bass: ${b.spelling.step}${alterStr}${b.octave}`,
+      role: "bass",
+      pitch: b,
+    });
+  }
+
+  for (const p of realization.pitches) {
+    const alterStr = p.spelling.alter === 1 ? "#" : p.spelling.alter === -1 ? "b" : "";
+    notesToDisplay.push({
+      noteKey: String(p.midiNumber),
+      label: `${p.spelling.step}${alterStr}${p.octave}`,
+      role: "upper",
+      pitch: p,
+    });
+  }
 
   return (
     <section
@@ -182,21 +285,55 @@ export function PianoPerformanceInspector({
             ))}
           </select>
         </div>
-        <div className="subgroup">
-          <label htmlFor="bass-octave-select">Bass Octave</label>
-          <select
-            id="bass-octave-select"
-            value={String(perf.bass.octaveOffset)}
-            onChange={handleBassOctaveChange}
-            aria-label="Bass Octave"
-          >
-            {BASS_OCTAVES.map((opt) => (
-              <option key={String(opt.value)} value={String(opt.value)}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+
+        {perf.bass.choice === "custom" ? (
+          <div className="custom-bass-editor" aria-label="Custom Bass Note Editor">
+            <label htmlFor="custom-bass-midi-input">
+              Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
+            </label>
+            <input
+              id="custom-bass-midi-input"
+              type="number"
+              min={PIANO_RANGE_MIN_MIDI}
+              max={PIANO_RANGE_MAX_MIDI}
+              value={perf.bass.customPitch?.midiNumber ?? 36}
+              onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
+              aria-label="Custom Bass MIDI Number"
+            />
+            {perf.bass.customPitch && (
+              <span className="custom-bass-readout">
+                Pitch: {perf.bass.customPitch.spelling.step}
+                {perf.bass.customPitch.spelling.alter === 1
+                  ? "#"
+                  : perf.bass.customPitch.spelling.alter === -1
+                    ? "b"
+                    : ""}
+                {perf.bass.customPitch.octave}
+              </span>
+            )}
+            {customBassError && (
+              <p className="error-text" role="alert">
+                {customBassError}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="subgroup">
+            <label htmlFor="bass-octave-select">Bass Octave</label>
+            <select
+              id="bass-octave-select"
+              value={String(perf.bass.octaveOffset)}
+              onChange={handleBassOctaveChange}
+              aria-label="Bass Octave"
+            >
+              {BASS_OCTAVES.map((opt) => (
+                <option key={String(opt.value)} value={String(opt.value)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Articulation Control */}
@@ -299,11 +436,11 @@ export function PianoPerformanceInspector({
           </select>
         </div>
 
-        {/* Per-note Overrides summary */}
+        {/* Per-note Overrides summary & Clear */}
         <div className="per-note-overrides-summary">
           <span>
             {overrideCount === 0
-              ? "No note velocity overrides (notes follow Master Velocity)"
+              ? "All notes inheriting Master Velocity"
               : `${overrideCount} note velocity override${overrideCount > 1 ? "s" : ""} active`}
           </span>
           {overrideCount > 0 && (
@@ -316,6 +453,70 @@ export function PianoPerformanceInspector({
               Clear Overrides (Balanced)
             </button>
           )}
+        </div>
+
+        {/* Per-Note Velocity Editor */}
+        <div className="per-note-velocity-editor" aria-label="Per-note velocity editor">
+          <h5>Per-Note Velocity Overrides</h5>
+          <div className="per-note-list">
+            {notesToDisplay.map((note) => {
+              const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
+              const currentVel = isOverridden
+                ? perf.perNoteVelocityOverrides[note.noteKey]!
+                : perf.masterVelocity;
+
+              return (
+                <div key={note.noteKey} className="per-note-velocity-row">
+                  <div className="note-info">
+                    <span className="note-label">{note.label}</span>
+                    <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
+                    <span className={`note-role-badge role-${note.role}`}>
+                      {note.role === "bass" ? "Independent Bass" : "Upper"}
+                    </span>
+                  </div>
+                  <div className="note-velocity-controls">
+                    {isOverridden ? (
+                      <div className="override-active-controls">
+                        <span className="status-badge override">Override: {currentVel}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={127}
+                          value={currentVel}
+                          onChange={(e) =>
+                            handleSetNoteOverride(note.noteKey, Number(e.target.value))
+                          }
+                          aria-label={`Velocity override for ${note.label}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleResetNoteToInherit(note.noteKey)}
+                          className="reset-inherit-btn"
+                          aria-label={`Reset ${note.label} to inherit master velocity`}
+                        >
+                          Reset to Inherit
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="inherit-active-controls">
+                        <span className="status-badge inherit">
+                          Inherits Master ({perf.masterVelocity})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSetNoteOverride(note.noteKey, perf.masterVelocity)}
+                          className="set-override-btn"
+                          aria-label={`Override velocity for ${note.label}`}
+                        >
+                          Override...
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

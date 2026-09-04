@@ -75,6 +75,7 @@ export interface InstrumentRealizationInput {
   readonly chord: ChordDefinition;
   readonly performance: StepPerformance;
   readonly previousPitches?: readonly ExactPitch[];
+  readonly previousBassPitch?: ExactPitch;
   readonly nextPitches?: readonly ExactPitch[];
 }
 
