@@ -4,6 +4,13 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
   test("loads real Salamander manifest and decodes velocity-sensitive Ogg samples in real Chromium WebAudio", async ({
     page,
   }) => {
+    // Enable audio diagnostics in test environment
+    await page.addInitScript(() => {
+      (
+        window as unknown as { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
+      ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
+    });
+
     await page.goto("/");
 
     // Execute real browser WebAudio playback test using actual prepared Salamander assets
@@ -34,6 +41,10 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
       const readyStatus = provider.state;
 
       // Schedule low, medium, and high velocity C4 notes
+      // Under authoritative Salamander V3 metadata:
+      // - velocity 30 -> Layer 2 (range 27..34)
+      // - velocity 78 -> Layer 10 (range 73..80)
+      // - velocity 110 -> Layer 14 (range 105..112)
       const clock = { now: () => audioCtx.currentTime };
       const playback = provider.schedule(
         [
@@ -41,7 +52,7 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
             pitch: 60, // C4
             startSeconds: 0.0,
             durationSeconds: 0.5,
-            velocity: 30, // Layer 4
+            velocity: 30, // Layer 2
             channelRole: "upper",
           },
           {
@@ -69,16 +80,16 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
       const cache = provider.cache;
       const cacheStats = cache ? cache.stats : null;
 
-      const hasLayer4 = cache ? cache.has("samples/C4v4.ogg") : false;
+      const hasLayer2 = cache ? cache.has("samples/C4v2.ogg") : false;
       const hasLayer10 = cache ? cache.has("samples/C4v10.ogg") : false;
       const hasLayer14 = cache ? cache.has("samples/C4v14.ogg") : false;
 
-      let layer4SampleRate = 0;
-      let layer4Duration = 0;
-      if (cache && hasLayer4) {
-        const buf = await cache.get("samples/C4v4.ogg");
-        layer4SampleRate = buf.sampleRate;
-        layer4Duration = buf.duration;
+      let layer2SampleRate = 0;
+      let layer2Duration = 0;
+      if (cache && hasLayer2) {
+        const buf = await cache.get("samples/C4v2.ogg");
+        layer2SampleRate = buf.sampleRate;
+        layer2Duration = buf.duration;
       }
 
       // Diagnostic mappings for evidence
@@ -93,11 +104,11 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
         initialStatus,
         readyStatus,
         cacheStats,
-        hasLayer4,
+        hasLayer2,
         hasLayer10,
         hasLayer14,
-        layer4SampleRate,
-        layer4Duration,
+        layer2SampleRate,
+        layer2Duration,
         lowMapping,
         medMapping,
         highMapping,
@@ -108,9 +119,9 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
     expect(result.initialStatus).toBe("idle");
     expect(result.readyStatus).toBe("ready");
 
-    // Proves distinct velocity layers for low / medium / high
-    expect(result.lowMapping.velocityLayer).toBe(4);
-    expect(result.lowMapping.assetPath).toBe("samples/C4v4.ogg");
+    // Proves distinct velocity layers for low / medium / high matching authoritative Salamander V3
+    expect(result.lowMapping.velocityLayer).toBe(2);
+    expect(result.lowMapping.assetPath).toBe("samples/C4v2.ogg");
 
     expect(result.medMapping.velocityLayer).toBe(10);
     expect(result.medMapping.assetPath).toBe("samples/C4v10.ogg");
@@ -119,12 +130,12 @@ test.describe("T092/T094 — Real Browser Audio Smoke Test with Prepared Salaman
     expect(result.highMapping.assetPath).toBe("samples/C4v14.ogg");
 
     // Proves actual browser WebAudio decoding of 48kHz Ogg samples
-    expect(result.hasLayer4).toBe(true);
+    expect(result.hasLayer2).toBe(true);
     expect(result.hasLayer10).toBe(true);
     expect(result.hasLayer14).toBe(true);
 
-    expect(result.layer4SampleRate).toBe(48000);
-    expect(result.layer4Duration).toBeGreaterThan(5.0); // full acoustic decay preserved!
+    expect(result.layer2SampleRate).toBe(48000);
+    expect(result.layer2Duration).toBeGreaterThan(5.0); // full acoustic decay preserved!
 
     expect(result.cacheStats?.size).toBe(3);
     expect(result.finalStatus).toBe("idle");

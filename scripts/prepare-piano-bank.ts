@@ -56,14 +56,16 @@ export const SALAMANDER_ROOTS: readonly PianoRootDefinition[] = [
   { name: "C8", midi: 108, min: 107, max: 108, sfzName: "C8" },
 ] as const;
 
+export const PINNED_SALAMANDER_REVISION = "370497372ece1603d1ca7b9892c82c1da566565e";
+
 export const VELOCITY_RANGES: readonly { layer: number; min: number; max: number }[] = [
-  { layer: 1, min: 1, max: 8 },
-  { layer: 2, min: 9, max: 16 },
-  { layer: 3, min: 17, max: 24 },
-  { layer: 4, min: 25, max: 32 },
-  { layer: 5, min: 33, max: 40 },
-  { layer: 6, min: 41, max: 48 },
-  { layer: 7, min: 49, max: 56 },
+  { layer: 1, min: 1, max: 26 },
+  { layer: 2, min: 27, max: 34 },
+  { layer: 3, min: 35, max: 36 },
+  { layer: 4, min: 37, max: 43 },
+  { layer: 5, min: 44, max: 46 },
+  { layer: 6, min: 47, max: 50 },
+  { layer: 7, min: 51, max: 56 },
   { layer: 8, min: 57, max: 64 },
   { layer: 9, min: 65, max: 72 },
   { layer: 10, min: 73, max: 80 },
@@ -106,6 +108,13 @@ export function buildManifest(format = "ogg", sampleRate = 48000) {
     displayName: "Salamander Grand Piano V3",
     sampleFormat: format,
     sampleRate,
+    metadata: {
+      sourceRepository: "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      sourceRevision: PINNED_SALAMANDER_REVISION,
+      sourceInstrument: "Salamander Grand Piano V3",
+      sourceLicense: "CC BY 3.0 Alexander Holm",
+      encoding: "Ogg Vorbis 48kHz Stereo q=4",
+    },
     regions,
   };
 }
@@ -117,7 +126,7 @@ export async function downloadAndEncodeSample(
   format = "ogg",
 ): Promise<string> {
   const encodedName = encodeURIComponent(root.sfzName);
-  const sourceUrl = `https://raw.githubusercontent.com/sfzinstruments/SalamanderGrandPiano/master/Samples/${encodedName}v${layer}.flac`;
+  const sourceUrl = `https://raw.githubusercontent.com/sfzinstruments/SalamanderGrandPiano/${PINNED_SALAMANDER_REVISION}/Samples/${encodedName}v${layer}.flac`;
   const tempFlac = resolve(outputDir, `temp_${root.name}v${layer}.flac`);
   const finalAudio = resolve(outputDir, `${root.name}v${layer}.${format}`);
 
@@ -167,24 +176,32 @@ export async function main() {
 
   // If --fetch-demo or --all passed, download and encode actual samples
   const args = process.argv.slice(2);
-  const fetchDemo = args.includes("--demo") || args.includes("--fetch-demo") || args.length === 0;
+  const onlyTestFixtures = args.includes("--test-fixtures");
+  const fetchDemo =
+    onlyTestFixtures ||
+    args.includes("--demo") ||
+    args.includes("--fetch-demo") ||
+    args.length === 0;
 
   if (fetchDemo && hasFfmpeg) {
     console.log(
-      "Preparing real Salamander sample assets for demo and browser audio smoke tests...",
+      onlyTestFixtures
+        ? "Preparing test fixture samples (C4v2, C4v10, C4v14)..."
+        : "Preparing real Salamander sample assets for demo and browser audio smoke tests...",
     );
-    // Key notes for demo:
-    // C4: layers 4 (low), 10 (medium), 14 (high) -> proves velocity layer selection on same note
-    // Chord progression notes: C3 (bass), G3, A3, C4, Ds4, Fs4, A4, C5
-    const demoNotesToDownload: { rootName: string; layers: number[] }[] = [
-      { rootName: "C4", layers: [4, 10, 14] },
-      { rootName: "C3", layers: [4, 10, 14] },
-      { rootName: "A3", layers: [4, 10] },
-      { rootName: "Ds4", layers: [4, 10] },
-      { rootName: "Fs4", layers: [4, 10] },
-      { rootName: "A4", layers: [4, 10] },
-      { rootName: "C5", layers: [4, 10] },
-    ];
+
+    const demoNotesToDownload: { rootName: string; layers: number[] }[] = onlyTestFixtures
+      ? [{ rootName: "C4", layers: [2, 10, 14] }]
+      : [
+          // C4: layers 2 (low, vel 30), 4 (low-mid, vel 40), 10 (medium, vel 78), 14 (high, vel 110)
+          { rootName: "C4", layers: [2, 4, 10, 14] },
+          { rootName: "C3", layers: [2, 10, 14] },
+          { rootName: "A3", layers: [2, 10] },
+          { rootName: "Ds4", layers: [2, 10] },
+          { rootName: "Fs4", layers: [2, 10] },
+          { rootName: "A4", layers: [2, 10] },
+          { rootName: "C5", layers: [2, 10] },
+        ];
 
     for (const noteDef of demoNotesToDownload) {
       const root = SALAMANDER_ROOTS.find((r) => r.name === noteDef.rootName);
@@ -199,7 +216,7 @@ export async function main() {
       }
     }
 
-    console.log("Demo and smoke test audio samples prepared successfully.");
+    console.log("Audio samples prepared successfully.");
   }
 }
 

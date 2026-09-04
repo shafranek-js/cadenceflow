@@ -4,7 +4,7 @@ import {
   resolveVelocityLayer,
 } from "../../../../src/audio/hq-sample-piano/velocityLayers";
 
-describe("T091 — Salamander 16 Velocity Layers", () => {
+describe("T091 — Salamander 16 Velocity Layers (Authoritative Data/notes.txt)", () => {
   it("defines exactly 16 discrete velocity layers covering 1..127 without gaps", () => {
     expect(SALAMANDER_VELOCITY_LAYERS).toHaveLength(16);
 
@@ -21,13 +21,39 @@ describe("T091 — Salamander 16 Velocity Layers", () => {
     }
   });
 
-  it("selects distinctly different velocity layers for low, medium, and high velocities", () => {
-    const low = resolveVelocityLayer(30); // 30 is in layer 4 (25..32)
-    const medium = resolveVelocityLayer(80); // 80 is in layer 10 (73..80)
-    const high = resolveVelocityLayer(112); // 112 is in layer 14 (105..112)
+  it("tests lower and upper boundaries for all 16 Salamander V3 layers", () => {
+    const expectedBounds = [
+      { layer: 1, min: 1, max: 26 },
+      { layer: 2, min: 27, max: 34 },
+      { layer: 3, min: 35, max: 36 },
+      { layer: 4, min: 37, max: 43 },
+      { layer: 5, min: 44, max: 46 },
+      { layer: 6, min: 47, max: 50 },
+      { layer: 7, min: 51, max: 56 },
+      { layer: 8, min: 57, max: 64 },
+      { layer: 9, min: 65, max: 72 },
+      { layer: 10, min: 73, max: 80 },
+      { layer: 11, min: 81, max: 88 },
+      { layer: 12, min: 89, max: 96 },
+      { layer: 13, min: 97, max: 104 },
+      { layer: 14, min: 105, max: 112 },
+      { layer: 15, min: 113, max: 120 },
+      { layer: 16, min: 121, max: 127 },
+    ];
 
-    expect(low.layer).toBe(4);
-    expect(low.name).toBe("v4");
+    for (const bound of expectedBounds) {
+      expect(resolveVelocityLayer(bound.min).layer).toBe(bound.layer);
+      expect(resolveVelocityLayer(bound.max).layer).toBe(bound.layer);
+    }
+  });
+
+  it("selects distinctly different velocity layers for low (30 -> Layer 2), medium (78 -> Layer 10), and high (110 -> Layer 14)", () => {
+    const low = resolveVelocityLayer(30); // 30 is in layer 2 (27..34)
+    const medium = resolveVelocityLayer(78); // 78 is in layer 10 (73..80)
+    const high = resolveVelocityLayer(110); // 110 is in layer 14 (105..112)
+
+    expect(low.layer).toBe(2);
+    expect(low.name).toBe("v2");
 
     expect(medium.layer).toBe(10);
     expect(medium.name).toBe("v10");
@@ -38,6 +64,12 @@ describe("T091 — Salamander 16 Velocity Layers", () => {
     // All three are strictly different layers
     expect(low.layer).not.toBe(medium.layer);
     expect(medium.layer).not.toBe(high.layer);
+  });
+
+  it("resolves layer 4 for velocity 40 (range 37..43)", () => {
+    const layer4 = resolveVelocityLayer(40);
+    expect(layer4.layer).toBe(4);
+    expect(layer4.name).toBe("v4");
   });
 
   it("safely clamps boundary and out-of-range velocities", () => {

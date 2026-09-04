@@ -9,3 +9,6 @@ coverage/
 !.env.example
 public/audio/piano-hq/samples/*
 !public/audio/piano-hq/samples/.gitkeep
+!public/audio/piano-hq/samples/C4v2.ogg
+!public/audio/piano-hq/samples/C4v10.ogg
+!public/audio/piano-hq/samples/C4v14.ogg

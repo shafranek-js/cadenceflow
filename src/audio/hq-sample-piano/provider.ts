@@ -307,10 +307,10 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
           record.nodes.splice(idx, 1);
         }
       };
-    } catch {
-      // Missing or unmappable note
-      // Expose fallback state if assets cannot be loaded
+    } catch (err) {
+      // Expose observable fallback state when assets cannot be fetched or decoded
       this.providerState = "fallback";
+      throw err;
     }
   }
 

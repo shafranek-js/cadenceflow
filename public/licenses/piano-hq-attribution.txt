@@ -5,8 +5,10 @@ Instrument / Sample Bank: Salamander Grand Piano V3
 Original Recording Author: Alexander Holm
 Original Recording Source: https://archive.org/details/SalamanderGrandPianoV3
 SFZ Instrument Reference: https://github.com/sfzinstruments/SalamanderGrandPiano
+Pinned Upstream Revision: 370497372ece1603d1ca7b9892c82c1da566565e
 License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
 License URL: https://creativecommons.org/licenses/by/3.0/
+Committed Test Fixtures: public/audio/piano-hq/samples/C4v2.ogg, C4v10.ogg, C4v14.ogg
 ================================================================================
 
 ATTRIBUTION SUMMARY

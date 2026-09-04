@@ -11,13 +11,13 @@ export interface VelocityLayerDefinition {
 }
 
 export const SALAMANDER_VELOCITY_LAYERS: readonly VelocityLayerDefinition[] = [
-  { layer: 1, name: "v1", velocityMin: 1, velocityMax: 8 },
-  { layer: 2, name: "v2", velocityMin: 9, velocityMax: 16 },
-  { layer: 3, name: "v3", velocityMin: 17, velocityMax: 24 },
-  { layer: 4, name: "v4", velocityMin: 25, velocityMax: 32 },
-  { layer: 5, name: "v5", velocityMin: 33, velocityMax: 40 },
-  { layer: 6, name: "v6", velocityMin: 41, velocityMax: 48 },
-  { layer: 7, name: "v7", velocityMin: 49, velocityMax: 56 },
+  { layer: 1, name: "v1", velocityMin: 1, velocityMax: 26 },
+  { layer: 2, name: "v2", velocityMin: 27, velocityMax: 34 },
+  { layer: 3, name: "v3", velocityMin: 35, velocityMax: 36 },
+  { layer: 4, name: "v4", velocityMin: 37, velocityMax: 43 },
+  { layer: 5, name: "v5", velocityMin: 44, velocityMax: 46 },
+  { layer: 6, name: "v6", velocityMin: 47, velocityMax: 50 },
+  { layer: 7, name: "v7", velocityMin: 51, velocityMax: 56 },
   { layer: 8, name: "v8", velocityMin: 57, velocityMax: 64 },
   { layer: 9, name: "v9", velocityMin: 65, velocityMax: 72 },
   { layer: 10, name: "v10", velocityMin: 73, velocityMax: 80 },

@@ -4,6 +4,13 @@
   "displayName": "Salamander Grand Piano V3",
   "sampleFormat": "ogg",
   "sampleRate": 48000,
+  "metadata": {
+    "sourceRepository": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+    "sourceRevision": "370497372ece1603d1ca7b9892c82c1da566565e",
+    "sourceInstrument": "Salamander Grand Piano V3",
+    "sourceLicense": "CC BY 3.0 Alexander Holm",
+    "encoding": "Ogg Vorbis 48kHz Stereo q=4"
+  },
   "regions": [
     {
       "id": "A0v1",
@@ -14,7 +21,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A0v1.ogg"
@@ -27,8 +34,8 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A0v2.ogg"
@@ -41,8 +48,8 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A0v3.ogg"
@@ -55,8 +62,8 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A0v4.ogg"
@@ -69,8 +76,8 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A0v5.ogg"
@@ -83,8 +90,8 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A0v6.ogg"
@@ -97,7 +104,7 @@
         "max": 22
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -238,7 +245,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C1v1.ogg"
@@ -251,8 +258,8 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C1v2.ogg"
@@ -265,8 +272,8 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C1v3.ogg"
@@ -279,8 +286,8 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C1v4.ogg"
@@ -293,8 +300,8 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C1v5.ogg"
@@ -307,8 +314,8 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C1v6.ogg"
@@ -321,7 +328,7 @@
         "max": 25
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -462,7 +469,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds1v1.ogg"
@@ -475,8 +482,8 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds1v2.ogg"
@@ -489,8 +496,8 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds1v3.ogg"
@@ -503,8 +510,8 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds1v4.ogg"
@@ -517,8 +524,8 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds1v5.ogg"
@@ -531,8 +538,8 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds1v6.ogg"
@@ -545,7 +552,7 @@
         "max": 28
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -686,7 +693,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs1v1.ogg"
@@ -699,8 +706,8 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs1v2.ogg"
@@ -713,8 +720,8 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs1v3.ogg"
@@ -727,8 +734,8 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs1v4.ogg"
@@ -741,8 +748,8 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs1v5.ogg"
@@ -755,8 +762,8 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs1v6.ogg"
@@ -769,7 +776,7 @@
         "max": 31
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -910,7 +917,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A1v1.ogg"
@@ -923,8 +930,8 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A1v2.ogg"
@@ -937,8 +944,8 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A1v3.ogg"
@@ -951,8 +958,8 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A1v4.ogg"
@@ -965,8 +972,8 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A1v5.ogg"
@@ -979,8 +986,8 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A1v6.ogg"
@@ -993,7 +1000,7 @@
         "max": 34
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -1134,7 +1141,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C2v1.ogg"
@@ -1147,8 +1154,8 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C2v2.ogg"
@@ -1161,8 +1168,8 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C2v3.ogg"
@@ -1175,8 +1182,8 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C2v4.ogg"
@@ -1189,8 +1196,8 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C2v5.ogg"
@@ -1203,8 +1210,8 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C2v6.ogg"
@@ -1217,7 +1224,7 @@
         "max": 37
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -1358,7 +1365,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds2v1.ogg"
@@ -1371,8 +1378,8 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds2v2.ogg"
@@ -1385,8 +1392,8 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds2v3.ogg"
@@ -1399,8 +1406,8 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds2v4.ogg"
@@ -1413,8 +1420,8 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds2v5.ogg"
@@ -1427,8 +1434,8 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds2v6.ogg"
@@ -1441,7 +1448,7 @@
         "max": 40
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -1582,7 +1589,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs2v1.ogg"
@@ -1595,8 +1602,8 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs2v2.ogg"
@@ -1609,8 +1616,8 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs2v3.ogg"
@@ -1623,8 +1630,8 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs2v4.ogg"
@@ -1637,8 +1644,8 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs2v5.ogg"
@@ -1651,8 +1658,8 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs2v6.ogg"
@@ -1665,7 +1672,7 @@
         "max": 43
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -1806,7 +1813,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A2v1.ogg"
@@ -1819,8 +1826,8 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A2v2.ogg"
@@ -1833,8 +1840,8 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A2v3.ogg"
@@ -1847,8 +1854,8 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A2v4.ogg"
@@ -1861,8 +1868,8 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A2v5.ogg"
@@ -1875,8 +1882,8 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A2v6.ogg"
@@ -1889,7 +1896,7 @@
         "max": 46
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -2030,7 +2037,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C3v1.ogg"
@@ -2043,8 +2050,8 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C3v2.ogg"
@@ -2057,8 +2064,8 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C3v3.ogg"
@@ -2071,8 +2078,8 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C3v4.ogg"
@@ -2085,8 +2092,8 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C3v5.ogg"
@@ -2099,8 +2106,8 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C3v6.ogg"
@@ -2113,7 +2120,7 @@
         "max": 49
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -2254,7 +2261,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds3v1.ogg"
@@ -2267,8 +2274,8 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds3v2.ogg"
@@ -2281,8 +2288,8 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds3v3.ogg"
@@ -2295,8 +2302,8 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds3v4.ogg"
@@ -2309,8 +2316,8 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds3v5.ogg"
@@ -2323,8 +2330,8 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds3v6.ogg"
@@ -2337,7 +2344,7 @@
         "max": 52
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -2478,7 +2485,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs3v1.ogg"
@@ -2491,8 +2498,8 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs3v2.ogg"
@@ -2505,8 +2512,8 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs3v3.ogg"
@@ -2519,8 +2526,8 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs3v4.ogg"
@@ -2533,8 +2540,8 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs3v5.ogg"
@@ -2547,8 +2554,8 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs3v6.ogg"
@@ -2561,7 +2568,7 @@
         "max": 55
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -2702,7 +2709,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A3v1.ogg"
@@ -2715,8 +2722,8 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A3v2.ogg"
@@ -2729,8 +2736,8 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A3v3.ogg"
@@ -2743,8 +2750,8 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A3v4.ogg"
@@ -2757,8 +2764,8 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A3v5.ogg"
@@ -2771,8 +2778,8 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A3v6.ogg"
@@ -2785,7 +2792,7 @@
         "max": 58
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -2926,7 +2933,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C4v1.ogg"
@@ -2939,8 +2946,8 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C4v2.ogg"
@@ -2953,8 +2960,8 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C4v3.ogg"
@@ -2967,8 +2974,8 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C4v4.ogg"
@@ -2981,8 +2988,8 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C4v5.ogg"
@@ -2995,8 +3002,8 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C4v6.ogg"
@@ -3009,7 +3016,7 @@
         "max": 61
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -3150,7 +3157,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds4v1.ogg"
@@ -3163,8 +3170,8 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds4v2.ogg"
@@ -3177,8 +3184,8 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds4v3.ogg"
@@ -3191,8 +3198,8 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds4v4.ogg"
@@ -3205,8 +3212,8 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds4v5.ogg"
@@ -3219,8 +3226,8 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds4v6.ogg"
@@ -3233,7 +3240,7 @@
         "max": 64
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -3374,7 +3381,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs4v1.ogg"
@@ -3387,8 +3394,8 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs4v2.ogg"
@@ -3401,8 +3408,8 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs4v3.ogg"
@@ -3415,8 +3422,8 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs4v4.ogg"
@@ -3429,8 +3436,8 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs4v5.ogg"
@@ -3443,8 +3450,8 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs4v6.ogg"
@@ -3457,7 +3464,7 @@
         "max": 67
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -3598,7 +3605,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A4v1.ogg"
@@ -3611,8 +3618,8 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A4v2.ogg"
@@ -3625,8 +3632,8 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A4v3.ogg"
@@ -3639,8 +3646,8 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A4v4.ogg"
@@ -3653,8 +3660,8 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A4v5.ogg"
@@ -3667,8 +3674,8 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A4v6.ogg"
@@ -3681,7 +3688,7 @@
         "max": 70
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -3822,7 +3829,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C5v1.ogg"
@@ -3835,8 +3842,8 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C5v2.ogg"
@@ -3849,8 +3856,8 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C5v3.ogg"
@@ -3863,8 +3870,8 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C5v4.ogg"
@@ -3877,8 +3884,8 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C5v5.ogg"
@@ -3891,8 +3898,8 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C5v6.ogg"
@@ -3905,7 +3912,7 @@
         "max": 73
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -4046,7 +4053,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds5v1.ogg"
@@ -4059,8 +4066,8 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds5v2.ogg"
@@ -4073,8 +4080,8 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds5v3.ogg"
@@ -4087,8 +4094,8 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds5v4.ogg"
@@ -4101,8 +4108,8 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds5v5.ogg"
@@ -4115,8 +4122,8 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds5v6.ogg"
@@ -4129,7 +4136,7 @@
         "max": 76
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -4270,7 +4277,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs5v1.ogg"
@@ -4283,8 +4290,8 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs5v2.ogg"
@@ -4297,8 +4304,8 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs5v3.ogg"
@@ -4311,8 +4318,8 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs5v4.ogg"
@@ -4325,8 +4332,8 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs5v5.ogg"
@@ -4339,8 +4346,8 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs5v6.ogg"
@@ -4353,7 +4360,7 @@
         "max": 79
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -4494,7 +4501,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A5v1.ogg"
@@ -4507,8 +4514,8 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A5v2.ogg"
@@ -4521,8 +4528,8 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A5v3.ogg"
@@ -4535,8 +4542,8 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A5v4.ogg"
@@ -4549,8 +4556,8 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A5v5.ogg"
@@ -4563,8 +4570,8 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A5v6.ogg"
@@ -4577,7 +4584,7 @@
         "max": 82
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -4718,7 +4725,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C6v1.ogg"
@@ -4731,8 +4738,8 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C6v2.ogg"
@@ -4745,8 +4752,8 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C6v3.ogg"
@@ -4759,8 +4766,8 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C6v4.ogg"
@@ -4773,8 +4780,8 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C6v5.ogg"
@@ -4787,8 +4794,8 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C6v6.ogg"
@@ -4801,7 +4808,7 @@
         "max": 85
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -4942,7 +4949,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds6v1.ogg"
@@ -4955,8 +4962,8 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds6v2.ogg"
@@ -4969,8 +4976,8 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds6v3.ogg"
@@ -4983,8 +4990,8 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds6v4.ogg"
@@ -4997,8 +5004,8 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds6v5.ogg"
@@ -5011,8 +5018,8 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds6v6.ogg"
@@ -5025,7 +5032,7 @@
         "max": 88
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -5166,7 +5173,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs6v1.ogg"
@@ -5179,8 +5186,8 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs6v2.ogg"
@@ -5193,8 +5200,8 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs6v3.ogg"
@@ -5207,8 +5214,8 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs6v4.ogg"
@@ -5221,8 +5228,8 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs6v5.ogg"
@@ -5235,8 +5242,8 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs6v6.ogg"
@@ -5249,7 +5256,7 @@
         "max": 91
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -5390,7 +5397,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A6v1.ogg"
@@ -5403,8 +5410,8 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A6v2.ogg"
@@ -5417,8 +5424,8 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A6v3.ogg"
@@ -5431,8 +5438,8 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A6v4.ogg"
@@ -5445,8 +5452,8 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A6v5.ogg"
@@ -5459,8 +5466,8 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A6v6.ogg"
@@ -5473,7 +5480,7 @@
         "max": 94
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -5614,7 +5621,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C7v1.ogg"
@@ -5627,8 +5634,8 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C7v2.ogg"
@@ -5641,8 +5648,8 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C7v3.ogg"
@@ -5655,8 +5662,8 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C7v4.ogg"
@@ -5669,8 +5676,8 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C7v5.ogg"
@@ -5683,8 +5690,8 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C7v6.ogg"
@@ -5697,7 +5704,7 @@
         "max": 97
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -5838,7 +5845,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Ds7v1.ogg"
@@ -5851,8 +5858,8 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Ds7v2.ogg"
@@ -5865,8 +5872,8 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Ds7v3.ogg"
@@ -5879,8 +5886,8 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Ds7v4.ogg"
@@ -5893,8 +5900,8 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Ds7v5.ogg"
@@ -5907,8 +5914,8 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Ds7v6.ogg"
@@ -5921,7 +5928,7 @@
         "max": 100
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -6062,7 +6069,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/Fs7v1.ogg"
@@ -6075,8 +6082,8 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/Fs7v2.ogg"
@@ -6089,8 +6096,8 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/Fs7v3.ogg"
@@ -6103,8 +6110,8 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/Fs7v4.ogg"
@@ -6117,8 +6124,8 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/Fs7v5.ogg"
@@ -6131,8 +6138,8 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/Fs7v6.ogg"
@@ -6145,7 +6152,7 @@
         "max": 103
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -6286,7 +6293,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/A7v1.ogg"
@@ -6299,8 +6306,8 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/A7v2.ogg"
@@ -6313,8 +6320,8 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/A7v3.ogg"
@@ -6327,8 +6334,8 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/A7v4.ogg"
@@ -6341,8 +6348,8 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/A7v5.ogg"
@@ -6355,8 +6362,8 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/A7v6.ogg"
@@ -6369,7 +6376,7 @@
         "max": 106
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,
@@ -6510,7 +6517,7 @@
       },
       "velocityRange": {
         "min": 1,
-        "max": 8
+        "max": 26
       },
       "velocityLayer": 1,
       "assetPath": "samples/C8v1.ogg"
@@ -6523,8 +6530,8 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 9,
-        "max": 16
+        "min": 27,
+        "max": 34
       },
       "velocityLayer": 2,
       "assetPath": "samples/C8v2.ogg"
@@ -6537,8 +6544,8 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 17,
-        "max": 24
+        "min": 35,
+        "max": 36
       },
       "velocityLayer": 3,
       "assetPath": "samples/C8v3.ogg"
@@ -6551,8 +6558,8 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 25,
-        "max": 32
+        "min": 37,
+        "max": 43
       },
       "velocityLayer": 4,
       "assetPath": "samples/C8v4.ogg"
@@ -6565,8 +6572,8 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 33,
-        "max": 40
+        "min": 44,
+        "max": 46
       },
       "velocityLayer": 5,
       "assetPath": "samples/C8v5.ogg"
@@ -6579,8 +6586,8 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 41,
-        "max": 48
+        "min": 47,
+        "max": 50
       },
       "velocityLayer": 6,
       "assetPath": "samples/C8v6.ogg"
@@ -6593,7 +6600,7 @@
         "max": 108
       },
       "velocityRange": {
-        "min": 49,
+        "min": 51,
         "max": 56
       },
       "velocityLayer": 7,

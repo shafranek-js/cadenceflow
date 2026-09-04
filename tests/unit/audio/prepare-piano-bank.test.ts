@@ -45,6 +45,10 @@ describe("T094 — Piano Bank Preparation & Attribution Pipeline", () => {
     const validated = validatePianoManifest(data);
     expect(validated.regions).toHaveLength(480);
     expect(validated.sampleFormat).toBe("ogg");
+    expect(validated.metadata?.sourceRevision).toBe("370497372ece1603d1ca7b9892c82c1da566565e");
+    expect(validated.metadata?.sourceRepository).toBe(
+      "https://github.com/sfzinstruments/SalamanderGrandPiano",
+    );
   });
 
   it("verifies public/licenses/piano-hq-attribution.txt contains all required attribution details", () => {
