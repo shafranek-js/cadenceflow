@@ -1,7 +1,7 @@
 import { EMPTY_HARMONIC_VARIANT, type BaseChordQuality, type ChordDefinition, type HarmonicVariant } from "../chord";
 import type { HarmonicFunctionCategory, HarmonicFunctionIdentity } from "../functions";
 import { normalizePitchClass, type PitchClassIdentity, type PitchSpelling } from "../pitch";
-import { defaultTonicSpelling, formatPitchSpelling, spellScaleDegree, spellingToPitchClass } from "../spelling";
+import { defaultTonicSpelling, formatPitchSpelling, spellLeadingTone, spellScaleDegree, spellingToPitchClass } from "../spelling";
 import type { HarmonicModuleDefinition } from "./types";
 
 interface DarkFunctionSpec {
@@ -96,8 +96,9 @@ function getDarkSpec(functionId: string): DarkFunctionSpec | undefined {
 export function realizeDarkHarmonyChord(functionId: string, tonic: PitchClassIdentity): ChordDefinition {
   if (functionId.startsWith("vii°7/")) {
     const target = functionId.slice("vii°7/".length);
-    const root = normalizePitchClass(targetRoot(target, tonic).pc - 1);
-    const rootSpelling = defaultTonicSpelling(root, "tonal-minor");
+    const targetInfo = targetRoot(target, tonic);
+    const rootSpelling = spellLeadingTone(targetInfo.spelling);
+    const root = spellingToPitchClass(rootSpelling);
     return { harmonicFunction: secondaryDiminishedFunction(target), rootPitchClass: root, baseQuality: "diminished", variant: DIM7, spelling: { root: rootSpelling, symbol: `${formatPitchSpelling(rootSpelling)}°7` } };
   }
   const spec = getDarkSpec(functionId);

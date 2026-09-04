@@ -46,6 +46,18 @@ export function spellScaleDegree(
   return { step, alter };
 }
 
+export function spellLeadingTone(targetSpelling: PitchSpelling): PitchSpelling {
+  const targetPc = spellingToPitchClass(targetSpelling);
+  const stepIndex = STEPS.indexOf(targetSpelling.step);
+  const step = STEPS[(stepIndex + 6) % 7]!;
+  const targetLeadingTonePc = normalizePitchClass(targetPc - 1);
+  const naturalPc = NATURAL_PC[step];
+  let alter = targetLeadingTonePc - naturalPc;
+  while (alter > 6) alter -= 12;
+  while (alter < -6) alter += 12;
+  return { step, alter };
+}
+
 export function formatPitchSpelling(value: PitchSpelling): string {
   if (value.alter === 0) return value.step;
   const sign = value.alter > 0 ? "#" : "b";
