@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CadenceFlow — Advanced Customizable Harmonic Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    body.theme-dark {
+      --bg-main: #090d16;
+      --bg-header: #0f172a;
+      --bg-cutout: linear-gradient(180deg, #1e2530 0%, #11151c 100%);
+      --border-main: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --arrow-passive: #334155;
+      --slider-rail: #020617;
+      --piano-white: #f8fafc;
+      --piano-white-border: #334155;
+      --modal-bg: #111827;
+    }
+
+    body.theme-light {
+      --bg-main: #f1f5f9;
+      --bg-header: #ffffff;
+      --bg-cutout: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+      --border-main: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --arrow-passive: #cbd5e1;
+      --slider-rail: #cbd5e1;
+      --piano-white: #ffffff;
+      --piano-white-border: #94a3b8;
+      --modal-bg: #ffffff;
+    }
+
+    .bg-main { background-color: var(--bg-main); }
+    .bg-header { background-color: var(--bg-header); }
+    .border-main { border-color: var(--border-main); }
+    .text-main { color: var(--text-main); }
+    .text-muted { color: var(--text-muted); }
+
+    .cutout {
+      background: var(--bg-cutout);
+      border: 1px solid var(--border-main);
+      position: relative;
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s, box-shadow 0.2s;
+    }
+    .cutout:hover {
+      border-color: #38bdf8 !important;
+      transform: translateY(-2px);
+    }
+
+    .cutout.playing-step {
+      border-color: #38bdf8 !important;
+      background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%) !important;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.7) !important;
+      transform: scale(1.05) translateY(-3px) !important;
+      z-index: 40 !important;
+    }
+    .cutout.playing-step * { color: #ffffff !important; }
+
+    .cutout.trail-step {
+      border-color: #0284c7 !important;
+      box-shadow: 0 0 10px rgba(2, 132, 199, 0.35) !important;
+    }
+
+    @keyframes pulse-gold {
+      0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); border-color: #f59e0b; }
+      50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.85); border-color: #fbbf24; }
+    }
+    .cutout.rec-best {
+      animation: pulse-gold 1.4s infinite ease-in-out;
+      border-width: 2px !important;
+      z-index: 25;
+    }
+    @keyframes pulse-cyan {
+      0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.3); border-color: #38bdf8; }
+      50% { box-shadow: 0 0 16px rgba(56, 189, 248, 0.7); border-color: #7dd3fc; }
+    }
+    .cutout.rec-alt {
+      animation: pulse-cyan 1.6s infinite ease-in-out;
+      border-width: 1.5px !important;
+      z-index: 20;
+    }
+
+    @keyframes dashflow {
+      from { stroke-dashoffset: 28; }
+      to { stroke-dashoffset: 0; }
+    }
+    .flow-arrow-live {
+      stroke: #38bdf8 !important;
+      stroke-width: 3.5 !important;
+      stroke-dasharray: 6 3;
+      animation: dashflow 0.5s linear infinite;
+      filter: drop-shadow(0 0 8px #38bdf8);
+    }
+    .flow-arrow-best {
+      stroke: #f59e0b !important;
+      stroke-width: 3 !important;
+      stroke-dasharray: 6 3;
+      animation: dashflow 0.6s linear infinite;
+      filter: drop-shadow(0 0 8px #f59e0b);
+    }
+    .flow-arrow-alt {
+      stroke: #38bdf8 !important;
+      stroke-width: 2 !important;
+      stroke-dasharray: 5 3;
+      animation: dashflow 0.9s linear infinite;
+      filter: drop-shadow(0 0 6px #38bdf8);
+    }
+
+    .piano-key-white {
+      flex: 1;
+      height: 90px;
+      background: var(--piano-white);
+      border: 1px solid var(--piano-white-border);
+      border-radius: 0 0 4px 4px;
+      position: relative;
+    }
+    .piano-key-black {
+      width: 60%;
+      height: 55px;
+      background: #0f172a;
+      position: absolute;
+      left: 70%;
+      top: 0;
+      z-index: 20;
+      border-radius: 0 0 3px 3px;
+      border: 1px solid #000;
+    }
+    .key-chord {
+      background: #38bdf8 !important;
+      box-shadow: 0 0 12px #38bdf8;
+    }
+  </style>
+</head>
+<body class="theme-dark bg-main text-main h-full flex flex-col overflow-hidden">
+
+  <!-- ШАПКА СТУДИИ -->
+  <header class="h-14 bg-header border-b border-main px-6 flex items-center justify-between shrink-0 shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center font-black text-slate-950 text-sm shadow-md shadow-sky-500/20">
+        CF
+      </div>
+      <div>
+        <h1 class="text-sm font-extrabold tracking-wider flex items-center gap-2">
+          CADENCEFLOW <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono">CHORD ENGINE v2.0</span>
+        </h1>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-6 text-xs">
+      <div class="flex items-center gap-2">
+        <span class="text-muted">Тональность:</span>
+        <span id="headerKeyBadge" class="font-bold text-sky-500 bg-slate-500/10 px-2.5 py-1 rounded border border-main font-mono text-sm">C Major</span>
+      </div>
+
+      <div class="flex items-center gap-4 text-xs font-semibold">
+        <span class="flex items-center gap-1.5 text-amber-400">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> ★ Best Match
+        </span>
+        <span class="flex items-center gap-1.5 text-sky-400">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Альтернативы
+        </span>
+      </div>
+
+      <button id="themeToggleBtn" onclick="toggleTheme()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-main bg-slate-500/10 hover:bg-slate-500/20 transition text-main font-medium">
+        <span id="themeIcon">☀️</span>
+        <span id="themeLabel">Light</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- СТОЛ -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- СЛАЙДЕР СЛЕВА -->
+    <aside class="w-24 bg-header border-r border-main flex flex-col items-center py-4 px-2 shrink-0">
+      <span class="text-[9px] uppercase tracking-widest font-black text-muted mb-3">Set The Key</span>
+      <div class="relative flex-1 w-full flex justify-center py-2">
+        <div class="w-2 h-full rounded-full relative flex flex-col justify-between py-1 border border-main" style="background-color: var(--slider-rail)">
+          <div id="sliderKnob" class="w-7 h-7 rounded-full absolute -left-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing z-30"
+               style="background: radial-gradient(circle at 35% 35%, #ffffff, #94a3b8 60%, #475569); box-shadow: 0 3px 8px rgba(0,0,0,0.4);"></div>
+        </div>
+        <div id="keyLabels" class="absolute left-8 h-full flex flex-col-reverse justify-between text-xs font-bold text-muted cursor-pointer"></div>
+      </div>
+    </aside>
+
+    <!-- ЦЕНТРАЛЬНАЯ МАТРИЦА -->
+    <main class="flex-1 flex flex-col p-6 overflow-y-auto relative" id="matrixStage">
+      
+      <svg id="arrowOverlay" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+        <defs>
+          <marker id="arr-head-best" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#f59e0b"/>
+          </marker>
+          <marker id="arr-head-alt" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#38bdf8"/>
+          </marker>
+          <marker id="arr-head-live" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#38bdf8"/>
+          </marker>
+          <marker id="arr-head-passive" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="var(--arrow-passive)"/>
+          </marker>
+        </defs>
+      </svg>
+
+      <div class="w-full flex-1 flex flex-col justify-between max-w-7xl mx-auto gap-4 relative z-20">
+
+        <!-- ВЕРХНИЙ РЯД: ПОБОЧНЫЕ ДОМИНАНТЫ -->
+        <div class="border border-dashed border-amber-500/40 bg-amber-500/5 rounded-2xl p-4 relative">
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-2 text-xs text-amber-500 font-bold uppercase tracking-wider">
+              <span>▲</span> Secondary Dominants
+            </div>
+            <span class="text-[11px] text-muted font-mono">DOWN: Resolves directly to target</span>
+          </div>
+
+          <div class="grid grid-cols-7 gap-4">
+            <div id="slot-sec-V"   class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-sec-vi"  class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-sec-IV"  class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-sec-ii"  class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-sec-V5"  class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-sec-iii" class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div class="h-20 rounded-xl border border-main border-dashed flex items-center justify-center text-muted text-xs font-mono">—</div>
+          </div>
+        </div>
+
+        <!-- ЦЕНТРАЛЬНЫЙ РЯД: ОСНОВНЫЕ АККОРДЫ -->
+        <div class="border-2 border-sky-500/50 bg-sky-500/5 rounded-2xl p-4 relative shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-black text-sky-500 bg-sky-500/10 px-2.5 py-1 rounded border border-sky-500/30 tracking-wider">
+                START HERE ➔
+              </span>
+              <span class="text-xs font-bold uppercase tracking-wider">Main Chords (Diatonic Core)</span>
+            </div>
+            <span class="text-[11px] text-muted font-mono" id="recommenderTip">Кликните любой аккорд или ⚙ для настройки параметров звучания</span>
+          </div>
+
+          <div class="grid grid-cols-7 gap-4">
+            <div id="slot-main-I"   class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer border-sky-400/50"></div>
+            <div id="slot-main-vi"  class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-main-IV"  class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-main-ii"  class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-main-V"   class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer border-amber-400/50"></div>
+            <div id="slot-main-iii" class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-main-vii" class="cutout h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer"></div>
+          </div>
+        </div>
+
+        <!-- НИЖНИЙ РЯД: МОДАЛЬНЫЕ ЗАИМСТВОВАНИЯ -->
+        <div class="border border-dashed border-emerald-500/40 bg-emerald-500/5 rounded-2xl p-4 relative">
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-2 text-xs text-emerald-500 font-bold uppercase tracking-wider">
+              <span>▼</span> Modal Interchange (Borrowed Colors)
+            </div>
+            <span class="text-[11px] text-muted font-mono">UP: Modal resolutions</span>
+          </div>
+
+          <div class="grid grid-cols-7 gap-4">
+            <div class="h-20 rounded-xl border border-main border-dashed flex items-center justify-center text-muted text-xs font-mono">—</div>
+            <div id="slot-mod-bIII" class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-mod-bVI"  class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-mod-iv"   class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div id="slot-mod-bVII" class="cutout h-20 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer"></div>
+            <div class="col-span-2 rounded-xl bg-slate-500/10 border border-main p-3 flex items-center justify-center text-xs text-muted italic">
+              Цветовые замены из параллельного минора
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- НИЖНЯЯ ПАНЕЛЬ: КЛАВИАТУРА + ДВУХВКЛАДОЧНЫЙ ЦЕНТР -->
+  <footer class="bg-header border-t border-main p-4 shrink-0 flex flex-col lg:flex-row items-center gap-6">
+    <div class="w-full lg:w-80 flex flex-col shrink-0">
+      <div class="flex justify-between text-xs mb-1.5 text-muted">
+        <span>Инспектор клавиш: <b id="pianoChordLabel" class="text-sky-500">—</b></span>
+      </div>
+      <div id="pianoRoll" class="flex h-20 bg-slate-500/10 p-1.5 rounded-lg border border-main relative"></div>
+    </div>
+
+    <div class="flex-1 w-full bg-slate-500/5 p-3 rounded-xl border border-main flex flex-col justify-between min-h-[96px]">
+      
+      <div class="flex justify-between items-center mb-2">
+        <div class="flex items-center gap-2">
+          <button id="tabBtnPresets" onclick="switchConsoleTab('presets')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-sky-500/20 text-sky-400 border border-sky-400/40">
+            Готовые рецепты (Presets)
+          </button>
+          <button id="tabBtnCustom" onclick="switchConsoleTab('custom')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-muted hover:text-white border border-transparent">
+            Моя собранная цепочка <span id="customCountBadge" class="font-mono text-[11px]">(0)</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="btnLoopToggle" onclick="toggleLoop()" class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition font-mono text-[11px]">
+            <span>🔁</span>
+            <span id="loopStatusText">Loop: OFF</span>
+          </button>
+          <button onclick="stopPlayback()" class="text-[11px] text-slate-400 hover:text-rose-400 px-2.5 py-0.5 rounded border border-transparent hover:border-rose-400/40 transition">
+            ⏹ Стоп
+          </button>
+        </div>
+      </div>
+
+      <!-- ВКЛАДКА 1: ГОТОВЫЕ РЕЦЕПТЫ -->
+      <div id="tabContentPresets" class="grid grid-cols-2 gap-2 text-xs font-mono">
+        <button onclick="playPresetRecipe('rec-1')" id="btn-rec-1" class="recipe-btn p-1.5 rounded bg-slate-500/10 hover:bg-slate-500/20 text-left transition border border-transparent">
+          <div class="flex justify-between items-center">
+            <span id="rec-1-text" class="text-sky-500 font-bold">Am — F — G — C</span>
+            <span class="text-[10px] text-muted">Main chords</span>
+          </div>
+        </button>
+        <button onclick="playPresetRecipe('rec-2')" id="btn-rec-2" class="recipe-btn p-1.5 rounded bg-slate-500/10 hover:bg-slate-500/20 text-left transition border border-transparent">
+          <div class="flex justify-between items-center">
+            <span id="rec-2-text" class="text-sky-500 font-bold">C — [ C7 ] — F — G</span>
+            <span class="text-[10px] text-amber-500">+ Sec. dom</span>
+          </div>
+        </button>
+        <button onclick="playPresetRecipe('rec-3')" id="btn-rec-3" class="recipe-btn p-1.5 rounded bg-slate-500/10 hover:bg-slate-500/20 text-left transition border border-transparent">
+          <div class="flex justify-between items-center">
+            <span id="rec-3-text" class="text-sky-500 font-bold">F — G — [ Bb ] — C</span>
+            <span class="text-[10px] text-emerald-500">+ Modal int.</span>
+          </div>
+        </button>
+        <button onclick="playPresetRecipe('rec-4')" id="btn-rec-4" class="recipe-btn p-1.5 rounded bg-slate-500/10 hover:bg-slate-500/20 text-left transition border border-transparent">
+          <div class="flex justify-between items-center">
+            <span id="rec-4-text" class="text-sky-500 font-bold">C — [ C7 ] — [ Fm ] — [ Ab ]</span>
+            <span class="text-[10px] text-indigo-400">+ Combined</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- ВКЛАДКА 2: МОЯ СОБРАННАЯ ЦЕПОЧКА -->
+      <div id="tabContentCustom" class="hidden flex items-center justify-between gap-3">
+        <div id="progressionTimeline" class="flex-1 flex gap-2 overflow-x-auto items-center py-1">
+          <span class="text-xs text-muted italic">Кликайте аккорды на матрице выше — они автоматически добавляются сюда.</span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="playCustomProgressionAnimated()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1 shadow-sm">
+            ▶ Воспроизвести путь
+          </button>
+          <button onclick="clearCustomProgression()" class="bg-slate-500/20 hover:bg-slate-500/30 text-muted px-2 py-1 rounded text-xs transition">
+            Очистить
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- МОДАЛЬНЫЙ ИНСПЕКТОР НАСТРОЕК АККОРДА (OBJECT CONFIG MODAL) -->
+  <div id="chordSettingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="w-full max-w-md rounded-2xl border border-main p-6 shadow-2xl relative" style="background-color: var(--modal-bg)">
+      
+      <div class="flex justify-between items-center pb-3 border-b border-main mb-4">
+        <div>
+          <h3 class="font-bold text-base flex items-center gap-2">
+            <span>⚙ Настройка аккорда:</span>
+            <span id="modalChordTitle" class="text-sky-500 font-mono font-black">C</span>
+          </h3>
+          <p class="text-xs text-muted" id="modalChordSubtitle">Ступень I (Diatonic Core)</p>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-muted hover:text-main text-xl font-bold p-1 leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <!-- Режим воспроизведения -->
+        <div>
+          <label class="block font-bold mb-1 text-muted uppercase tracking-wider text-[10px]">Фактура игры (Playback Style)</label>
+          <div class="grid grid-cols-4 gap-1.5 font-semibold" id="settingPlayback">
+            <button data-val="block" class="p-2 rounded border border-main text-center hover:border-sky-500">Block</button>
+            <button data-val="arp_up" class="p-2 rounded border border-main text-center hover:border-sky-500">Arp ↑</button>
+            <button data-val="arp_down" class="p-2 rounded border border-main text-center hover:border-sky-500">Arp ↓</button>
+            <button data-val="strum" class="p-2 rounded border border-main text-center hover:border-sky-500">Strum</button>
+          </div>
+        </div>
+
+        <!-- Длительность -->
+        <div>
+          <label class="block font-bold mb-1 text-muted uppercase tracking-wider text-[10px]">Метрическая длительность (Duration)</label>
+          <div class="grid grid-cols-4 gap-1.5 font-semibold" id="settingDuration">
+            <button data-val="1/1" class="p-2 rounded border border-main text-center hover:border-sky-500">1/1 (Целый)</button>
+            <button data-val="1/2" class="p-2 rounded border border-main text-center hover:border-sky-500">1/2 (2 доли)</button>
+            <button data-val="1/4" class="p-2 rounded border border-main text-center hover:border-sky-500">1/4 (Доля)</button>
+            <button data-val="3/4" class="p-2 rounded border border-main text-center hover:border-sky-500">3/4 (Вальс)</button>
+          </div>
+        </div>
+
+        <!-- Гармонические надстройки (Tensions) -->
+        <div>
+          <label class="block font-bold mb-1 text-muted uppercase tracking-wider text-[10px]">Надстройки и альтерации (Tension)</label>
+          <div class="grid grid-cols-4 gap-1.5 font-semibold" id="settingTension">
+            <button data-val="triad" class="p-2 rounded border border-main text-center hover:border-sky-500">Трезвучие</button>
+            <button data-val="7th" class="p-2 rounded border border-main text-center hover:border-sky-500">7th (Септ)</button>
+            <button data-val="9th" class="p-2 rounded border border-main text-center hover:border-sky-500">9th (Нона)</button>
+            <button data-val="sus4" class="p-2 rounded border border-main text-center hover:border-sky-500">sus4</button>
+          </div>
+        </div>
+
+        <!-- Обращения (Inversions) -->
+        <div>
+          <label class="block font-bold mb-1 text-muted uppercase tracking-wider text-[10px]">Обращение (Voicing Inversion)</label>
+          <div class="grid grid-cols-3 gap-1.5 font-semibold" id="settingInversion">
+            <button data-val="root" class="p-2 rounded border border-main text-center hover:border-sky-500">Основной вид</button>
+            <button data-val="inv1" class="p-2 rounded border border-main text-center hover:border-sky-500">1st (3 в басу)</button>
+            <button data-val="inv2" class="p-2 rounded border border-main text-center hover:border-sky-500">2nd (5 в басу)</button>
+          </div>
+        </div>
+
+        <!-- Бас / Slash -->
+        <div>
+          <label class="block font-bold mb-1 text-muted uppercase tracking-wider text-[10px]">Басовая основа (Bass Extension)</label>
+          <div class="grid grid-cols-3 gap-1.5 font-semibold" id="settingBass">
+            <button data-val="auto" class="p-2 rounded border border-main text-center hover:border-sky-500">Auto Bass</button>
+            <button data-val="sub" class="p-2 rounded border border-main text-center hover:border-sky-500">+ Deep Sub</button>
+            <button data-val="slash5" class="p-2 rounded border border-main text-center hover:border-sky-500">Slash /5</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mt-6 pt-4 border-t border-main">
+        <button onclick="previewConfiguredChord()" class="text-sky-500 font-bold hover:underline flex items-center gap-1">
+          ▶ Тест звучания
+        </button>
+        <button onclick="saveAndCloseModal()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 py-1.5 rounded-lg transition shadow-md shadow-sky-500/20">
+          Применить
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ТЕМА
+    let currentTheme = 'theme-dark';
+    function toggleTheme() {
+      const b = document.body;
+      const icon = document.getElementById('themeIcon');
+      const label = document.getElementById('themeLabel');
+      if (currentTheme === 'theme-dark') {
+        b.classList.remove('theme-dark');
+        b.classList.add('theme-light');
+        currentTheme = 'theme-light';
+        icon.innerText = '🌙';
+        label.innerText = 'Dark';
+      } else {
+        b.classList.remove('theme-light');
+        b.classList.add('theme-dark');
+        currentTheme = 'theme-dark';
+        icon.innerText = '☀️';
+        label.innerText = 'Light';
+      }
+      setTimeout(renderArrows, 30);
+    }
+
+    // РАСШИРЕННЫЙ АУДИОДВИЖОК С АРПЕДЖИО И СТРАМОМ
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      },
+      midiToFreq(midi) {
+        return 440 * Math.pow(2, (midi - 69) / 12);
+      },
+      playVoice(midi, startTime, duration = 1.0, isBass = false) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = isBass ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(this.midiToFreq(midi), startTime);
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(isBass ? 0.25 : 0.16, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      },
+      playConfiguredChord(notes, config, durationSec = 1.0) {
+        this.init();
+        const now = this.ctx.currentTime;
+        const style = config.playback || 'block';
+
+        let voiceList = [...notes];
+
+        // Обращения (Inversions)
+        if (config.inversion === 'inv1' && voiceList.length > 1) {
+          const first = voiceList.shift();
+          voiceList.push(first + 12);
+        } else if (config.inversion === 'inv2' && voiceList.length > 2) {
+          const f1 = voiceList.shift();
+          const f2 = voiceList.shift();
+          voiceList.push(f1 + 12);
+          voiceList.push(f2 + 12);
+        }
+
+        // Добавочный бас
+        if (config.bass === 'sub') {
+          this.playVoice(notes[0] - 12, now, durationSec, true);
+        } else if (config.bass === 'slash5' && notes.length > 2) {
+          this.playVoice(notes[2] - 12, now, durationSec, true);
+        }
+
+        // Рендеринг фактуры
+        if (style === 'block') {
+          voiceList.forEach(m => this.playVoice(m, now, durationSec));
+        } else if (style === 'arp_up') {
+          const step = Math.min(0.12, durationSec / (voiceList.length + 1));
+          voiceList.forEach((m, i) => this.playVoice(m, now + i * step, durationSec - i * step));
+        } else if (style === 'arp_down') {
+          const reversed = [...voiceList].reverse();
+          const step = Math.min(0.12, durationSec / (reversed.length + 1));
+          reversed.forEach((m, i) => this.playVoice(m, now + i * step, durationSec - i * step));
+        } else if (style === 'strum') {
+          // Микрозадержки для живого струма (25мс)
+          voiceList.forEach((m, i) => this.playVoice(m, now + i * 0.025, durationSec));
+        }
+      }
+    };
+
+    const CHROMATIC_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    let currentKeyIndex = 0;
+    let playbackTimeouts = [];
+    let dynamicTraversalArrow = null;
+    let isLoopEnabled = false;
+    let currentPlayingContext = null;
+    let customHistory = [];
+    let activeRecommendations = [];
+
+    // ХРАНИЛИЩЕ НАСТРОЕК ДЛЯ КАЖДОГО СЛОТА КАРТОЧКИ
+    const slotConfigs = {};
+
+    function getDefaultConfig() {
+      return {
+        playback: 'block',    // 'block' | 'arp_up' | 'arp_down' | 'strum'
+        duration: '1/1',      // '1/1' | '1/2' | '1/4' | '3/4'
+        tension: 'triad',     // 'triad' | '7th' | '9th' | 'sus4'
+        inversion: 'root',    // 'root' | 'inv1' | 'inv2'
+        bass: 'auto'          // 'auto' | 'sub' | 'slash5'
+      };
+    }
+
+    let activeModalSlotId = null;
+
+    // ПРАВИЛА РЕКОМЕНДАТЕЛЯ
+    const HARMONIC_FLOW_RULES = {
+      'slot-main-I': [
+        { targetId: 'slot-main-vi', isBest: true,  reason: 'Квинтовый нисходящий шаг (vi)' },
+        { targetId: 'slot-main-IV', isBest: false, reason: 'Уход в субдоминанту (IV)' },
+        { targetId: 'slot-sec-IV',  isBest: false, reason: 'Подготовка к субдоминанте (V7/IV)' },
+        { targetId: 'slot-mod-bVI', isBest: false, reason: 'Модальный драматичный спуск (bVI)' }
+      ],
+      'slot-main-vi': [
+        { targetId: 'slot-main-ii', isBest: true,  reason: 'Сильный шаг цикла квинт (vi -> ii)' },
+        { targetId: 'slot-main-IV', isBest: false, reason: 'Мягкий поп-переход в IV' },
+        { targetId: 'slot-sec-V5',  isBest: false, reason: 'Двойная доминанта (V7/V)' }
+      ],
+      'slot-main-IV': [
+        { targetId: 'slot-main-V',   isBest: true,  reason: 'Классическое нагнетание в Доминанту (IV -> V)' },
+        { targetId: 'slot-mod-iv',   isBest: false, reason: 'Сентиментальная минорная субдоминанта (iv)' },
+        { targetId: 'slot-mod-bVII', isBest: false, reason: 'Бэкдор-каданс (bVII)' }
+      ],
+      'slot-main-ii': [
+        { targetId: 'slot-main-V',  isBest: true,  reason: 'Золотой стандарт джаза и попа: ii -> V' },
+        { targetId: 'slot-sec-V',   isBest: false, reason: 'Доминантовый септаккорд V7' }
+      ],
+      'slot-main-V': [
+        { targetId: 'slot-main-I',  isBest: true,  reason: 'Полный каданс и разрешение в Тонику (V -> I)' },
+        { targetId: 'slot-main-vi', isBest: false, reason: 'Неожиданный прерванный каданс (V -> vi)' },
+        { targetId: 'slot-mod-bVI', isBest: false, reason: 'Драматический оборот в bVI' }
+      ],
+      'slot-main-iii': [
+        { targetId: 'slot-main-vi', isBest: true,  reason: 'Квинтовый шаг в шестую ступень (iii -> vi)' },
+        { targetId: 'slot-main-IV', isBest: false, reason: 'Плавный спуск в IV' }
+      ],
+      'slot-main-vii': [
+        { targetId: 'slot-main-I',  isBest: true,  reason: 'Прямое вводное разрешение в Тонику (vii° -> I)' }
+      ],
+      'slot-sec-IV':  [{ targetId: 'slot-main-IV', isBest: true, reason: 'Прямое доминантное разрешение в IV' }],
+      'slot-sec-vi':  [{ targetId: 'slot-main-vi', isBest: true, reason: 'Прямое доминантное разрешение в vi' }],
+      'slot-sec-ii':  [{ targetId: 'slot-main-ii', isBest: true, reason: 'Прямое доминантное разрешение в ii' }],
+      'slot-sec-V5':  [{ targetId: 'slot-main-V',  isBest: true, reason: 'Разрешение двойной доминанты в V' }],
+      'slot-sec-iii': [{ targetId: 'slot-main-iii',isBest: true, reason: 'Прямое разрешение в iii' }],
+      'slot-sec-V':   [{ targetId: 'slot-main-I',  isBest: true, reason: 'Доминантовое разрешение в Тонику' }],
+      'slot-mod-iv':   [{ targetId: 'slot-main-I', isBest: true,  reason: 'Плагальный минорный каданс в I' }],
+      'slot-mod-bVI':  [{ targetId: 'slot-main-V', isBest: true,  reason: 'Полутоновый спуск в доминанту V' }],
+      'slot-mod-bVII': [{ targetId: 'slot-main-I', isBest: true,  reason: 'Рок-разрешение bVII -> I' }],
+      'slot-mod-bIII': [{ targetId: 'slot-mod-bVI',isBest: true,  reason: 'Квинтовый шаг модального минора' }]
+    };
+
+    const RECIPE_DEFINITIONS = {
+      'rec-1': [
+        { slotId: 'slot-main-vi', offset: 9, isMin: true, isDom: false },
+        { slotId: 'slot-main-IV', offset: 5, isMin: false, isDom: false },
+        { slotId: 'slot-main-V',  offset: 7, isMin: false, isDom: false },
+        { slotId: 'slot-main-I',  offset: 0, isMin: false, isDom: false }
+      ],
+      'rec-2': [
+        { slotId: 'slot-main-I',  offset: 0, isMin: false, isDom: false },
+        { slotId: 'slot-sec-IV',  offset: 0, isMin: false, isDom: true },
+        { slotId: 'slot-main-IV', offset: 5, isMin: false, isDom: false },
+        { slotId: 'slot-main-V',  offset: 7, isMin: false, isDom: false }
+      ],
+      'rec-3': [
+        { slotId: 'slot-main-IV',  offset: 5, isMin: false, isDom: false },
+        { slotId: 'slot-main-V',   offset: 7, isMin: false, isDom: false },
+        { slotId: 'slot-mod-bVII', offset: 10, isMin: false, isDom: false },
+        { slotId: 'slot-main-I',   offset: 0, isMin: false, isDom: false }
+      ],
+      'rec-4': [
+        { slotId: 'slot-main-I',  offset: 0, isMin: false, isDom: false },
+        { slotId: 'slot-sec-IV',  offset: 0, isMin: false, isDom: true },
+        { slotId: 'slot-mod-iv',  offset: 5, isMin: true, isDom: false },
+        { slotId: 'slot-mod-bVI', offset: 8, isMin: false, isDom: false }
+      ]
+    };
+
+    function switchConsoleTab(tab) {
+      const btnPresets = document.getElementById('tabBtnPresets');
+      const btnCustom = document.getElementById('tabBtnCustom');
+      const contentPresets = document.getElementById('tabContentPresets');
+      const contentCustom = document.getElementById('tabContentCustom');
+
+      if (tab === 'presets') {
+        btnPresets.className = 'px-3 py-1 rounded-lg text-xs font-bold transition bg-sky-500/20 text-sky-400 border border-sky-400/40';
+        btnCustom.className = 'px-3 py-1 rounded-lg text-xs font-bold transition text-muted hover:text-white border border-transparent';
+        contentPresets.classList.remove('hidden');
+        contentCustom.classList.add('hidden');
+      } else {
+        btnCustom.className = 'px-3 py-1 rounded-lg text-xs font-bold transition bg-sky-500/20 text-sky-400 border border-sky-400/40';
+        btnPresets.className = 'px-3 py-1 rounded-lg text-xs font-bold transition text-muted hover:text-white border border-transparent';
+        contentCustom.classList.remove('hidden');
+        contentPresets.classList.add('hidden');
+      }
+    }
+
+    function toggleLoop() {
+      isLoopEnabled = !isLoopEnabled;
+      const btn = document.getElementById('btnLoopToggle');
+      const text = document.getElementById('loopStatusText');
+      if (isLoopEnabled) {
+        btn.classList.remove('bg-slate-800', 'border-slate-600', 'text-slate-300');
+        btn.classList.add('bg-sky-500/20', 'border-sky-400', 'text-sky-400', 'shadow-sm', 'shadow-sky-500/30');
+        text.innerText = 'Loop: ON';
+      } else {
+        btn.classList.remove('bg-sky-500/20', 'border-sky-400', 'text-sky-400', 'shadow-sm', 'shadow-sky-500/30');
+        btn.classList.add('bg-slate-800', 'border-slate-600', 'text-slate-300');
+        text.innerText = 'Loop: OFF';
+      }
+    }
+
+    const keyLabels = document.getElementById('keyLabels');
+    const sliderKnob = document.getElementById('sliderKnob');
+
+    CHROMATIC_KEYS.forEach((key, idx) => {
+      const label = document.createElement('div');
+      label.innerText = key;
+      label.className = 'hover:text-sky-500 transition';
+      label.onclick = () => setKey(idx);
+      keyLabels.appendChild(label);
+    });
+
+    function setKey(index) {
+      stopPlayback();
+      currentKeyIndex = index;
+      const pct = (index / (CHROMATIC_KEYS.length - 1)) * 100;
+      sliderKnob.style.bottom = `calc(${pct}% - 14px)`;
+
+      Array.from(keyLabels.children).forEach((el, i) => {
+        el.className = (i === index) ? 'text-sky-500 font-black text-sm' : 'hover:text-sky-500 transition text-muted';
+      });
+
+      document.getElementById('headerKeyBadge').innerText = `${CHROMATIC_KEYS[index]} Major`;
+      updatePlate();
+      clearCustomProgression();
+    }
+
+    function getNote(root, offset) {
+      return NOTE_NAMES[(root + offset) % 12];
+    }
+
+    // ВЫЧИСЛЕНИЕ НОТ С УЧЕТОМ НАДСТРОЕК КАРТОЧКИ
+    function getTunedChordNotes(slotId, baseMidi, isMinor, isDominant) {
+      const cfg = slotConfigs[slotId] || getDefaultConfig();
+      let intervals = isMinor ? [0, 3, 7] : [0, 4, 7];
+
+      if (cfg.tension === '7th') {
+        intervals.push(isDominant ? 10 : (isMinor ? 10 : 11));
+      } else if (cfg.tension === '9th') {
+        intervals.push(isDominant ? 10 : (isMinor ? 10 : 11));
+        intervals.push(14); // 9-я ступень
+      } else if (cfg.tension === 'sus4') {
+        intervals = [0, 5, 7];
+        if (isDominant) intervals.push(10);
+      }
+
+      return intervals.map(inter => baseMidi + inter);
+    }
+
+    function getDurationSeconds(durationStr) {
+      switch(durationStr) {
+        case '1/2': return 0.6;
+        case '1/4': return 0.35;
+        case '3/4': return 0.9;
+        case '1/1':
+        default: return 1.1;
+      }
+    }
+
+    // СОЗДАНИЕ КАРТОЧКИ С КНОПКОЙ-ШЕСТЕРЕНКОЙ ⚙
+    function createCard(id, roman, name, baseMidi, isMinor, isDominant) {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      if (!slotConfigs[id]) slotConfigs[id] = getDefaultConfig();
+      const cfg = slotConfigs[id];
+
+      // Подготовка текстовых плашек надстроек
+      let pills = [];
+      if (cfg.playback !== 'block') pills.push(cfg.playback === 'strum' ? 'Strum' : cfg.playback === 'arp_up' ? 'Arp ↑' : 'Arp ↓');
+      if (cfg.tension !== 'triad') pills.push(cfg.tension);
+      if (cfg.inversion !== 'root') pills.push(cfg.inversion === 'inv1' ? '1st' : '2nd');
+      if (cfg.duration !== '1/1') pills.push(cfg.duration);
+
+      const pillsHtml = pills.map(p => `<span class="text-[8px] px-1 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono">${p}</span>`).join(' ');
+
+      el.innerHTML = `
+        <div class="flex justify-between items-start text-xs font-bold text-muted">
+          <span class="card-roman">${roman}</span>
+          <button class="btn-card-gear text-slate-400 hover:text-sky-400 p-0.5 rounded transition text-xs font-mono" title="Настроить параметры звучания">⚙</button>
+        </div>
+        <div class="flex items-baseline justify-between mt-1">
+          <div class="text-xl font-black tracking-tight card-name">${name}</div>
+          <div class="flex gap-1 flex-wrap justify-end">${pillsHtml}</div>
+        </div>
+        <div class="recommendation-badge absolute -top-2.5 right-2 hidden text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"></div>
+      `;
+
+      // Клик по карточке — играем
+      el.onclick = (e) => {
+        if (e.target.classList.contains('btn-card-gear')) {
+          e.stopPropagation();
+          openSettingsModal(id, roman, name, baseMidi, isMinor, isDominant);
+          return;
+        }
+        handleManualCardClick(id, name, baseMidi, isMinor, isDominant);
+      };
+    }
+
+    // МОДАЛЬНЫЙ ИНСПЕКТОР НАСТРОЕК
+    let currentModalChordData = null;
+
+    function openSettingsModal(slotId, roman, name, baseMidi, isMinor, isDominant) {
+      activeModalSlotId = slotId;
+      currentModalChordData = { baseMidi, isMinor, isDominant, name };
+
+      const cfg = slotConfigs[slotId] || getDefaultConfig();
+      document.getElementById('modalChordTitle').innerText = name;
+      document.getElementById('modalChordSubtitle').innerText = `Ступень ${roman}`;
+
+      // Синхронизация активных кнопок
+      syncButtonGroup('settingPlayback', cfg.playback);
+      syncButtonGroup('settingDuration', cfg.duration);
+      syncButtonGroup('settingTension', cfg.tension);
+      syncButtonGroup('settingInversion', cfg.inversion);
+      syncButtonGroup('settingBass', cfg.bass);
+
+      document.getElementById('chordSettingsModal').classList.remove('hidden');
+    }
+
+    function syncButtonGroup(containerId, activeVal) {
+      const container = document.getElementById(containerId);
+      Array.from(container.children).forEach(btn => {
+        if (btn.dataset.val === activeVal) {
+          btn.className = 'p-2 rounded border border-sky-500 bg-sky-500/20 text-sky-400 font-bold text-center';
+        } else {
+          btn.className = 'p-2 rounded border border-main text-center hover:border-sky-500 text-muted';
+        }
+        btn.onclick = () => {
+          slotConfigs[activeModalSlotId][containerId.replace('setting', '').toLowerCase()] = btn.dataset.val;
+          syncButtonGroup(containerId, btn.dataset.val);
+        };
+      });
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('chordSettingsModal').classList.add('hidden');
+      activeModalSlotId = null;
+    }
+
+    function saveAndCloseModal() {
+      closeSettingsModal();
+      updatePlate();
+    }
+
+    function previewConfiguredChord() {
+      if (!activeModalSlotId || !currentModalChordData) return;
+      const cfg = slotConfigs[activeModalSlotId];
+      const notes = getTunedChordNotes(activeModalSlotId, currentModalChordData.baseMidi, currentModalChordData.isMinor, currentModalChordData.isDominant);
+      const dur = getDurationSeconds(cfg.duration);
+      AudioEngine.playConfiguredChord(notes, cfg, dur);
+      updatePiano(currentModalChordData.name, notes);
+    }
+
+    // РУЧНОЙ ВЫБОР АККОРДА
+    function handleManualCardClick(slotId, chordName, baseMidi, isMinor, isDominant) {
+      stopPlayback();
+      const cfg = slotConfigs[slotId] || getDefaultConfig();
+      const notes = getTunedChordNotes(slotId, baseMidi, isMinor, isDominant);
+      const dur = getDurationSeconds(cfg.duration);
+
+      AudioEngine.playConfiguredChord(notes, cfg, dur);
+      updatePiano(chordName, notes);
+
+      customHistory.push({ slotId, chordName, notes, cfg, dur });
+      renderCustomTimeline();
+      clearVisualHighlights();
+
+      const currentEl = document.getElementById(slotId);
+      if (currentEl) currentEl.classList.add('playing-step');
+
+      const recs = HARMONIC_FLOW_RULES[slotId] || [];
+      activeRecommendations = recs;
+
+      recs.forEach(rec => {
+        const targetEl = document.getElementById(rec.targetId);
+        if (!targetEl) return;
+        const badge = targetEl.querySelector('.recommendation-badge');
+        if (rec.isBest) {
+          targetEl.classList.add('rec-best');
+          if (badge) {
+            badge.innerText = '★ Best';
+            badge.className = 'recommendation-badge absolute -top-2.5 right-2 bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md shadow-amber-500/50';
+            badge.classList.remove('hidden');
+          }
+        } else {
+          targetEl.classList.add('rec-alt');
+          if (badge) {
+            badge.innerText = 'Alt';
+            badge.className = 'recommendation-badge absolute -top-2.5 right-2 bg-sky-500 text-slate-950 font-bold text-[9px] px-1.5 py-0.5 rounded-full';
+            badge.classList.remove('hidden');
+          }
+        }
+      });
+
+      const tip = document.getElementById('recommenderTip');
+      const best = recs.find(r => r.isBest);
+      if (best) tip.innerHTML = `<span class="text-amber-400 font-bold">Совет:</span> ${best.reason}`;
+
+      renderArrows();
+    }
+
+    // ВОСПРОИЗВЕДЕНИЕ ГОТОВОГО РЕЦЕПТА
+    function playPresetRecipe(recipeKey) {
+      if (currentPlayingContext && currentPlayingContext.id === recipeKey) {
+        stopPlayback();
+        return;
+      }
+      stopPlayback();
+      currentPlayingContext = { type: 'preset', id: recipeKey };
+
+      const steps = RECIPE_DEFINITIONS[recipeKey];
+      if (!steps) return;
+
+      const btn = document.getElementById(`btn-${recipeKey}`);
+      if (btn) btn.classList.add('border-sky-500', 'bg-sky-500/10');
+
+      const root = currentKeyIndex;
+      let accumulatedDelay = 0;
+
+      steps.forEach((step, idx) => {
+        const cfg = slotConfigs[step.slotId] || getDefaultConfig();
+        const baseMidi = 48 + root + step.offset;
+        const notes = getTunedChordNotes(step.slotId, baseMidi, step.isMin, step.isDom);
+        const dur = getDurationSeconds(cfg.duration);
+        const name = `${getNote(root, step.offset)}${step.isMin ? 'm' : ''}${step.isDom ? '7' : ''}`;
+
+        const t = setTimeout(() => {
+          document.querySelectorAll('.cutout').forEach(el => el.classList.remove('playing-step'));
+
+          const curEl = document.getElementById(step.slotId);
+          if (curEl) curEl.classList.add('playing-step', 'trail-step');
+
+          if (idx < steps.length - 1) {
+            dynamicTraversalArrow = { from: step.slotId, to: steps[idx + 1].slotId };
+          } else if (isLoopEnabled) {
+            dynamicTraversalArrow = { from: step.slotId, to: steps[0].slotId };
+          } else {
+            dynamicTraversalArrow = null;
+          }
+          renderArrows();
+
+          AudioEngine.playConfiguredChord(notes, cfg, dur);
+          updatePiano(name, notes);
+
+          if (idx === steps.length - 1) {
+            const finalTimeout = setTimeout(() => {
+              if (isLoopEnabled && currentPlayingContext?.id === recipeKey) {
+                document.querySelectorAll('.cutout').forEach(el => el.classList.remove('trail-step'));
+                playPresetRecipe(recipeKey);
+              } else {
+                stopPlayback();
+              }
+            }, dur * 1000);
+            playbackTimeouts.push(finalTimeout);
+          }
+        }, accumulatedDelay);
+
+        accumulatedDelay += dur * 1000;
+        playbackTimeouts.push(t);
+      });
+    }
+
+    // ВОСПРОИЗВЕДЕНИЕ СОБРАННОЙ ЦЕПОЧКИ
+    function playCustomProgressionAnimated() {
+      if (customHistory.length === 0) return;
+      stopPlayback();
+      currentPlayingContext = { type: 'custom', id: 'custom' };
+
+      let accumulatedDelay = 0;
+
+      customHistory.forEach((item, idx) => {
+        const t = setTimeout(() => {
+          document.querySelectorAll('.cutout').forEach(el => el.classList.remove('playing-step'));
+
+          const curEl = document.getElementById(item.slotId);
+          if (curEl) curEl.classList.add('playing-step', 'trail-step');
+
+          if (idx < customHistory.length - 1) {
+            dynamicTraversalArrow = { from: item.slotId, to: customHistory[idx + 1].slotId };
+          } else if (isLoopEnabled) {
+            dynamicTraversalArrow = { from: item.slotId, to: customHistory[0].slotId };
+          } else {
+            dynamicTraversalArrow = null;
+          }
+          renderArrows();
+
+          AudioEngine.playConfiguredChord(item.notes, item.cfg, item.dur);
+          updatePiano(item.chordName, item.notes);
+
+          if (idx === customHistory.length - 1) {
+            const finalTimeout = setTimeout(() => {
+              if (isLoopEnabled && currentPlayingContext?.type === 'custom') {
+                document.querySelectorAll('.cutout').forEach(el => el.classList.remove('trail-step'));
+                playCustomProgressionAnimated();
+              } else {
+                stopPlayback();
+              }
+            }, item.dur * 1000);
+            playbackTimeouts.push(finalTimeout);
+          }
+        }, accumulatedDelay);
+
+        accumulatedDelay += item.dur * 1000;
+        playbackTimeouts.push(t);
+      });
+    }
+
+    function clearVisualHighlights() {
+      document.querySelectorAll('.cutout').forEach(el => {
+        el.classList.remove('playing-step', 'trail-step', 'rec-best', 'rec-alt');
+        const b = el.querySelector('.recommendation-badge');
+        if (b) b.classList.add('hidden');
+      });
+      document.querySelectorAll('.recipe-btn').forEach(el => {
+        el.classList.remove('border-sky-500', 'bg-sky-500/10');
+      });
+      dynamicTraversalArrow = null;
+      activeRecommendations = [];
+      renderArrows();
+    }
+
+    function stopPlayback() {
+      playbackTimeouts.forEach(t => clearTimeout(t));
+      playbackTimeouts = [];
+      currentPlayingContext = null;
+      clearVisualHighlights();
+      document.getElementById('pianoChordLabel').innerText = '—';
+      document.querySelectorAll('.piano-key-white, .piano-key-black').forEach(el => el.classList.remove('key-chord'));
+    }
+
+    function clearCustomProgression() {
+      stopPlayback();
+      customHistory = [];
+      renderCustomTimeline();
+      document.getElementById('recommenderTip').innerText = 'Кликните любой аккорд или ⚙ для настройки параметров звучания';
+    }
+
+    function renderCustomTimeline() {
+      const container = document.getElementById('progressionTimeline');
+      const badge = document.getElementById('customCountBadge');
+      badge.innerText = `(${customHistory.length})`;
+
+      if (customHistory.length === 0) {
+        container.innerHTML = '<span class="text-xs text-muted italic">Кликайте аккорды на матрице выше — они автоматически добавляются сюда.</span>';
+        return;
+      }
+
+      container.innerHTML = '';
+      customHistory.forEach((item, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-500/20 text-sky-400 font-mono text-xs font-bold shrink-0 border border-main';
+        chip.innerHTML = `
+          <span>${idx + 1}. ${item.chordName}</span>
+          <span class="text-muted hover:text-rose-400 cursor-pointer ml-1 text-sm leading-none" onclick="removeCustomItem(${idx})">&times;</span>
+        `;
+        container.appendChild(chip);
+      });
+    }
+
+    window.removeCustomItem = function(idx) {
+      customHistory.splice(idx, 1);
+      renderCustomTimeline();
+      if (customHistory.length > 0) {
+        const last = customHistory[customHistory.length - 1];
+        handleManualCardClick(last.slotId, last.chordName, last.notes[0], false, false);
+      } else {
+        clearCustomProgression();
+      }
+    };
+
+    function renderArrows() {
+      const svg = document.getElementById('arrowOverlay');
+      const stage = document.getElementById('matrixStage');
+      const stageRect = stage.getBoundingClientRect();
+
+      svg.querySelectorAll('path').forEach(p => p.remove());
+
+      if (dynamicTraversalArrow) {
+        const fEl = document.getElementById(dynamicTraversalArrow.from);
+        const tEl = document.getElementById(dynamicTraversalArrow.to);
+        if (fEl && tEl) {
+          const fRect = fEl.getBoundingClientRect();
+          const tRect = tEl.getBoundingClientRect();
+
+          const fCenterX = fRect.left + fRect.width / 2 - stageRect.left;
+          const fCenterY = fRect.top + fRect.height / 2 - stageRect.top;
+          const tCenterX = tRect.left + tRect.width / 2 - stageRect.left;
+          const tCenterY = tRect.top + tRect.height / 2 - stageRect.top;
+
+          let startX = fCenterX, startY = fCenterY;
+          let endX = tCenterX, endY = tCenterY;
+
+          if (fCenterY < tCenterY - 15) {
+            startY = fRect.bottom - stageRect.top; endY = tRect.top - stageRect.top - 4;
+          } else if (fCenterY > tCenterY + 15) {
+            startY = fRect.top - stageRect.top; endY = tRect.bottom - stageRect.top + 4;
+          } else {
+            if (fCenterX < tCenterX) {
+              startX = fRect.right - stageRect.left; endX = tRect.left - stageRect.left - 4;
+            } else {
+              startX = fRect.left - stageRect.left; endX = tRect.right - stageRect.left + 4;
+            }
+          }
+
+          const midX = startX + (endX - startX) * 0.5;
+          const midY = startY + (endY - startY) * 0.5;
+          const d = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+
+          const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          p.setAttribute('d', d);
+          p.setAttribute('class', 'flow-arrow-live');
+          p.setAttribute('marker-end', 'url(#arr-head-live)');
+          svg.appendChild(p);
+        }
+        return;
+      }
+
+      if (activeRecommendations.length > 0 && customHistory.length > 0) {
+        const lastSlotId = customHistory[customHistory.length - 1].slotId;
+        const fromEl = document.getElementById(lastSlotId);
+        if (!fromEl) return;
+
+        const fRect = fromEl.getBoundingClientRect();
+        const fCenterX = fRect.left + fRect.width / 2 - stageRect.left;
+        const fCenterY = fRect.top + fRect.height / 2 - stageRect.top;
+
+        activeRecommendations.forEach(rec => {
+          const toEl = document.getElementById(rec.targetId);
+          if (!toEl) return;
+
+          const tRect = toEl.getBoundingClientRect();
+          const tCenterX = tRect.left + tRect.width / 2 - stageRect.left;
+          const tCenterY = tRect.top + tRect.height / 2 - stageRect.top;
+
+          let startX = fCenterX, startY = fCenterY;
+          let endX = tCenterX, endY = tCenterY;
+
+          if (fCenterY < tCenterY - 15) {
+            startY = fRect.bottom - stageRect.top; endY = tRect.top - stageRect.top - 4;
+          } else if (fCenterY > tCenterY + 15) {
+            startY = fRect.top - stageRect.top; endY = tRect.bottom - stageRect.top + 4;
+          } else {
+            if (fCenterX < tCenterX) {
+              startX = fRect.right - stageRect.left; endX = tRect.left - stageRect.left - 4;
+            } else {
+              startX = fRect.left - stageRect.left; endX = tRect.right - stageRect.left + 4;
+            }
+          }
+
+          const midX = startX + (endX - startX) * 0.5;
+          const midY = startY + (endY - startY) * 0.5;
+          const d = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+
+          const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          p.setAttribute('d', d);
+          p.setAttribute('class', rec.isBest ? 'flow-arrow-best' : 'flow-arrow-alt');
+          p.setAttribute('marker-end', rec.isBest ? 'url(#arr-head-best)' : 'url(#arr-head-alt)');
+          svg.appendChild(p);
+        });
+      }
+    }
+
+    function buildPiano() {
+      const container = document.getElementById('pianoRoll');
+      container.innerHTML = '';
+      const whiteKeys = [0, 2, 4, 5, 7, 9, 11];
+
+      for (let oct = 0; oct < 2; oct++) {
+        whiteKeys.forEach(p => {
+          const midi = 48 + oct * 12 + p;
+          const key = document.createElement('div');
+          key.className = 'piano-key-white';
+          key.dataset.midi = midi;
+          key.dataset.pitch = p;
+
+          if ([0, 2, 5, 7, 9].includes(p)) {
+            const black = document.createElement('div');
+            black.className = 'piano-key-black';
+            black.dataset.midi = midi + 1;
+            black.dataset.pitch = p + 1;
+            key.appendChild(black);
+          }
+          container.appendChild(key);
+        });
+      }
+    }
+
+    function updatePiano(chordName, midiNotes) {
+      document.getElementById('pianoChordLabel').innerText = chordName;
+      const pitches = midiNotes.map(m => m % 12);
+      document.querySelectorAll('.piano-key-white, .piano-key-black').forEach(el => {
+        el.classList.remove('key-chord');
+        const pitch = parseInt(el.dataset.pitch);
+        if (pitches.includes(pitch)) el.classList.add('key-chord');
+      });
+    }
+
+    function updatePlate() {
+      const root = currentKeyIndex;
+      const keyName = CHROMATIC_KEYS[root];
+
+      createCard('slot-main-I',   'I',    getNote(root, 0),         48 + root, false, false);
+      createCard('slot-main-vi',  'vi',   `${getNote(root, 9)}m`,   48 + root + 9, true, false);
+      createCard('slot-main-IV',  'IV',   getNote(root, 5),         48 + root + 5, false, false);
+      createCard('slot-main-ii',  'ii',   `${getNote(root, 2)}m`,   48 + root + 2, true, false);
+      createCard('slot-main-V',   'V',    getNote(root, 7),         48 + root + 7, false, true);
+      createCard('slot-main-iii', 'iii',  `${getNote(root, 4)}m`,   48 + root + 4, true, false);
+      createCard('slot-main-vii', 'vii°', `${getNote(root, 11)}dim`,48 + root + 11, true, true);
+
+      createCard('slot-sec-V',   'V/I',   `${getNote(root, 7)}7`,   48 + root + 7, false, true);
+      createCard('slot-sec-vi',  'V/vi',  `${getNote(root, 4)}7`,   48 + root + 4, false, true);
+      createCard('slot-sec-IV',  'V/IV',  `${getNote(root, 0)}7`,   48 + root + 0, false, true);
+      createCard('slot-sec-ii',  'V/ii',  `${getNote(root, 9)}7`,   48 + root + 9, false, true);
+      createCard('slot-sec-V5',  'V/V',   `${getNote(root, 2)}7`,   48 + root + 2, false, true);
+      createCard('slot-sec-iii', 'V/iii', `${getNote(root, 11)}7`,  48 + root + 11, false, true);
+
+      createCard('slot-mod-bIII', 'bIII', getNote(root, 3),         48 + root + 3, false, false);
+      createCard('slot-mod-bVI',  'bVI',  getNote(root, 8),         48 + root + 8, false, false);
+      createCard('slot-mod-iv',   'iv',   `${getNote(root, 5)}m`,   48 + root + 5, true, false);
+      createCard('slot-mod-bVII', 'bVII', getNote(root, 10),        48 + root + 10, false, true);
+
+      document.getElementById('rec-1-text').innerText = `${getNote(root, 9)}m — ${getNote(root, 5)} — ${getNote(root, 7)} — ${getNote(root, 0)}`;
+      document.getElementById('rec-2-text').innerText = `${getNote(root, 0)} — [ ${getNote(root, 0)}7 ] — ${getNote(root, 5)} — ${getNote(root, 7)}`;
+      document.getElementById('rec-3-text').innerText = `${getNote(root, 5)} — ${getNote(root, 7)} — [ ${getNote(root, 10)} ] — ${getNote(root, 0)}`;
+      document.getElementById('rec-4-text').innerText = `${getNote(root, 0)} — [ ${getNote(root, 0)}7 ] — [ ${getNote(root, 5)}m ] — [ ${getNote(root, 8)} ]`;
+    }
+
+    window.addEventListener('resize', renderArrows);
+
+    buildPiano();
+    setKey(0);
+  </script>
+</body>
+</html>

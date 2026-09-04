@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/instruments/contracts.ts",
+    "src/audio/contracts.ts",
+    "src/app/commands/**/*.ts",
+    "src/app/history/**/*.ts",
+    "src/app/appStore.ts"
+  ]
+}

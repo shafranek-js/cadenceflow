@@ -1,0 +1,8 @@
+{
+  "id": "a-tonal-minor",
+  "tonic": 9,
+  "moduleId": "dark-harmony",
+  "mode": "tonal-minor",
+  "core": ["i", "ii°", "III", "iv", "V", "V7", "VI", "vii°"],
+  "naturalMinorVariants": ["v", "VII"]
+}

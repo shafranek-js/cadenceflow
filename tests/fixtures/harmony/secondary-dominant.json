@@ -1,0 +1,7 @@
+{
+  "id": "secondary-dominant",
+  "context": "C major",
+  "function": "V7/V",
+  "expectedChord": "D7",
+  "targetFunction": "V"
+}

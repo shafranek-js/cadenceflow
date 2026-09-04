@@ -1,0 +1,5 @@
+CadenceFlow HQ Piano - attribution placeholder
+
+The production sample bank is not bundled in this repository scaffold.
+Before adding samples, record the source bank, version, author, source URL,
+license text/identifier, required attribution, and any redistribution conditions here.

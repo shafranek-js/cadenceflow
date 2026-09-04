@@ -1,0 +1,15 @@
+{
+  "id": "c-major-progressions",
+  "tonic": 0,
+  "moduleId": "progressions",
+  "mode": "major",
+  "functions": [
+    { "id": "I", "root": "C", "quality": "major" },
+    { "id": "ii", "root": "D", "quality": "minor" },
+    { "id": "iii", "root": "E", "quality": "minor" },
+    { "id": "IV", "root": "F", "quality": "major" },
+    { "id": "V", "root": "G", "quality": "major" },
+    { "id": "vi", "root": "A", "quality": "minor" },
+    { "id": "vii°", "root": "B", "quality": "diminished" }
+  ]
+}

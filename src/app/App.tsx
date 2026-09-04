@@ -1,0 +1,227 @@
+import { useEffect, useMemo, useState } from "react";
+import { AppStore } from "./appStore";
+import { addMatrixPreview, type AddMatrixPreviewCommand } from "./commands/matrixCommands";
+import { setCardViewOverride, setGlobalCardView, type SetCardViewOverrideCommand, type SetGlobalCardViewCommand } from "./commands/matrixViewCommands";
+import { setTonic, switchModule, type SetTonicCommand, type SwitchModuleCommand } from "./commands/harmonyContextCommands";
+import {
+  addBranchPreview, commitBranchCommand, discardBranch, setBranchIntent, setBranchRejoinCommand, startBranch,
+  type AddBranchPreviewCommand, type CommitBranchCommand, type DiscardBranchCommand, type SetBranchIntentCommand,
+  type SetBranchRejoinCommand, type StartBranchCommand,
+} from "./commands/branchCommands";
+import { createDefaultProject } from "../domain/project/factory";
+import { recommend } from "../domain/recommendations/engine";
+import { baselineFunctionIdentities, recommendationVocabulary } from "../domain/harmony/moduleRegistry";
+import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/moduleSwitch";
+import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
+import { realizeChord } from "../domain/harmony/realization";
+import { branchRecommendationPath, type CompositionIntent } from "../domain/progression/branch";
+import type { CardViewId, StepPerformance } from "../domain/progression/step";
+import { HarmonicMatrix } from "../ui/matrix/HarmonicMatrix";
+import { ModuleSwitchDialog } from "../ui/matrix/ModuleSwitchDialog";
+import { RecommendationInspector } from "../ui/inspector/RecommendationInspector";
+import { HarmonyDetails } from "../ui/inspector/HarmonyDetails";
+import { CompositionIntentControl } from "../ui/inspector/CompositionIntentControl";
+import { BranchComparison } from "../ui/progression/BranchComparison";
+import { BranchControls } from "../ui/progression/BranchControls";
+import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
+import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
+import { patchMatrixTemplate, resetCardTemplate, resetMatrixScope, type PatchMatrixTemplateCommand, type ResetCardTemplateCommand, type ResetMatrixScopeCommand } from "./commands/matrixTemplateCommands";
+import { editStepPerformance, removeStep, reorderStep, replaceStep, resetStepPerformance, selectStep, setAllStepCardView, setStepCardView, type EditStepPerformanceCommand, type RemoveStepCommand, type ReorderStepCommand, type ReplaceStepCommand, type ResetStepPerformanceCommand, type SelectStepCommand, type SetAllStepCardViewCommand, type SetStepCardViewCommand } from "./commands/progressionCommands";
+import type { StepPerformanceOverrides } from "../domain/project/defaults";
+
+function useStore(store: AppStore) {
+  const [, force] = useState(0);
+  useEffect(() => store.subscribe(() => force((value) => value + 1)), [store]);
+  return { project: store.project, matrixSession: store.matrixSession };
+}
+
+export function App() {
+  const store = useMemo(() => new AppStore(createDefaultProject("local-dev", "CadenceFlow", "2026-09-04T00:00:00.000Z")), []);
+  const { project, matrixSession } = useStore(store);
+  const [pendingSwitch, setPendingSwitch] = useState<ModuleSwitchPlan | null>(null);
+  const [selectedBranchStepIds, setSelectedBranchStepIds] = useState<readonly string[]>(Object.freeze([]));
+  const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!project.temporaryBranch) { setSelectedBranchStepIds(Object.freeze([])); return; }
+    const existing = new Set(selectedBranchStepIds);
+    const next = project.temporaryBranch.steps.map((step) => step.id);
+    if (next.some((id) => !existing.has(id)) || selectedBranchStepIds.some((id) => !next.includes(id))) setSelectedBranchStepIds(Object.freeze(next));
+  }, [project.temporaryBranch?.steps]);
+
+  const vocabulary = recommendationVocabulary(project.activeModule);
+  const baselineIds = new Set(baselineFunctionIdentities(project.activeModule).map((identity) => identity.functionId));
+  const pathSteps = project.temporaryBranch ? branchRecommendationPath(project.progression, project.temporaryBranch) : project.progression.steps;
+  const pathFunctionIds = pathSteps.filter((step) => step.kind === "chord").map((step) => step.harmonicFunction.functionId);
+  const current = project.temporaryBranch ? pathFunctionIds.at(-1) : matrixSession.previewFunctionId ?? pathFunctionIds.at(-1);
+  const recommendationHistory = project.temporaryBranch
+    ? pathFunctionIds
+    : [...pathFunctionIds, ...(matrixSession.previewFunctionId ? [matrixSession.previewFunctionId] : [])];
+  const recommendations = current ? recommend({
+    moduleId: project.activeModule,
+    currentFunctionId: current,
+    recentFunctionIds: recommendationHistory,
+    visibleFunctionIds: vocabulary.map((identity) => identity.functionId),
+    compositionIntent: project.temporaryBranch?.compositionIntent ?? "neutral",
+  }) : null;
+
+  const contextualIds = new Set<string>();
+  for (const candidate of [recommendations?.bestMatch, ...(recommendations?.alternatives ?? [])]) {
+    if (candidate?.functionId.startsWith("vii°7/") && !baselineIds.has(candidate.functionId)) contextualIds.add(candidate.functionId);
+  }
+  const lastBranchStep = project.temporaryBranch?.steps.at(-1);
+  const activePreviewId = project.temporaryBranch
+    ? lastBranchStep?.kind === "chord" ? lastBranchStep.harmonicFunction.functionId : undefined
+    : matrixSession.previewFunctionId;
+  if (activePreviewId?.startsWith("vii°7/") && !baselineIds.has(activePreviewId)) contextualIds.add(activePreviewId);
+  const contextualFunctions = vocabulary.filter((identity) => contextualIds.has(identity.functionId));
+
+  const previewIdentity = activePreviewId ? vocabulary.find((identity) => identity.functionId === activePreviewId) ?? null : null;
+  const previewChord = previewIdentity ? realizeChord(previewIdentity, project.tonic) : null;
+  const inspected = recommendations?.bestMatch ?? null;
+
+  const addToProgression = (functionId: string) => {
+    const nowIso = new Date().toISOString();
+    const command: AddMatrixPreviewCommand = { type: "matrix/add-preview", payload: { functionId, stepId: crypto.randomUUID(), nowIso } };
+    store.dispatch(command, addMatrixPreview);
+  };
+  const addToBranch = (functionId: string) => {
+    const command: AddBranchPreviewCommand = { type: "branch/add-preview", payload: { functionId, stepId: crypto.randomUUID(), nowIso: new Date().toISOString() } };
+    store.dispatch(command, addBranchPreview);
+  };
+  const preview = (functionId: string) => project.temporaryBranch ? addToBranch(functionId) : store.selectMatrixPreview(functionId);
+  const add = (functionId: string) => project.temporaryBranch ? addToBranch(functionId) : addToProgression(functionId);
+
+
+  const patchTemplatePerformance = (overrides: StepPerformanceOverrides) => {
+    if (!settingsFunctionId) return;
+    const command: PatchMatrixTemplateCommand = { type: "matrix-template/patch", payload: { functionId: settingsFunctionId, performanceOverrides: overrides, nowIso: new Date().toISOString() } };
+    store.dispatch(command, patchMatrixTemplate);
+  };
+  const resetCard = (functionId: string) => {
+    const command: ResetCardTemplateCommand = { type: "matrix-template/reset-card", payload: { functionId, nowIso: new Date().toISOString() } };
+    store.dispatch(command, resetCardTemplate);
+  };
+  const resetMatrix = (scope: "current-module" | "all-modules") => {
+    const command: ResetMatrixScopeCommand = { type: "matrix-template/reset-scope", payload: { scope, nowIso: new Date().toISOString() } };
+    store.dispatch(command, resetMatrixScope);
+  };
+  const selectProgressionStep = (stepId: string) => {
+    const command: SelectStepCommand = { type: "progression/select-step", payload: { stepId, nowIso: new Date().toISOString() } };
+    store.dispatch(command, selectStep);
+  };
+  const editProgressionPerformance = (stepId: string, performance: Partial<StepPerformance>) => {
+    const command: EditStepPerformanceCommand = { type: "progression/edit-performance", payload: { stepId, performance, nowIso: new Date().toISOString() } };
+    store.dispatch(command, editStepPerformance);
+  };
+  const setProgressionStepView = (stepId: string, view: CardViewId) => {
+    const command: SetStepCardViewCommand = { type: "progression/set-card-view", payload: { stepId, view, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setStepCardView);
+  };
+  const setProgressionViews = (view: CardViewId) => {
+    const command: SetAllStepCardViewCommand = { type: "progression/set-all-card-view", payload: { view, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setAllStepCardView);
+  };
+  const replaceProgressionStep = (stepId: string, functionId: string) => {
+    const command: ReplaceStepCommand = { type: "progression/replace-step", payload: { stepId, functionId, nowIso: new Date().toISOString() } };
+    store.dispatch(command, replaceStep);
+  };
+  const resetProgressionStep = (stepId: string) => {
+    const command: ResetStepPerformanceCommand = { type: "progression/reset-performance", payload: { stepId, nowIso: new Date().toISOString() } };
+    store.dispatch(command, resetStepPerformance);
+  };
+  const removeProgressionStep = (stepId: string) => {
+    const command: RemoveStepCommand = { type: "progression/remove-step", payload: { stepId, nowIso: new Date().toISOString() } };
+    store.dispatch(command, removeStep);
+  };
+  const reorderProgressionStep = (stepId: string, targetIndex: number) => {
+    const command: ReorderStepCommand = { type: "progression/reorder-step", payload: { stepId, targetIndex, nowIso: new Date().toISOString() } };
+    store.dispatch(command, reorderStep);
+  };
+
+  const globalView = (view: CardViewId) => {
+    const command: SetGlobalCardViewCommand = { type: "matrix/set-global-card-view", payload: { view, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setGlobalCardView);
+  };
+  const cardView = (functionId: string, view: CardViewId) => {
+    const command: SetCardViewOverrideCommand = { type: "matrix/set-card-view-override", payload: { functionId, view, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setCardViewOverride);
+  };
+  const applyModuleSwitch = (destinationModule: HarmonicModuleId, resolutions: Readonly<Record<string, HarmonicFunctionIdentity | "keep-original">>) => {
+    const command: SwitchModuleCommand = { type: "harmony/switch-module", payload: { destinationModule, resolutions, nowIso: new Date().toISOString() } };
+    store.dispatch(command, switchModule);
+    store.clearMatrixPreview();
+    setPendingSwitch(null);
+  };
+  const changeTonic = (tonic: number) => {
+    const command: SetTonicCommand = { type: "harmony/set-tonic", payload: { tonic, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setTonic);
+  };
+  const requestModuleSwitch = (destinationModule: HarmonicModuleId) => {
+    if (destinationModule === project.activeModule) return;
+    const plan = planModuleSwitch(project.progression.steps, destinationModule);
+    if (plan.hasAmbiguities) setPendingSwitch(plan);
+    else applyModuleSwitch(destinationModule, Object.freeze({}));
+  };
+  const startExploration = (originStepId?: string) => {
+    const command: StartBranchCommand = { type: "branch/start", payload: { branchId: crypto.randomUUID(), ...(originStepId ? { originStepId } : {}), compositionIntent: "neutral", nowIso: new Date().toISOString() } };
+    store.dispatch(command, startBranch);
+    store.clearMatrixPreview();
+  };
+  const setRejoin = (rejoinStepId?: string) => {
+    const command: SetBranchRejoinCommand = { type: "branch/set-rejoin", payload: { ...(rejoinStepId ? { rejoinStepId } : {}), nowIso: new Date().toISOString() } };
+    store.dispatch(command, setBranchRejoinCommand);
+  };
+  const commitWhole = () => {
+    const command: CommitBranchCommand = { type: "branch/commit", payload: { nowIso: new Date().toISOString() } };
+    store.dispatch(command, commitBranchCommand);
+  };
+  const commitSelected = () => {
+    const command: CommitBranchCommand = { type: "branch/commit", payload: { selectedBranchStepIds, nowIso: new Date().toISOString() } };
+    store.dispatch(command, commitBranchCommand);
+  };
+  const discard = () => {
+    const command: DiscardBranchCommand = { type: "branch/discard", payload: { nowIso: new Date().toISOString() } };
+    store.dispatch(command, discardBranch);
+  };
+  const changeIntent = (compositionIntent: CompositionIntent) => {
+    const command: SetBranchIntentCommand = { type: "branch/set-intent", payload: { compositionIntent, nowIso: new Date().toISOString() } };
+    store.dispatch(command, setBranchIntent);
+  };
+
+  return (
+    <main className="app-shell">
+      <header className="app-header"><strong>CadenceFlow</strong><span>{project.activeModule === "progressions" ? "Progressions · Major" : "Dark Harmony · Tonal Minor"}</span>{project.temporaryBranch ? <span className="branch-status">What-if branch active</span> : null}</header>
+      <div className="studio-grid">
+        <HarmonicMatrix
+          project={project}
+          {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
+          recommendations={recommendations}
+          contextualFunctionIds={contextualFunctions}
+          onPreview={preview}
+          onAdd={add}
+          onCardView={cardView}
+          onGlobalView={globalView}
+          onModuleChange={requestModuleSwitch}
+          onTonicChange={changeTonic}
+          onSettingsOpen={(functionId) => setSettingsFunctionId(functionId)}
+          onResetCard={resetCard}
+          onResetCurrentModule={() => resetMatrix("current-module")}
+          onResetAllModules={() => resetMatrix("all-modules")}
+        />
+        <aside className="inspector-stack">
+          <RecommendationInspector candidate={inspected} mode={project.presentation.expertiseMode} />
+          <CompositionIntentControl value={project.temporaryBranch?.compositionIntent ?? "neutral"} disabled={!project.temporaryBranch} onChange={changeIntent} />
+          <CardTemplateInspector project={project} functionId={settingsFunctionId} onPerformancePatch={patchTemplatePerformance} onReset={() => settingsFunctionId && resetCard(settingsFunctionId)} />
+          <HarmonyDetails chord={previewChord} />
+        </aside>
+      </div>
+      <section className="progression-strip" aria-label="My Progression">
+        <div className="progression-heading"><h2>My Progression</h2><BranchControls project={project} selectedBranchStepIds={selectedBranchStepIds} onStart={startExploration} onRejoin={setRejoin} onCommitWhole={commitWhole} onCommitSelected={commitSelected} onDiscard={discard} /></div>
+        <ProgressionTrack project={project} {...(matrixSession.previewFunctionId ? { previewFunctionId: matrixSession.previewFunctionId } : {})} onSelectStep={selectProgressionStep} onEditPerformance={editProgressionPerformance} onSetStepView={setProgressionStepView} onSetAllViews={setProgressionViews} onReplace={replaceProgressionStep} onReset={resetProgressionStep} onRemove={removeProgressionStep} onReorder={reorderProgressionStep} />
+        <BranchComparison project={project} selectedStepIds={selectedBranchStepIds} onSelectedStepIdsChange={(ids) => setSelectedBranchStepIds(Object.freeze(ids))} />
+      </section>
+      {pendingSwitch ? <ModuleSwitchDialog plan={pendingSwitch} onCancel={() => setPendingSwitch(null)} onConfirm={(resolutions) => applyModuleSwitch(pendingSwitch.destinationModule, resolutions)} /> : null}
+    </main>
+  );
+}

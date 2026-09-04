@@ -1,0 +1,11 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.env*
+!.env.example
+public/audio/piano-hq/samples/*
+!public/audio/piano-hq/samples/.gitkeep

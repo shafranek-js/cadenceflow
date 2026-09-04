@@ -1,0 +1,11 @@
+{
+  "id": "ambiguous-module-conversion",
+  "sourceModule": "progressions",
+  "targetModule": "dark-harmony",
+  "sourceFunction": "bVII",
+  "expected": {
+    "automatic": false,
+    "mustOfferKeepOriginal": true,
+    "minimumAlternativeCount": 1
+  }
+}

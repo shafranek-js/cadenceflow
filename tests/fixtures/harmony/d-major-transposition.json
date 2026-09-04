@@ -1,0 +1,5 @@
+{
+  "id": "d-major-transposition",
+  "source": { "tonic": 0, "moduleId": "progressions", "functions": ["I", "vi", "IV", "V"] },
+  "target": { "tonic": 2, "moduleId": "progressions", "chords": ["D", "Bm", "G", "A"] }
+}
