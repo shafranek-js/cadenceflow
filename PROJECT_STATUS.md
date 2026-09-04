@@ -1,13 +1,13 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-04  
-**Current implementation stage:** US5 Batch A & B accepted; next milestone is US5 Batch C (HQ Piano Audio Backend)  
-**Task progress:** T001–T089 complete, 89 / 158 total tasks  
+**Current implementation stage:** US5 Batch C accepted; next milestone is US5 Batch D (T095–T096)  
+**Task progress:** T001–T094 complete, 94 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
-Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. The immediate goal is **User Story 5 / Phase 8**: implement a piano realization pipeline and high-quality velocity-sensitive sample playback while preserving one canonical pitch/velocity model across Piano View, Staff View, audio scheduling, and later exports.
+Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. The immediate goal is **User Story 5 Batch D / Phase 8**: end-to-end pitch/velocity projection consistency (T095) and final Playwright Piano Performance acceptance (T096).
 
 Do **not** start US6 timing/transport until US5 passes its acceptance gate.
 
@@ -100,6 +100,18 @@ Implemented:
 - `PianoPerformanceInspector` providing step-level controls for voicing, bass, register, articulation, and dynamics (`T088`).
 - Canonical `AudioNoteEvent` performance realization shared across audio, visualization, and exports (`T089`).
 
+### US5 Batch C — HQ Piano Audio Backend — T090–T094
+
+Implemented:
+
+- React-independent look-ahead WebAudio scheduler with zero drift (`T090`).
+- 16 discrete velocity layers aligned with upstream Salamander V3 `Data/notes.txt` (`370497372ece1603d1ca7b9892c82c1da566565e`), key-region bounds covering 88 keys (`Data/region.txt`), nearest-sample pitch transposition, and LRU decoded sample cache with 128 MB PCM byte budget and non-poisoning retryability (`T091`, `T092`).
+- Lazy-loaded `HqSamplePianoProvider` with cancelable tokens, observable `fallback` / `error` states, and promise lifecycle (`T092`).
+- SF2/SF3 SoundFont compatibility provider using `spessasynth_lib@4.3.14` proving interchangeable audio provider contracts (`T093`).
+- Reproducible bank preparation pipeline `scripts/prepare-piano-bank.ts`, full 480-region manifest, attribution license, and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) for deterministic clean-checkout real browser smoke (`T094`).
+
+**Current known limitation**: Sustain samples are implemented for v1; Salamander release resonance, string resonance, hammer noise, and pedal noise layers are deferred.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -128,10 +140,11 @@ Implemented:
 
 - Piano is the only fully implemented v1 instrument profile.
 - Required output is realistic **sample-based acoustic piano**, not an oscillator placeholder.
-- Architecture must support a lazy-loaded HQ multisample piano provider plus a separate SF2/SF3-compatible provider behind `InstrumentAudioProvider`.
-- Velocity must affect actual timbral sample selection, not only amplitude.
-- Production sample files are currently **not bundled**. `public/audio/piano-hq/manifest.json` contains no regions and the attribution file is still a placeholder.
-- Do not add samples without verifying redistribution/license/attribution requirements.
+- Architecture supports a lazy-loaded HQ multisample piano provider plus a separate SF2/SF3-compatible provider behind `InstrumentAudioProvider`.
+- Velocity affects actual timbral sample selection across 16 discrete velocity layers, not only amplitude.
+- Upstream source revision is pinned to `370497372ece1603d1ca7b9892c82c1da566565e`.
+- Full 480-region sustain manifest is generated; 3 test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) are committed for zero-setup clean-checkout test execution. Full bank can be prepared via `scripts/prepare-piano-bank.ts`.
+- Known limitation: sustain samples implemented; release/resonance/hammer/pedal noise deferred.
 
 ### Persistence/export direction
 

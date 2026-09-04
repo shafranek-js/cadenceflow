@@ -215,11 +215,11 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T087 [US5] Implement exact Master Velocity, musical dynamic labels, per-note overrides, and dynamics presets in `src/instruments/piano/dynamics.ts`
 - [x] T088 [US5] Implement piano performance controls in Inspector in `src/ui/inspector/PianoPerformanceInspector.tsx`
 - [x] T089 [US5] Implement canonical performance-event realization consumed by audio/visualization/export in `src/audio/eventRealizer.ts`
-- [ ] T090 [US5] Implement AudioContext look-ahead scheduler independent of React frames in `src/audio/scheduler.ts`
-- [ ] T091 [US5] Implement HQ piano manifest, velocity-region selection, bounded pitch mapping, and decoded-sample cache in `src/audio/hq-sample-piano/manifest.ts`, `velocityLayers.ts`, and `sampleCache.ts`
-- [ ] T092 [US5] Implement lazy-loaded `HqSamplePianoProvider` with loading/fallback/error states in `src/audio/hq-sample-piano/provider.ts`
-- [ ] T093 [P] [US5] Implement `spessasynth_lib` SF2/SF3 compatibility proof provider behind the same contract in `src/audio/soundfont/spessaProvider.ts`
-- [ ] T094 [US5] Implement sample-bank preparation/encoding/attribution pipeline in `scripts/prepare-piano-bank.ts`, `public/audio/piano-hq/manifest.json`, and `public/licenses/piano-hq-attribution.txt`
+- [x] T090 [US5] Implement AudioContext look-ahead scheduler independent of React frames in `src/audio/scheduler.ts`
+- [x] T091 [US5] Implement HQ piano manifest, velocity-region selection, bounded pitch mapping, and decoded-sample cache in `src/audio/hq-sample-piano/manifest.ts`, `velocityLayers.ts`, and `sampleCache.ts`
+- [x] T092 [US5] Implement lazy-loaded `HqSamplePianoProvider` with loading/fallback/error states in `src/audio/hq-sample-piano/provider.ts`
+- [x] T093 [P] [US5] Implement `spessasynth_lib` SF2/SF3 compatibility proof provider behind the same contract in `src/audio/soundfont/spessaProvider.ts`
+- [x] T094 [US5] Implement sample-bank preparation/encoding/attribution pipeline in `scripts/prepare-piano-bank.ts`, `public/audio/piano-hq/manifest.json`, and `public/licenses/piano-hq-attribution.txt`
 - [ ] T095 [US5] Write integration test proving Piano View, Staff View, scheduled audio events, and stored manual voicing use identical exact pitches/velocities in `tests/integration/pitch-projection-consistency.test.ts`
 - [ ] T096 [US5] Write Playwright acceptance for manual voicing, per-note velocity, dynamics presets, and audible HQ-piano readiness state in `tests/e2e/us5-piano-performance.spec.ts`
 
