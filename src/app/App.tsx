@@ -47,6 +47,10 @@ import { BranchComparison } from "../ui/progression/BranchComparison";
 import { BranchControls } from "../ui/progression/BranchControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
+import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
+import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
+import { realizeProgressionStepPitches } from "../instruments/piano/profile";
+import type { ChordStep } from "../domain/progression/step";
 import {
   patchMatrixTemplate,
   resetCardTemplate,
@@ -93,6 +97,13 @@ export function App() {
     Object.freeze([]),
   );
   const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
+  const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
+
+  const selectedProgressionStep = project.progression.selectedStepId
+    ? project.progression.steps.find(
+        (s): s is ChordStep => s.id === project.progression.selectedStepId && s.kind === "chord",
+      )
+    : undefined;
 
   useEffect(() => {
     const branch = project.temporaryBranch;
@@ -399,6 +410,16 @@ export function App() {
             onPerformancePatch={patchTemplatePerformance}
             onReset={() => settingsFunctionId && resetCard(settingsFunctionId)}
           />
+          {selectedProgressionStep && (
+            <PianoPerformanceInspector
+              step={selectedProgressionStep}
+              tonic={project.tonic}
+              onPerformanceChange={(perf) =>
+                editProgressionPerformance(selectedProgressionStep.id, perf)
+              }
+              onOpenVoicingEditor={() => setVoicingEditorOpen(true)}
+            />
+          )}
           <HarmonyDetails chord={previewChord} />
         </aside>
       </div>
@@ -444,6 +465,30 @@ export function App() {
           }
         />
       ) : null}
+      {voicingEditorOpen && selectedProgressionStep && (
+        <PianoVoicingEditor
+          isOpen={voicingEditorOpen}
+          stepLabel={selectedProgressionStep.harmonicFunction.functionId}
+          initialPitches={
+            selectedProgressionStep.performance.manualVoicing?.length
+              ? selectedProgressionStep.performance.manualVoicing
+              : realizeProgressionStepPitches(selectedProgressionStep, project.tonic)
+          }
+          onClose={() => setVoicingEditorOpen(false)}
+          onSave={(pitches) => {
+            editProgressionPerformance(selectedProgressionStep.id, {
+              voicingMode: "manual",
+              manualVoicing: pitches,
+            });
+          }}
+          onResetToAuto={() => {
+            editProgressionPerformance(selectedProgressionStep.id, {
+              voicingMode: "auto",
+            });
+            setVoicingEditorOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }
