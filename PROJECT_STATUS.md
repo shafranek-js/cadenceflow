@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-04  
-**Current implementation stage:** US3 source complete; next milestone is US5 Piano Performance + HQ Audio  
-**Task progress:** T001–T076 complete, 76 / 158 total tasks  
+**Current implementation stage:** US5 Batch A & B accepted; next milestone is US5 Batch C (HQ Piano Audio Backend)  
+**Task progress:** T001–T089 complete, 89 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -84,6 +84,21 @@ Implemented:
 - Step-local Harmonic/Piano/Staff Card Views.
 - `Reset Step Performance` preserving harmonic identity/variant/tensions and duration.
 - Manual Preview Voicing is copied as an independent exact-pitch snapshot when explicitly added.
+
+### US5 Batch A & B — canonical piano realization and contracts — T077–T089
+
+Implemented:
+
+- Voice-leading, manual voicing, bass, register, articulation, dynamics, and audio-provider contract suites (`T077–T080`).
+- `PianoInstrumentProfile` realization pipeline (`T081`).
+- Contextual voice leading with common-tone retention and bounded jumps (`T082`).
+- Manual exact-pitch voicing validation and `PianoVoicingEditor` interactive keyboard UI (`T083`).
+- Independent bass note (`Auto/Root/3rd/5th/Custom`) and bass octave (`Auto/-1/-2`) realization (`T084`).
+- Step register control (`Auto/-2/-1/0/+1/+2`) without altering harmonic identity (`T085`).
+- Piano articulations `Block`, `Arp Up`, `Arp Down`, `Broken Chord`, and `Humanized` (`T086`).
+- Master velocity, dynamic levels (`ppp`..`fff`), per-note overrides, and dynamic presets (`T087`).
+- `PianoPerformanceInspector` providing step-level controls for voicing, bass, register, articulation, and dynamics (`T088`).
+- Canonical `AudioNoteEvent` performance realization shared across audio, visualization, and exports (`T089`).
 
 ## 4. Key technical decisions that must be preserved
 
@@ -177,73 +192,36 @@ The working folder has no Git metadata, so this is a verified list of the main c
 - `tests/e2e/us4-major-minor.spec.ts`
 - `tests/e2e/us4a-modules.spec.ts`
 
-## 6. Verification performed at handoff
+## 6. Verification performed
 
-The following checks were rerun against the current files on 2026-09-04.
+The real toolchain and test suite were stabilized and verified on 2026-09-04:
 
-### Passed
-
-- `tsc -p tsconfig.domain.json --noEmit` → **PASS**.
-- `tsc -p tsconfig.foundation.json --noEmit` → **PASS**.
-- UI TS/TSX strict smoke compile with temporary React/VexFlow type stubs → **PASS**.
-- Test-source strict TypeScript smoke with temporary Vitest/Playwright/Node stubs → **PASS**.
-- `cadenceflow-project.schema.json` JSON parse → **PASS**.
-- Spec/task consistency → **PASS**: 182 FR, 17 SC, 76 completed tasks, no placeholders.
-
-These stub-based smoke checks validate local TypeScript consistency only; they are **not substitutes** for the real framework/test packages.
-
-### Not yet validated with the real toolchain
-
-- Vite production build.
-- Vitest execution.
-- Playwright browser acceptance tests.
-- ESLint / Prettier against installed dependencies.
-- Real WebAudio/sample playback.
-- HQ piano sample-bank preparation/loading.
+- Toolchain: `pnpm 10.12.4` pinned via `packageManager` in `package.json`, `typescript 6.0.3` pinned.
+- `pnpm run build` (`tsc -b && vite build`) → **PASS**.
+- `pnpm test` (Vitest, 23 files, 89 tests across domain, UI, and US5 Batch A/B contracts) → **PASS**.
+- `pnpm run test:e2e` (Playwright Chromium, 6 specs including US1–US4A) → **PASS**.
+- `pnpm run lint` (ESLint 9) → **PASS** (0 errors, 0 warnings).
+- `pnpm run format:check` (Prettier) → **PASS**.
+- App dev server active on `http://localhost:5173`.
+- Spec/task consistency → **PASS**: 182 FR, 17 SC, 89 completed tasks (T001–T089), no placeholders.
 
 ## 7. Known issues / environment limitations
 
-1. **No `.git` directory is present** in `/mnt/data/cadenceflow-spec`.
-   - `git status` and `git diff` cannot be verified.
-   - Do not infer historical changes from timestamps as if they were Git history.
-   - Establish/attach a real repository before the next implementation batch.
+1. **Active Git Repository**: Repository is active and clean on `master` branch.
+2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
+3. **HQ piano assets**: Manifest currently has empty regions; sample bank preparation, encoding, attribution, and lazy audio provider are assigned in US5 Batch C (T090–T094).
+4. **US6–US10**: Pending completion and acceptance of US5.
 
-2. **`node_modules` is absent** and `pnpm` is not installed in the current environment.
+## 8. Current development sequence: US5 Batch C — T090–T094
 
-3. Current global compiler is **TypeScript 5.8.3**, while `package.json` requests `typescript ^7.0.0` and `tsconfig.app.json`/`tsconfig.node.json` target `ES2025`.
-   - Domain/foundation configs deliberately target ES2022 and compile with the global compiler.
-   - Full app build must be repeated using the project-local TypeScript version after dependency installation.
+Batch A and Batch B have been accepted by the orchestrator (commits `73a07ff` through `6d63f70`).
+Active milestone is **US5 Batch C (HQ Piano Audio Backend)**:
 
-4. HQ piano assets are not present.
-   - `public/audio/piano-hq/manifest.json`: `regions: []`.
-   - `public/licenses/piano-hq-attribution.txt`: placeholder only.
-
-5. US5–US10 and cross-cutting polish are not implemented. Do not mark tasks complete based only on scaffold files or interfaces.
-
-## 8. Approaches already tried but not valid in this environment
-
-- `npm test -- --runInBand` was attempted and failed with `vitest: not found` because dependencies are not installed.
-- `npm run build` was attempted and failed before Vite because the environment fell back to global TypeScript 5.8.3, which rejects the configured `ES2025` target/lib and cannot resolve project Node typings without installed dependencies.
-- Previous attempts to restore packages during this implementation stage were blocked by unavailable package registry access; the handoff therefore intentionally does not claim a real dependency-based build/test pass.
-- Git verification was attempted and failed because the working folder is not a Git repository.
-
-Do not treat these failures as confirmed product-code regressions. Restore the intended toolchain first, then rerun the official commands.
-
-## 9. Next development sequence
-
-### Preflight — before modifying product code
-
-1. Attach this folder to the intended Git repository or initialize a new repository and create a baseline commit from the handoff package.
-2. Use Node >=22 as specified in `package.json`.
-3. Restore the project package manager/dependencies. Prefer a reproducible lockfile and pin the package-manager version.
-4. Run:
-   - `npm run build` (or the equivalent selected package-manager command)
-   - `npm test`
-   - `npm run test:e2e`
-   - `npm run lint`
-   - `npm run format:check`
-5. If baseline failures appear, separate environment/configuration failures from real code failures before changing domain behavior.
-6. Record the verified baseline in this document before starting US5.
+- **T090**: React-independent look-ahead scheduler (`src/audio/scheduler.ts`).
+- **T091**: HQ multisample manifest, 16 velocity layers, sample cache (`src/audio/hq-sample-piano/`).
+- **T092**: Lazy `HqSamplePianoProvider` with loading/fallback/error states (`src/audio/hq-sample-piano/provider.ts`).
+- **T093**: `spessasynth_lib` SF2/SF3 compatibility proof provider (`src/audio/soundfont/spessaProvider.ts`).
+- **T094**: Sample-bank preparation script, manifest, and CC-BY attribution (`scripts/prepare-piano-bank.ts`, `public/audio/piano-hq/`, `public/licenses/`).
 
 ### Phase 8 / US5 — tasks T077–T096
 

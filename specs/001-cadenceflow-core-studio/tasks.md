@@ -200,21 +200,21 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T077 [P] [US5] Write piano auto-voicing/voice-leading tests with common-tone retention and bounded jumps in `tests/unit/instruments/piano/voice-leading.test.ts`
-- [ ] T078 [P] [US5] Write manual voicing, bass-separation, register-offset, and playable-range tests in `tests/unit/instruments/piano/realization.test.ts`
-- [ ] T079 [P] [US5] Write articulation and dynamics/per-note velocity/preset tests in `tests/unit/instruments/piano/performance.test.ts`
-- [ ] T080 [P] [US5] Write audio-provider contract tests with a mock clock/provider in `tests/integration/audio-provider-contract.test.ts`
+- [x] T077 [P] [US5] Write piano auto-voicing/voice-leading tests with common-tone retention and bounded jumps in `tests/unit/instruments/piano/voice-leading.test.ts`
+- [x] T078 [P] [US5] Write manual voicing, bass-separation, register-offset, and playable-range tests in `tests/unit/instruments/piano/realization.test.ts`
+- [x] T079 [P] [US5] Write articulation and dynamics/per-note velocity/preset tests in `tests/unit/instruments/piano/performance.test.ts`
+- [x] T080 [P] [US5] Write audio-provider contract tests with a mock clock/provider in `tests/integration/audio-provider-contract.test.ts`
 ### Implementation
 
-- [ ] T081 [US5] Implement `PianoInstrumentProfile` realization pipeline in `src/instruments/piano/profile.ts`
-- [ ] T082 [US5] Implement contextual auto voicing and neighboring-step voice leading in `src/instruments/piano/voicing.ts` and `src/instruments/piano/voiceLeading.ts`
-- [ ] T083 [US5] Implement manual exact-pitch voicing validation/editor domain operations in `src/instruments/piano/voicing.ts` and `src/ui/piano/PianoVoicingEditor.tsx`
-- [ ] T084 [US5] Implement independent bass note (`Auto/Root/3rd/5th/Custom`) and bass octave (`Auto/-1/-2`) realization in `src/instruments/piano/bass.ts`
-- [ ] T085 [US5] Implement step register control (`Auto/-2/-1/0/+1/+2`) in `src/instruments/piano/voicing.ts` and `src/ui/inspector/RegisterControl.tsx`
-- [ ] T086 [US5] Implement Piano articulations `Block`, `Arp Up`, `Arp Down`, `Broken Chord`, `Humanized` in `src/instruments/piano/articulation.ts`
-- [ ] T087 [US5] Implement exact Master Velocity, musical dynamic labels, per-note overrides, and dynamics presets in `src/instruments/piano/dynamics.ts`
-- [ ] T088 [US5] Implement piano performance controls in Inspector in `src/ui/inspector/PianoPerformanceInspector.tsx`
-- [ ] T089 [US5] Implement canonical performance-event realization consumed by audio/visualization/export in `src/audio/eventRealizer.ts`
+- [x] T081 [US5] Implement `PianoInstrumentProfile` realization pipeline in `src/instruments/piano/profile.ts`
+- [x] T082 [US5] Implement contextual auto voicing and neighboring-step voice leading in `src/instruments/piano/voicing.ts` and `src/instruments/piano/voiceLeading.ts`
+- [x] T083 [US5] Implement manual exact-pitch voicing validation/editor domain operations in `src/instruments/piano/voicing.ts` and `src/ui/piano/PianoVoicingEditor.tsx`
+- [x] T084 [US5] Implement independent bass note (`Auto/Root/3rd/5th/Custom`) and bass octave (`Auto/-1/-2`) realization in `src/instruments/piano/bass.ts`
+- [x] T085 [US5] Implement step register control (`Auto/-2/-1/0/+1/+2`) in `src/instruments/piano/voicing.ts` and `src/ui/inspector/RegisterControl.tsx`
+- [x] T086 [US5] Implement Piano articulations `Block`, `Arp Up`, `Arp Down`, `Broken Chord`, `Humanized` in `src/instruments/piano/articulation.ts`
+- [x] T087 [US5] Implement exact Master Velocity, musical dynamic labels, per-note overrides, and dynamics presets in `src/instruments/piano/dynamics.ts`
+- [x] T088 [US5] Implement piano performance controls in Inspector in `src/ui/inspector/PianoPerformanceInspector.tsx`
+- [x] T089 [US5] Implement canonical performance-event realization consumed by audio/visualization/export in `src/audio/eventRealizer.ts`
 - [ ] T090 [US5] Implement AudioContext look-ahead scheduler independent of React frames in `src/audio/scheduler.ts`
 - [ ] T091 [US5] Implement HQ piano manifest, velocity-region selection, bounded pitch mapping, and decoded-sample cache in `src/audio/hq-sample-piano/manifest.ts`, `velocityLayers.ts`, and `sampleCache.ts`
 - [ ] T092 [US5] Implement lazy-loaded `HqSamplePianoProvider` with loading/fallback/error states in `src/audio/hq-sample-piano/provider.ts`
