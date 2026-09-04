@@ -17,6 +17,12 @@ import type {
   InstrumentRealizationInput,
   ValidationResult,
 } from "../contracts";
+import {
+  applyRegisterOffset,
+  contextualAutoVoicing,
+  validateManualVoicing as validatePianoManualVoicing,
+} from "./voicing";
+import { resolveBassPitch } from "./bass";
 
 const STEPS: readonly DiatonicStep[] = ["C", "D", "E", "F", "G", "A", "B"];
 const NATURAL_PC: Readonly<Record<DiatonicStep, number>> = {
@@ -84,13 +90,30 @@ export const pianoProfile: InstrumentProfile = Object.freeze({
   supportedArticulations(): readonly ArticulationDescriptor[] {
     return PIANO_ARTICULATIONS;
   },
-  validateManualVoicing(_pitches: readonly ExactPitch[]): ValidationResult {
-    // Contract stub for T083 — full manual voicing validation will be implemented in Batch B
-    return Object.freeze({ valid: true, messages: Object.freeze([]) });
+  validateManualVoicing(pitches: readonly ExactPitch[]): ValidationResult {
+    return validatePianoManualVoicing(pitches);
   },
-  realizeChord(_input: InstrumentRealizationInput): InstrumentRealization {
-    // Contract stub for T081/T082/T084/T085 — realization pipeline will be implemented in Batch B
-    return Object.freeze({ pitches: Object.freeze([]) });
+  realizeChord(input: InstrumentRealizationInput): InstrumentRealization {
+    let upperPitches: readonly ExactPitch[];
+    if (input.performance.voicingMode === "manual" && input.performance.manualVoicing?.length) {
+      // Manual exact voicing is authoritative; register offset must NOT shift it
+      upperPitches = input.performance.manualVoicing;
+    } else {
+      const autoPitches = contextualAutoVoicing(
+        input.chord,
+        input.performance,
+        input.context,
+        input.previousPitches,
+      );
+      upperPitches = applyRegisterOffset(autoPitches, input.performance.register);
+    }
+
+    const bassPitch = resolveBassPitch(input.chord, input.performance.bass, upperPitches);
+
+    return Object.freeze({
+      pitches: Object.freeze(upperPitches),
+      bassPitch,
+    });
   },
 });
 
@@ -98,7 +121,22 @@ export function realizeProgressionStepPitches(
   step: ChordStep,
   tonic: PitchClassIdentity,
 ): readonly ExactPitch[] {
-  if (step.performance.voicingMode === "manual" && step.performance.manualVoicing?.length)
-    return step.performance.manualVoicing;
-  return realizeBasicPreview(realizeHarmonyChord(step.harmonicFunction, tonic)).pitches;
+  const chord = realizeHarmonyChord(step.harmonicFunction, tonic);
+  const realization = pianoProfile.realizeChord({
+    context: {
+      tonic,
+      mode: "major",
+      moduleId: step.harmonicFunction.moduleId,
+      spellingContext: {
+        tonic,
+        mode: "major",
+      },
+    },
+    chord: {
+      ...chord,
+      variant: step.harmonicVariant,
+    },
+    performance: step.performance,
+  });
+  return realization.pitches;
 }
