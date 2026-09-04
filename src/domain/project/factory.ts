@@ -16,9 +16,16 @@ export const DEFAULT_PIANO_PERFORMANCE: StepPerformance = Object.freeze({
   dynamicsViewPreference: "musical",
 });
 
-export function createDefaultProject(id: string, name = "Untitled", nowIso = new Date().toISOString()): Project {
+export function createDefaultProject(
+  id: string,
+  name = "Untitled",
+  nowIso = new Date().toISOString(),
+): Project {
   const defaults = Object.freeze({
-    piano: Object.freeze({ duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }), performance: DEFAULT_PIANO_PERFORMANCE }),
+    piano: Object.freeze({
+      duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }),
+      performance: DEFAULT_PIANO_PERFORMANCE,
+    }),
   });
   return Object.freeze({
     id,
@@ -30,7 +37,11 @@ export function createDefaultProject(id: string, name = "Untitled", nowIso = new
     tonic: 0,
     globalTiming: globalTiming(100, meter(4, 4, [4])),
     groove: groove("straight"),
-    presentation: Object.freeze({ expertiseMode: "composer", theme: "dark", globalMatrixCardView: "harmonic" }),
+    presentation: Object.freeze({
+      expertiseMode: "composer",
+      theme: "dark",
+      globalMatrixCardView: "harmonic",
+    }),
     defaults,
     moduleTemplateStates: Object.freeze({
       progressions: Object.freeze({ cards: Object.freeze({}) }),

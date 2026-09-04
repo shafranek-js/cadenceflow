@@ -14,11 +14,35 @@ export interface RecommendationExplanation {
   readonly details: readonly string[];
 }
 
-export function explainRecommendation(candidate: RecommendationCandidate, mode: PresentationMode): RecommendationExplanation {
-  const top = [...candidate.factors].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+export function explainRecommendation(
+  candidate: RecommendationCandidate,
+  mode: PresentationMode,
+): RecommendationExplanation {
+  const top = [...candidate.factors].sort(
+    (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution),
+  );
   const primary = top[0];
-  if (!primary) return { headline: "Valid harmonic option", details: ["No strong functional tendency dominates this choice."] };
-  if (mode === "beginner") return { headline: BEGINNER[primary.code] ?? "Musically useful next step.", details: top.slice(1).map((f) => BEGINNER[f.code] ?? f.code.replaceAll("-", " ")) };
-  if (mode === "composer") return { headline: primary.code.replaceAll("-", " "), details: top.map((f) => `${f.source}: ${f.code} (${f.contribution >= 0 ? "+" : ""}${f.contribution})`) };
-  return { headline: `${primary.code} · score ${candidate.score}`, details: top.map((f) => `${f.source}/${f.code}: ${f.contribution >= 0 ? "+" : ""}${f.contribution}`) };
+  if (!primary)
+    return {
+      headline: "Valid harmonic option",
+      details: ["No strong functional tendency dominates this choice."],
+    };
+  if (mode === "beginner")
+    return {
+      headline: BEGINNER[primary.code] ?? "Musically useful next step.",
+      details: top.slice(1).map((f) => BEGINNER[f.code] ?? f.code.replaceAll("-", " ")),
+    };
+  if (mode === "composer")
+    return {
+      headline: primary.code.replaceAll("-", " "),
+      details: top.map(
+        (f) => `${f.source}: ${f.code} (${f.contribution >= 0 ? "+" : ""}${f.contribution})`,
+      ),
+    };
+  return {
+    headline: `${primary.code} · score ${candidate.score}`,
+    details: top.map(
+      (f) => `${f.source}/${f.code}: ${f.contribution >= 0 ? "+" : ""}${f.contribution}`,
+    ),
+  };
 }

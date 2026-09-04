@@ -31,8 +31,16 @@ export class SessionHistory {
     this.#redo = [];
   }
 
-  get canUndo(): boolean { return this.#undo.length > 0; }
-  get canRedo(): boolean { return this.#redo.length > 0; }
-  get undoDepth(): number { return this.#undo.length; }
-  get redoDepth(): number { return this.#redo.length; }
+  get canUndo(): boolean {
+    return this.#undo.length > 0;
+  }
+  get canRedo(): boolean {
+    return this.#redo.length > 0;
+  }
+  get undoDepth(): number {
+    return this.#undo.length;
+  }
+  get redoDepth(): number {
+    return this.#redo.length;
+  }
 }

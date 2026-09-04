@@ -16,8 +16,12 @@ export class AppStore {
     this.#project = project;
   }
 
-  get project(): Project { return this.#project; }
-  get matrixSession(): MatrixSessionState { return this.#matrixSession; }
+  get project(): Project {
+    return this.#project;
+  }
+  get matrixSession(): MatrixSessionState {
+    return this.#matrixSession;
+  }
 
   subscribe(listener: () => void): () => void {
     this.#listeners.add(listener);
@@ -38,7 +42,10 @@ export class AppStore {
     this.#notify();
   }
 
-  dispatch<TCommand extends ProjectCommand>(command: TCommand, handler: ProjectCommandHandler<TCommand>): void {
+  dispatch<TCommand extends ProjectCommand>(
+    command: TCommand,
+    handler: ProjectCommandHandler<TCommand>,
+  ): void {
     const before = this.#project;
     const applied = handler(before, command);
     this.#project = applied.project;

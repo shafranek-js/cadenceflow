@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("US3 keeps repeated steps independent and requires explicit Replace Step", async ({ page }) => {
+test("US3 keeps repeated steps independent and requires explicit Replace Step", async ({
+  page,
+}) => {
   await page.goto("/");
   const tonic = page.getByTestId("chord-card-I");
 

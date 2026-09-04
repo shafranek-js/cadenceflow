@@ -11,7 +11,10 @@ export interface MusicalDuration {
   readonly displayHint?: DurationDisplayHint;
 }
 
-export function musicalDuration(beats: Rational, displayHint?: DurationDisplayHint): MusicalDuration {
+export function musicalDuration(
+  beats: Rational,
+  displayHint?: DurationDisplayHint,
+): MusicalDuration {
   if (compareRational(beats, rational(0)) <= 0) throw new RangeError("duration must be positive");
   return displayHint ? Object.freeze({ beats, displayHint }) : Object.freeze({ beats });
 }

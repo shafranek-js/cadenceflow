@@ -11,11 +11,18 @@ export interface GlobalTiming {
 
 export type MeterChangePolicy = "reflow" | "preserve-beat-lengths";
 
-export function meter(numerator: number, denominator: Meter["denominator"], grouping?: readonly number[]): Meter {
-  if (!Number.isInteger(numerator) || numerator <= 0) throw new RangeError("meter numerator must be positive");
+export function meter(
+  numerator: number,
+  denominator: Meter["denominator"],
+  grouping?: readonly number[],
+): Meter {
+  if (!Number.isInteger(numerator) || numerator <= 0)
+    throw new RangeError("meter numerator must be positive");
   const resolved = grouping ? [...grouping] : [numerator];
-  if (resolved.some((value) => !Number.isInteger(value) || value <= 0)) throw new RangeError("meter grouping values must be positive integers");
-  if (resolved.reduce((sum, value) => sum + value, 0) !== numerator) throw new RangeError("meter grouping must sum to numerator");
+  if (resolved.some((value) => !Number.isInteger(value) || value <= 0))
+    throw new RangeError("meter grouping values must be positive integers");
+  if (resolved.reduce((sum, value) => sum + value, 0) !== numerator)
+    throw new RangeError("meter grouping must sum to numerator");
   return Object.freeze({ numerator, denominator, grouping: Object.freeze(resolved) });
 }
 

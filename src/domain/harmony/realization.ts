@@ -4,7 +4,10 @@ import type { PitchClassIdentity } from "./pitch";
 import { realizeDarkHarmonyChord } from "./modules/darkHarmony";
 import { realizeProgressionsChord } from "./modules/progressions";
 
-export function realizeChord(identity: HarmonicFunctionIdentity, tonic: PitchClassIdentity): ChordDefinition {
+export function realizeChord(
+  identity: HarmonicFunctionIdentity,
+  tonic: PitchClassIdentity,
+): ChordDefinition {
   return identity.moduleId === "progressions"
     ? realizeProgressionsChord(identity.functionId, tonic)
     : realizeDarkHarmonyChord(identity.functionId, tonic);

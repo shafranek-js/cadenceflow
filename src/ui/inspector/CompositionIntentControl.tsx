@@ -10,10 +10,32 @@ const INTENTS: readonly { readonly id: CompositionIntent; readonly label: string
   { id: "smooth-voice-leading", label: "Smooth Voice Leading" },
 ];
 
-export function CompositionIntentControl({ value, disabled, onChange }: {
+export function CompositionIntentControl({
+  value,
+  disabled,
+  onChange,
+}: {
   readonly value: CompositionIntent;
   readonly disabled: boolean;
   readonly onChange: (intent: CompositionIntent) => void;
 }) {
-  return <label className="composition-intent"><span>Composition Intent</span><select aria-label="Composition Intent" disabled={disabled} value={value} onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(event.target.value as CompositionIntent)}>{INTENTS.map((intent) => <option key={intent.id} value={intent.id}>{intent.label}</option>)}</select></label>;
+  return (
+    <label className="composition-intent">
+      <span>Composition Intent</span>
+      <select
+        aria-label="Composition Intent"
+        disabled={disabled}
+        value={value}
+        onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+          onChange(event.target.value as CompositionIntent)
+        }
+      >
+        {INTENTS.map((intent) => (
+          <option key={intent.id} value={intent.id}>
+            {intent.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }

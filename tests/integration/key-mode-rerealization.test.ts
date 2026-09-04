@@ -17,8 +17,18 @@ describe("key/module re-realization", () => {
     if (!original || original.kind !== "chord") throw new Error("expected chord step");
     const performance = original.performance;
 
-    project = setTonic(project, { type: "harmony/set-tonic", payload: { tonic: 2, nowIso: "2026-09-04T12:00:02.000Z" } }).project;
-    project = switchModule(project, { type: "harmony/switch-module", payload: { destinationModule: "dark-harmony", resolutions: {}, nowIso: "2026-09-04T12:00:03.000Z" } }).project;
+    project = setTonic(project, {
+      type: "harmony/set-tonic",
+      payload: { tonic: 2, nowIso: "2026-09-04T12:00:02.000Z" },
+    }).project;
+    project = switchModule(project, {
+      type: "harmony/switch-module",
+      payload: {
+        destinationModule: "dark-harmony",
+        resolutions: {},
+        nowIso: "2026-09-04T12:00:03.000Z",
+      },
+    }).project;
 
     const changed = project.progression.steps[0];
     if (!changed || changed.kind !== "chord") throw new Error("expected chord step");

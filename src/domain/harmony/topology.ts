@@ -23,13 +23,22 @@ export interface MatrixTopologyDefinition {
   readonly routes: readonly MatrixRoute[];
 }
 
-export function manhattanRoute(from: MatrixPosition, to: MatrixPosition, bendColumn?: number): readonly MatrixPosition[] {
+export function manhattanRoute(
+  from: MatrixPosition,
+  to: MatrixPosition,
+  bendColumn?: number,
+): readonly MatrixPosition[] {
   const bend = bendColumn ?? to.column;
   const points: MatrixPosition[] = [from];
   if (from.column !== bend) points.push({ column: bend, row: from.row });
   if (from.row !== to.row) points.push({ column: bend, row: to.row });
   if (bend !== to.column) points.push(to);
-  const compact = points.filter((point, index) => index === 0 || point.column !== points[index - 1]!.column || point.row !== points[index - 1]!.row);
+  const compact = points.filter(
+    (point, index) =>
+      index === 0 ||
+      point.column !== points[index - 1]!.column ||
+      point.row !== points[index - 1]!.row,
+  );
   return Object.freeze(compact.map((point) => Object.freeze({ ...point })));
 }
 
@@ -43,10 +52,14 @@ export function expandedStripEntries(
   row: number,
   startColumn = 0,
 ): readonly MatrixCardTopologyEntry[] {
-  return Object.freeze(identities.map((identity, index) => Object.freeze({
-    identity,
-    layerId,
-    position: Object.freeze({ column: startColumn + index, row }),
-    baseline: false,
-  })));
+  return Object.freeze(
+    identities.map((identity, index) =>
+      Object.freeze({
+        identity,
+        layerId,
+        position: Object.freeze({ column: startColumn + index, row }),
+        baseline: false,
+      }),
+    ),
+  );
 }

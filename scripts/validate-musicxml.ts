@@ -6,6 +6,8 @@ try {
   await access(schemaDir);
   console.log(`MusicXML schema cache available at ${schemaDir}`);
 } catch {
-  console.error(`MusicXML schema cache missing at ${schemaDir}. Add the approved MusicXML 4.0 XSD set before validation.`);
+  console.error(
+    `MusicXML schema cache missing at ${schemaDir}. Add the approved MusicXML 4.0 XSD set before validation.`,
+  );
   process.exitCode = 2;
 }

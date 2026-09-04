@@ -12,11 +12,19 @@ export interface AddMatrixPreviewPayload {
   readonly nowIso: string;
 }
 
-export type AddMatrixPreviewCommand = ProjectCommand<AddMatrixPreviewPayload> & { readonly type: "matrix/add-preview" };
+export type AddMatrixPreviewCommand = ProjectCommand<AddMatrixPreviewPayload> & {
+  readonly type: "matrix/add-preview";
+};
 
-export function identityForMatrixFunction(project: Project, functionId: string): HarmonicFunctionIdentity {
-  const identity = recommendationVocabulary(project.activeModule).find((candidate) => candidate.functionId === functionId);
-  if (!identity) throw new RangeError(`Unsupported ${project.activeModule} function: ${functionId}`);
+export function identityForMatrixFunction(
+  project: Project,
+  functionId: string,
+): HarmonicFunctionIdentity {
+  const identity = recommendationVocabulary(project.activeModule).find(
+    (candidate) => candidate.functionId === functionId,
+  );
+  if (!identity)
+    throw new RangeError(`Unsupported ${project.activeModule} function: ${functionId}`);
   return identity;
 }
 
@@ -24,17 +32,28 @@ function templateFor(project: Project, functionId: string): MatrixCardTemplateSt
   return project.moduleTemplateStates[project.activeModule].cards[functionId];
 }
 
-export function createMatrixChordStep(project: Project, functionId: string, stepId: string): ChordStep {
+export function createMatrixChordStep(
+  project: Project,
+  functionId: string,
+  stepId: string,
+): ChordStep {
   const identity = identityForMatrixFunction(project, functionId);
   const chord = realizeChord(identity, project.tonic);
   const template = templateFor(project, functionId);
   const resolved = resolveStepCreationDefaults(project.defaults.piano, template?.explicitOverrides);
-  const performance = snapshotStepPerformance(Object.freeze({
-    ...resolved.performance,
-    ...(template?.manualPreviewVoicing
-      ? { voicingMode: "manual" as const, manualVoicing: Object.freeze([...template.manualPreviewVoicing]) }
-      : resolved.performance.manualVoicing ? { manualVoicing: Object.freeze([...resolved.performance.manualVoicing]) } : {}),
-  }));
+  const performance = snapshotStepPerformance(
+    Object.freeze({
+      ...resolved.performance,
+      ...(template?.manualPreviewVoicing
+        ? {
+            voicingMode: "manual" as const,
+            manualVoicing: Object.freeze([...template.manualPreviewVoicing]),
+          }
+        : resolved.performance.manualVoicing
+          ? { manualVoicing: Object.freeze([...resolved.performance.manualVoicing]) }
+          : {}),
+    }),
+  );
   const duration = resolved.duration;
   return Object.freeze({
     id: stepId,
@@ -47,15 +66,24 @@ export function createMatrixChordStep(project: Project, functionId: string, step
   });
 }
 
-export function addMatrixPreview(project: Project, command: AddMatrixPreviewCommand): AppliedCommand {
+export function addMatrixPreview(
+  project: Project,
+  command: AddMatrixPreviewCommand,
+): AppliedCommand {
   const step = createMatrixChordStep(project, command.payload.functionId, command.payload.stepId);
   const next: Project = Object.freeze({
     ...project,
     updatedAt: command.payload.nowIso,
-    progression: Object.freeze({ ...project.progression, steps: Object.freeze([...project.progression.steps, step]) }),
+    progression: Object.freeze({
+      ...project.progression,
+      steps: Object.freeze([...project.progression.steps, step]),
+    }),
   });
   return {
     project: next,
-    inverse: { type: "progression/remove-step", payload: { stepId: step.id, nowIso: command.payload.nowIso } },
+    inverse: {
+      type: "progression/remove-step",
+      payload: { stepId: step.id, nowIso: command.payload.nowIso },
+    },
   };
 }

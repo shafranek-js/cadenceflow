@@ -19,13 +19,21 @@ export interface ProjectDefaults {
   readonly piano: StepCreationDefaults;
 }
 
-export function resolveStepPerformance(defaults: StepPerformance, overrides?: StepPerformanceOverrides): StepPerformance {
+export function resolveStepPerformance(
+  defaults: StepPerformance,
+  overrides?: StepPerformanceOverrides,
+): StepPerformance {
   if (!overrides) return defaults;
-  const bass = overrides.bass ? Object.freeze({ ...defaults.bass, ...overrides.bass }) : defaults.bass;
+  const bass = overrides.bass
+    ? Object.freeze({ ...defaults.bass, ...overrides.bass })
+    : defaults.bass;
   return Object.freeze({ ...defaults, ...overrides, bass });
 }
 
-export function resolveStepCreationDefaults(defaults: StepCreationDefaults, overrides?: StepCreationOverrides): StepCreationDefaults {
+export function resolveStepCreationDefaults(
+  defaults: StepCreationDefaults,
+  overrides?: StepCreationOverrides,
+): StepCreationDefaults {
   if (!overrides) return defaults;
   return Object.freeze({
     duration: overrides.duration ?? defaults.duration,

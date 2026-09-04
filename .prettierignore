@@ -1,0 +1,27 @@
+# Dependencies and build outputs
+node_modules/
+dist/
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo
+pnpm-lock.yaml
+
+# Prototype reference
+reference/
+
+# Handoff and status documents
+HANDOFF_INDEX.md
+PROJECT_STATUS.md
+NEXT_DEVELOPER_TASK.md
+DEVELOPMENT_WORKFLOW.md
+HANDOFF_MANIFEST.sha256
+
+# Spec Kit and integrations
+specs/
+.specify/
+.agents/
+
+# Audio and binary assets
+public/audio/
+public/licenses/

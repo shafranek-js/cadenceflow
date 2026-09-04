@@ -51,11 +51,14 @@ export function snapshotStepPerformance(performance: StepPerformance): StepPerfo
     ...performance,
     bass: Object.freeze({ ...performance.bass }),
     perNoteVelocityOverrides: Object.freeze({ ...performance.perNoteVelocityOverrides }),
-    ...(performance.manualVoicing ? { manualVoicing: Object.freeze([...performance.manualVoicing]) } : {}),
+    ...(performance.manualVoicing
+      ? { manualVoicing: Object.freeze([...performance.manualVoicing]) }
+      : {}),
   });
 }
 
 export function assertVelocity(value: number): number {
-  if (!Number.isInteger(value) || value < 1 || value > 127) throw new RangeError("velocity must be an integer in 1..127");
+  if (!Number.isInteger(value) || value < 1 || value > 127)
+    throw new RangeError("velocity must be an integer in 1..127");
   return value;
 }

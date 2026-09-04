@@ -30,11 +30,17 @@ export const ZERO: Rational = rational(0);
 export const ONE: Rational = rational(1);
 
 export function addRational(a: Rational, b: Rational): Rational {
-  return rational(a.numerator * b.denominator + b.numerator * a.denominator, a.denominator * b.denominator);
+  return rational(
+    a.numerator * b.denominator + b.numerator * a.denominator,
+    a.denominator * b.denominator,
+  );
 }
 
 export function subtractRational(a: Rational, b: Rational): Rational {
-  return rational(a.numerator * b.denominator - b.numerator * a.denominator, a.denominator * b.denominator);
+  return rational(
+    a.numerator * b.denominator - b.numerator * a.denominator,
+    a.denominator * b.denominator,
+  );
 }
 
 export function multiplyRational(a: Rational, b: Rational): Rational {

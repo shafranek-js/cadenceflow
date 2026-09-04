@@ -10,5 +10,11 @@ export function StaffCardView({ pitches }: { readonly pitches: readonly ExactPit
     if (!ref.current) return;
     return renderStaffProjection(ref.current, projection);
   }, [projection]);
-  return <div ref={ref} className="mini-staff" aria-label={`Staff realization: ${projection.notes.map((note) => `${note.step}${note.octave}`).join(", ")}`} />;
+  return (
+    <div
+      ref={ref}
+      className="mini-staff"
+      aria-label={`Staff realization: ${projection.notes.map((note) => `${note.step}${note.octave}`).join(", ")}`}
+    />
+  );
 }

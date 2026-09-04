@@ -10,4 +10,7 @@ export interface AppliedCommand {
   readonly inverse: ProjectCommand;
 }
 
-export type ProjectCommandHandler<TCommand extends ProjectCommand = ProjectCommand> = (project: Project, command: TCommand) => AppliedCommand;
+export type ProjectCommandHandler<TCommand extends ProjectCommand = ProjectCommand> = (
+  project: Project,
+  command: TCommand,
+) => AppliedCommand;

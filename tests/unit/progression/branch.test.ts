@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { appendBranchStep, commitBranch, compareBranch, setBranchRejoin, startTemporaryBranch } from "../../../src/domain/progression/branch";
+import {
+  appendBranchStep,
+  commitBranch,
+  compareBranch,
+  setBranchRejoin,
+  startTemporaryBranch,
+} from "../../../src/domain/progression/branch";
 import type { Progression } from "../../../src/domain/progression/progression";
 import type { ChordStep } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
@@ -8,9 +14,19 @@ import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 
 function step(id: string, fn: string): ChordStep {
-  return { id, kind: "chord", harmonicFunction: { moduleId: "progressions", functionId: fn, category: "core" }, harmonicVariant: EMPTY_HARMONIC_VARIANT, duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }), performance: DEFAULT_PIANO_PERFORMANCE, cardView: "harmonic" };
+  return {
+    id,
+    kind: "chord",
+    harmonicFunction: { moduleId: "progressions", functionId: fn, category: "core" },
+    harmonicVariant: EMPTY_HARMONIC_VARIANT,
+    duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }),
+    performance: DEFAULT_PIANO_PERFORMANCE,
+    cardView: "harmonic",
+  };
 }
-function progression(): Progression { return { steps: [step("s1", "I"), step("s2", "vi"), step("s3", "IV"), step("s4", "V")] }; }
+function progression(): Progression {
+  return { steps: [step("s1", "I"), step("s2", "vi"), step("s3", "IV"), step("s4", "V")] };
+}
 
 describe("temporary branch", () => {
   it("compares and whole-commits only the interval before the rejoin", () => {
@@ -30,7 +46,12 @@ describe("temporary branch", () => {
     branch = appendBranchStep(branch, step("b1", "ii"));
     branch = appendBranchStep(branch, step("b2", "V"));
     branch = setBranchRejoin(p, branch, "s4");
-    expect(commitBranch(p, branch, ["b2"]).steps.map((x) => x.id)).toEqual(["s1", "s2", "b2", "s4"]);
+    expect(commitBranch(p, branch, ["b2"]).steps.map((x) => x.id)).toEqual([
+      "s1",
+      "s2",
+      "b2",
+      "s4",
+    ]);
   });
 
   it("rejects invalid rejoin and requires an explicit rejoin for a mid-progression commit", () => {

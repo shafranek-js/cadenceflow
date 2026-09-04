@@ -44,12 +44,18 @@ export interface HarmonicVariantValidation {
   readonly errors: readonly string[];
 }
 
-export function validateHarmonicVariant(baseQuality: BaseChordQuality, variant: HarmonicVariant): HarmonicVariantValidation {
+export function validateHarmonicVariant(
+  baseQuality: BaseChordQuality,
+  variant: HarmonicVariant,
+): HarmonicVariantValidation {
   const errors: string[] = [];
   if (variant.suspensions.length > 1) errors.push("Only one suspension may be active at a time");
-  if (variant.add9 && variant.extensions.includes(9)) errors.push("add9 and extension 9 are mutually exclusive");
+  if (variant.add9 && variant.extensions.includes(9))
+    errors.push("add9 and extension 9 are mutually exclusive");
   const alterationDegrees = variant.alterations.map((item) => item.degree);
-  if (new Set(alterationDegrees).size !== alterationDegrees.length) errors.push("Only one alteration per degree is supported");
-  if (baseQuality === "diminished" && variant.suspensions.length > 0) errors.push("Suspensions are not supported on diminished base quality in v1");
+  if (new Set(alterationDegrees).size !== alterationDegrees.length)
+    errors.push("Only one alteration per degree is supported");
+  if (baseQuality === "diminished" && variant.suspensions.length > 0)
+    errors.push("Suspensions are not supported on diminished base quality in v1");
   return { valid: errors.length === 0, errors };
 }

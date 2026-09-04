@@ -34,13 +34,17 @@ const MIN_STRONG_SCORE = 68;
 
 function baseScore(moduleId: HarmonicModuleId, from: string, to: string): RecommendationCandidate {
   const factors: RecommendationFactor[] = [];
-  const currentTonicizationTarget = moduleId === "dark-harmony" ? secondaryDiminishedTarget(from) : secondaryDominantTarget(from);
+  const currentTonicizationTarget =
+    moduleId === "dark-harmony" ? secondaryDiminishedTarget(from) : secondaryDominantTarget(from);
   let score = 30;
 
   if (currentTonicizationTarget === to) {
     score = 112;
     factors.push({
-      code: moduleId === "dark-harmony" ? "secondary-diminished-resolution" : "secondary-dominant-resolution",
+      code:
+        moduleId === "dark-harmony"
+          ? "secondary-diminished-resolution"
+          : "secondary-dominant-resolution",
       contribution: 82,
       source: "function",
     });
@@ -49,13 +53,21 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
     // strong destination from the current function. This is what allows the
     // expanded strip to surface useful non-baseline secondary diminished cards.
     const target = secondaryDiminishedTarget(to)!;
-    const targetRule = rulesForModule(moduleId).find((candidate) => candidate.from === from && candidate.to === target);
+    const targetRule = rulesForModule(moduleId).find(
+      (candidate) => candidate.from === from && candidate.to === target,
+    );
     if (targetRule) {
       score = Math.max(MIN_STRONG_SCORE, targetRule.score - 8);
-      factors.push({ code: "approach-via-secondary-diminished", contribution: score - 30, source: "function" });
+      factors.push({
+        code: "approach-via-secondary-diminished",
+        contribution: score - 30,
+        source: "function",
+      });
     }
   } else {
-    const rule = rulesForModule(moduleId).find((candidate) => candidate.from === from && candidate.to === to);
+    const rule = rulesForModule(moduleId).find(
+      (candidate) => candidate.from === from && candidate.to === to,
+    );
     if (rule) {
       score = rule.score;
       factors.push({ code: rule.factor, contribution: rule.score - 30, source: "function" });
@@ -82,12 +94,21 @@ export function recommend(context: RecommendationContext): RecommendationResult 
         score += variantBoost;
         factors.push({ code: "variant-tendency", contribution: variantBoost, source: "variant" });
       }
-      const intent = intentAdjustment(context.compositionIntent ?? "neutral", moduleId, context.currentFunctionId, id);
+      const intent = intentAdjustment(
+        context.compositionIntent ?? "neutral",
+        moduleId,
+        context.currentFunctionId,
+        id,
+      );
       if (intent) {
         score += intent.amount;
         factors.push({ code: intent.code, contribution: intent.amount, source: "intent" });
       }
-      return { functionId: id, score, factors: Object.freeze(factors) } satisfies RecommendationCandidate;
+      return {
+        functionId: id,
+        score,
+        factors: Object.freeze(factors),
+      } satisfies RecommendationCandidate;
     })
     .sort((a, b) => b.score - a.score || a.functionId.localeCompare(b.functionId));
 
@@ -95,7 +116,13 @@ export function recommend(context: RecommendationContext): RecommendationResult 
   const bestMatch = strong[0] ?? null;
   const alternatives = bestMatch ? strong.slice(1, 4) : [];
   return {
-    contextHash: JSON.stringify([moduleId, context.currentFunctionId, context.recentFunctionIds, context.variantEvidence ?? {}, context.compositionIntent ?? "neutral"]),
+    contextHash: JSON.stringify([
+      moduleId,
+      context.currentFunctionId,
+      context.recentFunctionIds,
+      context.variantEvidence ?? {},
+      context.compositionIntent ?? "neutral",
+    ]),
     bestMatch,
     alternatives: Object.freeze(alternatives),
   };

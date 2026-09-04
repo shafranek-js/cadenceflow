@@ -10,7 +10,8 @@ describe("domain architecture boundary", () => {
     const names = (await readdir(root, { recursive: true })).filter((name) => name.endsWith(".ts"));
     for (const name of names) {
       const source = await readFile(resolve(root, name), "utf8");
-      for (const token of forbidden) expect(source.toLowerCase()).not.toContain(token.toLowerCase());
+      for (const token of forbidden)
+        expect(source.toLowerCase()).not.toContain(token.toLowerCase());
     }
   });
 });

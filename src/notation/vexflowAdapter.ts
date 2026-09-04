@@ -10,7 +10,10 @@ function accidentalToken(alter: number): string | null {
   return null;
 }
 
-export function renderStaffProjection(container: HTMLDivElement, projection: StaffProjectionDto): () => void {
+export function renderStaffProjection(
+  container: HTMLDivElement,
+  projection: StaffProjectionDto,
+): () => void {
   container.replaceChildren();
   if (projection.notes.length === 0) return () => container.replaceChildren();
 
