@@ -1,7 +1,7 @@
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import type { ChordStep } from "../../domain/progression/step";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
-import { realizeChord } from "../../domain/harmony/realization";
+import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import {
   exactPitch,
   normalizePitchClass,
@@ -9,6 +9,14 @@ import {
   type ExactPitch,
   type PitchSpelling,
 } from "../../domain/harmony/pitch";
+import type {
+  ArticulationDescriptor,
+  CardViewDescriptor,
+  InstrumentProfile,
+  InstrumentRealization,
+  InstrumentRealizationInput,
+  ValidationResult,
+} from "../contracts";
 
 const STEPS: readonly DiatonicStep[] = ["C", "D", "E", "F", "G", "A", "B"];
 const NATURAL_PC: Readonly<Record<DiatonicStep, number>> = {
@@ -53,11 +61,44 @@ export function realizeBasicPreview(chord: ChordDefinition): PreviewPianoRealiza
   return Object.freeze({ pitches: Object.freeze(pitches) });
 }
 
+export const PIANO_CARD_VIEWS: readonly CardViewDescriptor[] = Object.freeze([
+  Object.freeze({ id: "harmonic", label: "Harmonic" }),
+  Object.freeze({ id: "piano", label: "Piano" }),
+  Object.freeze({ id: "staff", label: "Staff" }),
+]);
+
+export const PIANO_ARTICULATIONS: readonly ArticulationDescriptor[] = Object.freeze([
+  Object.freeze({ id: "block", label: "Block" }),
+  Object.freeze({ id: "arp-up", label: "Arp Up" }),
+  Object.freeze({ id: "arp-down", label: "Arp Down" }),
+  Object.freeze({ id: "broken-chord", label: "Broken Chord" }),
+  Object.freeze({ id: "humanized", label: "Humanized" }),
+]);
+
+export const pianoProfile: InstrumentProfile = Object.freeze({
+  id: "piano",
+  displayName: "Acoustic Piano",
+  supportedCardViews(): readonly CardViewDescriptor[] {
+    return PIANO_CARD_VIEWS;
+  },
+  supportedArticulations(): readonly ArticulationDescriptor[] {
+    return PIANO_ARTICULATIONS;
+  },
+  validateManualVoicing(_pitches: readonly ExactPitch[]): ValidationResult {
+    // Contract stub for T083 — full manual voicing validation will be implemented in Batch B
+    return Object.freeze({ valid: true, messages: Object.freeze([]) });
+  },
+  realizeChord(_input: InstrumentRealizationInput): InstrumentRealization {
+    // Contract stub for T081/T082/T084/T085 — realization pipeline will be implemented in Batch B
+    return Object.freeze({ pitches: Object.freeze([]) });
+  },
+});
+
 export function realizeProgressionStepPitches(
   step: ChordStep,
   tonic: PitchClassIdentity,
 ): readonly ExactPitch[] {
   if (step.performance.voicingMode === "manual" && step.performance.manualVoicing?.length)
     return step.performance.manualVoicing;
-  return realizeBasicPreview(realizeChord(step.harmonicFunction, tonic)).pitches;
+  return realizeBasicPreview(realizeHarmonyChord(step.harmonicFunction, tonic)).pitches;
 }
