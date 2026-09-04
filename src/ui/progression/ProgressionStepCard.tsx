@@ -57,7 +57,7 @@ export function ProgressionStepCard({
       <div className="step-view">
         {step.cardView === "harmonic" ? (
           <>
-            <strong>{step.harmonicFunction.functionId}</strong>
+            <strong data-testid="step-function">{step.harmonicFunction.functionId}</strong>
             <span>
               {step.performance.articulation} · v{step.performance.masterVelocity}
             </span>

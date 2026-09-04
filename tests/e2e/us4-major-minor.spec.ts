@@ -12,12 +12,16 @@ test("US4 switches unambiguous progression from Major to Tonal Minor without los
     .getByTestId("chord-card-V")
     .getByRole("button", { name: /Add V to progression/i })
     .click();
-  await page.getByRole("button", { name: "Set key D" }).click();
+  await page.getByRole("button", { name: "Set key D", exact: true }).click();
   await expect(page.getByTestId("chord-card-V")).toContainText("A");
   await page.getByRole("button", { name: /Dark Harmony/i }).click();
   await expect(page.getByTestId("progression-step")).toHaveCount(2);
-  await expect(page.getByTestId("progression-step").nth(0)).toHaveText("i");
-  await expect(page.getByTestId("progression-step").nth(1)).toHaveText("V");
+  await expect(page.getByTestId("progression-step").nth(0).getByTestId("step-function")).toHaveText(
+    "i",
+  );
+  await expect(page.getByTestId("progression-step").nth(1).getByTestId("step-function")).toHaveText(
+    "V",
+  );
 });
 
 test("US4 never guesses an ambiguous module conversion silently", async ({ page }) => {

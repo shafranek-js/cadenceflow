@@ -29,7 +29,13 @@ test("US2 explores a mid-progression branch, compares paths, rejoins, and commit
 
   await page.getByRole("button", { name: "Commit Branch" }).click();
   await expect(page.getByTestId("progression-step")).toHaveCount(5);
-  await expect(page.getByTestId("progression-step").nth(2)).toHaveText("ii");
-  await expect(page.getByTestId("progression-step").nth(3)).toHaveText("V7/V");
-  await expect(page.getByTestId("progression-step").nth(4)).toHaveText("V");
+  await expect(page.getByTestId("progression-step").nth(2).getByTestId("step-function")).toHaveText(
+    "ii",
+  );
+  await expect(page.getByTestId("progression-step").nth(3).getByTestId("step-function")).toHaveText(
+    "V7/V",
+  );
+  await expect(page.getByTestId("progression-step").nth(4).getByTestId("step-function")).toHaveText(
+    "V",
+  );
 });
