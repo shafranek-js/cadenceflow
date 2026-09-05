@@ -51,7 +51,7 @@ export class AppStore {
     const applied = handler(before, command);
     this.#project = applied.project;
     if (command.type !== "progression/select-step") {
-      this.history.push({ forward: command, inverse: applied.inverse });
+      this.history.push({ forward: applied.forward ?? command, inverse: applied.inverse });
     }
     this.#notify();
   }
@@ -64,8 +64,28 @@ export class AppStore {
     return true;
   }
 
+  redo(): boolean {
+    const entry = this.history.takeRedo();
+    if (!entry) return false;
+    this.#project = applyInverseCommand(this.#project, entry.forward);
+    this.#notify();
+    return true;
+  }
+
   get canUndo(): boolean {
     return this.history.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.history.canRedo;
+  }
+
+  setProjectDefaults(defaults: Project["defaults"]): void {
+    this.#project = Object.freeze({
+      ...this.#project,
+      defaults,
+    });
+    this.#notify();
   }
 
   replaceLoadedProject(project: Project): void {

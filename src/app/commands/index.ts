@@ -8,6 +8,7 @@ export interface ProjectCommand<TPayload = unknown> {
 export interface AppliedCommand {
   readonly project: Project;
   readonly inverse: ProjectCommand;
+  readonly forward?: ProjectCommand;
 }
 
 export type ProjectCommandHandler<TCommand extends ProjectCommand = ProjectCommand> = (

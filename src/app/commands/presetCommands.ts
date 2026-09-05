@@ -75,6 +75,13 @@ export function saveCustomPreset(
       customPresets: updatedCustomPresets,
       updatedAt: command.payload.nowIso,
     }),
+    forward: {
+      type: "presets/restore-custom",
+      payload: {
+        customPresets: updatedCustomPresets,
+        nowIso: command.payload.nowIso,
+      },
+    },
     inverse: {
       type: "presets/restore-custom",
       payload: {
@@ -124,6 +131,13 @@ export function deleteCustomPreset(
       customPresets: updatedCustomPresets,
       updatedAt: command.payload.nowIso,
     }),
+    forward: {
+      type: "presets/restore-custom",
+      payload: {
+        customPresets: updatedCustomPresets,
+        nowIso: command.payload.nowIso,
+      },
+    },
     inverse: {
       type: "presets/restore-custom",
       payload: {
@@ -159,6 +173,13 @@ export function applyPreset(project: Project, command: ApplyPresetCommand): Appl
       progression: nextProgression,
       updatedAt: command.payload.nowIso,
     }),
+    forward: {
+      type: "progression/restore",
+      payload: {
+        progression: nextProgression,
+        nowIso: command.payload.nowIso,
+      },
+    },
     inverse: {
       type: "progression/restore",
       payload: {

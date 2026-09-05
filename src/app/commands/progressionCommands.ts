@@ -39,6 +39,7 @@ export function restoreProgression(
 function withInverse(project: Project, progression: Progression, nowIso: string): AppliedCommand {
   return {
     project: updateProgression(project, progression, nowIso),
+    forward: { type: "progression/restore", payload: { progression, nowIso } },
     inverse: { type: "progression/restore", payload: { progression: project.progression, nowIso } },
   };
 }

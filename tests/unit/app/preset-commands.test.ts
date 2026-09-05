@@ -169,11 +169,8 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       const undone = applyInverseCommand(initialSave.project, initialSave.inverse);
       expect(undone.customPresets).toHaveLength(0);
 
-      // Redo via inverse of undo: restores the exact snapshot
-      const redone = applyInverseCommand(undone, {
-        type: "presets/restore-custom",
-        payload: { customPresets: initialSave.project.customPresets, nowIso },
-      });
+      // Redo via production forward snapshot: restores the exact snapshot
+      const redone = applyInverseCommand(undone, initialSave.forward!);
 
       expect(redone.customPresets).toHaveLength(1);
       const restoredPreset = redone.customPresets[0]!;
@@ -335,11 +332,8 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       expect(undone.progression.steps.map((s) => s.id)).toEqual(["step-a", "step-b", "step-c"]);
       expect(undone.progression.selectedStepId).toBe("step-b");
 
-      // Redo via progression snapshot inverse: restores A X Y [B selected] C
-      const redone = applyInverseCommand(undone, {
-        type: "progression/restore",
-        payload: { progression: applied.project.progression, nowIso },
-      });
+      // Redo via production forward snapshot: restores A X Y [B selected] C
+      const redone = applyInverseCommand(undone, applied.forward!);
 
       expect(redone.progression.steps).toHaveLength(5);
       expect(redone.progression.steps[1]!.id).toBe(capturedXId);
@@ -405,10 +399,7 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       };
 
       // Redo: restores the application snapshot, which still retains Defaults A
-      const redone = applyInverseCommand(projectWithDefaultsB, {
-        type: "progression/restore",
-        payload: { progression: applied.project.progression, nowIso },
-      });
+      const redone = applyInverseCommand(projectWithDefaultsB, applied.forward!);
 
       const redoneStep1 = redone.progression.steps[0] as ChordStep;
       expect(redoneStep1.performance.articulation).toBe("arp-up");
