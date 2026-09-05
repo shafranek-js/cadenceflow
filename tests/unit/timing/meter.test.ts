@@ -7,11 +7,7 @@ import {
   pulseToBeats,
 } from "../../../src/domain/timing/meter";
 import { musicalDuration } from "../../../src/domain/timing/duration";
-import {
-  addRational,
-  equalRational,
-  rational,
-} from "../../../src/domain/timing/rational";
+import { addRational, equalRational, rational } from "../../../src/domain/timing/rational";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 

@@ -283,9 +283,7 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
     });
 
     it("rejects loop validation on an empty progression", () => {
-      expect(() =>
-        validateLoopRegion({ startStepId: "s1", endStepId: "s1" }, []),
-      ).toThrow();
+      expect(() => validateLoopRegion({ startStepId: "s1", endStepId: "s1" }, [])).toThrow();
     });
   });
 

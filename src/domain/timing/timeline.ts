@@ -1,9 +1,4 @@
-import {
-  addRational,
-  divideRational,
-  rational,
-  type Rational,
-} from "./rational";
+import { addRational, divideRational, rational, type Rational } from "./rational";
 import type { Meter } from "./meter";
 import type { ChordStep, ProgressionStep } from "../progression/step";
 
@@ -57,18 +52,19 @@ export function createProgressionTimeline(
 
   for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
     const step = steps[stepIndex];
+    if (!step) {
+      continue;
+    }
     const startBeats = currentBeats;
     const durationBeats = step.duration.beats;
     const endBeats = addRational(startBeats, durationBeats);
     currentBeats = endBeats;
 
     const startBar = Math.floor(
-      (startBeats.numerator / startBeats.denominator) *
-        (meter.denominator / (meter.numerator * 4)),
+      (startBeats.numerator / startBeats.denominator) * (meter.denominator / (meter.numerator * 4)),
     );
     const endBar = Math.floor(
-      (endBeats.numerator / endBeats.denominator) *
-        (meter.denominator / (meter.numerator * 4)),
+      (endBeats.numerator / endBeats.denominator) * (meter.denominator / (meter.numerator * 4)),
     );
 
     entries.push(
@@ -95,18 +91,13 @@ export function createProgressionTimeline(
   });
 }
 
-export function lookupStepBoundary(
-  timeline: ProgressionTimeline,
-  boundaryIndex: number,
-): Rational {
+export function lookupStepBoundary(timeline: ProgressionTimeline, boundaryIndex: number): Rational {
   if (
     !Number.isInteger(boundaryIndex) ||
     boundaryIndex < 0 ||
     boundaryIndex > timeline.steps.length
   ) {
-    throw new RangeError(
-      `boundaryIndex must be an integer between 0 and ${timeline.steps.length}`,
-    );
+    throw new RangeError(`boundaryIndex must be an integer between 0 and ${timeline.steps.length}`);
   }
 
   if (boundaryIndex === 0) {
@@ -115,7 +106,11 @@ export function lookupStepBoundary(
   if (boundaryIndex === timeline.steps.length) {
     return timeline.totalDurationBeats;
   }
-  return timeline.steps[boundaryIndex].startBeats;
+  const entry = timeline.steps[boundaryIndex];
+  if (!entry) {
+    throw new RangeError(`invalid boundaryIndex: ${boundaryIndex}`);
+  }
+  return entry.startBeats;
 }
 
 export function validateLoopRegion(
@@ -143,12 +138,18 @@ export function validateLoopRegion(
 
   let startBeats = rational(0, 1);
   for (let i = 0; i < startStepIndex; i++) {
-    startBeats = addRational(startBeats, steps[i].duration.beats);
+    const step = steps[i];
+    if (step) {
+      startBeats = addRational(startBeats, step.duration.beats);
+    }
   }
 
   let durationBeats = rational(0, 1);
   for (let i = startStepIndex; i <= endStepIndex; i++) {
-    durationBeats = addRational(durationBeats, steps[i].duration.beats);
+    const step = steps[i];
+    if (step) {
+      durationBeats = addRational(durationBeats, step.duration.beats);
+    }
   }
 
   const endBeats = addRational(startBeats, durationBeats);
@@ -166,17 +167,13 @@ export function resolveHarmonicPredecessor(
   timeline: ProgressionTimeline,
   stepIndex: number,
 ): ChordStep | undefined {
-  if (
-    !Number.isInteger(stepIndex) ||
-    stepIndex < 0 ||
-    stepIndex >= timeline.steps.length
-  ) {
+  if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= timeline.steps.length) {
     return undefined;
   }
 
   for (let i = stepIndex - 1; i >= 0; i--) {
     const entry = timeline.steps[i];
-    if (entry.step.kind === "chord") {
+    if (entry && entry.step.kind === "chord") {
       return entry.step;
     }
   }

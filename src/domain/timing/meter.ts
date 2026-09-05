@@ -1,9 +1,4 @@
-import {
-  divideRational,
-  multiplyRational,
-  rational,
-  type Rational,
-} from "./rational";
+import { divideRational, multiplyRational, rational, type Rational } from "./rational";
 import { musicalDuration } from "./duration";
 import type { ProgressionStep } from "../progression/step";
 

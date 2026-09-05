@@ -80,7 +80,11 @@ export function parseMusicalDuration(text: string): MusicalDuration {
   if (!match) {
     throw new RangeError(`malformed musical duration text: "${text}"`);
   }
-  const num = parseInt(match[1], 10);
+  const numStr = match[1];
+  if (!numStr) {
+    throw new RangeError(`malformed musical duration text: "${text}"`);
+  }
+  const num = parseInt(numStr, 10);
   const den = match[2] !== undefined ? parseInt(match[2], 10) : 1;
   if (den === 0) {
     throw new RangeError("denominator cannot be zero");
