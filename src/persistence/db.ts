@@ -2,6 +2,9 @@ import { Dexie, type EntityTable } from "dexie";
 
 /**
  * Dexie database schema definitions and types (T121).
+ * Accepted v1 architecture:
+ * - One canonical `projects` store containing latest valid Project snapshot.
+ * - One small `metadata` store containing `lastActiveProjectId`.
  */
 
 export interface ProjectRecord {
@@ -11,7 +14,7 @@ export interface ProjectRecord {
   readonly updatedAt: string;
   readonly schemaVersion: number;
   readonly revision: number;
-  readonly payload: string;
+  readonly payload: string; // Canonical portable semantic .cadenceflow JSON payload
 }
 
 export interface MetadataRecord {
@@ -19,30 +22,20 @@ export interface MetadataRecord {
   readonly value: unknown;
 }
 
-export interface AutosaveRecord {
-  readonly id: string;
-  readonly projectId: string;
-  readonly updatedAt: string;
-  readonly payload: unknown;
-}
-
 export interface CadenceFlowDatabase extends Dexie {
   projects: EntityTable<ProjectRecord, "id">;
   metadata: EntityTable<MetadataRecord, "key">;
-  autosaves: EntityTable<AutosaveRecord, "id">;
 }
 
 export class CadenceFlowDexie extends Dexie implements CadenceFlowDatabase {
   projects!: EntityTable<ProjectRecord, "id">;
   metadata!: EntityTable<MetadataRecord, "key">;
-  autosaves!: EntityTable<AutosaveRecord, "id">;
 
   constructor(dbName = "CadenceFlowDB") {
     super(dbName);
     this.version(1).stores({
       projects: "id, name, updatedAt, schemaVersion, revision",
       metadata: "key",
-      autosaves: "id, projectId, updatedAt",
     });
   }
 }

@@ -95,20 +95,24 @@ export class DebouncedAutosaveEngine implements AutosaveEngine {
       await this.flush();
     }
     const lastActiveId = await this.repo.getLastActiveProjectId();
-    if (lastActiveId) {
-      const project = await this.repo.loadProject(lastActiveId);
-      if (project) {
-        return project;
-      }
+    if (!lastActiveId) {
+      return null;
     }
-    // Fallback if no last active pointer exists: find most recently updated project
-    const list = await this.repo.listProjects();
-    if (list.length > 0 && list[0]) {
-      return this.repo.loadProject(list[0].id);
+    const project = await this.repo.loadProject(lastActiveId);
+    if (project) {
+      return project;
     }
+    // Stale pointer detected: referenced project does not exist in store.
+    // Deterministically clear stale pointer and return null (no arbitrary resurrection).
+    await this.repo.clearLastActiveProjectId();
     return null;
   }
 
+  /**
+   * Cancels pending autosave timers, discards unpersisted in-memory snapshots,
+   * and clears the `lastActiveProjectId` pointer in metadata.
+   * NOTE: Does NOT delete the canonical named Project record from the database.
+   */
   async clearAutosave(): Promise<void> {
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
@@ -118,6 +122,11 @@ export class DebouncedAutosaveEngine implements AutosaveEngine {
     await this.repo.clearLastActiveProjectId();
   }
 
+  /**
+   * Disposes the autosave engine, canceling any pending debounce timer
+   * and discarding unpersisted pending memory state without scheduling new persistence.
+   * NOTE: Call `flush()` prior to `dispose()` if pending state must be guaranteed saved.
+   */
   dispose(): void {
     this.isDisposed = true;
     if (this.debounceTimer !== null) {

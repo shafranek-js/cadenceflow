@@ -44,62 +44,99 @@ export class InvalidPortableProjectError extends Error {
 }
 
 /**
- * Pure deterministic encoder for DurationDisplayHint into schema string.
+ * Pure deterministic encoder for DurationDisplayHint into strict schema wire string.
  */
 export function encodeDurationDisplayHint(hint?: DurationDisplayHint): string | undefined {
   if (!hint) return undefined;
   switch (hint.kind) {
     case "bars":
+      if (!Number.isInteger(hint.bars) || hint.bars < 1) {
+        throw new InvalidPortableProjectError(
+          `Invalid DurationDisplayHint bars: must be a positive integer, received ${hint.bars}`,
+        );
+      }
       return `bars:${hint.bars}`;
     case "beats":
       return hint.label !== undefined ? `beats:${hint.label}` : "beats";
     case "dotted":
+      if (
+        !Number.isInteger(hint.baseBeats.numerator) ||
+        hint.baseBeats.numerator < 1 ||
+        !Number.isInteger(hint.baseBeats.denominator) ||
+        hint.baseBeats.denominator < 1
+      ) {
+        throw new InvalidPortableProjectError(
+          `Invalid DurationDisplayHint dotted baseBeats: must be positive integers, received ${hint.baseBeats.numerator}/${hint.baseBeats.denominator}`,
+        );
+      }
       return `dotted:${hint.baseBeats.numerator}/${hint.baseBeats.denominator}`;
     case "triplet":
+      if (
+        !Number.isInteger(hint.baseBeats.numerator) ||
+        hint.baseBeats.numerator < 1 ||
+        !Number.isInteger(hint.baseBeats.denominator) ||
+        hint.baseBeats.denominator < 1
+      ) {
+        throw new InvalidPortableProjectError(
+          `Invalid DurationDisplayHint triplet baseBeats: must be positive integers, received ${hint.baseBeats.numerator}/${hint.baseBeats.denominator}`,
+        );
+      }
       return `triplet:${hint.baseBeats.numerator}/${hint.baseBeats.denominator}`;
   }
 }
 
 /**
- * Pure deterministic decoder for DurationDisplayHint from schema string.
+ * Pure deterministic decoder for DurationDisplayHint from strict schema wire string.
+ * Strictly enforces v1 grammar:
+ * - "beats"
+ * - "beats:<label>"
+ * - "bars:<positive-integer>"
+ * - "dotted:<positive-integer>/<positive-integer>"
+ * - "triplet:<positive-integer>/<positive-integer>"
+ *
+ * Any unknown, malformed, or legacy format throws InvalidPortableProjectError.
  */
 export function decodeDurationDisplayHint(raw?: string): DurationDisplayHint | undefined {
-  if (!raw) return undefined;
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string" || raw.length === 0) {
+    throw new InvalidPortableProjectError(
+      `Invalid DurationDisplayHint wire value: expected non-empty string, received ${String(raw)}`,
+    );
+  }
+
   if (raw === "beats") {
     return { kind: "beats" };
   }
+
   if (raw.startsWith("beats:")) {
-    return { kind: "beats", label: raw.slice(6) };
+    const label = raw.slice(6);
+    return { kind: "beats", label };
   }
-  if (raw.startsWith("bars:")) {
-    const bars = parseInt(raw.slice(5), 10);
-    return { kind: "bars", bars: Number.isFinite(bars) ? bars : 1 };
+
+  const barsMatch = /^bars:([1-9]\d*)$/.exec(raw);
+  if (barsMatch && barsMatch[1]) {
+    return { kind: "bars", bars: Number(barsMatch[1]) };
   }
-  if (raw.startsWith("dotted:")) {
-    const parts = raw.slice(7).split("/");
-    const num = parseInt(parts[0] ?? "1", 10);
-    const den = parseInt(parts[1] ?? "1", 10);
+
+  const dottedMatch = /^dotted:([1-9]\d*)\/([1-9]\d*)$/.exec(raw);
+  if (dottedMatch && dottedMatch[1] && dottedMatch[2]) {
     return {
       kind: "dotted",
-      baseBeats: rational(
-        Number.isFinite(num) ? num : 1,
-        Number.isFinite(den) && den > 0 ? den : 1,
-      ),
+      baseBeats: rational(Number(dottedMatch[1]), Number(dottedMatch[2])),
     };
   }
-  if (raw.startsWith("triplet:")) {
-    const parts = raw.slice(8).split("/");
-    const num = parseInt(parts[0] ?? "1", 10);
-    const den = parseInt(parts[1] ?? "1", 10);
+
+  const tripletMatch = /^triplet:([1-9]\d*)\/([1-9]\d*)$/.exec(raw);
+  if (tripletMatch && tripletMatch[1] && tripletMatch[2]) {
     return {
       kind: "triplet",
-      baseBeats: rational(
-        Number.isFinite(num) ? num : 1,
-        Number.isFinite(den) && den > 0 ? den : 1,
-      ),
+      baseBeats: rational(Number(tripletMatch[1]), Number(tripletMatch[2])),
     };
   }
-  return { kind: "beats", label: raw };
+
+  throw new InvalidPortableProjectError(
+    `Invalid or unrecognized DurationDisplayHint wire string: "${raw}"`,
+  );
 }
 
 // Wire duration representation matching cadenceflow-project.schema.json
