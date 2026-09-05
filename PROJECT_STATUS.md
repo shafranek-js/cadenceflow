@@ -1,15 +1,18 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** US5 / Phase 8 accepted; next milestone is US6 / Phase 9 (T097–T111)  
-**Task progress:** T001–T096 complete, 96 / 158 total tasks  
+**Current implementation stage:** US6 / Phase 9 in progress; timing contracts (T097–T100) accepted; next milestone is US6 domain implementation (T101–T104)  
+**Task progress:** T001–T100 complete, 100 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) is fully accepted across all tasks T077–T096.
 
-The next milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111).
+The current milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111). Timing contracts T097–T100 are accepted. Canonical timing invariant is established:
+- `1 MusicalDuration beat = one quarter note`
+- Bar length in canonical beats is `meter.numerator * 4 / meter.denominator`.
+- All musical timing arithmetic is exact Rational arithmetic.
 
 ## 2. Sources of truth
 
@@ -119,6 +122,14 @@ Implemented:
 - Full Playwright acceptance test suite covering repeated chord independence, Manual Voicing Editor validation & register immunity, per-note dynamics & presets, independent bass selection & bounds, and HQ piano readiness & discrete velocity layer paths in real Chromium (`T096`).
 
 **Current known limitation**: Sustain multisamples are implemented for v1; Salamander release resonance, sympathetic string resonance, hammer noise, and pedal noise layers remain deferred.
+
+### US6 Batch A — exact timing contracts — T097–T100
+
+Defined and verified executable test contracts for CadenceFlow's exact musical-time model:
+- `tests/unit/timing/duration.test.ts` (`T097`): canonical 1 beat = quarter-note beat invariant, dotted (3/2 * base), triplet (2/3 * base), bars ↔ beats conversions across simple/compound/asymmetric meters, formatting and round-trip.
+- `tests/unit/timing/meter.test.ts` (`T098`): meter validation, pulse vs canonical quarter-note beat separation, accent projection hierarchy (`primary`, `secondary`, `subdivision`), and `reflow` vs `preserve-beat-lengths` meter change policies across bar boundaries.
+- `tests/unit/timing/swing.test.ts` (`T099`): straight vs swing projection, pair sum invariance, swing amount ordering, non-destructive preservation, and ineligible subdivision exclusion.
+- `tests/unit/timing/timeline.test.ts` (`T100`): rational progression timeline, rest step duration consumption, harmonic predecessor resolution across rests, contiguous loop region invariant, and 1000-step precision drift immunity.
 
 ## 4. Key technical decisions that must be preserved
 

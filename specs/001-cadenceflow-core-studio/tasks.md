@@ -235,10 +235,10 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T097 [P] [US6] Write exact-duration, dotted, triplet, and bars/beats conversion tests in `tests/unit/timing/duration.test.ts`
-- [ ] T098 [P] [US6] Write custom meter/grouping and `Reflow` versus `Preserve beat lengths` transformation tests in `tests/unit/timing/meter.test.ts`
-- [ ] T099 [P] [US6] Write swing and semantic-duration preservation tests in `tests/unit/timing/swing.test.ts`
-- [ ] T100 [P] [US6] Write timeline/Rest Step/loop-boundary/no-drift tests in `tests/unit/timing/timeline.test.ts`
+- [x] T097 [P] [US6] Write exact-duration, dotted, triplet, and bars/beats conversion tests in `tests/unit/timing/duration.test.ts`
+- [x] T098 [P] [US6] Write custom meter/grouping and `Reflow` versus `Preserve beat lengths` transformation tests in `tests/unit/timing/meter.test.ts`
+- [x] T099 [P] [US6] Write swing and semantic-duration preservation tests in `tests/unit/timing/swing.test.ts`
+- [x] T100 [P] [US6] Write timeline/Rest Step/loop-boundary/no-drift tests in `tests/unit/timing/timeline.test.ts`
 ### Implementation
 
 - [ ] T101 [US6] Implement exact duration constructors/parsers for bars, beats, fractional beats, dotted values, and tuplets in `src/domain/timing/duration.ts`
