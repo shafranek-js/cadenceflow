@@ -148,7 +148,7 @@ Implemented:
 
 ### US6 Batch D — integration, E2E acceptance, and final closure — T110–T111
 
-Fully accepted and closed across all 158 tasks to date (111 / 158):
+US6 / Phase 9 fully accepted and closed. Overall project progress: 111 / 158.
 - `tests/integration/timing-audio-projection.test.ts` (`T110`): 14 comprehensive integration fixtures verifying:
   1. Exact tempo-boundary invariance (60 vs 120 BPM: $s_{120} = s_{60} / 2$, silence during rests, zero mutation).
   2. Production T103 swing projection ($\Delta = U \times \frac{A}{3}$) across $A \in [0, 0.55, 0.66, 0.75, 1.0]$.
