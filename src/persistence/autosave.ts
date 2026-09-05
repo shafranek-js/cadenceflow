@@ -17,7 +17,7 @@ export interface AutosaveEngine {
   scheduleAutosave(project: Project): void;
   flush(): Promise<void>;
   loadAutosavedProject(): Promise<Project | null>;
-  clearAutosave(): Promise<void>;
+  clearRecoveryTarget(): Promise<void>;
   dispose(): void;
 }
 
@@ -109,16 +109,11 @@ export class DebouncedAutosaveEngine implements AutosaveEngine {
   }
 
   /**
-   * Cancels pending autosave timers, discards unpersisted in-memory snapshots,
-   * and clears the `lastActiveProjectId` pointer in metadata.
-   * NOTE: Does NOT delete the canonical named Project record from the database.
+   * Clears the `lastActiveProjectId` recovery pointer in metadata so that subsequent
+   * sessions do not automatically resume the last project.
+   * NOTE: Does NOT cancel pending saves, mutate Project payloads, or delete any Project record.
    */
-  async clearAutosave(): Promise<void> {
-    if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
-    this.pendingProject = null;
+  async clearRecoveryTarget(): Promise<void> {
     await this.repo.clearLastActiveProjectId();
   }
 

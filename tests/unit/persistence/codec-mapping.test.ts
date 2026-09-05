@@ -483,23 +483,78 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
     });
   });
 
-  describe("clearAutosave() Contract (Item 2)", () => {
-    it("cancels timer and clears pointer without deleting the Project record", async () => {
-      const db = createCadenceFlowDb("ClearAutosaveDB");
+  describe("clearRecoveryTarget() Lifecycle & Safety Contracts (Items 2, 4, 5, 6)", () => {
+    it("clearRecoveryTarget removes last-session recovery pointer without deleting named project or mutating payload", async () => {
+      const db = createCadenceFlowDb("ClearRecoveryTargetDB");
       const repo = createProjectRepository(db);
       const autosave = createAutosaveEngine({ db, repo });
 
+      // 1. Project P is already persisted
       const p = createDefaultProject("p-retain", "Retained Project");
       await repo.saveProject(p);
+      const recordBefore = await db.projects.get("p-retain");
+      expect(recordBefore?.revision).toBe(1);
+
+      // 2. lastActiveProjectId = P
       await repo.setLastActiveProjectId("p-retain");
+      expect(await repo.getLastActiveProjectId()).toBe("p-retain");
 
-      await autosave.clearAutosave();
+      // 3. Call clearRecoveryTarget()
+      await autosave.clearRecoveryTarget();
 
-      // Pointer cleared
+      // 4. Pointer becomes null
       expect(await repo.getLastActiveProjectId()).toBeNull();
 
-      // But project record is NOT deleted!
-      expect(await repo.loadProject("p-retain")).not.toBeNull();
+      // 5. loadProject(P) still returns exact P
+      const loaded = await repo.loadProject("p-retain");
+      expect(loaded).not.toBeNull();
+      expect(loaded?.name).toBe("Retained Project");
+
+      // 6. Project record revision and payload are completely unchanged
+      const recordAfter = await db.projects.get("p-retain");
+      expect(recordAfter?.revision).toBe(recordBefore?.revision);
+      expect(recordAfter?.payload).toBe(recordBefore?.payload);
+      expect(recordAfter?.updatedAt).toBe(recordBefore?.updatedAt);
+
+      // Fresh restart: after re-opening repository, P still exists in list, but recovery returns null
+      const freshRepo = createProjectRepository(db);
+      const freshAutosave = createAutosaveEngine({ db, repo: freshRepo });
+
+      const list = await freshRepo.listProjects();
+      expect(list.some((item) => item.id === "p-retain")).toBe(true);
+      expect(await freshAutosave.loadAutosavedProject()).toBeNull(); // No resurrection
+
+      // Re-activation: set P active again
+      await freshRepo.setLastActiveProjectId("p-retain");
+      const reactivated = await freshAutosave.loadAutosavedProject();
+      expect(reactivated?.id).toBe("p-retain");
+
+      freshAutosave.dispose();
+      autosave.dispose();
+      await db.delete();
+    });
+
+    it("clearRecoveryTarget does not discard an unrelated pending semantic Project save", async () => {
+      const db = createCadenceFlowDb("PendingSaveClearTargetDB");
+      const repo = createProjectRepository(db);
+      const autosave = createAutosaveEngine({ db, repo, debounceMs: 500 });
+
+      // Project P has a pending save
+      const pPending = createDefaultProject("p-pending", "Pending Project");
+      autosave.scheduleAutosave(pPending);
+
+      // Clear recovery target while save is pending
+      await autosave.clearRecoveryTarget();
+
+      // Recovery pointer is null
+      expect(await repo.getLastActiveProjectId()).toBeNull();
+
+      // Flush commits the pending write without discarding it
+      await autosave.flush();
+
+      const loaded = await repo.loadProject("p-pending");
+      expect(loaded).not.toBeNull();
+      expect(loaded?.name).toBe("Pending Project");
 
       autosave.dispose();
       await db.delete();
