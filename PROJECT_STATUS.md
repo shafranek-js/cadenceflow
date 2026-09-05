@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 10 / User Story 7 (Presets) ACCEPTED / COMPLETE; T112–T118 accepted  
-**Task progress:** T001–T118 complete, 118 / 158 total tasks  
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T120 accepted  
+**Task progress:** T001–T120 complete, 120 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The next milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **NOT STARTED (0 / 11 complete, overall 118 / 158)**.
+The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (2 / 11 complete, overall 120 / 158)**.
 
 ## 2. Sources of truth
 
@@ -315,6 +315,27 @@ US7 / Phase 10 fully accepted and closed across all tasks T112–T118. Overall p
 - **Quality-Aware UI Previews**: Contextual UI previews show quality-aware realized chords without mutating Preset data.
 - **Modal Accessibility**: Presets modal stack uses accepted focus/inert/topmost semantics.
 
+### US8 Batch A — portable project and autosave recovery contracts — T119–T120
+
+Defined executable test contracts for CadenceFlow v1 project persistence and autosave recovery:
+- `tests/unit/persistence/portable-project.test.ts` (`T119`): 18 unit tests establishing `.cadenceflow` contract conformance, full semantic round-trip across all domains (US1–US7), schema validation rejection of malformed envelopes or extra properties, pure version migration chain, unsupported future-version rejection, wire codec mappings, and strict exclusion of history, audio, and transport runtime state.
+- `tests/integration/autosave-recovery.test.ts` (`T120`): 10 integration tests establishing transactional Dexie autosave, temporary what-if branch persistence and restoration, debounce coalescing, queue flush on demand, last-active project pointer management, and atomic deletion cleanup.
+
+#### Accepted US8 Persistence Boundaries & Invariants (T119–T120)
+- **Tonic Wire Format**: Runtime Project uses canonical `tonic: number` (`0`..`11`). Portable wire schema specifies `tonic: { semitone: number }`. Codec bridges this reversibly without altering the authoritative JSON Schema.
+- **DurationDisplayHint Wire Format**: Runtime uses structured `DurationDisplayHint` (`beats`, `bars`, `dotted`, `triplet`). Portable schema specifies string (`{ "type": "string" }`). Codec bridges this deterministically and reversibly (e.g. `bars:<n>`, `beats:<label>`, `dotted:<n>/<d>`, `triplet:<n>/<d>`).
+- **Strict Decode Pipeline Order**:
+  1. `JSON.parse` (syntax error -> `InvalidPortableProjectError`);
+  2. Plain-object / envelope check (rejects non-objects, arrays, null -> `InvalidPortableProjectError`);
+  3. Read `schemaVersion` (validate integer $\ge 1$ -> `InvalidPortableProjectError`);
+  4. Future-version check (`schemaVersion > CURRENT_VERSION` throws `UnsupportedProjectVersionError`);
+  5. Migration chain (`migrateProjectData`);
+  6. JSON Schema validation against `cadenceflow-project.schema.json` via JSON Schema validator (violations -> `InvalidPortableProjectError`);
+  7. Portable document -> runtime `Project` decode with domain invariant validation.
+- **Single Canonical Project Record**: Both portable file export and Dexie persistence share the exact same canonical serialization boundary produced by `PortableProject` codec. Dexie `ProjectRecord` stores `{ id, name, updatedAt, schemaVersion, revision, payload: PortableProjectDocument }` in IndexedDB table `projects` indexed by `id`, `name`, `updatedAt`.
+- **Last-Active Pointer**: `lastActiveProjectId` is stored in a dedicated Dexie `metadata` key-value store, not `localStorage`. Atomic delete cleans up the pointer if the active project is deleted.
+- **Strict State Exclusion**: Session Undo/Redo history, audio buffers/caches, and transport playback states are strictly excluded from persistence and initialized clean upon load.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -446,8 +467,8 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 Active milestone is **Phase 11: User Story 8 — Save and reopen complete work safely (Priority: P2)**:
 
-- **T119**: [ ] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
-- **T120**: [ ] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
+- **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
+- **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
 - **T121**: [ ] Implement Dexie database schema and project records in `src/persistence/db.ts`.
 - **T122**: [ ] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
 - **T123**: [ ] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.

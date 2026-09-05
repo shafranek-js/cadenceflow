@@ -287,8 +287,8 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T119 [P] [US8] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`
-- [ ] T120 [P] [US8] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`
+- [x] T119 [P] [US8] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`
+- [x] T120 [P] [US8] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`
 ### Implementation
 
 - [ ] T121 [US8] Implement Dexie database schema and project records in `src/persistence/db.ts`
