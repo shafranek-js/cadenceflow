@@ -432,7 +432,9 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
 
       // Events only exist for Chord 1 [0.0s, 0.5s) and Chord 2 [1.5s, 2.0s)
       const chord1Events = events.filter((e) => e.startSeconds < 0.5);
-      const restIntervalEvents = events.filter((e) => e.startSeconds >= 0.5 && e.startSeconds < 1.5);
+      const restIntervalEvents = events.filter(
+        (e) => e.startSeconds >= 0.5 && e.startSeconds < 1.5,
+      );
       const chord2Events = events.filter((e) => e.startSeconds >= 1.5);
 
       expect(chord1Events.length).toBeGreaterThan(0);
@@ -557,6 +559,7 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
       ];
       const store = new TransportStore();
       const loopRange = setLoopRange("s2", "s3", steps);
+      expect(loopRange.enabled).toBe(true);
 
       store.play({ stepCount: 3, loopStartStepIndex: 1 });
       expect(store.getState().startingStepIndex).toBe(1);

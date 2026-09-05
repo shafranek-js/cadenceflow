@@ -89,6 +89,7 @@ import {
   type ResetMatrixScopeCommand,
 } from "./commands/matrixTemplateCommands";
 import {
+  addRestStep,
   editStepPerformance,
   removeStep,
   reorderStep,
@@ -97,6 +98,7 @@ import {
   selectStep,
   setAllStepCardView,
   setStepCardView,
+  type AddRestStepCommand,
   type EditStepPerformanceCommand,
   type RemoveStepCommand,
   type ReorderStepCommand,
@@ -340,6 +342,26 @@ export function App() {
     };
     store.dispatch(command, reorderStep);
   };
+  const addRest = () => {
+    const command: AddRestStepCommand = {
+      type: "progression/add-rest",
+      payload: { stepId: crypto.randomUUID(), nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, addRestStep);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        if (store.canUndo) {
+          e.preventDefault();
+          store.undo();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [store]);
 
   const globalView = (view: CardViewId) => {
     const command: SetGlobalCardViewCommand = {
@@ -581,6 +603,8 @@ export function App() {
         onSetLoopRange={handleSetLoopRange}
         onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
         onToggleCountIn={() => setCountInEnabled((v) => !v)}
+        onUndo={() => store.undo()}
+        canUndo={store.canUndo}
       />
       <div className="studio-grid">
         <HarmonicMatrix
@@ -665,6 +689,7 @@ export function App() {
           onReset={resetProgressionStep}
           onRemove={removeProgressionStep}
           onReorder={reorderProgressionStep}
+          onAddRest={addRest}
         />
         <BranchComparison
           project={project}

@@ -1,4 +1,5 @@
 import type { ProjectCommand, ProjectCommandHandler } from "./commands";
+import { applyInverseCommand } from "./commands/dispatcher";
 import { SessionHistory } from "./history/history";
 import type { Project } from "../domain/project/project";
 
@@ -49,8 +50,22 @@ export class AppStore {
     const before = this.#project;
     const applied = handler(before, command);
     this.#project = applied.project;
-    this.history.push({ forward: command, inverse: applied.inverse });
+    if (command.type !== "progression/select-step") {
+      this.history.push({ forward: command, inverse: applied.inverse });
+    }
     this.#notify();
+  }
+
+  undo(): boolean {
+    const entry = this.history.takeUndo();
+    if (!entry) return false;
+    this.#project = applyInverseCommand(this.#project, entry.inverse);
+    this.#notify();
+    return true;
+  }
+
+  get canUndo(): boolean {
+    return this.history.canUndo;
   }
 
   replaceLoadedProject(project: Project): void {

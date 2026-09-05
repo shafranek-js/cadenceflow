@@ -1,6 +1,13 @@
 import type { Project } from "../../domain/project/project";
 import type { Progression } from "../../domain/progression/progression";
-import type { CardViewId, ChordStep, StepPerformance } from "../../domain/progression/step";
+import type {
+  CardViewId,
+  ChordStep,
+  RestStep,
+  StepPerformance,
+} from "../../domain/progression/step";
+import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
+import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
 import type { AppliedCommand, ProjectCommand } from ".";
@@ -243,6 +250,28 @@ export function reorderStep(project: Project, command: ReorderStepCommand): Appl
   return withInverse(
     project,
     Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface AddRestStepPayload {
+  readonly stepId: string;
+  readonly duration?: MusicalDuration;
+  readonly nowIso: string;
+}
+export type AddRestStepCommand = ProjectCommand<AddRestStepPayload> & {
+  readonly type: "progression/add-rest";
+};
+export function addRestStep(project: Project, command: AddRestStepCommand): AppliedCommand {
+  const restStep: RestStep = Object.freeze({
+    id: command.payload.stepId,
+    kind: "rest",
+    duration: command.payload.duration ?? musicalDuration(rational(1, 1)),
+  });
+  const steps = Object.freeze([...project.progression.steps, restStep]);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps }),
     command.payload.nowIso,
   );
 }

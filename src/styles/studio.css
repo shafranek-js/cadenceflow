@@ -589,7 +589,8 @@
   border-radius: 10px;
   background: var(--surface-2);
 }
-.progression-step-card.is-selected {
+.progression-step-card.is-selected,
+.progression-rest-card.is-selected {
   outline: 2px solid currentColor;
 }
 .step-view {
@@ -990,7 +991,15 @@
   gap: 3px;
 }
 .meter-policy-toggle .policy-option input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 .meter-policy-toggle .policy-option.is-selected {
   background: var(--surface-3, #388bfd);
@@ -1196,4 +1205,34 @@
 .progression-rest-card.is-in-loop {
   border-color: rgba(56, 139, 253, 0.6);
   border-width: 1.5px;
+}
+
+.transport-error-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(248, 81, 73, 0.15);
+  border: 1px solid #f85149;
+  border-radius: 4px;
+  color: #f85149;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.add-rest-btn {
+  margin-left: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--border, #30363d);
+  background: var(--surface-2, #21262d);
+  color: var(--text, #c9d1d9);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.add-rest-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #8b949e;
 }

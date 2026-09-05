@@ -35,6 +35,8 @@ export interface TransportBarProps {
   readonly onSetLoopRange: (startStepId: string, endStepId: string) => void;
   readonly onToggleMetronome: () => void;
   readonly onToggleCountIn: () => void;
+  readonly onUndo?: () => void;
+  readonly canUndo?: boolean;
 }
 
 export function TransportBar({
@@ -56,6 +58,8 @@ export function TransportBar({
   onSetLoopRange,
   onToggleMetronome,
   onToggleCountIn,
+  onUndo,
+  canUndo,
 }: TransportBarProps) {
   const tempoInputId = useId();
   const meterNumId = useId();
@@ -194,17 +198,28 @@ export function TransportBar({
   };
 
   // Groove handlers
+  const [cachedSwingAmount, setCachedSwingAmount] = useState(
+    project.groove.swingAmount > 0 ? project.groove.swingAmount : 0.66,
+  );
+
+  useEffect(() => {
+    if (project.groove.swingAmount > 0) {
+      setCachedSwingAmount(project.groove.swingAmount);
+    }
+  }, [project.groove.swingAmount]);
+
   const handleGrooveToggle = () => {
     const isCurrentlySwing = project.groove.feel === "swing";
     const nextGroove: GrooveSettings = isCurrentlySwing
       ? { feel: "straight", swingAmount: 0 }
-      : { feel: "swing", swingAmount: 0.66 };
+      : { feel: "swing", swingAmount: cachedSwingAmount };
     onSetGroove(nextGroove);
   };
 
   const handleSwingAmountChange = (e: ChangeEvent<HTMLInputElement>) => {
     const amount = parseFloat(e.target.value);
     if (Number.isFinite(amount)) {
+      setCachedSwingAmount(amount);
       onSetGroove({
         feel: amount > 0 ? "swing" : "straight",
         swingAmount: amount,
@@ -314,6 +329,22 @@ export function TransportBar({
           <span className="transport-btn-label">Stop</span>
         </button>
 
+        {onUndo && (
+          <button
+            type="button"
+            className="transport-button transport-undo"
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label="Undo"
+            title="Undo last action (Ctrl+Z)"
+          >
+            <span className="transport-btn-icon" aria-hidden="true">
+              ↶
+            </span>
+            <span className="transport-btn-label">Undo</span>
+          </button>
+        )}
+
         <div
           role="status"
           aria-live="polite"
@@ -329,6 +360,12 @@ export function TransportBar({
                 : "Stopped"}
           </span>
         </div>
+
+        {transportState.error && (
+          <div role="alert" className="transport-error-badge" data-testid="transport-error">
+            {transportState.error}
+          </div>
+        )}
       </div>
 
       {/* 2. Tempo Controls */}
@@ -427,6 +464,7 @@ export function TransportBar({
                 type="radio"
                 name="meter-policy"
                 value="reflow"
+                aria-label="Reflow"
                 checked={meterPolicy === "reflow"}
                 onChange={() => setMeterPolicy("reflow")}
               />
@@ -439,6 +477,7 @@ export function TransportBar({
                 type="radio"
                 name="meter-policy"
                 value="preserve-beat-lengths"
+                aria-label="Preserve"
                 checked={meterPolicy === "preserve-beat-lengths"}
                 onChange={() => setMeterPolicy("preserve-beat-lengths")}
               />

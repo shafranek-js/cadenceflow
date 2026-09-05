@@ -17,6 +17,7 @@ export function ProgressionTrack({
   onReset,
   onRemove,
   onReorder,
+  onAddRest,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -30,6 +31,7 @@ export function ProgressionTrack({
   readonly onReset: (stepId: string) => void;
   readonly onRemove: (stepId: string) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
+  readonly onAddRest?: () => void;
 }) {
   const loopIndices = (() => {
     if (!loopState?.enabled || !loopState.region) return null;
@@ -74,6 +76,16 @@ export function ProgressionTrack({
             <option value="staff">Staff</option>
           </select>
         </label>
+        {onAddRest ? (
+          <button
+            type="button"
+            className="add-rest-btn"
+            onClick={onAddRest}
+            aria-label="Add Rest to progression"
+          >
+            + Rest
+          </button>
+        ) : null}
       </div>
       <div className="progression-step-cards">
         {project.progression.steps.map((step, index) => {
@@ -85,10 +97,13 @@ export function ProgressionTrack({
           return step.kind === "rest" ? (
             <div
               key={step.id}
-              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""}`}
+              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${project.progression.selectedStepId === step.id ? "is-selected" : ""}`}
               data-testid="progression-step"
               data-playing={isPlaying ? "true" : undefined}
               data-in-loop={isInLoop ? "true" : undefined}
+              onClick={() => onSelectStep(step.id)}
+              role="button"
+              tabIndex={0}
             >
               Rest
             </div>
