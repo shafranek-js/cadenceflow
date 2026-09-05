@@ -40,13 +40,14 @@
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
+    "fake-indexeddb": "^6.2.5",
     "globals": "latest",
+    "jsdom": "latest",
     "prettier": "latest",
     "tsx": "latest",
     "typescript": "6.0.3",
     "typescript-eslint": "latest",
     "vite": "^8.1.0",
-    "vitest": "latest",
-    "jsdom": "latest"
+    "vitest": "latest"
   }
 }
