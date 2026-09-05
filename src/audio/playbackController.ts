@@ -91,6 +91,12 @@ export class PlaybackController {
       return false;
     }
 
+    if (this.pianoProvider.state === "error") {
+      this.transportStore.setError(`Audio provider error: ${this.pianoProvider.id}`);
+      this.transportStore.stop();
+      return false;
+    }
+
     this.stopCurrentSession();
 
     let startingStepIndex = 0;
@@ -120,6 +126,12 @@ export class PlaybackController {
   playFromHere(stepTarget: string | number, params: PlaybackSessionParams): boolean {
     if (params.steps.length === 0) {
       this.transportStore.playFromHere({ stepTarget, stepCount: 0 });
+      return false;
+    }
+
+    if (this.pianoProvider.state === "error") {
+      this.transportStore.setError(`Audio provider error: ${this.pianoProvider.id}`);
+      this.transportStore.stop();
       return false;
     }
 
@@ -185,6 +197,8 @@ export class PlaybackController {
     }
     this.activeSessionId = null;
     this.currentParams = null;
+    this.loopIteration = 0;
+    this.loopBaseAudioTime = 0;
   }
 
   private launchSessionPlayback(startingStepIndex: number, isLoopIteration: boolean): boolean {
@@ -237,6 +251,11 @@ export class PlaybackController {
       const countIn = generateCountInEvents(meter, tempoBpm, 0);
       countInDurationSeconds = countIn.durationSeconds;
       countInEvents.push(...countIn.events);
+    }
+
+    if (!isLoopIteration) {
+      this.loopIteration = 0;
+      this.loopBaseAudioTime = this.clock.now() + countInDurationSeconds;
     }
 
     // 2. Realize progression steps into events and step boundaries
@@ -359,7 +378,13 @@ export class PlaybackController {
         },
       });
 
-      this.scheduler.start(allSessionEvents);
+      const sessionStartAudioTime = isLoopIteration
+        ? this.loopBaseAudioTime +
+          (this.loopIteration * this.loopDurationBeatsNumerator * 60) /
+            (this.loopDurationBeatsDenominator * tempoBpm)
+        : this.loopBaseAudioTime - countInDurationSeconds;
+
+      this.scheduler.start(allSessionEvents, sessionStartAudioTime);
       this.startStepTracking();
       return true;
     } catch (err) {

@@ -114,8 +114,16 @@ async function main() {
   console.log("Capturing 06-metronome-countin.png...");
   await saveScreenshots(page, "06-metronome-countin.png");
 
+  // 7. Step Duration Controls (Whole, Half, Quarter, Eighth, Sixteenth, Dot, Trip and Beats: label)
+  console.log("Capturing 07-step-duration-controls.png...");
+  await steps.first().click();
+  const customDurInput = page.locator(".custom-duration-input");
+  await customDurInput.fill("3/4");
+  await page.waitForTimeout(100);
+  await saveScreenshots(page, "07-step-duration-controls.png");
+
   await browser.close();
-  console.log("All 6 screenshots captured successfully!");
+  console.log("All 7 screenshots captured successfully!");
 }
 
 main().catch((err) => {

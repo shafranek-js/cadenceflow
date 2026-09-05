@@ -207,6 +207,12 @@ export class LookAheadScheduler {
         };
         const playback = this.provider.schedule(chunkToSchedule, chunkClock);
         this.activePlaybacks.push(playback);
+        playback.ready?.catch((err) => {
+          this.cancelActivePlaybacks();
+          this.clearTickTimer();
+          this.state = "idle";
+          this.onError?.(err);
+        });
       } catch (err) {
         this.clearTickTimer();
         this.state = "idle";
@@ -306,6 +312,12 @@ export class LookAheadScheduler {
         };
         const playback = this.provider.schedule(chunkToSchedule, chunkClock);
         this.activePlaybacks.push(playback);
+        playback.ready?.catch((err) => {
+          this.cancelActivePlaybacks();
+          this.clearTickTimer();
+          this.state = "idle";
+          this.onError?.(err);
+        });
       } catch (err) {
         this.clearTickTimer();
         this.state = "idle";

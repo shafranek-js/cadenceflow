@@ -1047,7 +1047,11 @@
 .custom-duration-group {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+}
+.custom-duration-label {
+  font-size: 0.68rem;
+  color: var(--text-muted, #8b949e);
 }
 .custom-duration-input {
   width: 44px;

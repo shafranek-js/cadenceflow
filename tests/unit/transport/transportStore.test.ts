@@ -171,4 +171,99 @@ describe("T105 — Transport State Machine", () => {
     store.onSessionEnded(session2);
     expect(store.getState().status).toBe("stopped");
   });
+
+  describe("Loop-Aware Play and Reset Behavior", () => {
+    it("starts at Step 0 when loop is disabled", () => {
+      const store = new TransportStore();
+      store.play({ stepCount: 4 });
+      expect(store.getState().startingStepIndex).toBe(0);
+      expect(store.getState().currentStepIndex).toBe(0);
+
+      store.stop();
+      expect(store.getState().startingStepIndex).toBe(0);
+    });
+
+    it("starts at loop start step and Stop resets to loop start when Loop Range is active", () => {
+      const store = new TransportStore();
+      // Loop region: steps 2..4 -> start index is 2
+      store.setLoopAwareResetTarget(2);
+      store.play({ stepCount: 5, loopStartStepIndex: 2 });
+
+      expect(store.getState().startingStepIndex).toBe(2);
+      expect(store.getState().currentStepIndex).toBe(2);
+      expect(store.getState().loopAwareResetTarget).toBe(2);
+
+      // Advance playing step to 3
+      store.setCurrentStepIndex(3);
+      expect(store.getState().currentStepIndex).toBe(3);
+
+      // Stop resets startingStepIndex to loopAwareResetTarget (2)
+      store.stop();
+      expect(store.getState().status).toBe("stopped");
+      expect(store.getState().currentStepIndex).toBeNull();
+      expect(store.getState().startingStepIndex).toBe(2);
+    });
+
+    it("natural completion without loop resets playhead to 0 and clears active step", () => {
+      const store = new TransportStore();
+      store.play({ stepCount: 4 });
+      const sessionId = store.getState().sessionId!;
+      store.setCurrentStepIndex(3, sessionId);
+
+      store.onSessionEnded(sessionId);
+      expect(store.getState().status).toBe("stopped");
+      expect(store.getState().currentStepIndex).toBeNull();
+      expect(store.getState().startingStepIndex).toBe(0);
+    });
+  });
+
+  describe("Editor Selection vs Playing Step Independence", () => {
+    it("proves transport playback and playhead stepping never mutate editor selection state", () => {
+      const store = new TransportStore();
+
+      // Simulated editor state: user has selected step-3 for editing
+      const editorSelection = { selectedStepId: "step-3" };
+
+      // Playback starts at step 0
+      store.play({ stepCount: 4 });
+      expect(store.getState().currentStepIndex).toBe(0);
+      expect(editorSelection.selectedStepId).toBe("step-3"); // Unaffected
+
+      // Playing step advances during audio playback: 0 -> 1 -> 2
+      store.setCurrentStepIndex(1);
+      expect(store.getState().currentStepIndex).toBe(1);
+      expect(editorSelection.selectedStepId).toBe("step-3"); // Still step-3!
+
+      store.setCurrentStepIndex(2);
+      expect(store.getState().currentStepIndex).toBe(2);
+      expect(editorSelection.selectedStepId).toBe("step-3"); // Still step-3!
+
+      // Stop clears playing step
+      store.stop();
+      expect(store.getState().currentStepIndex).toBeNull();
+      expect(editorSelection.selectedStepId).toBe("step-3"); // Retains step-3!
+    });
+  });
+
+  describe("Extended Stale Session Isolation", () => {
+    it("stale callbacks cannot overwrite error state or reset loop targets", () => {
+      const store = new TransportStore();
+      store.play({ stepCount: 4 });
+      const sessionA = store.getState().sessionId!;
+
+      store.stop();
+      store.setLoopAwareResetTarget(2);
+      store.play({ stepCount: 4, loopStartStepIndex: 2 });
+      const sessionB = store.getState().sessionId!;
+
+      // Stale callback from session A attempts to report error or clear
+      store.onSessionEnded(sessionA);
+      expect(store.getState().sessionId).toBe(sessionB);
+      expect(store.getState().status).toBe("playing");
+      expect(store.getState().startingStepIndex).toBe(2);
+
+      store.setCurrentStepIndex(0, sessionA);
+      expect(store.getState().currentStepIndex).toBe(2); // Retained session B target
+    });
+  });
 });

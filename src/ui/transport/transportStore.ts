@@ -196,7 +196,7 @@ export class TransportStore {
       pausedPositionSeconds: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",
-      error: null,
+      error: this.#state.error,
     });
     this.emit();
   }

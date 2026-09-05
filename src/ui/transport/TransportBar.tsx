@@ -477,54 +477,66 @@ export function TransportBar({
           <button
             type="button"
             className="duration-btn"
-            onClick={() => handlePresetDuration(4)}
+            onClick={() => handlePresetDuration(4, 1)}
             disabled={!selectedStepId}
-            title="Whole Note (4 beats)"
+            title="Whole Note (4 canonical beats)"
+            aria-label="Whole Note (4 canonical beats)"
+            data-testid="duration-preset-whole"
           >
-            1/1
+            Whole
           </button>
           <button
             type="button"
             className="duration-btn"
-            onClick={() => handlePresetDuration(2)}
+            onClick={() => handlePresetDuration(2, 1)}
             disabled={!selectedStepId}
-            title="Half Note (2 beats)"
+            title="Half Note (2 canonical beats)"
+            aria-label="Half Note (2 canonical beats)"
+            data-testid="duration-preset-half"
           >
-            1/2
+            Half
           </button>
           <button
             type="button"
             className="duration-btn"
-            onClick={() => handlePresetDuration(1)}
+            onClick={() => handlePresetDuration(1, 1)}
             disabled={!selectedStepId}
-            title="Quarter Note (1 beat)"
+            title="Quarter Note (1 canonical beat)"
+            aria-label="Quarter Note (1 canonical beat)"
+            data-testid="duration-preset-quarter"
           >
-            1/4
+            Quarter
           </button>
           <button
             type="button"
             className="duration-btn"
             onClick={() => handlePresetDuration(1, 2)}
             disabled={!selectedStepId}
-            title="Eighth Note (1/2 beat)"
+            title="Eighth Note (1/2 canonical beat)"
+            aria-label="Eighth Note (1/2 canonical beat)"
+            data-testid="duration-preset-eighth"
           >
-            1/8
+            Eighth
           </button>
           <button
             type="button"
             className="duration-btn"
             onClick={() => handlePresetDuration(1, 4)}
             disabled={!selectedStepId}
-            title="Sixteenth Note (1/4 beat)"
+            title="Sixteenth Note (1/4 canonical beat)"
+            aria-label="Sixteenth Note (1/4 canonical beat)"
+            data-testid="duration-preset-sixteenth"
           >
-            1/16
+            Sixteenth
           </button>
           <button
             type="button"
             className="duration-btn"
             onClick={handleDottedDuration}
             disabled={!selectedStepId}
-            title="Dotted (× 1.5)"
+            title="Dotted (× 1.5 beats)"
+            aria-label="Dotted (× 1.5 beats)"
+            data-testid="duration-preset-dotted"
           >
             Dot
           </button>
@@ -533,29 +545,35 @@ export function TransportBar({
             className="duration-btn"
             onClick={handleTripletDuration}
             disabled={!selectedStepId}
-            title="Triplet (× 2/3)"
+            title="Triplet (× 2/3 beat)"
+            aria-label="Triplet (× 2/3 beat)"
+            data-testid="duration-preset-triplet"
           >
             Trip
           </button>
 
           <div className="custom-duration-group">
+            <label htmlFor={customDurationId} className="custom-duration-label">
+              Beats:
+            </label>
             <input
               id={customDurationId}
               type="text"
               value={customDurationText}
               onChange={(e) => setCustomDurationText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleApplyCustomDuration()}
-              placeholder="e.g. 3/2"
+              placeholder="e.g. 3/4"
               className={`custom-duration-input ${customDurationError ? "has-error" : ""}`}
               disabled={!selectedStepId}
-              aria-label="Custom step duration"
+              aria-label="Duration in canonical quarter-note beats"
+              title="Duration in canonical quarter-note beats (e.g. 3/4, 2, 1/2)"
             />
             <button
               type="button"
               className="custom-duration-apply-btn"
               onClick={handleApplyCustomDuration}
               disabled={!selectedStepId}
-              aria-label="Set custom duration"
+              aria-label="Set custom duration in beats"
             >
               Set
             </button>
