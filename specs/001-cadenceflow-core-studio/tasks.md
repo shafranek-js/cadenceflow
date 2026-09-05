@@ -265,7 +265,7 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T112 [P] [US7] Write preset serialization/re-realization/insertion tests in `tests/unit/progression/presets.test.ts`
+- [x] T112 [P] [US7] Write preset serialization/re-realization/insertion tests in `tests/unit/progression/presets.test.ts`
 ### Implementation
 
 - [ ] T113 [US7] Implement functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`

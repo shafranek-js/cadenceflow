@@ -1,16 +1,16 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 9 / User Story 6 (Timing and Transport) ACCEPTED / COMPLETE; Phase 10 / User Story 7 (Presets) NOT STARTED  
-**Task progress:** T001–T111 complete, 111 / 158 total tasks  
+**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112 contract tests accepted  
+**Task progress:** T001–T112 complete, 112 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) and User Story 6 (**Exact Musical Timing & Transport Runtime**) are fully accepted across all tasks T077–T111.
 
-The current milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
-The next milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **NOT STARTED**.
+The previous milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
+The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112 complete, 112 / 158)**.
 
 ## 2. Sources of truth
 
@@ -200,6 +200,26 @@ US6 / Phase 9 fully accepted and closed. Overall project progress: 111 / 158.
     4. *Realized sounding-note remainder* (e.g. 1.9 s - 0.6 s = ~1.3 s).
     These four values are distinct and not implied to be identical.
 
+### US7 Batch A — functional preset contracts — T112
+
+Defined and verified contract tests in `tests/unit/progression/presets.test.ts` (`T112`) establishing:
+- `PresetStep = { harmonicFunction, duration }` containing only `HarmonicFunctionIdentity` and `MusicalDuration` (no `HarmonicVariant`, extensions, tensions, performance overrides, or spelling).
+- Exact Rational musical duration serialization and defensive schema validation (rejecting non-integers, missing fields, or invalid display hints).
+- Re-realization across keys, modes, and spelling using atomic `ModuleSwitchResolution`.
+- Insertion transformations (`replace`, `append`, `insert`) with strict selection management (replace clears selection, append and insert preserve selection; insert inserts immediately before selected step).
+- Custom preset creation stripping performance realization and rejecting Rest-containing progressions (`unsupported-progression`).
+
+#### Accepted US7 Preset Boundaries & Invariants
+- **PresetStep Contract**: `PresetStep = HarmonicFunctionIdentity + MusicalDuration` only. Presets store purely functional harmonic material and per-step musical durations; no `HarmonicVariant`, extensions, tensions, custom voicings, dynamics, or articulations.
+- **No Performance Data**: Presets strip all instrument, performance, and voicing data on save and instantiate clean default realization on application.
+- **Rest-Step Restriction**: Progressions containing Rest Steps cannot be saved as v1 Custom Presets; saving returns `{ kind: "unsupported-progression", reason: "rest-step" }` without mutating project or history.
+- **Insertion Semantics**:
+  - `replace`: Replaces entire progression; clears selection (`selectedStepId = undefined`).
+  - `append`: Appends to end; preserves existing `selectedStepId`.
+  - `insert`: Inserts immediately before `selectedStepId`; preserves existing `selectedStepId`. Rejects non-empty progressions without selection with `RangeError`.
+  - For empty progressions, all three modes instantiate steps at the beginning.
+- **Project-Owned Custom Presets**: Custom Presets are owned by `Project.customPresets`, undoable/redoable via standard command patterns, and persisted with the project.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -308,17 +328,17 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US7–US10**: Pending start and implementation of US7 presets.
 
-## 8. Next development sequence: Phase 10 / US7 — T112–T118 (Not Started)
-
+## 8. Next development sequence: Phase 10 / US7 — T113–T118
+ 
 Active milestone is **Phase 10: User Story 7 — Use functional presets as reusable composition material (Priority: P2)**:
-
-- **T112**: Preset serialization, re-realization across keys/modes, and insertion transformation tests in `tests/unit/progression/presets.test.ts`.
-- **T113**: Functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`.
-- **T114**: Curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`.
-- **T115**: Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`.
-- **T116**: `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`.
-- **T117**: Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`.
-- **T118**: Playwright acceptance for cross-key functional preset reuse and all insertion modes in `tests/e2e/us7-presets.spec.ts`.
+ 
+- **T112**: [x] Preset serialization, re-realization across keys/modes, and insertion transformation tests in `tests/unit/progression/presets.test.ts`.
+- **T113**: [ ] Functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`.
+- **T114**: [ ] Curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`.
+- **T115**: [ ] Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`.
+- **T116**: [ ] `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`.
+- **T117**: [ ] Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`.
+- **T118**: [ ] Playwright acceptance for cross-key functional preset reuse and all insertion modes in `tests/e2e/us7-presets.spec.ts`.
 
 ## 9. Handoff operating model
 
