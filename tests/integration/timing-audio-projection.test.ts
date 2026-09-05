@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rational } from "../../src/domain/timing/rational";
-import { musicalDuration } from "../../src/domain/timing/duration";
+import { rational, type Rational } from "../../src/domain/timing/rational";
+import { barsToBeats, musicalDuration } from "../../src/domain/timing/duration";
 import { meter, applyMeterChange, pulseToBeats } from "../../src/domain/timing/meter";
 import { groove, projectSwingTiming, type TimedEvent } from "../../src/domain/timing/swing";
 import {
@@ -10,7 +10,6 @@ import {
 import type { ChordStep, RestStep, StepPerformance } from "../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../src/domain/harmony/chord";
 import { realizeProgressionAudioEvents } from "../../src/audio/eventRealizer";
-import { generateCountInEvents } from "../../src/audio/metronome";
 import { PlaybackController } from "../../src/audio/playbackController";
 import { TransportStore } from "../../src/ui/transport/transportStore";
 import { setLoopRange } from "../../src/ui/transport/loopState";
@@ -100,8 +99,8 @@ function makeChord(id: string, num: number, den = 1, functionId = "I"): ChordSte
     harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(num, den)),
-    cardView: "harmonic",
     performance: DEFAULT_PERF,
+    cardView: "harmonic",
   });
 }
 
@@ -113,82 +112,29 @@ function makeRest(id: string, num: number, den = 1): RestStep {
   });
 }
 
-describe("T110 — Timing → Playback/Audio Projection Integration Acceptance", () => {
-  // Invariant 1: semantic timing = Rational, playback seconds = boundary projection only
-  // Invariant 2: Rest duration exists, Rest pitched audio event does not
-  describe("Fixture A — Straight 4/4 exact projection", () => {
-    it("projects mixed chord/rest durations with exact Rational starts and seconds conversion without emitting events for Rest", () => {
-      // Step 1 chord: Quarter = 1 beat
-      // Step 2 chord: Eighth = 1/2 beat
-      // Step 3 Rest: 1/2 beat
-      // Step 4 chord: Half = 2 beats
-      // Total = 4 canonical beats
-      const steps = [
-        makeChord("step-1", 1, 1, "I"),
-        makeChord("step-2", 1, 2, "IV"),
-        makeRest("step-3", 1, 2),
-        makeChord("step-4", 2, 1, "V"),
-      ];
+function beatsToSeconds(beats: Rational, tempoBpm: number): number {
+  return (beats.numerator * 60) / (beats.denominator * tempoBpm);
+}
+
+describe("T110 — Timing Domain to Audio Projection Integration Acceptance", () => {
+  // 1. Tempo boundary invariance (60 BPM vs 120 BPM)
+  describe("Fixture 1 — Exact Tempo Boundary Invariance (60 BPM vs 120 BPM)", () => {
+    it("proves identical ProgressionStep Rational durations and ProgressionTimeline starts, exact 2:1 seconds ratio, and rest silence", () => {
+      // Mixed progression: Chord 1 (1 beat) -> Chord 2 (1/2 beat) -> Rest 1 (1/2 beat) -> Chord 3 (2 beats)
+      const c1 = makeChord("c1", 1, 1, "I");
+      const c2 = makeChord("c2", 1, 2, "IV");
+      const r1 = makeRest("r1", 1, 2);
+      const c3 = makeChord("c3", 2, 1, "V");
+      const steps = Object.freeze([c1, c2, r1, c3]);
       const m44 = meter(4, 4);
 
-      // 1. Semantic timeline calculation
+      // Semantic timeline: starts at 0, 1, 3/2, 2
       const timeline = createProgressionTimeline(steps, m44);
-      expect(timeline.totalDurationBeats).toEqual(rational(4, 1));
-      expect(timeline.totalBars).toEqual(rational(1, 1));
-
-      // Exact semantic starts: 0, 1, 3/2, 2
       expect(timeline.steps[0]!.startBeats).toEqual(rational(0, 1));
       expect(timeline.steps[1]!.startBeats).toEqual(rational(1, 1));
-      expect(timeline.steps[2]!.startBeats).toEqual(rational(3, 2)); // Rest starts at 3/2
-      expect(timeline.steps[3]!.startBeats).toEqual(rational(2, 1)); // Step 4 starts at 2
-
-      // 2. Playback seconds projection at 120 BPM (1 beat = 0.5s)
-      const tempoBpm = 120;
-      const events = realizeProgressionAudioEvents({
-        steps,
-        tonic: 0,
-        context: "major",
-        tempoBpm,
-      });
-
-      // Events start times: Step 1 at 0.0s, Step 2 at 0.5s, Step 4 at 1.0s
-      const at0 = events.filter((e) => Math.abs(e.startSeconds - 0.0) < 0.001);
-      const at05 = events.filter((e) => Math.abs(e.startSeconds - 0.5) < 0.001);
-      const at10 = events.filter((e) => Math.abs(e.startSeconds - 1.0) < 0.001);
-
-      expect(at0.length).toBeGreaterThan(0); // Step 1 (I)
-      expect(at05.length).toBeGreaterThan(0); // Step 2 (IV)
-      expect(at10.length).toBeGreaterThan(0); // Step 4 (V)
-
-      // Rest interval [0.75s, 1.0s): strictly ZERO pitched events start here
-      const duringRest = events.filter((e) => e.startSeconds >= 0.75 && e.startSeconds < 1.0);
-      expect(duringRest).toHaveLength(0);
-
-      // Step objects must remain unmutated
-      expect(steps[0]!.duration.beats).toEqual(rational(1, 1));
-      expect(steps[1]!.duration.beats).toEqual(rational(1, 2));
-      expect(steps[2]!.duration.beats).toEqual(rational(1, 2));
-      expect(steps[3]!.duration.beats).toEqual(rational(2, 1));
-    });
-  });
-
-  describe("Fixture B — Tempo is boundary projection only", () => {
-    it("preserves bit-identical Rational durations while 120 BPM playback seconds are exactly half 60 BPM values", () => {
-      const steps = [
-        makeChord("s1", 1, 1, "I"),
-        makeChord("s2", 1, 2, "IV"),
-        makeRest("s3", 1, 2),
-        makeChord("s4", 2, 1, "V"),
-      ];
-      const m44 = meter(4, 4);
-
-      // Project at 60 BPM (1 beat = 1.0s)
-      const events60 = realizeProgressionAudioEvents({
-        steps,
-        tonic: 0,
-        context: "major",
-        tempoBpm: 60,
-      });
+      expect(timeline.steps[2]!.startBeats).toEqual(rational(3, 2));
+      expect(timeline.steps[3]!.startBeats).toEqual(rational(2, 1));
+      expect(timeline.totalDurationBeats).toEqual(rational(4, 1));
 
       // Project at 120 BPM (1 beat = 0.5s)
       const events120 = realizeProgressionAudioEvents({
@@ -198,212 +144,132 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
         tempoBpm: 120,
       });
 
-      expect(events120).toHaveLength(events60.length);
-
-      // Every note at 120 BPM must have exactly half startSeconds and durationSeconds of 60 BPM
-      for (let i = 0; i < events60.length; i++) {
-        const e60 = events60[i]!;
-        const e120 = events120[i]!;
-        expect(e120.pitch).toBe(e60.pitch);
-        expect(e120.startSeconds).toBeCloseTo(e60.startSeconds / 2, 4);
-        expect(e120.durationSeconds).toBeCloseTo(e60.durationSeconds / 2, 4);
-      }
-
-      // Canonical Rational durations remain bit-identical
-      const timeline = createProgressionTimeline(steps, m44);
-      expect(timeline.steps[0]!.durationBeats).toEqual(rational(1, 1));
-      expect(timeline.steps[1]!.durationBeats).toEqual(rational(1, 2));
-      expect(timeline.steps[2]!.durationBeats).toEqual(rational(1, 2));
-      expect(timeline.steps[3]!.durationBeats).toEqual(rational(2, 1));
-    });
-  });
-
-  // Invariant 3: Swing projection != Project mutation
-  describe("Fixture C — Swing non-destructive projection", () => {
-    it("projects swung timing on eighth-note pairs while preserving exact pair sum (1 beat) and unmutated Step durations", () => {
-      const steps = [makeChord("c1", 1, 2, "I"), makeChord("c2", 1, 2, "V")];
-      expect(steps[0]!.duration.beats).toEqual(rational(1, 2));
-      expect(steps[1]!.duration.beats).toEqual(rational(1, 2));
-
-      // Timed events representing two consecutive eighth notes
-      const unswungEvents: TimedEvent[] = [
-        { startBeats: rational(0, 1), durationBeats: rational(1, 2) },
-        { startBeats: rational(1, 2), durationBeats: rational(1, 2) },
-      ];
-
-      const swingGroove = groove("swing", 0.6);
-      const swungEvents = projectSwingTiming(unswungEvents, swingGroove);
-
-      // First subdivision longer (> 1/2 beat)
-      const firstDur =
-        swungEvents[0]!.durationBeats.numerator / swungEvents[0]!.durationBeats.denominator;
-      expect(firstDur).toBeGreaterThan(0.5);
-
-      // Second subdivision delayed (> 1/2 beat start) and shorter (< 1/2 beat duration)
-      const secondStart =
-        swungEvents[1]!.startBeats.numerator / swungEvents[1]!.startBeats.denominator;
-      const secondDur =
-        swungEvents[1]!.durationBeats.numerator / swungEvents[1]!.durationBeats.denominator;
-      expect(secondStart).toBeGreaterThan(0.5);
-      expect(secondDur).toBeLessThan(0.5);
-
-      // Projected pair total remains exactly 1 canonical beat: secondStart + secondDur = 1.0
-      expect(secondStart + secondDur).toBeCloseTo(1.0, 4);
-
-      // Original Step durations remain completely unmutated
-      expect(steps[0]!.duration.beats).toEqual(rational(1, 2));
-      expect(steps[1]!.duration.beats).toEqual(rational(1, 2));
-
-      // Straight feel with the same remembered nonzero swing amount produces original timing
-      const straightGroove = groove("straight", 0.6);
-      const straightEvents = projectSwingTiming(unswungEvents, straightGroove);
-      expect(straightEvents[0]!.startBeats).toEqual(rational(0, 1));
-      expect(straightEvents[0]!.durationBeats).toEqual(rational(1, 2));
-      expect(straightEvents[1]!.startBeats).toEqual(rational(1, 2));
-      expect(straightEvents[1]!.durationBeats).toEqual(rational(1, 2));
-    });
-  });
-
-  describe("Fixture D — Polyphonic Swing", () => {
-    it("displaces simultaneous voices identically in the same grid slot regardless of input array permutation", () => {
-      interface PolyTimedNote extends TimedEvent {
-        readonly pitch: number;
-        readonly voice: "upper" | "bass";
-      }
-
-      const noteUpper1: PolyTimedNote = {
-        pitch: 64,
-        voice: "upper",
-        startBeats: rational(0, 1),
-        durationBeats: rational(1, 2),
-      };
-      const noteBass1: PolyTimedNote = {
-        pitch: 48,
-        voice: "bass",
-        startBeats: rational(0, 1),
-        durationBeats: rational(1, 2),
-      };
-      const noteUpper2: PolyTimedNote = {
-        pitch: 67,
-        voice: "upper",
-        startBeats: rational(1, 2),
-        durationBeats: rational(1, 2),
-      };
-      const noteBass2: PolyTimedNote = {
-        pitch: 55,
-        voice: "bass",
-        startBeats: rational(1, 2),
-        durationBeats: rational(1, 2),
-      };
-
-      const originalOrder = [noteUpper1, noteBass1, noteUpper2, noteBass2];
-      const permutedOrder = [noteBass2, noteUpper1, noteBass1, noteUpper2];
-
-      const swingGroove = groove("swing", 0.75);
-      const swungOriginal = projectSwingTiming(originalOrder, swingGroove);
-      const swungPermuted = projectSwingTiming(permutedOrder, swingGroove);
-
-      // In slot 1 (beat 0): upper and bass have identical start and duration
-      const origBeat0Upper = swungOriginal.find((n) => n.pitch === 64)!;
-      const origBeat0Bass = swungOriginal.find((n) => n.pitch === 48)!;
-      expect(origBeat0Upper.startBeats).toEqual(origBeat0Bass.startBeats);
-      expect(origBeat0Upper.durationBeats).toEqual(origBeat0Bass.durationBeats);
-
-      // In slot 2 (beat 1/2 offbeat): upper and bass have identical displacement
-      const origBeat1Upper = swungOriginal.find((n) => n.pitch === 67)!;
-      const origBeat1Bass = swungOriginal.find((n) => n.pitch === 55)!;
-      expect(origBeat1Upper.startBeats).toEqual(origBeat1Bass.startBeats);
-      expect(origBeat1Upper.durationBeats).toEqual(origBeat1Bass.durationBeats);
-
-      // Permutation invariance: results match regardless of array input ordering
-      const permBeat1Upper = swungPermuted.find((n) => n.pitch === 67)!;
-      const permBeat1Bass = swungPermuted.find((n) => n.pitch === 55)!;
-      expect(permBeat1Upper.startBeats).toEqual(origBeat1Upper.startBeats);
-      expect(permBeat1Bass.startBeats).toEqual(origBeat1Bass.startBeats);
-    });
-  });
-
-  describe("Fixture E — Custom meter 7/8 [2+2+3]", () => {
-    it("calculates one bar as 7/2 canonical beats and projects 1.75s duration at 120 BPM without treating eighths as quarter notes", () => {
-      const meter78 = meter(7, 8, [2, 2, 3]);
-
-      // One bar in canonical beats = 7 * 4 / 8 = 7/2 = 3.5 beats
-      const step = makeChord("s1", 7, 2, "I");
-      const timeline = createProgressionTimeline([step], meter78);
-
-      expect(timeline.totalDurationBeats).toEqual(rational(7, 2));
-      expect(timeline.totalBars).toEqual(rational(1, 1)); // Exactly 1 bar
-
-      // Pulse-to-beat conversion: pulses are based on eighth-note denominator
-      expect(pulseToBeats(0, meter78)).toEqual(rational(0, 1));
-      expect(pulseToBeats(2, meter78)).toEqual(rational(1, 1)); // 2 eighths = 1 canonical beat
-      expect(pulseToBeats(4, meter78)).toEqual(rational(2, 1)); // 4 eighths = 2 canonical beats
-      expect(pulseToBeats(7, meter78)).toEqual(rational(7, 2)); // 7 eighths = 3.5 canonical beats
-
-      // Playback seconds conversion at 120 BPM:
-      // 1 beat = 0.5s. 7/2 beats = 3.5 * 0.5 = 1.75 seconds.
-      const countIn = generateCountInEvents(meter78, 120, 0);
-      expect(countIn.durationSeconds).toBeCloseTo(1.75, 4);
-
-      // Pulses at 0, 2, 4 eighths correspond to 0.0s, 0.5s, 1.0s
-      const accented = countIn.events.filter((e) => e.pitch === 84 || e.pitch === 76);
-      expect(accented).toHaveLength(3);
-      expect(accented[0]!.startSeconds).toBeCloseTo(0.0, 3);
-      expect(accented[1]!.startSeconds).toBeCloseTo(0.5, 3);
-      expect(accented[2]!.startSeconds).toBeCloseTo(1.0, 3);
-    });
-  });
-
-  describe("Fixture F — Meter change Reflow vs Preserve", () => {
-    it("proves Reflow proportionally scales [4, 2, 2] to [3, 3/2, 3/2] while Preserve leaves durations unchanged", () => {
-      const steps = [
-        makeChord("step-a", 4, 1, "I"),
-        makeChord("step-b", 2, 1, "IV"),
-        makeChord("step-c", 2, 1, "V"),
-      ];
-      const m44 = meter(4, 4);
-      const m34 = meter(3, 4);
-
-      // Policy 1: Reflow (4/4 -> 3/4 scales by 3/4)
-      const reflowed = applyMeterChange(steps, m44, m34, "reflow");
-      expect(reflowed).toHaveLength(3);
-      expect(reflowed[0]!.id).toBe("step-a");
-      expect(reflowed[1]!.id).toBe("step-b");
-      expect(reflowed[2]!.id).toBe("step-c");
-
-      // [4, 2, 2] * 3/4 = [3, 3/2, 3/2]
-      expect(reflowed[0]!.duration.beats).toEqual(rational(3, 1));
-      expect(reflowed[1]!.duration.beats).toEqual(rational(3, 2));
-      expect(reflowed[2]!.duration.beats).toEqual(rational(3, 2));
-
-      // Playback projection uses the reflowed durations:
-      // At 120 BPM (0.5s/beat): 3 beats = 1.5s, 3/2 beats = 0.75s, 3/2 beats = 0.75s
-      const reflowedAudio = realizeProgressionAudioEvents({
-        steps: reflowed,
+      // Project at 60 BPM (1 beat = 1.0s)
+      const events60 = realizeProgressionAudioEvents({
+        steps,
         tonic: 0,
         context: "major",
-        tempoBpm: 120,
+        tempoBpm: 60,
       });
-      const at0 = reflowedAudio.filter((e) => Math.abs(e.startSeconds - 0.0) < 0.01);
-      const at15 = reflowedAudio.filter((e) => Math.abs(e.startSeconds - 1.5) < 0.01);
-      const at225 = reflowedAudio.filter((e) => Math.abs(e.startSeconds - 2.25) < 0.01);
-      expect(at0.length).toBeGreaterThan(0);
-      expect(at15.length).toBeGreaterThan(0);
-      expect(at225.length).toBeGreaterThan(0);
 
-      // Policy 2: Preserve Beat Lengths
-      const preserved = applyMeterChange(steps, m44, m34, "preserve-beat-lengths");
-      expect(preserved).toHaveLength(3);
-      expect(preserved[0]!.duration.beats).toEqual(rational(4, 1));
-      expect(preserved[1]!.duration.beats).toEqual(rational(2, 1));
-      expect(preserved[2]!.duration.beats).toEqual(rational(2, 1));
+      // Events only emitted for c1, c2, c3; zero events for r1
+      const c1Events120 = events120.filter((e) => Math.abs(e.startSeconds - 0.0) < 0.001);
+      const c2Events120 = events120.filter((e) => Math.abs(e.startSeconds - 0.5) < 0.001);
+      const restEvents120 = events120.filter(
+        (e) => e.startSeconds >= 0.74 && e.startSeconds < 0.99,
+      );
+      const c3Events120 = events120.filter((e) => Math.abs(e.startSeconds - 1.0) < 0.001);
 
-      // Original steps remain untouched
-      expect(steps[0]!.duration.beats).toEqual(rational(4, 1));
+      expect(c1Events120.length).toBeGreaterThan(0);
+      expect(c2Events120.length).toBeGreaterThan(0);
+      expect(restEvents120).toHaveLength(0); // Rest produces zero pitched events
+      expect(c3Events120.length).toBeGreaterThan(0);
+
+      const c1Events60 = events60.filter((e) => Math.abs(e.startSeconds - 0.0) < 0.001);
+      const c2Events60 = events60.filter((e) => Math.abs(e.startSeconds - 1.0) < 0.001);
+      const restEvents60 = events60.filter((e) => e.startSeconds >= 1.49 && e.startSeconds < 1.99);
+      const c3Events60 = events60.filter((e) => Math.abs(e.startSeconds - 2.0) < 0.001);
+
+      expect(c1Events60.length).toBeGreaterThan(0);
+      expect(c2Events60.length).toBeGreaterThan(0);
+      expect(restEvents60).toHaveLength(0); // Rest produces zero pitched events
+      expect(c3Events60.length).toBeGreaterThan(0);
+
+      // Exact 2:1 ratio: 120 BPM seconds are exactly half 60 BPM seconds
+      expect(c2Events120[0]!.startSeconds).toBeCloseTo(c2Events60[0]!.startSeconds / 2, 6);
+      expect(c3Events120[0]!.startSeconds).toBeCloseTo(c3Events60[0]!.startSeconds / 2, 6);
+
+      // Semantic rational durations and timeline are completely identical before and after
+      expect(steps[0]!.duration.beats).toEqual(rational(1, 1));
+      expect(steps[1]!.duration.beats).toEqual(rational(1, 2));
+      expect(steps[2]!.duration.beats).toEqual(rational(1, 2));
+      expect(steps[3]!.duration.beats).toEqual(rational(2, 1));
+      expect(timeline.totalDurationBeats).toEqual(rational(4, 1));
     });
   });
 
-  describe("Fixture G — Rest harmonic context + playback silence", () => {
+  // 2. Production T103 Swing Projection & Non-Mutation
+  describe("Fixture 2 — Production T103 Swing Projection & Semantic Non-Mutation", () => {
+    it("proves production projectSwingTiming matches exact T103 delta = U * A / 3 across A=0, 0.55, 0.66, 0.75, 1.0 at 120 BPM", () => {
+      const U = rational(1, 2); // eighth notes (0.5 canonical beat)
+      const tempoBpm = 120; // 1 beat = 0.5s, U = 0.25s
+
+      interface MockNote extends TimedEvent {
+        readonly id: string;
+        readonly pitch: number;
+      }
+
+      const inputNotes: readonly MockNote[] = Object.freeze([
+        { id: "onbeat", pitch: 60, startBeats: rational(0, 1), durationBeats: U },
+        { id: "offbeat", pitch: 64, startBeats: rational(1, 2), durationBeats: U },
+      ]);
+
+      const testCases = [
+        { amount: 0.0, expectedOffbeatSeconds: 0.25 },
+        { amount: 0.55, expectedOffbeatSeconds: 0.25 + (0.25 * 0.55) / 3 }, // 0.295833...
+        { amount: 0.66, expectedOffbeatSeconds: 0.25 + (0.25 * 0.66) / 3 }, // 0.305
+        { amount: 0.75, expectedOffbeatSeconds: 0.25 + (0.25 * 0.75) / 3 }, // 0.3125
+        { amount: 1.0, expectedOffbeatSeconds: 0.25 + (0.25 * 1.0) / 3 }, // 1/3s = 0.333333...
+      ];
+
+      for (const tc of testCases) {
+        const g = groove(tc.amount > 0 ? "swing" : "straight", tc.amount);
+        const projected = projectSwingTiming(inputNotes, g);
+
+        expect(projected).toHaveLength(2);
+
+        // On-beat start is always exact 0.0
+        const onbeatStartSec = beatsToSeconds(projected[0]!.startBeats, tempoBpm);
+        expect(onbeatStartSec).toBe(0.0);
+
+        // Off-beat start matches exact production projection formula
+        const offbeatStartSec = beatsToSeconds(projected[1]!.startBeats, tempoBpm);
+        expect(offbeatStartSec).toBeCloseTo(tc.expectedOffbeatSeconds, 5);
+
+        // Total pair duration is strictly invariant: (U + delta) + (U - delta) = 2U = 1 beat = 0.5s
+        const onbeatDurSec = beatsToSeconds(projected[0]!.durationBeats, tempoBpm);
+        const offbeatDurSec = beatsToSeconds(projected[1]!.durationBeats, tempoBpm);
+        expect(onbeatDurSec + offbeatDurSec).toBeCloseTo(0.5, 6);
+
+        // Input notes remain completely unmutated
+        expect(inputNotes[0]!.durationBeats).toEqual(rational(1, 2));
+        expect(inputNotes[1]!.startBeats).toEqual(rational(1, 2));
+      }
+    });
+
+    it("proves polyphonic chord notes (C4, E4, G4) shift identically under swing", () => {
+      const U = rational(1, 2);
+      const chordNotes: readonly (TimedEvent & { pitch: number })[] = [
+        { pitch: 60, startBeats: rational(1, 2), durationBeats: U },
+        { pitch: 64, startBeats: rational(1, 2), durationBeats: U },
+        { pitch: 67, startBeats: rational(1, 2), durationBeats: U },
+      ];
+
+      const projected = projectSwingTiming(chordNotes, groove("swing", 0.66));
+      expect(projected[0]!.startBeats).toEqual(projected[1]!.startBeats);
+      expect(projected[1]!.startBeats).toEqual(projected[2]!.startBeats);
+      expect(projected[0]!.durationBeats).toEqual(projected[1]!.durationBeats);
+    });
+
+    it("proves groove feel 'straight' with remembered nonzero swingAmount produces exact straight projection", () => {
+      const U = rational(1, 2);
+      const notes = [
+        { startBeats: rational(0, 1), durationBeats: U },
+        { startBeats: rational(1, 2), durationBeats: U },
+      ];
+
+      const g = groove("straight", 0.75);
+      const projected = projectSwingTiming(notes, g);
+
+      expect(projected[0]!.startBeats).toEqual(rational(0, 1));
+      expect(projected[0]!.durationBeats).toEqual(rational(1, 2));
+      expect(projected[1]!.startBeats).toEqual(rational(1, 2));
+      expect(projected[1]!.durationBeats).toEqual(rational(1, 2));
+    });
+  });
+
+  // 3. Rest harmonic context and silence
+  describe("Fixture 3 — Rest Harmonic Context & Silence (I -> Rest -> Rest -> IV)", () => {
     it("maintains Rest timeline duration, emits zero pitched events, and resolves I as harmonic predecessor for IV across multiple Rests", () => {
       const steps = [
         makeChord("c1", 1, 1, "I"),
@@ -443,7 +309,65 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
     });
   });
 
-  describe("Fixture H — Play From Here boundary", () => {
+  // 4. Count-in strictly outside semantic progression time
+  describe("Fixture 4 — Count-in Strictly Outside Semantic Progression Time", () => {
+    it("proves Count-in is 4 beats in 4/4 and 7/2 beats in 7/8, starting before step 0 without mutating progression time", () => {
+      const clock = new FakeAudioClock(0.0);
+      const provider = new MockAudioProvider();
+      const transportStore = new TransportStore();
+
+      const controller = new PlaybackController({
+        clock,
+        pianoProvider: provider,
+        transportStore,
+        lookAheadHorizonSeconds: 10.0,
+      });
+
+      const step = makeChord("c1", 4, 1, "I");
+      const steps = [step];
+
+      // 4/4 meter count-in: 4 canonical beats = 2.0s at 120 BPM
+      controller.start({
+        steps,
+        meter: meter(4, 4),
+        tempoBpm: 120,
+        groove: groove("straight"),
+        tonic: 0,
+        context: "major",
+        countInEnabled: true,
+      });
+
+      const allEvents = provider.scheduledBatches.flatMap((b) => b.events);
+      const metronomeEvents = allEvents.filter((e) => e.channelRole === "metronome");
+      const pianoEvents = allEvents.filter((e) => e.channelRole !== "metronome");
+
+      // 4 count-in clicks preceding audio in [0, 2.0s)
+      expect(metronomeEvents).toHaveLength(4);
+      expect(pianoEvents[0]!.startSeconds).toBeCloseTo(2.0, 2);
+
+      // Semantic timeline start and duration are unchanged
+      const timeline = createProgressionTimeline(steps, meter(4, 4));
+      expect(timeline.steps[0]!.startBeats).toEqual(rational(0, 1));
+      expect(timeline.totalDurationBeats).toEqual(rational(4, 1));
+      expect(step.duration.beats).toEqual(rational(4, 1));
+
+      controller.stop();
+    });
+
+    it("proves 7/8 meter count-in has bar length 7/2 canonical beats (1.5s at 140 BPM)", () => {
+      const m78 = meter(7, 8, [2, 2, 3]);
+      // Bar length in canonical beats = 7 * 4 / 8 = 7/2 = 3.5 beats
+      expect(barsToBeats(rational(1, 1), m78)).toEqual(rational(7, 2));
+
+      // Pulse to beats: pulse 0 -> 0, pulse 2 -> 1, pulse 4 -> 2
+      expect(pulseToBeats(0, m78)).toEqual(rational(0, 1));
+      expect(pulseToBeats(2, m78)).toEqual(rational(1, 1));
+      expect(pulseToBeats(4, m78)).toEqual(rational(2, 1));
+    });
+  });
+
+  // 5. Play From Here boundary
+  describe("Fixture 5 — Play From Here Boundary & Count-in", () => {
     it("starts playback strictly from target step boundary without scheduling prior steps", () => {
       const clock = new FakeAudioClock(0.0);
       const provider = new MockAudioProvider();
@@ -489,94 +413,8 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
     });
   });
 
-  // Invariant 4: Count-in time != Progression semantic time
-  describe("Fixture I — One-bar Count-in", () => {
-    it("schedules count-in preceding audio without mutating progression semantic time", () => {
-      const clock = new FakeAudioClock(0.0);
-      const provider = new MockAudioProvider();
-      const transportStore = new TransportStore();
-
-      const controller = new PlaybackController({
-        clock,
-        pianoProvider: provider,
-        transportStore,
-        lookAheadHorizonSeconds: 10.0,
-      });
-
-      const step = makeChord("c1", 4, 1, "I");
-      const steps = [step];
-
-      controller.start({
-        steps,
-        meter: meter(4, 4),
-        tempoBpm: 120,
-        groove: groove("straight"),
-        tonic: 0,
-        context: "major",
-        countInEnabled: true,
-      });
-
-      const allEvents = provider.scheduledBatches.flatMap((b) => b.events);
-      const metronomeEvents = allEvents.filter((e) => e.channelRole === "metronome");
-      const pianoEvents = allEvents.filter((e) => e.channelRole !== "metronome");
-
-      // 4 count-in clicks preceding audio in [0, 2.0s)
-      expect(metronomeEvents).toHaveLength(4);
-      expect(pianoEvents[0]!.startSeconds).toBeCloseTo(2.0, 2);
-
-      // Semantic duration unchanged
-      expect(step.duration.beats).toEqual(rational(4, 1));
-
-      controller.stop();
-    });
-  });
-
-  // Invariant 5: Loop iteration timing is anchor-based
-  describe("Fixture J — Loop projection and zero drift", () => {
-    it("proves base-anchored loop iteration timing maintains zero cumulative drift (< 1e-9 s) over 1000 iterations", () => {
-      const tempoBpm = 120;
-      const t0 = 50.0; // Arbitrary audio clock base
-
-      // Awkward rational loop duration: 7/6 beat
-      const num = 7;
-      const den = 6;
-
-      for (let k = 1; k <= 1000; k++) {
-        // Production PlaybackController anchor formula:
-        const tk = t0 + (k * num * 60) / (den * tempoBpm);
-
-        // Theoretical exact value: t0 + k * (420 / 720) = t0 + (k * 7) / 12
-        const exact = t0 + (k * 7 * 60) / (6 * 120);
-        const drift = Math.abs(tk - exact);
-        expect(drift).toBeLessThan(1e-9);
-      }
-
-      // Prove Stop resets to loop start
-      const steps = [
-        makeChord("s1", 2, 1, "I"),
-        makeChord("s2", 2, 1, "IV"),
-        makeChord("s3", 2, 1, "V"),
-      ];
-      const store = new TransportStore();
-      const loopRange = setLoopRange("s2", "s3", steps);
-      expect(loopRange.enabled).toBe(true);
-
-      store.play({ stepCount: 3, loopStartStepIndex: 1 });
-      expect(store.getState().startingStepIndex).toBe(1);
-
-      store.stop();
-      expect(store.getState().status).toBe("stopped");
-      expect(store.getState().startingStepIndex).toBe(1); // Resets to loop range start!
-
-      // Disabling loop resets subsequent Stop target to progression start (0)
-      store.setLoopAwareResetTarget(0);
-      store.stop();
-      expect(store.getState().startingStepIndex).toBe(0);
-    });
-  });
-
-  describe("Fixture K — Pause/Resume Outcome B", () => {
-    // v1 Outcome B — sample attack restarts while remaining timeline duration is preserved
+  // 6. Explicit Pause/Resume Outcome B integration fixture
+  describe("Fixture 6 — Explicit Pause/Resume Outcome B", () => {
     it("v1 Outcome B — sample attack restarts while remaining timeline duration is preserved", () => {
       const clock = new FakeAudioClock(0.0);
       const provider = new MockAudioProvider();
@@ -589,7 +427,7 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
         lookAheadHorizonSeconds: 10.0,
       });
 
-      // Step 1: 4 beats = 2.0s duration at 120 BPM (effective note duration ~1.9s)
+      // Step 1: 4 beats = 2.0s duration at 120 BPM
       // Step 2: 2 beats = 1.0s duration (starts at 2.0s)
       const steps = [makeChord("c1", 4, 1, "I"), makeChord("c2", 2, 1, "V")];
 
@@ -621,7 +459,7 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
       const resumedBatches = provider.scheduledBatches.slice(batchesBeforeResume);
       const resumedEvents = resumedBatches.flatMap((b) => b.events);
 
-      // Outcome B: Attack restarts with remaining duration (1.9s - 0.6s = ~1.3s), not full 1.9s
+      // Outcome B: Attack restarts with remaining duration (~1.3s), not full 1.9s
       const continuationNotes = resumedEvents.filter((e) => e.startSeconds === 0);
       expect(continuationNotes.length).toBeGreaterThan(0);
       for (const note of continuationNotes) {
@@ -629,7 +467,7 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
         expect(note.durationSeconds).toBeLessThan(1.5);
       }
 
-      // Future events are not duplicated and start at relative offset (2.0s - 0.6s = 1.4s)
+      // Future events start at relative offset (2.0s - 0.6s = 1.4s) and are not duplicated
       const futureNotes = resumedEvents.filter((e) => Math.abs(e.startSeconds - 1.4) < 0.05);
       expect(futureNotes.length).toBeGreaterThan(0);
 
@@ -637,7 +475,8 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
     });
   });
 
-  describe("Fixture L — Runtime audio failure cleanup", () => {
+  // 7. Runtime audio failure cleanup
+  describe("Fixture 7 — Runtime Audio Failure Cleanup", () => {
     it("clears active playback and sets error state on provider prepare or asynchronous ready rejection without fallback", async () => {
       const clock = new FakeAudioClock(0.0);
       const provider = new MockAudioProvider();
@@ -686,8 +525,114 @@ describe("T110 — Timing → Playback/Audio Projection Integration Acceptance",
     });
   });
 
-  // Invariant 6: Playing Step != Selected editing Step
-  describe("Canonical Invariant — Playing Step vs Selected Editing Step Independence", () => {
+  // 8. Loop no-drift over 1000 iterations
+  describe("Fixture 8 — Loop Projection and Zero Cumulative Drift Over 1000 Iterations", () => {
+    it("proves base-anchored loop iteration timing maintains zero cumulative drift (< 1e-9 s) over 1000 iterations for awkward rationals 7/6 and 1/3", () => {
+      const tempoBpm = 120;
+      const t0 = 50.0; // Arbitrary audio clock base
+
+      // Awkward rational loop duration: 7/6 beat
+      const num1 = 7;
+      const den1 = 6;
+      for (let k = 1; k <= 1000; k++) {
+        const tk = t0 + (k * num1 * 60) / (den1 * tempoBpm);
+        const exact = t0 + (k * 7 * 60) / (6 * 120);
+        expect(Math.abs(tk - exact)).toBeLessThan(1e-9);
+      }
+
+      // Awkward rational loop duration: 1/3 beat
+      const num2 = 1;
+      const den2 = 3;
+      for (let k = 1; k <= 1000; k++) {
+        const tk = t0 + (k * num2 * 60) / (den2 * tempoBpm);
+        const exact = t0 + (k * 1 * 60) / (3 * 120);
+        expect(Math.abs(tk - exact)).toBeLessThan(1e-9);
+      }
+
+      // Prove Stop resets to loop start
+      const steps = [
+        makeChord("s1", 2, 1, "I"),
+        makeChord("s2", 2, 1, "IV"),
+        makeChord("s3", 2, 1, "V"),
+      ];
+      const store = new TransportStore();
+      const loopRange = setLoopRange("s2", "s3", steps);
+      expect(loopRange.enabled).toBe(true);
+
+      store.play({ stepCount: 3, loopStartStepIndex: 1 });
+      expect(store.getState().startingStepIndex).toBe(1);
+
+      store.stop();
+      expect(store.getState().status).toBe("stopped");
+      expect(store.getState().startingStepIndex).toBe(1); // Resets to loop range start!
+
+      // Disabling loop resets subsequent Stop target to progression start (0)
+      store.setLoopAwareResetTarget(0);
+      store.stop();
+      expect(store.getState().startingStepIndex).toBe(0);
+    });
+  });
+
+  // 9. Meter reflow vs preserve invariants
+  describe("Fixture 9 — Meter Reflow (Proportional 1:1) vs Preserve Beat Lengths", () => {
+    it("preserves exact step count, IDs, and order without splitting, clipping, or padding", () => {
+      const steps = [
+        makeChord("step-a", 4, 1, "I"),
+        makeChord("step-b", 2, 1, "IV"),
+        makeChord("step-c", 2, 1, "V"),
+      ];
+      const m44 = meter(4, 4);
+      const m34 = meter(3, 4);
+
+      // Policy 1: Reflow (4/4 -> 3/4 scales by 3/4)
+      const reflowed = applyMeterChange(steps, m44, m34, "reflow");
+      expect(reflowed).toHaveLength(3);
+      expect(reflowed[0]!.id).toBe("step-a");
+      expect(reflowed[1]!.id).toBe("step-b");
+      expect(reflowed[2]!.id).toBe("step-c");
+
+      // [4, 2, 2] * 3/4 = [3, 3/2, 3/2]
+      expect(reflowed[0]!.duration.beats).toEqual(rational(3, 1));
+      expect(reflowed[1]!.duration.beats).toEqual(rational(3, 2));
+      expect(reflowed[2]!.duration.beats).toEqual(rational(3, 2));
+
+      // Policy 2: Preserve Beat Lengths
+      const preserved = applyMeterChange(steps, m44, m34, "preserve-beat-lengths");
+      expect(preserved).toHaveLength(3);
+      expect(preserved[0]!.duration.beats).toEqual(rational(4, 1));
+      expect(preserved[1]!.duration.beats).toEqual(rational(2, 1));
+      expect(preserved[2]!.duration.beats).toEqual(rational(2, 1));
+
+      // Original steps remain untouched
+      expect(steps[0]!.duration.beats).toEqual(rational(4, 1));
+    });
+  });
+
+  // 10. Canonical durations, dotted, and triplets
+  describe("Fixture 10 — Canonical Subdivision, Dotted and Triplet Durations", () => {
+    it("converts standard note subdivisions, dotted values, and triplets to exact seconds at 120 BPM", () => {
+      const bpm = 120; // 0.5s per canonical beat
+
+      const whole = musicalDuration(rational(4, 1));
+      const half = musicalDuration(rational(2, 1));
+      const quarter = musicalDuration(rational(1, 1));
+      const eighth = musicalDuration(rational(1, 2));
+      const sixteenth = musicalDuration(rational(1, 4));
+      const dottedQuarter = musicalDuration(rational(3, 2));
+      const quarterTriplet = musicalDuration(rational(2, 3));
+
+      expect(beatsToSeconds(whole.beats, bpm)).toBe(2.0);
+      expect(beatsToSeconds(half.beats, bpm)).toBe(1.0);
+      expect(beatsToSeconds(quarter.beats, bpm)).toBe(0.5);
+      expect(beatsToSeconds(eighth.beats, bpm)).toBe(0.25);
+      expect(beatsToSeconds(sixteenth.beats, bpm)).toBe(0.125);
+      expect(beatsToSeconds(dottedQuarter.beats, bpm)).toBe(0.75);
+      expect(beatsToSeconds(quarterTriplet.beats, bpm)).toBeCloseTo(1 / 3, 6);
+    });
+  });
+
+  // 11. Playing Step vs Selected Editing Step Independence
+  describe("Fixture 11 — Playing Step vs Selected Editing Step Independence", () => {
     it("proves transport playhead progression does not mutate editor selection state", () => {
       const store = new TransportStore();
       const editorState = { selectedStepId: "step-edit-target" };

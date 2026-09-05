@@ -224,30 +224,40 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(resumeBtn).toBeDisabled();
     await expect(stopBtn).toBeDisabled();
 
-    // 1. Play
+    // Set Step 1 to Eighth note (1/2 beat) and Step 2 to Whole note (4 beats)
+    const steps = page.locator('[data-testid="progression-step"]');
+    await steps.nth(0).click();
+    await page.getByTestId("duration-preset-eighth").click();
+    await steps.nth(1).click();
+    await page.getByTestId("duration-preset-whole").click();
+
+    // 1. Play starts on Step 1
     await playBtn.click();
     await expect(statusBadge).toContainText("Playing");
     await expect(playBtn).toBeDisabled();
     await expect(pauseBtn).toBeEnabled();
     await expect(stopBtn).toBeEnabled();
-
-    const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps.nth(0)).toHaveClass(/is-playing/);
 
-    // 2. Pause
+    // 2. Wait for playback to advance into Step 2 (after 0.25s)
+    await expect(steps.nth(1)).toHaveClass(/is-playing/);
+
+    // 3. Pause while Step 2 is actively playing
     await pauseBtn.click();
     await expect(statusBadge).toContainText("Paused");
     await expect(pauseBtn).toBeDisabled();
     await expect(resumeBtn).toBeEnabled();
     await expect(stopBtn).toBeEnabled();
 
-    // 3. Resume (Outcome B: attack restarts for remaining unplayed duration)
+    // 4. Resume: playhead continues on Step 2 (Outcome B: attack restarts, does NOT return to Step 1)
     await resumeBtn.click();
     await expect(statusBadge).toContainText("Playing");
     await expect(pauseBtn).toBeEnabled();
     await expect(resumeBtn).toBeDisabled();
+    await expect(steps.nth(1)).toHaveClass(/is-playing/);
+    await expect(steps.nth(0)).not.toHaveClass(/is-playing/); // Playhead continuation proven!
 
-    // 4. Stop
+    // 5. Stop resets playhead
     await stopBtn.click();
     await expect(statusBadge).toContainText("Stopped");
     await expect(playBtn).toBeEnabled();
