@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112 contract tests accepted  
-**Task progress:** T001–T112 complete, 112 / 158 total tasks  
+**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112–T114 accepted  
+**Task progress:** T001–T114 complete, 114 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) and User Story 6 (**Exact Musical Timing & Transport Runtime**) are fully accepted across all tasks T077–T111.
 
 The previous milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
-The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112 complete, 112 / 158)**.
+The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112–T114 complete, 114 / 158)**.
 
 ## 2. Sources of truth
 
@@ -219,6 +219,17 @@ Defined and verified contract tests in `tests/unit/progression/presets.test.ts` 
   - `insert`: Inserts immediately before `selectedStepId`; preserves existing `selectedStepId`. Rejects non-empty progressions without selection with `RangeError`.
   - For empty progressions, all three modes instantiate steps at the beginning.
 - **Project-Owned Custom Presets**: Custom Presets are owned by `Project.customPresets`, undoable/redoable via standard command patterns, and persisted with the project.
+
+### US7 Batch B — functional preset domain and neutral built-ins — T113–T114
+
+Implemented and accepted:
+- `src/domain/progression/presets.ts` (`T113`): functional preset domain model storing strictly `PresetStep = HarmonicFunctionIdentity + MusicalDuration` only (zero `HarmonicVariant`, performance overrides, or voicing data). Exact Rational duration serialization with defensive validation rejecting invalid rationals, non-positive durations, or forbidden timing units (`seconds`, `durationMs`). Cross-module realization using existing `ModuleSwitchResolution` architecture without synthetic guessing (`kind: "ambiguous"` with diagnostic `ambiguousSteps` containing candidate alternatives).
+- `src/domain/progression/builtInPresets.ts` (`T114`): curated built-in functional preset catalog containing exactly 6 neutral presets (3 Major: `Major I–vi–IV–V`, `Major I–IV–V–I`, `Major ii–V–I`; 3 Tonal Minor: `Minor i–iv–V–i`, `Minor i–VII–VI–V`, `Minor ii°–V–i`). Preset names, descriptions, and IDs are strictly functional and neutral with zero genre or stylistic labels. Presets and their steps are deeply frozen against mutation.
+
+#### Accepted US7 Preset Boundaries & Invariants (T113–T114)
+- **Semantic Content**: `PresetStep = HarmonicFunctionIdentity + MusicalDuration` only.
+- **Cross-Module Compatibility**: Evaluated via existing `planModuleSwitch`; unambiguous steps map automatically, while ambiguous steps (`!automaticTarget && alternatives.length > 0`) yield observable diagnostic `ambiguousSteps` without partial mutation.
+- **Built-in Catalog**: Exactly six neutral functional presets with neutral IDs (`builtin-major-*`, `builtin-minor-*`) and no genre labels.
 
 ## 4. Key technical decisions that must be preserved
 

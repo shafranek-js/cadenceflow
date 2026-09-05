@@ -268,8 +268,8 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T112 [P] [US7] Write preset serialization/re-realization/insertion tests in `tests/unit/progression/presets.test.ts`
 ### Implementation
 
-- [ ] T113 [US7] Implement functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`
-- [ ] T114 [P] [US7] Implement curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`
+- [x] T113 [US7] Implement functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`
+- [x] T114 [P] [US7] Implement curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`
 - [ ] T115 [US7] Implement Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`
 - [ ] T116 [US7] Implement `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`
 - [ ] T117 [US7] Implement Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`
