@@ -227,6 +227,71 @@ export async function verifyBank(_samplesDir?: string) {
   };
 }
 
+export async function decodeAudioFile(filePath: string): Promise<boolean> {
+  try {
+    await execFileAsync("ffmpeg", ["-v", "error", "-i", filePath, "-f", "null", "-"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function verifyBankDecode(_samplesDir?: string): Promise<{
+  readonly total: number;
+  readonly decodedSuccessfully: number;
+  readonly decodeFailures: number;
+  readonly failedPaths: readonly string[];
+}> {
+  const manifest = buildManifest("ogg", 48000);
+  console.log("\n--- Full Piano Bank Decode Verification ---");
+
+  const concurrency = 16;
+  let completed = 0;
+  let decodedSuccessfully = 0;
+  let decodeFailures = 0;
+  const failedPaths: string[] = [];
+
+  const tasks = [...manifest.regions];
+
+  const worker = async () => {
+    while (tasks.length > 0) {
+      const region = tasks.shift();
+      if (!region) break;
+
+      const fullPath = resolve("public/audio/piano-hq", region.assetPath);
+      const ok = await decodeAudioFile(fullPath);
+      completed++;
+      if (ok) {
+        decodedSuccessfully++;
+      } else {
+        decodeFailures++;
+        failedPaths.push(region.assetPath);
+        console.error(`FAILED DECODE: ${region.assetPath}`);
+      }
+      if (completed % 40 === 0 || completed === manifest.regions.length) {
+        console.log(
+          `Decoding progress: ${completed}/${manifest.regions.length} (${decodeFailures} failures)`,
+        );
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+  console.log(`\nDecoded successfully: ${decodedSuccessfully}`);
+  console.log(`Decode failures: ${decodeFailures}`);
+  if (failedPaths.length > 0) {
+    console.log("Failed paths:", failedPaths);
+  }
+
+  return {
+    total: manifest.regions.length,
+    decodedSuccessfully,
+    decodeFailures,
+    failedPaths,
+  };
+}
+
 export async function main() {
   const outputRoot = resolve("public/audio/piano-hq");
   const samplesDir = resolve(outputRoot, "samples");
@@ -252,9 +317,22 @@ export async function main() {
   const onlyTestFixtures = args.includes("--test-fixtures");
   const allRegions = args.includes("--all");
   const verifyOnly = args.includes("--verify");
+  const verifyDecode = args.includes("--verify-decode");
+
+  if (verifyDecode) {
+    const stats = await verifyBank(samplesDir);
+    const decodeResult = await verifyBankDecode(samplesDir);
+    if (decodeResult.decodeFailures > 0 || stats.missingCount > 0 || stats.emptyCount > 0) {
+      process.exit(1);
+    }
+    return;
+  }
 
   if (verifyOnly) {
-    await verifyBank(samplesDir);
+    const stats = await verifyBank(samplesDir);
+    if (stats.missingCount > 0 || stats.emptyCount > 0) {
+      process.exit(1);
+    }
     return;
   }
 

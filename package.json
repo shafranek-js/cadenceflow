@@ -19,6 +19,7 @@
     "validate:musicxml": "tsx scripts/validate-musicxml.ts",
     "prepare:piano-bank": "tsx scripts/prepare-piano-bank.ts",
     "prepare:test-fixtures": "tsx scripts/prepare-piano-bank.ts --test-fixtures",
+    "verify:piano-bank": "tsx scripts/prepare-piano-bank.ts --verify-decode",
     "lint": "eslint .",
     "format:check": "prettier --check ."
   },

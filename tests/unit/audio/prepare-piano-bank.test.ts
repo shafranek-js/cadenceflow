@@ -7,6 +7,7 @@ import {
   VELOCITY_RANGES,
   buildManifest,
   checkFfmpeg,
+  decodeAudioFile,
 } from "../../../scripts/prepare-piano-bank";
 
 describe("T094 — Piano Bank Preparation & Attribution Pipeline", () => {
@@ -67,5 +68,15 @@ describe("T094 — Piano Bank Preparation & Attribution Pipeline", () => {
   it("detects ffmpeg in the environment", async () => {
     const hasFfmpeg = await checkFfmpeg();
     expect(hasFfmpeg).toBe(true);
+  }, 25000);
+
+  it("decodes a valid test fixture sample and rejects an invalid/missing file", async () => {
+    const fixtureSample = resolve("public/audio/piano-hq/samples/C4v2.ogg");
+    const validDecode = await decodeAudioFile(fixtureSample);
+    expect(validDecode).toBe(true);
+
+    const missingSample = resolve("public/audio/piano-hq/samples/non_existent.ogg");
+    const invalidDecode = await decodeAudioFile(missingSample);
+    expect(invalidDecode).toBe(false);
   }, 25000);
 });
