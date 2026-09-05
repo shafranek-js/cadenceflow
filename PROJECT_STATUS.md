@@ -1,19 +1,16 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** US6 / Phase 9 in progress; transport runtime and controls (T105–T109) accepted; next milestone is final US6 integration and acceptance (T110–T111)  
-**Task progress:** T001–T109 complete, 109 / 158 total tasks  
+**Current implementation stage:** Phase 9 / User Story 6 (Timing and Transport) ACCEPTED / COMPLETE; Phase 10 / User Story 7 (Presets) NOT STARTED  
+**Task progress:** T001–T111 complete, 111 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
-Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) is fully accepted across all tasks T077–T096.
+Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) and User Story 6 (**Exact Musical Timing & Transport Runtime**) are fully accepted across all tasks T077–T111.
 
-The current milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111). Exact timing domain implementation T101–T104 is accepted:
-- `1 MusicalDuration beat = quarter note`
-- Exact Rational semantic timeline (zero floating-point accumulation or drift)
-- Reflow = proportional 1:1 duration transformation (`newDuration = oldDuration * newBarLength / oldBarLength`, step count, IDs, kinds, and non-timing performance state strictly preserved, incomplete final bars preserved without padding)
-- Swing = non-destructive playback projection ($\Delta = U \times \frac{A}{3}$ with deterministic quantization $N=10000$, grid-based polyphonic grouping independent of array adjacency/ordering)
+The current milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
+The next milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **NOT STARTED**.
 
 ## 2. Sources of truth
 
@@ -149,15 +146,59 @@ Implemented:
 - `src/audio/metronome.ts` & `src/ui/transport/MetronomeControls.tsx` (`T108`): metronome click generation with metric accents honoring simple/compound/asymmetric beat groupings (e.g. 7/8 [2+2+3]), and 1-bar count-in preceding playback.
 - `src/ui/transport/TransportBar.tsx` (`T109`): full transport bar with tempo steppers, meter change with `Reflow` vs `Preserve beat lengths` policies, groove toggle and swing amount slider, loop mode/range selectors, metronome/count-in toggles, and step duration note-value preset buttons (`Whole · Half · Quarter · Eighth · Sixteenth · Dot · Trip`) mapping to canonical quarter-note beats with `Beats:` fraction input.
 
-**Accepted Pause/Resume v1 limitation**:
-- Timeline resumes from the paused musical position without restarting the progression.
-- A sounding sample attack restarts on Resume (due to sample-based audio provider playing without arbitrary sub-frame buffer offset seek).
-- Only the remaining musical duration of the sounding note is scheduled (`durationSeconds = unplayedRemainder`).
-- Future events are not duplicated.
+### US6 Batch D — integration, E2E acceptance, and final closure — T110–T111
 
-**Editor Selection vs Playing Step separation**:
-- Selected editing Step (`selectedStepId`) and currently playing Step (`currentStepIndex`) are strictly decoupled runtime concepts.
-- Transport playback, stepping, pausing, and stopping never mutate the editor's active selection.
+Fully accepted and closed across all 158 tasks to date (111 / 158):
+- `tests/integration/timing-audio-projection.test.ts` (`T110`): 14 comprehensive integration fixtures verifying:
+  1. Exact tempo-boundary invariance (60 vs 120 BPM: $s_{120} = s_{60} / 2$, silence during rests, zero mutation).
+  2. Production T103 swing projection ($\Delta = U \times \frac{A}{3}$) across $A \in [0, 0.55, 0.66, 0.75, 1.0]$.
+  3. Polyphonic chord swing synchronization and straight feel with remembered non-zero amount.
+  4. Rest step harmonic context: consumes timeline duration, emits zero pitched events, and resolves previous sounding chord as harmonic predecessor (`I -> Rest -> Rest -> IV`).
+  5. Count-in projection strictly outside semantic time (4 beats in 4/4, 7/2 beats in 7/8 [2+2+3]).
+  6. Pause/Resume Outcome B: sample attack restarts while remaining timeline duration is preserved; future notes at relative offset without duplication.
+  7. Runtime audio failure cleanup: clean transition to `stopped`, active step cleared, audio error state, zero fallback.
+  8. Loop zero cumulative drift ($< 10^{-9}$s across 1000 iterations for awkward rationals 7/6 and 1/3) and Stop reset to loop start.
+  9. Proportional 1:1 Reflow vs Preserve Beat Lengths.
+  10. Canonical subdivision, dotted, and triplet duration conversion to exact seconds.
+  11. Playing Step vs Selected Editing Step independence.
+- `tests/e2e/us6-timing-transport.spec.ts` (`T111`): 10 Playwright E2E scenarios covering note duration presets/custom inputs, 7/8 pulse grouping, Reflow vs Preserve with Undo, transport state transitions and Outcome B playhead continuation, Play From Here, Rest step visual playback, loop regions, metronome/count-in, audio failure recovery, and editor selection independence.
+
+#### Final Accepted US6 Architecture & Invariants
+
+- **Canonical Timing Base**: `1 MusicalDuration beat = one quarter note` (strictly independent of meter denominator).
+- **Exact Semantic Timeline**: Semantic progression timing remains exact Rational arithmetic (`Rational { numerator, denominator }`). Seconds exist only at playback/export boundaries.
+- **Proportional Reflow**: Proportional 1:1 Step-duration transformation:
+  $$\text{newDuration} = \text{oldDuration} \times \frac{\text{newBarLength}}{\text{oldBarLength}}$$
+  Step count, IDs, kinds, and non-timing performance state are strictly preserved. Incomplete final bars are preserved without padding.
+- **Preserve Beat Lengths**: Canonical Step durations remain unchanged upon meter change; bar boundaries are re-indexed.
+- **Non-Destructive Swing**: Swing is a non-destructive playback projection using the accepted production T103 mapping:
+  $$\Delta = U \times \frac{A}{3}$$
+  where $U = 1/2\text{ canonical beat} = 0.25\text{ s}$ at 120 BPM for eighth-note swing, $A \in [0, 1]$ is the normalized `swingAmount`, with deterministic quantization ($N=10000$) and grid-based polyphonic grouping:
+
+  | Swing Amount ($A$) | Offbeat Start (seconds at 120 BPM) |
+  | :--- | ---: |
+  | 0.00 (Straight) | 0.250000 s |
+  | 0.55 | 0.295833 s |
+  | 0.66 | 0.305000 s |
+  | 0.75 | 0.312500 s |
+  | 1.00 (Full 2:1 Triplet) | 0.333333 s |
+
+  Full 2:1 triplet Swing occurs at $A = 1.0$.
+- **Rest Step Semantics**: Rest consumes progression timeline duration but emits no pitched piano event. Rest preserves the previous sounding chord as harmonic predecessor (`resolveHarmonicPredecessor`).
+- **Loop Timing**: Anchor-based loop scheduling ($t_k = t_0 + \frac{k \times \text{num} \times 60}{\text{den} \times \text{BPM}}$) guarantees zero cumulative deadline drift ($< 10^{-9}\text{ s}$ over 1000 iterations). Stop resets playhead to loop range start.
+- **Count-in Boundary**: Count-in belongs to runtime/session time and is not Progression semantic time. Count-in precedes step 0 at negative audio offset; omitted on Resume or loop iterations.
+- **Selection Independence**: Selected editing Step (`selectedStepId`) and currently playing Step (`currentStepIndex`) are strictly independent runtime concepts. Transport execution never alters editor selection.
+- **Pause/Resume Outcome B**:
+  - Semantic transport resumes from the paused timeline position.
+  - Future events are not duplicated.
+  - Only the remaining realized note duration is scheduled.
+  - For a sounding HQ piano sample, the sample attack restarts on Resume (arbitrary mid-buffer sample continuation is not implemented in v1).
+  - Explicit distinction of timing concepts:
+    1. *Semantic Step duration* (e.g. 4 canonical beats = 2.0 s at 120 BPM);
+    2. *Realized sounding-note duration after articulation/gate* (e.g. ~1.9 s);
+    3. *Semantic Step remainder* (e.g. 2.0 s - 0.6 s = 1.4 s);
+    4. *Realized sounding-note remainder* (e.g. 1.9 s - 0.6 s = ~1.3 s).
+    These four values are distinct and not implied to be identical.
 
 ## 4. Key technical decisions that must be preserved
 
@@ -202,143 +243,86 @@ Implemented:
 
 The working folder has no Git metadata, so this is a verified list of the main current files associated with completed tasks, **not a Git diff**.
 
-### Domain / commands
+### Domain / timing / transport / audio
 
-- `src/domain/harmony/moduleRegistry.ts`
-- `src/domain/harmony/moduleSwitch.ts`
-- `src/domain/harmony/realization.ts`
-- `src/domain/harmony/topology.ts`
-- `src/domain/progression/branch.ts`
-- `src/domain/progression/step.ts`
-- `src/domain/progression/reset.ts`
-- `src/domain/project/defaults.ts`
-- `src/domain/project/project.ts`
-- `src/domain/recommendations/engine.ts`
-- `src/app/commands/branchCommands.ts`
-- `src/app/commands/harmonyContextCommands.ts`
-- `src/app/commands/matrixCommands.ts`
-- `src/app/commands/matrixTemplateCommands.ts`
-- `src/app/commands/progressionCommands.ts`
-
-### UI
-
-- `src/app/App.tsx`
-- `src/ui/matrix/HarmonicMatrix.tsx`
-- `src/ui/matrix/ModuleSelector.tsx`
-- `src/ui/matrix/ModuleSwitchDialog.tsx`
-- `src/ui/matrix/TonicSelector.tsx`
-- `src/ui/progression/BranchControls.tsx`
-- `src/ui/progression/BranchComparison.tsx`
-- `src/ui/progression/ProgressionTrack.tsx`
-- `src/ui/progression/ProgressionStepCard.tsx`
-- `src/ui/inspector/CardTemplateInspector.tsx`
-- `src/ui/inspector/CompositionIntentControl.tsx`
-- `src/ui/chord-card/ChordCard.tsx`
-- `src/ui/settings/MatrixResetMenu.tsx`
+- `src/domain/harmony/*`
+- `src/domain/progression/*`
+- `src/domain/timing/duration.ts`
+- `src/domain/timing/meter.ts`
+- `src/domain/timing/rational.ts`
+- `src/domain/timing/swing.ts`
+- `src/domain/timing/timeline.ts`
+- `src/audio/playbackController.ts`
+- `src/audio/scheduler.ts`
+- `src/audio/metronome.ts`
+- `src/audio/eventRealizer.ts`
+- `src/audio/hq-sample-piano/*`
+- `src/audio/soundfont/*`
+- `src/ui/transport/transportStore.ts`
+- `src/ui/transport/loopState.ts`
+- `src/ui/transport/TransportBar.tsx`
+- `src/ui/transport/MetronomeControls.tsx`
+- `src/ui/transport/StepDurationControls.tsx`
 
 ### Tests/fixtures
 
 - `tests/unit/harmony/*`
-- `tests/unit/progression/branch.test.ts`
-- `tests/unit/progression/step-independence.test.ts`
-- `tests/unit/recommendations/*`
-- `tests/integration/key-mode-rerealization.test.ts`
-- `tests/integration/branch-undo.test.ts`
-- `tests/integration/matrix-preview-add.test.ts`
-- `tests/integration/matrix-template-state.test.ts`
+- `tests/unit/progression/*`
+- `tests/unit/instruments/*`
+- `tests/unit/audio/*`
+- `tests/unit/timing/*`
+- `tests/unit/transport/*`
+- `tests/integration/timing-audio-projection.test.ts`
+- `tests/integration/pitch-projection-consistency.test.ts`
+- `tests/integration/audio-provider-contract.test.ts`
 - `tests/e2e/us1-build-progression.spec.ts`
 - `tests/e2e/us2-branching.spec.ts`
 - `tests/e2e/us3-step-independence.spec.ts`
 - `tests/e2e/us4-major-minor.spec.ts`
 - `tests/e2e/us4a-modules.spec.ts`
+- `tests/e2e/us5-piano-performance.spec.ts`
+- `tests/e2e/us5-audio-playback.spec.ts`
+- `tests/e2e/us6-timing-transport.spec.ts`
 
 ## 6. Verification performed
 
-The real toolchain and test suite were stabilized and verified on 2026-09-04:
+The real toolchain and test suite were verified on 2026-09-05:
 
 - Toolchain: `pnpm 10.12.4` pinned via `packageManager` in `package.json`, `typescript 6.0.3` pinned.
-- `pnpm run build` (`tsc -b && vite build`) → **PASS**.
-- `pnpm test` (Vitest, 23 files, 89 tests across domain, UI, and US5 Batch A/B contracts) → **PASS**.
-- `pnpm run test:e2e` (Playwright Chromium, 6 specs including US1–US4A) → **PASS**.
+- `pnpm run build` (`tsc -b && vite build`) → **PASS** (0 errors).
+- `pnpm test` (Vitest, 42 test files, 290 tests) → **PASS** (`290 / 290` GREEN).
+- `pnpm run test:e2e:chromium` (Playwright Chromium, 22 tests across US1–US6) → **PASS** (`22 / 22` GREEN).
 - `pnpm run lint` (ESLint 9) → **PASS** (0 errors, 0 warnings).
-- `pnpm run format:check` (Prettier) → **PASS**.
-- App dev server active on `http://localhost:5173`.
-- Spec/task consistency → **PASS**: 182 FR, 17 SC, 89 completed tasks (T001–T089), no placeholders.
+- `pnpm run format:check` (Prettier) → **PASS** (all files formatted).
+- Spec integrity: 1077 lines, 182 FRs, 17 SCs, 0 TODOs / TBD / NEEDS CLARIFICATION placeholders.
+- Verified visual evidence archive:
+  - Path: `review-artifacts/us6-final/us6-final-evidence.zip`
+  - Size: `1,845,685 bytes`
+  - SHA-256: `97f4919b3431db74898c53736fc9ded9f33d01c7ff0be9315f1ec0bd9fd8b29a`
+  - Contents: 10 PNGs (`01`–`10`) + `us6-final-demo.webm`, verified integrity.
 
 ## 7. Known issues / environment limitations
 
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
-3. **HQ piano assets**: Manifest currently has empty regions; sample bank preparation, encoding, attribution, and lazy audio provider are assigned in US5 Batch C (T090–T094).
-4. **US6–US10**: Pending completion and acceptance of US5.
+3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
+4. **US7–US10**: Pending start and implementation of US7 presets.
 
-## 8. Current development sequence: US5 Batch C — T090–T094
+## 8. Next development sequence: Phase 10 / US7 — T112–T118 (Not Started)
 
-Batch A and Batch B have been accepted by the orchestrator (commits `73a07ff` through `6d63f70`).
-Active milestone is **US5 Batch C (HQ Piano Audio Backend)**:
+Active milestone is **Phase 10: User Story 7 — Use functional presets as reusable composition material (Priority: P2)**:
 
-- **T090**: React-independent look-ahead scheduler (`src/audio/scheduler.ts`).
-- **T091**: HQ multisample manifest, 16 velocity layers, sample cache (`src/audio/hq-sample-piano/`).
-- **T092**: Lazy `HqSamplePianoProvider` with loading/fallback/error states (`src/audio/hq-sample-piano/provider.ts`).
-- **T093**: `spessasynth_lib` SF2/SF3 compatibility proof provider (`src/audio/soundfont/spessaProvider.ts`).
-- **T094**: Sample-bank preparation script, manifest, and CC-BY attribution (`scripts/prepare-piano-bank.ts`, `public/audio/piano-hq/`, `public/licenses/`).
+- **T112**: Preset serialization, re-realization across keys/modes, and insertion transformation tests in `tests/unit/progression/presets.test.ts`.
+- **T113**: Functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`.
+- **T114**: Curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`.
+- **T115**: Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`.
+- **T116**: `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`.
+- **T117**: Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`.
+- **T118**: Playwright acceptance for cross-key functional preset reuse and all insertion modes in `tests/e2e/us7-presets.spec.ts`.
 
-### Phase 8 / US5 — tasks T077–T096
+## 9. Handoff operating model
 
-Implement in four reviewable batches:
-
-**Batch A — tests and contracts first: T077–T080**
-
-- Voice-leading tests.
-- Manual voicing/bass/register/range tests.
-- Articulation/dynamics/per-note velocity/preset tests.
-- Audio-provider contract tests with mock clock/provider.
-
-**Batch B — canonical piano realization: T081–T089**
-
-- `PianoInstrumentProfile` pipeline.
-- Contextual voice leading.
-- Manual exact-pitch editor/domain validation.
-- Independent bass and register.
-- Piano articulations.
-- Master velocity + per-note overrides + dynamic presets.
-- Piano Performance Inspector.
-- Canonical performance-event realization shared by audio/visualization/export.
-
-**Batch C — audio backend: T090–T094**
-
-- React-independent look-ahead scheduler.
-- HQ multisample manifest/velocity region selection/cache.
-- Lazy `HqSamplePianoProvider` with explicit loading/fallback/error states.
-- SF2/SF3 proof provider behind the same audio contract.
-- Sample preparation + license/attribution pipeline.
-
-**Batch D — consistency/acceptance: T095–T096**
-
-- Prove Piano View, Staff View, stored manual voicing and scheduled audio events use identical exact pitches/velocities.
-- Playwright acceptance for manual voicing, per-note velocity, presets, and HQ audio readiness.
-
-### US5 acceptance gate
-
-Do not mark T077–T096 complete until all of the following are demonstrated:
-
-- Automatic voicing uses neighboring-step context and avoids unnecessary jumps.
-- Manual voicing preserves exact pitches/octaves.
-- Bass is an independent lower voice.
-- Register controls work without changing harmonic identity.
-- `Block / Arp Up / Arp Down / Broken Chord / Humanized` produce deterministic event patterns except explicitly bounded humanization.
-- Master Velocity and per-note overrides survive step-local editing and are reflected in scheduled events.
-- Dynamic presets include `Balanced`, `Top Voice Emphasis`, `Bass Emphasis`, `Inner Voices Soft`, `Humanized Dynamics`.
-- HQ provider selects velocity-sensitive sample regions, lazy-loads/cache samples, and exposes loading/error/fallback state.
-- No oscillator placeholder is accepted as completion of HQ piano audio.
-- No unverified/unlicensed sample assets are committed.
-- Real tests/build are green in the restored dependency environment.
-
-Only after that gate proceed to **Phase 9 / US6 timing and transport**.
-
-## 10. Handoff operating model
-
-From this point, development should be orchestrated as controlled batches:
+From this point, development continues in controlled batches:
 
 1. The orchestrator issues one scoped developer assignment referencing exact task IDs.
 2. The developer implements only that scope and returns Git diff/commit, files changed, test output, and any deviations.
@@ -347,3 +331,4 @@ From this point, development should be orchestrated as controlled batches:
 5. Accepted review updates `tasks.md`, `PROJECT_STATUS.md`, and the handoff package.
 
 See `DEVELOPMENT_WORKFLOW.md` and `NEXT_DEVELOPER_TASK.md` for the exact next assignment and review protocol.
+

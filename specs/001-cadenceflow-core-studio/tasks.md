@@ -250,8 +250,8 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T107 [US6] Implement contiguous loop-region model and Stop reset-to-loop-start semantics in `src/ui/transport/loopState.ts` and `src/ui/progression/ProgressionTrack.tsx`
 - [x] T108 [US6] Implement metronome and one-bar default Count-in honoring custom beat grouping in `src/audio/metronome.ts` and `src/ui/transport/MetronomeControls.tsx`
 - [x] T109 [US6] Implement Tempo, Time Signature, beat-grouping, duration, swing, loop, and step-based transport controls in `src/ui/transport/TransportBar.tsx`
-- [ ] T110 [US6] Write integration test comparing semantic timeline with emitted AudioNoteEvents under tempo, swing, rests, and loop boundaries in `tests/integration/timing-audio-projection.test.ts`
-- [ ] T111 [US6] Write Playwright acceptance for custom meter, Rest Step, swing, count-in, loop region, Pause/Resume/Stop, and Play From Here in `tests/e2e/us6-timing-transport.spec.ts`
+- [x] T110 [US6] Write integration test comparing semantic timeline with emitted AudioNoteEvents under tempo, swing, rests, and loop boundaries in `tests/integration/timing-audio-projection.test.ts`
+- [x] T111 [US6] Write Playwright acceptance for custom meter, Rest Step, swing, count-in, loop region, Pause/Resume/Stop, and Play From Here in `tests/e2e/us6-timing-transport.spec.ts`
 
 **Checkpoint**: Exact bars/beats/subdivisions/rests/meter/grouping/swing and step-based transport play consistently with metronome/count-in/loop, without free DAW-style scrub.
 
