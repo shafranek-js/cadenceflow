@@ -3,6 +3,7 @@ import type { HarmonicModuleId } from "../harmony/functions";
 import type { ExactPitch, PitchClassIdentity } from "../harmony/pitch";
 import type { TemporaryBranch } from "../progression/branch";
 import type { Progression } from "../progression/progression";
+import type { FunctionalPreset } from "../progression/presets";
 import type { CardViewId } from "../progression/step";
 import type { GlobalTiming } from "../timing/meter";
 import type { GrooveSettings } from "../timing/swing";
@@ -53,7 +54,7 @@ export interface Project {
   readonly moduleTemplateStates: Readonly<Record<HarmonicModuleId, ModuleTemplateState>>;
   readonly progression: Progression;
   readonly temporaryBranch?: TemporaryBranch;
-  readonly customPresets: readonly CustomPresetRef[];
+  readonly customPresets: readonly FunctionalPreset[];
 }
 
 export function matrixCardOverrideCount(card?: MatrixCardTemplateState): number {
