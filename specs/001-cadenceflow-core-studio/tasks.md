@@ -270,8 +270,8 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 - [x] T113 [US7] Implement functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`
 - [x] T114 [P] [US7] Implement curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`
-- [ ] T115 [US7] Implement Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`
-- [ ] T116 [US7] Implement `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`
+- [x] T115 [US7] Implement Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`
+- [x] T116 [US7] Implement `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`
 - [ ] T117 [US7] Implement Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`
 - [ ] T118 [US7] Write Playwright acceptance for cross-key functional preset reuse and all insertion modes in `tests/e2e/us7-presets.spec.ts`
 
