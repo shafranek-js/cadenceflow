@@ -64,6 +64,22 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       expect(equalRational(projected[1].startBeats, rational(1, 2))).toBe(true);
       expect(equalRational(projected[1].durationBeats, rational(1, 2))).toBe(true);
     });
+
+    it("leaves timing unmodified when groove feel is 'straight' even with a non-zero stored swingAmount", () => {
+      // Switching Swing -> Straight preserves remembered amount in project/UI, but feel controls active projection
+      const gStraightWithAmount = groove("straight", 0.75);
+      const notes: MockPlaybackNote[] = [
+        createNote("n1", 0, 1, 1, 2),
+        createNote("n2", 1, 2, 1, 2),
+      ];
+
+      const projected = projectSwingTiming(notes, gStraightWithAmount);
+
+      expect(equalRational(projected[0].startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projected[0].durationBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1].startBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1].durationBeats, rational(1, 2))).toBe(true);
+    });
   });
 
   describe("2. Swing Projection and Pair Invariance", () => {
@@ -129,6 +145,25 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
         0,
       );
       expect(compareRational(stronger[1].durationBeats, moderate[1].durationBeats)).toBeLessThan(0);
+    });
+
+    it("ensures both projected subdivisions remain strictly positive even at maximum swing amount (1.0)", () => {
+      const notes: MockPlaybackNote[] = [
+        createNote("n1", 0, 1, 1, 2),
+        createNote("n2", 1, 2, 1, 2),
+      ];
+
+      const maxSwing = projectSwingTiming(notes, groove("swing", 1.0));
+
+      // First note lengthened, second note shortened but strictly positive (> 0)
+      expect(compareRational(maxSwing[0].durationBeats, rational(0, 1))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[1].durationBeats, rational(0, 1))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[0].durationBeats, rational(1, 2))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[1].durationBeats, rational(1, 2))).toBeLessThan(0);
+
+      // Invariance still holds
+      const sum = addRational(maxSwing[0].durationBeats, maxSwing[1].durationBeats);
+      expect(equalRational(sum, rational(1, 1))).toBe(true);
     });
 
     it("validates swingAmount bounds [0, 1]", () => {

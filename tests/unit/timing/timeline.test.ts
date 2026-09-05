@@ -111,6 +111,14 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
 
       expect(timeline.totalDurationBeats).toEqual(rational(3, 1));
     });
+
+    it("handles an empty progression by returning a zero-duration empty timeline", () => {
+      const timeline = createProgressionTimeline([], m44);
+      expect(timeline.steps).toHaveLength(0);
+      expect(timeline.totalDurationBeats).toEqual(rational(0, 1));
+      expect(timeline.totalBars).toEqual(rational(0, 1));
+      expect(timeline.meter).toBe(m44);
+    });
   });
 
   describe("2. Rest Step Semantics and Harmonic Predecessor Resolution", () => {
@@ -202,12 +210,14 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       expect(equalRational(sharedBoundary, timeline.steps[1].startBeats)).toBe(true);
     });
 
-    it("throws RangeError for out-of-range boundary indices", () => {
+    it("throws RangeError for out-of-range or non-integer boundary indices", () => {
       const steps: ProgressionStep[] = [makeCanonicalChordStep("c1", 4, 1)];
       const timeline = createProgressionTimeline(steps, m44);
 
       expect(() => lookupStepBoundary(timeline, -1)).toThrow(RangeError);
       expect(() => lookupStepBoundary(timeline, 2)).toThrow(RangeError);
+      expect(() => lookupStepBoundary(timeline, 0.5)).toThrow(RangeError);
+      expect(() => lookupStepBoundary(timeline, Number.NaN)).toThrow(RangeError);
     });
   });
 
@@ -269,6 +279,12 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       ).toThrow();
       expect(() =>
         validateLoopRegion({ startStepId: "s1", endStepId: "nonexistent" }, steps),
+      ).toThrow();
+    });
+
+    it("rejects loop validation on an empty progression", () => {
+      expect(() =>
+        validateLoopRegion({ startStepId: "s1", endStepId: "s1" }, []),
       ).toThrow();
     });
   });

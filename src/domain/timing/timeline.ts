@@ -1,6 +1,11 @@
-import type { Rational } from "./rational";
+import {
+  addRational,
+  divideRational,
+  rational,
+  type Rational,
+} from "./rational";
 import type { Meter } from "./meter";
-import type { ProgressionStep } from "../progression/step";
+import type { ChordStep, ProgressionStep } from "../progression/step";
 
 export interface TimelineStepEntry {
   readonly step: ProgressionStep;
@@ -33,29 +38,148 @@ export interface ResolvedLoopRegion {
 }
 
 export function createProgressionTimeline(
-  _steps: readonly ProgressionStep[],
-  _meter: Meter,
+  steps: readonly ProgressionStep[],
+  meter: Meter,
 ): ProgressionTimeline {
-  throw new Error("Not implemented: T104 createProgressionTimeline");
+  const barLengthBeats = rational(meter.numerator * 4, meter.denominator);
+
+  if (steps.length === 0) {
+    return Object.freeze({
+      steps: Object.freeze([]),
+      totalDurationBeats: rational(0, 1),
+      totalBars: rational(0, 1),
+      meter,
+    });
+  }
+
+  let currentBeats = rational(0, 1);
+  const entries: TimelineStepEntry[] = [];
+
+  for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+    const step = steps[stepIndex];
+    const startBeats = currentBeats;
+    const durationBeats = step.duration.beats;
+    const endBeats = addRational(startBeats, durationBeats);
+    currentBeats = endBeats;
+
+    const startBar = Math.floor(
+      (startBeats.numerator / startBeats.denominator) *
+        (meter.denominator / (meter.numerator * 4)),
+    );
+    const endBar = Math.floor(
+      (endBeats.numerator / endBeats.denominator) *
+        (meter.denominator / (meter.numerator * 4)),
+    );
+
+    entries.push(
+      Object.freeze({
+        step,
+        stepIndex,
+        startBeats,
+        endBeats,
+        durationBeats,
+        startBar,
+        endBar,
+      }),
+    );
+  }
+
+  const totalDurationBeats = currentBeats;
+  const totalBars = divideRational(totalDurationBeats, barLengthBeats);
+
+  return Object.freeze({
+    steps: Object.freeze(entries),
+    totalDurationBeats,
+    totalBars,
+    meter,
+  });
 }
 
 export function lookupStepBoundary(
-  _timeline: ProgressionTimeline,
-  _boundaryIndex: number,
+  timeline: ProgressionTimeline,
+  boundaryIndex: number,
 ): Rational {
-  throw new Error("Not implemented: T104 lookupStepBoundary");
+  if (
+    !Number.isInteger(boundaryIndex) ||
+    boundaryIndex < 0 ||
+    boundaryIndex > timeline.steps.length
+  ) {
+    throw new RangeError(
+      `boundaryIndex must be an integer between 0 and ${timeline.steps.length}`,
+    );
+  }
+
+  if (boundaryIndex === 0) {
+    return rational(0, 1);
+  }
+  if (boundaryIndex === timeline.steps.length) {
+    return timeline.totalDurationBeats;
+  }
+  return timeline.steps[boundaryIndex].startBeats;
 }
 
 export function validateLoopRegion(
-  _region: LoopRegion,
-  _steps: readonly ProgressionStep[],
+  region: LoopRegion,
+  steps: readonly ProgressionStep[],
 ): ResolvedLoopRegion {
-  throw new Error("Not implemented: T104 validateLoopRegion");
+  if (!steps || steps.length === 0) {
+    throw new RangeError("cannot validate loop region on an empty progression");
+  }
+
+  const startStepIndex = steps.findIndex((s) => s.id === region.startStepId);
+  const endStepIndex = steps.findIndex((s) => s.id === region.endStepId);
+
+  if (startStepIndex === -1) {
+    throw new RangeError(`startStepId not found: "${region.startStepId}"`);
+  }
+  if (endStepIndex === -1) {
+    throw new RangeError(`endStepId not found: "${region.endStepId}"`);
+  }
+  if (startStepIndex > endStepIndex) {
+    throw new RangeError(
+      `startStepId cannot appear after endStepId: start index ${startStepIndex} > end index ${endStepIndex}`,
+    );
+  }
+
+  let startBeats = rational(0, 1);
+  for (let i = 0; i < startStepIndex; i++) {
+    startBeats = addRational(startBeats, steps[i].duration.beats);
+  }
+
+  let durationBeats = rational(0, 1);
+  for (let i = startStepIndex; i <= endStepIndex; i++) {
+    durationBeats = addRational(durationBeats, steps[i].duration.beats);
+  }
+
+  const endBeats = addRational(startBeats, durationBeats);
+
+  return Object.freeze({
+    startStepIndex,
+    endStepIndex,
+    startBeats,
+    endBeats,
+    durationBeats,
+  });
 }
 
 export function resolveHarmonicPredecessor(
-  _timeline: ProgressionTimeline,
-  _stepIndex: number,
-): import("../progression/step").ChordStep | undefined {
-  throw new Error("Not implemented: T104 resolveHarmonicPredecessor");
+  timeline: ProgressionTimeline,
+  stepIndex: number,
+): ChordStep | undefined {
+  if (
+    !Number.isInteger(stepIndex) ||
+    stepIndex < 0 ||
+    stepIndex >= timeline.steps.length
+  ) {
+    return undefined;
+  }
+
+  for (let i = stepIndex - 1; i >= 0; i--) {
+    const entry = timeline.steps[i];
+    if (entry.step.kind === "chord") {
+      return entry.step;
+    }
+  }
+
+  return undefined;
 }
