@@ -108,6 +108,18 @@ import {
   type SetAllStepCardViewCommand,
   type SetStepCardViewCommand,
 } from "./commands/progressionCommands";
+import {
+  saveCustomPreset,
+  deleteCustomPreset,
+  applyPreset,
+  type SaveCustomPresetCommand,
+  type DeleteCustomPresetCommand,
+  type ApplyPresetCommand,
+} from "./commands/presetCommands";
+import type { FunctionalPreset, PresetApplyMode } from "../domain/progression/presets";
+import { PresetsPanel } from "../ui/progression/PresetsPanel";
+import { PresetApplyDialog } from "../ui/progression/PresetApplyDialog";
+import { SavePresetDialog } from "../ui/progression/SavePresetDialog";
 import type { StepPerformanceOverrides } from "../domain/project/defaults";
 
 function useStore(store: AppStore) {
@@ -131,6 +143,9 @@ export function App() {
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
   const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
+  const [presetsPanelOpen, setPresetsPanelOpen] = useState(false);
+  const [savePresetDialogOpen, setSavePresetDialogOpen] = useState(false);
+  const [applyDialogPreset, setApplyDialogPreset] = useState<FunctionalPreset | null>(null);
 
   const transportStore = useMemo(() => new TransportStore(), []);
   const [transportState, setTransportState] = useState<TransportState>(transportStore.getState());
@@ -570,6 +585,32 @@ export function App() {
     }
   };
 
+  const handleSaveCustomPreset = (name: string) => {
+    const command: SaveCustomPresetCommand = {
+      type: "presets/save-custom",
+      payload: { name, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, saveCustomPreset);
+  };
+
+  const handleDeleteCustomPreset = (presetId: string) => {
+    const command: DeleteCustomPresetCommand = {
+      type: "presets/delete-custom",
+      payload: { presetId, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, deleteCustomPreset);
+  };
+
+  const handleApplyPreset = (preset: FunctionalPreset, mode: PresetApplyMode) => {
+    const command: ApplyPresetCommand = {
+      type: "presets/apply",
+      payload: { preset, mode, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, applyPreset);
+    setApplyDialogPreset(null);
+    setPresetsPanelOpen(false);
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -663,7 +704,27 @@ export function App() {
       </div>
       <section className="progression-strip" aria-label="My Progression">
         <div className="progression-heading">
-          <h2>My Progression</h2>
+          <div className="progression-title-group">
+            <h2>My Progression</h2>
+            <div className="progression-preset-actions">
+              <button
+                type="button"
+                className="secondary-btn presets-trigger-btn"
+                onClick={() => setPresetsPanelOpen(true)}
+                data-testid="progression-presets-btn"
+              >
+                Presets
+              </button>
+              <button
+                type="button"
+                className="secondary-btn save-preset-trigger-btn"
+                onClick={() => setSavePresetDialogOpen(true)}
+                data-testid="progression-save-preset-btn"
+              >
+                Save as Preset
+              </button>
+            </div>
+          </div>
           <BranchControls
             project={project}
             selectedBranchStepIds={selectedBranchStepIds}
@@ -730,6 +791,31 @@ export function App() {
           }}
         />
       )}
+      <PresetsPanel
+        isOpen={presetsPanelOpen}
+        project={project}
+        onClose={() => setPresetsPanelOpen(false)}
+        onOpenApplyDialog={(preset) => {
+          setApplyDialogPreset(preset);
+        }}
+        onOpenSaveDialog={() => {
+          setSavePresetDialogOpen(true);
+        }}
+        onDeleteCustomPreset={handleDeleteCustomPreset}
+      />
+      <PresetApplyDialog
+        isOpen={Boolean(applyDialogPreset)}
+        preset={applyDialogPreset}
+        project={project}
+        onClose={() => setApplyDialogPreset(null)}
+        onApply={handleApplyPreset}
+      />
+      <SavePresetDialog
+        isOpen={savePresetDialogOpen}
+        project={project}
+        onClose={() => setSavePresetDialogOpen(false)}
+        onSave={handleSaveCustomPreset}
+      />
     </main>
   );
 }
