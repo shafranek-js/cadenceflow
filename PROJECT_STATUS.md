@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** US6 / Phase 9 in progress; exact timing domain (T101–T104) accepted; next milestone is transport runtime and controls (T105–T109)  
-**Task progress:** T001–T104 complete, 104 / 158 total tasks  
+**Current implementation stage:** US6 / Phase 9 in progress; transport runtime and controls (T105–T109) accepted; next milestone is final US6 integration and acceptance (T110–T111)  
+**Task progress:** T001–T109 complete, 109 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -139,6 +139,25 @@ Implemented:
 - `src/domain/timing/meter.ts` (`T102`): meter and grouping validation, pulse-to-beat conversion, metric accent hierarchy, and proportional 1:1 `reflowProgression` scaling preserving all step identities, kinds, and performance state.
 - `src/domain/timing/swing.ts` (`T103`): straight/swing groove projection with deterministic amount quantization ($N=10000$), grid-based grouping invariant across polyphonic simultaneous notes and array order permutations, and strictly positive off-beat durations.
 - `src/domain/timing/timeline.ts` (`T104`): exact rational progression timeline calculation, rest step silence allocation, harmonic predecessor lookup, and contiguous loop validation with zero drift.
+
+### US6 Batch C — transport runtime and controls — T105–T109
+
+Implemented:
+- `src/ui/transport/transportStore.ts` (`T105`): finite state machine for `stopped`, `playing`, and `paused` states, session-isolated runtime tracking (`generateTransportSessionId()`), loop-aware stop reset targets, and observable error propagation.
+- `src/audio/playbackController.ts` & `src/audio/scheduler.ts` (`T106`): decoupled WebAudio look-ahead scheduling coordinator, paused-position resumption, rest-step silence scheduling, and asynchronous audio failure recovery without fallback poisoning.
+- `src/ui/transport/loopState.ts` & `src/ui/progression/ProgressionTrack.tsx` (`T107`): contiguous loop range validation, single-step loops, base-anchored zero cumulative drift loop iterations ($< 10^{-9}$s across 1000 iterations), and loop-boundary stop reset semantics.
+- `src/audio/metronome.ts` & `src/ui/transport/MetronomeControls.tsx` (`T108`): metronome click generation with metric accents honoring simple/compound/asymmetric beat groupings (e.g. 7/8 [2+2+3]), and 1-bar count-in preceding playback.
+- `src/ui/transport/TransportBar.tsx` (`T109`): full transport bar with tempo steppers, meter change with `Reflow` vs `Preserve beat lengths` policies, groove toggle and swing amount slider, loop mode/range selectors, metronome/count-in toggles, and step duration note-value preset buttons (`Whole · Half · Quarter · Eighth · Sixteenth · Dot · Trip`) mapping to canonical quarter-note beats with `Beats:` fraction input.
+
+**Accepted Pause/Resume v1 limitation**:
+- Timeline resumes from the paused musical position without restarting the progression.
+- A sounding sample attack restarts on Resume (due to sample-based audio provider playing without arbitrary sub-frame buffer offset seek).
+- Only the remaining musical duration of the sounding note is scheduled (`durationSeconds = unplayedRemainder`).
+- Future events are not duplicated.
+
+**Editor Selection vs Playing Step separation**:
+- Selected editing Step (`selectedStepId`) and currently playing Step (`currentStepIndex`) are strictly decoupled runtime concepts.
+- Transport playback, stepping, pausing, and stopping never mutate the editor's active selection.
 
 ## 4. Key technical decisions that must be preserved
 

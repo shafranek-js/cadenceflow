@@ -245,11 +245,11 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T102 [US6] Implement custom meter validation, beat grouping, accents, and meter-change transformation policies in `src/domain/timing/meter.ts`
 - [x] T103 [US6] Implement project-level Straight/Swing groove timing projection without modifying semantic durations in `src/domain/timing/swing.ts`
 - [x] T104 [US6] Implement semantic progression timeline with Rest Steps and step-boundary indexing in `src/domain/timing/timeline.ts`
-- [ ] T105 [US6] Implement transport state machine for Play/Pause/Resume/Stop/Play From Here with session runtime state in `src/ui/transport/transportStore.ts`
-- [ ] T106 [US6] Integrate transport with look-ahead audio scheduler and paused-position resumption in `src/audio/scheduler.ts`
-- [ ] T107 [US6] Implement contiguous loop-region model and Stop reset-to-loop-start semantics in `src/ui/transport/loopState.ts` and `src/ui/progression/ProgressionTrack.tsx`
-- [ ] T108 [US6] Implement metronome and one-bar default Count-in honoring custom beat grouping in `src/audio/metronome.ts` and `src/ui/transport/MetronomeControls.tsx`
-- [ ] T109 [US6] Implement Tempo, Time Signature, beat-grouping, duration, swing, loop, and step-based transport controls in `src/ui/transport/TransportBar.tsx`
+- [x] T105 [US6] Implement transport state machine for Play/Pause/Resume/Stop/Play From Here with session runtime state in `src/ui/transport/transportStore.ts`
+- [x] T106 [US6] Integrate transport with look-ahead audio scheduler and paused-position resumption in `src/audio/scheduler.ts`
+- [x] T107 [US6] Implement contiguous loop-region model and Stop reset-to-loop-start semantics in `src/ui/transport/loopState.ts` and `src/ui/progression/ProgressionTrack.tsx`
+- [x] T108 [US6] Implement metronome and one-bar default Count-in honoring custom beat grouping in `src/audio/metronome.ts` and `src/ui/transport/MetronomeControls.tsx`
+- [x] T109 [US6] Implement Tempo, Time Signature, beat-grouping, duration, swing, loop, and step-based transport controls in `src/ui/transport/TransportBar.tsx`
 - [ ] T110 [US6] Write integration test comparing semantic timeline with emitted AudioNoteEvents under tempo, swing, rests, and loop boundaries in `tests/integration/timing-audio-projection.test.ts`
 - [ ] T111 [US6] Write Playwright acceptance for custom meter, Rest Step, swing, count-in, loop region, Pause/Resume/Stop, and Play From Here in `tests/e2e/us6-timing-transport.spec.ts`
 
