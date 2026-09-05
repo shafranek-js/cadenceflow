@@ -235,6 +235,8 @@ export class TransportStore {
     this.#state = Object.freeze({
       ...this.#state,
       loopAwareResetTarget: target,
+      startingStepIndex:
+        this.#state.status === "stopped" ? target : this.#state.startingStepIndex,
     });
     this.emit();
   }
