@@ -1,15 +1,15 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-04  
-**Current implementation stage:** US5 Batch C accepted; next milestone is US5 Batch D (T095–T096)  
-**Task progress:** T001–T094 complete, 94 / 158 total tasks  
+**Handoff date:** 2026-09-05  
+**Current implementation stage:** US5 / Phase 8 accepted; next milestone is US6 / Phase 9 (T097–T111)  
+**Task progress:** T001–T096 complete, 96 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
-Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. The immediate goal is **User Story 5 Batch D / Phase 8**: end-to-end pitch/velocity projection consistency (T095) and final Playwright Piano Performance acceptance (T096).
+Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) is fully accepted across all tasks T077–T096.
 
-Do **not** start US6 timing/transport until US5 passes its acceptance gate.
+The next milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111).
 
 ## 2. Sources of truth
 
@@ -110,7 +110,15 @@ Implemented:
 - SF2/SF3 SoundFont compatibility provider using `spessasynth_lib@4.3.14` proving interchangeable audio provider contracts (`T093`).
 - Reproducible bank preparation pipeline `scripts/prepare-piano-bank.ts`, full 480-region manifest, attribution license, and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) for deterministic clean-checkout real browser smoke (`T094`).
 
-**Current known limitation**: Sustain samples are implemented for v1; Salamander release resonance, string resonance, hammer noise, and pedal noise layers are deferred.
+### US5 Batch D — canonical projection consistency and final acceptance — T095–T096
+
+Implemented:
+
+- Canonical projection consistency integration test suite across 8 comprehensive fixtures (A–H) proving identical exact pitches and velocities across Piano Card View, Staff notation, `eventRealizer`, `AudioNoteEvent[]`, and `HqSamplePianoProvider` velocity-region selection (`T095`).
+- User-observable `PianoAudioStatus` studio header badge (`loading`, `ready`, `fallback`, `error`) and cleanly decoupled dev/test diagnostic boundary in `src/audio/testHooks.ts`.
+- Full Playwright acceptance test suite covering repeated chord independence, Manual Voicing Editor validation & register immunity, per-note dynamics & presets, independent bass selection & bounds, and HQ piano readiness & discrete velocity layer paths in real Chromium (`T096`).
+
+**Current known limitation**: Sustain multisamples are implemented for v1; Salamander release resonance, sympathetic string resonance, hammer noise, and pedal noise layers remain deferred.
 
 ## 4. Key technical decisions that must be preserved
 

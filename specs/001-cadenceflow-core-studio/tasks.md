@@ -220,8 +220,8 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T092 [US5] Implement lazy-loaded `HqSamplePianoProvider` with loading/fallback/error states in `src/audio/hq-sample-piano/provider.ts`
 - [x] T093 [P] [US5] Implement `spessasynth_lib` SF2/SF3 compatibility proof provider behind the same contract in `src/audio/soundfont/spessaProvider.ts`
 - [x] T094 [US5] Implement sample-bank preparation/encoding/attribution pipeline in `scripts/prepare-piano-bank.ts`, `public/audio/piano-hq/manifest.json`, and `public/licenses/piano-hq-attribution.txt`
-- [ ] T095 [US5] Write integration test proving Piano View, Staff View, scheduled audio events, and stored manual voicing use identical exact pitches/velocities in `tests/integration/pitch-projection-consistency.test.ts`
-- [ ] T096 [US5] Write Playwright acceptance for manual voicing, per-note velocity, dynamics presets, and audible HQ-piano readiness state in `tests/e2e/us5-piano-performance.spec.ts`
+- [x] T095 [US5] Write integration test proving Piano View, Staff View, scheduled audio events, and stored manual voicing use identical exact pitches/velocities in `tests/integration/pitch-projection-consistency.test.ts`
+- [x] T096 [US5] Write Playwright acceptance for manual voicing, per-note velocity, dynamics presets, and audible HQ-piano readiness state in `tests/e2e/us5-piano-performance.spec.ts`
 
 **Checkpoint**: Piano realizes context-aware voicings, manual exact pitches, bass/register/articulation/dynamics, and high-quality velocity-sensitive sample playback.
 
