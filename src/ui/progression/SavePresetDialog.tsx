@@ -1,5 +1,6 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import type { Project } from "../../domain/project/project";
+import { useModalFocus } from "../common/useModalFocus";
 
 export interface SavePresetDialogProps {
   readonly isOpen: boolean;
@@ -11,6 +12,14 @@ export interface SavePresetDialogProps {
 export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePresetDialogProps) {
   const [name, setName] = useState("");
   const [touched, setTouched] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const dialogRef = useModalFocus<HTMLElement>({
+    isOpen,
+    isTopmost: true,
+    onClose,
+    initialFocusRef: inputRef,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -18,18 +27,6 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
       setTouched(false);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -61,6 +58,7 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
   return (
     <div className="dialog-backdrop" role="presentation" onClick={onClose}>
       <section
+        ref={dialogRef}
         className="save-preset-dialog"
         role="dialog"
         aria-modal="true"
@@ -110,6 +108,7 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
                   Preset Name <span className="required-marker">*</span>
                 </label>
                 <input
+                  ref={inputRef}
                   id="preset-name-input"
                   type="text"
                   className={`text-input ${touched && isNameEmpty ? "input-error" : ""}`}
@@ -128,6 +127,7 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
                   <p
                     id="preset-name-validation"
                     className="error-text"
+                    role="alert"
                     data-testid="preset-name-error"
                   >
                     Preset name cannot be empty.
@@ -138,7 +138,12 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
           </div>
 
           <footer className="dialog-actions">
-            <button type="button" className="secondary-btn" onClick={onClose}>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={onClose}
+              data-testid="save-preset-cancel-btn"
+            >
               Cancel
             </button>
             <button

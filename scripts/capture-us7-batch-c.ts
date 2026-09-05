@@ -63,11 +63,15 @@ async function main() {
   await page.waitForSelector(".presets-panel");
   await saveScreenshots(page, "01-presets-browser.png");
 
-  // 2. Open Save as Preset dialog and capture 03-save-custom-preset.png
+  // 2. Open Save as Preset dialog and capture 12-save-dialog-focus.png and 03-save-custom-preset.png
   console.log("Opening Save as Preset Dialog...");
   await page.getByTestId("panel-save-preset-btn").click();
   await page.waitForSelector(".save-preset-dialog");
-  await page.fill("#preset-name-input", "50s Progression Loop");
+  await page.waitForTimeout(200);
+  // Initial focus is on #preset-name-input
+  await saveScreenshots(page, "12-save-dialog-focus.png");
+
+  await page.fill("#preset-name-input", "My I–vi–IV–V");
   await saveScreenshots(page, "03-save-custom-preset.png");
 
   // Save the custom preset
@@ -175,16 +179,28 @@ async function main() {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
 
-  // 10. Mobile / Narrow Viewport -> 10-mobile-presets.png
-  console.log("Setting viewport to 768x1024 mobile / tablet view and opening Presets panel...");
-  await page.setViewportSize({ width: 768, height: 1024 });
+  // 10. Mobile / Narrow Viewport -> 10-mobile-presets.png (390x844 phone view)
+  console.log("Setting viewport to 390x844 mobile view and opening Presets panel...");
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(200);
   await page.getByTestId("progression-presets-btn").click();
   await page.waitForSelector(".presets-panel");
   await saveScreenshots(page, "10-mobile-presets.png");
 
+  // Close presets panel
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+
+  // 11. Compact Desktop Viewport -> 11-presets-1280x720.png (1280x720)
+  console.log("Setting viewport to 1280x720 compact desktop view and opening Presets panel...");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(200);
+  await page.getByTestId("progression-presets-btn").click();
+  await page.waitForSelector(".presets-panel");
+  await saveScreenshots(page, "11-presets-1280x720.png");
+
   await browser.close();
-  console.log("All 10 visual review artifacts captured successfully!");
+  console.log("All 12 visual review artifacts captured successfully!");
 }
 
 main().catch((err) => {

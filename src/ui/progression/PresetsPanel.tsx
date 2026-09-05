@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import type { FunctionalPreset } from "../../domain/progression/presets";
 import { BUILT_IN_PRESETS } from "../../domain/progression/builtInPresets";
 import type { Project } from "../../domain/project/project";
+import { useModalFocus } from "../common/useModalFocus";
 import {
   formatContextLabel,
   formatPresetStepDuration,
@@ -10,6 +10,7 @@ import {
 
 export interface PresetsPanelProps {
   readonly isOpen: boolean;
+  readonly isTopmost?: boolean;
   readonly project: Project;
   readonly onClose: () => void;
   readonly onOpenApplyDialog: (preset: FunctionalPreset) => void;
@@ -19,23 +20,18 @@ export interface PresetsPanelProps {
 
 export function PresetsPanel({
   isOpen,
+  isTopmost = true,
   project,
   onClose,
   onOpenApplyDialog,
   onOpenSaveDialog,
   onDeleteCustomPreset,
 }: PresetsPanelProps) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  const dialogRef = useModalFocus<HTMLElement>({
+    isOpen,
+    isTopmost,
+    onClose,
+  });
 
   if (!isOpen) return null;
 
@@ -43,11 +39,14 @@ export function PresetsPanel({
   const customPresets = project.customPresets;
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
+    <div className="dialog-backdrop" role="presentation" onClick={isTopmost ? onClose : undefined}>
       <section
-        className="presets-panel"
+        ref={dialogRef}
+        className={`presets-panel ${!isTopmost ? "is-inert" : ""}`}
         role="dialog"
-        aria-modal="true"
+        aria-modal={isTopmost ? "true" : undefined}
+        aria-hidden={!isTopmost ? true : undefined}
+        inert={!isTopmost ? true : undefined}
         aria-labelledby="presets-panel-title"
         onClick={(e) => e.stopPropagation()}
       >

@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
 import type { Project } from "../../domain/project/project";
+import { useModalFocus } from "../common/useModalFocus";
 import {
   formatContextLabel,
   formatPresetStepDuration,
@@ -24,6 +25,12 @@ export function PresetApplyDialog({
 }: PresetApplyDialogProps) {
   const [selectedMode, setSelectedMode] = useState<PresetApplyMode>("replace");
 
+  const dialogRef = useModalFocus<HTMLElement>({
+    isOpen: isOpen && Boolean(preset),
+    isTopmost: true,
+    onClose,
+  });
+
   const isEmptyProgression = project.progression.steps.length === 0;
   const selectedStepId = project.progression.selectedStepId;
   const selectedStepIndex = project.progression.steps.findIndex((s) => s.id === selectedStepId);
@@ -41,19 +48,6 @@ export function PresetApplyDialog({
       setSelectedMode("append");
     }
   }, [isOpen, isEmptyProgression, selectedStepId]);
-
-  // Handle Escape key to close dialog
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen || !preset) return null;
 
@@ -85,6 +79,7 @@ export function PresetApplyDialog({
   return (
     <div className="dialog-backdrop" role="presentation" onClick={onClose}>
       <section
+        ref={dialogRef}
         className="preset-apply-dialog"
         role="dialog"
         aria-modal="true"
@@ -134,7 +129,12 @@ export function PresetApplyDialog({
             )}
 
             {realization.kind === "ambiguous" && (
-              <div className="warning-box" role="alert" data-testid="preset-ambiguous-alert">
+              <div
+                className="warning-box"
+                role="alert"
+                aria-live="polite"
+                data-testid="preset-ambiguous-alert"
+              >
                 <strong>Ambiguous Harmonic Mapping</strong>
                 <p>This preset has an ambiguous harmonic mapping in the current context.</p>
                 {realization.ambiguousAlternatives && (
@@ -149,7 +149,12 @@ export function PresetApplyDialog({
             )}
 
             {realization.kind === "incompatible" && (
-              <div className="error-box" role="alert" data-testid="preset-incompatible-alert">
+              <div
+                className="error-box"
+                role="alert"
+                aria-live="assertive"
+                data-testid="preset-incompatible-alert"
+              >
                 <strong>Incompatible Harmonic Context</strong>
                 <p>This preset cannot be realized in the current harmony context.</p>
                 {realization.unsupportedFunctionIds && (
@@ -220,6 +225,7 @@ export function PresetApplyDialog({
                       value="insert"
                       checked={selectedMode === "insert"}
                       disabled={!selectedStepId}
+                      aria-describedby="insert-mode-description"
                       onChange={() => setSelectedMode("insert")}
                     />
                     <div className="mode-details">
@@ -232,7 +238,7 @@ export function PresetApplyDialog({
                             }`
                           : "Insert at Selected Step (Unavailable)"}
                       </strong>
-                      <span>
+                      <span id="insert-mode-description">
                         {selectedStepId
                           ? "Inserts preset steps immediately before the selected step."
                           : "Select a progression step to insert before it."}

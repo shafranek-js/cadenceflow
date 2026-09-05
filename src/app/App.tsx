@@ -793,6 +793,7 @@ export function App() {
       )}
       <PresetsPanel
         isOpen={presetsPanelOpen}
+        isTopmost={!applyDialogPreset && !savePresetDialogOpen}
         project={project}
         onClose={() => setPresetsPanelOpen(false)}
         onOpenApplyDialog={(preset) => {

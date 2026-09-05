@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import React from "react";
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -28,6 +30,24 @@ function renderToDom(element: React.ReactElement): HTMLElement {
   const container = document.createElement("div");
   container.innerHTML = html;
   return container;
+}
+
+function mountToDom(element: React.ReactElement) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => {
+    root.render(element);
+  });
+  return {
+    container,
+    unmount: () => {
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+    },
+  };
 }
 
 function makeChordStep(id: string, functionId: string): ChordStep {
@@ -284,7 +304,7 @@ describe("T117 — Presets UI Components", () => {
   describe("3. PresetApplyDialog — Insertion Modes, Selection State, Contextual Realization", () => {
     const samplePreset: FunctionalPreset = BUILT_IN_PRESETS[0]!; // Major I-vi-IV-V
 
-    it("renders contextual preview matching the current key and mode", () => {
+    it("renders contextual preview matching the current key and mode with realized chord quality", () => {
       const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
       const dom = renderToDom(
         el(PresetApplyDialog, {
@@ -298,9 +318,85 @@ describe("T117 — Presets UI Components", () => {
 
       const previewBox = dom.querySelector('[data-testid="preset-contextual-preview"]');
       expect(previewBox).not.toBeNull();
-      // I · vi · IV · V in C Major realizes to C · A · F · G
-      expect(previewBox?.textContent).toContain("C · A · F · G");
+      // I · vi · IV · V in C Major realizes to C · Am · F · G (with quality)
+      expect(previewBox?.textContent).toContain("C · Am · F · G");
       expect(dom.textContent).toContain("C Major");
+    });
+
+    it("renders quality-aware preview across different keys: G Major (G · Em · C · D) and D Major (D · Bm · G · A)", () => {
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+
+      // G Major
+      const gMajorProject = { ...baseProject, tonic: 7 as const };
+      const gDom = renderToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: samplePreset,
+          project: gMajorProject,
+          onClose: vi.fn(),
+          onApply: vi.fn(),
+        }),
+      );
+      const gPreview = gDom.querySelector('[data-testid="preset-contextual-preview"]');
+      expect(gPreview?.textContent).toContain("G · Em · C · D");
+
+      // D Major
+      const dMajorProject = { ...baseProject, tonic: 2 as const };
+      const dDom = renderToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: samplePreset,
+          project: dMajorProject,
+          onClose: vi.fn(),
+          onApply: vi.fn(),
+        }),
+      );
+      const dPreview = dDom.querySelector('[data-testid="preset-contextual-preview"]');
+      expect(dPreview?.textContent).toContain("D · Bm · G · A");
+    });
+
+    it("renders quality-aware preview in G Tonal Minor: Gm · Cm · D · Gm", () => {
+      const minorPreset = BUILT_IN_PRESETS.find((p) => p.id === "builtin-minor-i-iv-v-i")!;
+      expect(minorPreset).toBeDefined();
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const gMinorProject = {
+        ...baseProject,
+        activeModule: "dark-harmony" as const,
+        tonic: 7 as const, // G = 7
+      };
+      const dom = renderToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: minorPreset,
+          project: gMinorProject,
+          onClose: vi.fn(),
+          onApply: vi.fn(),
+        }),
+      );
+      const preview = dom.querySelector('[data-testid="preset-contextual-preview"]');
+      expect(preview?.textContent).toContain("Gm · Cm · D · Gm");
+    });
+
+    it("renders flat-key spelling accurately in F Major: F · Bb · C · F (proves Bb, not A#)", () => {
+      const cadencePreset = BUILT_IN_PRESETS.find((p) => p.id === "builtin-major-i-iv-v-i")!;
+      expect(cadencePreset).toBeDefined();
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const fMajorProject = {
+        ...baseProject,
+        tonic: 5 as const, // F = 5
+      };
+      const dom = renderToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: cadencePreset,
+          project: fMajorProject,
+          onClose: vi.fn(),
+          onApply: vi.fn(),
+        }),
+      );
+      const preview = dom.querySelector('[data-testid="preset-contextual-preview"]');
+      expect(preview?.textContent).toContain("F · Bb · C · F");
+      expect(preview?.textContent).not.toContain("A#");
     });
 
     it("renders simplified 'Use Preset' flow when progression is empty", () => {
@@ -509,14 +605,345 @@ describe("T117 — Presets UI Components", () => {
       expect(formatContextLabel(minorProject)).toBe("A Tonal Minor");
     });
 
-    it("accurately summarizes realizable preset steps", () => {
+    it("accurately summarizes realizable preset steps with chord quality", () => {
       const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
       const summary = getPresetRealizationSummary(BUILT_IN_PRESETS[0]!, project);
       expect(summary.kind).toBe("success");
       if (summary.kind === "success") {
-        expect(summary.text).toBe("C · A · F · G");
-        expect(summary.chordSymbols).toEqual(["C", "A", "F", "G"]);
+        expect(summary.text).toBe("C · Am · F · G");
+        expect(summary.chordSymbols).toEqual(["C", "Am", "F", "G"]);
       }
+    });
+  });
+
+  describe("5. Modal Accessibility — Focus Trap, Initial Focus, Inert Nesting & Escape Handling", () => {
+    it("renders PresetsPanel as inert and aria-hidden when isTopmost is false", () => {
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const dom = renderToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          isTopmost: false,
+          project,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      const panel = dom.querySelector(".presets-panel");
+      expect(panel).not.toBeNull();
+      expect(panel?.hasAttribute("inert")).toBe(true);
+      expect(panel?.getAttribute("aria-hidden")).toBe("true");
+      expect(panel?.classList.contains("is-inert")).toBe(true);
+      expect(panel?.getAttribute("aria-modal")).toBeNull();
+    });
+
+    it("focuses #preset-name-input initially when SavePresetDialog opens", async () => {
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const step1 = makeChordStep("s1", "I");
+      const project = {
+        ...baseProject,
+        progression: {
+          ...baseProject.progression,
+          steps: [step1],
+        },
+      };
+
+      const mounted = mountToDom(
+        el(SavePresetDialog, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onSave: vi.fn(),
+        }),
+      );
+
+      // Allow requestAnimationFrame to execute
+      await new Promise((r) => requestAnimationFrame(r));
+
+      const input = mounted.container.querySelector("#preset-name-input");
+      expect(document.activeElement).toBe(input);
+
+      mounted.unmount();
+    });
+
+    it("traps Tab focus within the active dialog", async () => {
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const step1 = makeChordStep("s1", "I");
+      const project = {
+        ...baseProject,
+        progression: {
+          ...baseProject.progression,
+          steps: [step1],
+        },
+      };
+
+      const mounted = mountToDom(
+        el(SavePresetDialog, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onSave: vi.fn(),
+        }),
+      );
+
+      await new Promise((r) => requestAnimationFrame(r));
+
+      const input = mounted.container.querySelector("#preset-name-input") as HTMLInputElement;
+      const cancelBtn = mounted.container.querySelector(
+        '[data-testid="save-preset-cancel-btn"]',
+      ) as HTMLButtonElement;
+      const closeBtn = mounted.container.querySelector(".dialog-close-btn") as HTMLButtonElement;
+
+      expect(input).not.toBeNull();
+      expect(cancelBtn).not.toBeNull();
+      expect(closeBtn).not.toBeNull();
+
+      // Focus last focusable (cancel button since confirm is disabled)
+      act(() => {
+        cancelBtn.focus();
+      });
+      expect(document.activeElement).toBe(cancelBtn);
+
+      // Press Tab without shift on last element: wraps to first focusable
+      const tabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        window.dispatchEvent(tabEvent);
+      });
+      expect(document.activeElement).toBe(closeBtn);
+
+      // Press Shift+Tab on first element: wraps to last focusable
+      const shiftTabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        window.dispatchEvent(shiftTabEvent);
+      });
+      expect(document.activeElement).toBe(cancelBtn);
+
+      mounted.unmount();
+    });
+
+    it("closes only topmost dialog on Escape without closing underlying panel", () => {
+      const panelClose = vi.fn();
+      const childClose = vi.fn();
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+
+      // PresetsPanel is inert (not topmost)
+      const mountedPanel = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          isTopmost: false,
+          project,
+          onClose: panelClose,
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      // Child SavePresetDialog is open (topmost)
+      const mountedChild = mountToDom(
+        el(SavePresetDialog, {
+          isOpen: true,
+          project,
+          onClose: childClose,
+          onSave: vi.fn(),
+        }),
+      );
+
+      // First Escape: child modal receives and closes
+      const escapeEvent1 = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(escapeEvent1);
+
+      expect(childClose).toHaveBeenCalledTimes(1);
+      expect(panelClose).not.toHaveBeenCalled();
+
+      mountedChild.unmount();
+      mountedPanel.unmount();
+
+      // Now test panel when it IS topmost
+      const mountedPanelTopmost = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          isTopmost: true,
+          project,
+          onClose: panelClose,
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      const escapeEvent2 = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(escapeEvent2);
+
+      expect(panelClose).toHaveBeenCalledTimes(1);
+      mountedPanelTopmost.unmount();
+    });
+
+    it("restores focus to previous element when dialog unmounts", async () => {
+      const triggerButton = document.createElement("button");
+      triggerButton.textContent = "Open Modal";
+      document.body.appendChild(triggerButton);
+      triggerButton.focus();
+      expect(document.activeElement).toBe(triggerButton);
+
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const mounted = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          isTopmost: true,
+          project,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      await new Promise((r) => requestAnimationFrame(r));
+      expect(document.activeElement).not.toBe(triggerButton);
+
+      // Close / unmount dialog
+      mounted.unmount();
+
+      expect(document.activeElement).toBe(triggerButton);
+      triggerButton.remove();
+    });
+
+    it("associates validation error messages and alerts with accessible ARIA attributes", () => {
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const step1 = makeChordStep("s1", "I");
+      const project = {
+        ...baseProject,
+        progression: {
+          ...baseProject.progression,
+          steps: [step1],
+        },
+      };
+
+      const dom = renderToDom(
+        el(SavePresetDialog, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onSave: vi.fn(),
+        }),
+      );
+
+      const input = dom.querySelector("#preset-name-input") as HTMLInputElement;
+      expect(input).not.toBeNull();
+      expect(input.getAttribute("aria-invalid")).toBe("false");
+      expect(input.getAttribute("aria-describedby")).toBeNull();
+
+      // Check PresetApplyDialog accessible alerts
+      const darkD7Preset: FunctionalPreset = {
+        id: "test-ambiguous-d7",
+        name: "Ambiguous D7 Preset",
+        source: "custom",
+        steps: [
+          {
+            harmonicFunction: { moduleId: "dark-harmony", functionId: "D7" },
+            duration: musicalDuration(rational(1, 1)),
+          },
+        ],
+      };
+
+      const projectWithSteps = {
+        ...baseProject,
+        progression: {
+          ...baseProject.progression,
+          steps: [step1],
+        },
+      };
+
+      const applyDom = renderToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: darkD7Preset,
+          project: projectWithSteps,
+          onClose: vi.fn(),
+          onApply: vi.fn(),
+        }),
+      );
+
+      const alert = applyDom.querySelector('[data-testid="preset-ambiguous-alert"]');
+      expect(alert?.getAttribute("role")).toBe("alert");
+      expect(alert?.getAttribute("aria-live")).toBe("polite");
+
+      // Check disabled insert description link
+      const insertRadio = applyDom.querySelector('input[value="insert"]');
+      expect(insertRadio?.getAttribute("aria-describedby")).toBe("insert-mode-description");
+      const desc = applyDom.querySelector("#insert-mode-description");
+      expect(desc).not.toBeNull();
+    });
+  });
+
+  describe("6. Zero History Mutation Invariance", () => {
+    it("opening, browsing, previewing, and closing dialogs dispatches 0 commands and modifies 0 history", () => {
+      const baseProject = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const onSaveSpy = vi.fn();
+      const onApplySpy = vi.fn();
+      const onDeleteSpy = vi.fn();
+
+      // Mount PresetsPanel
+      const panel = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          isTopmost: true,
+          project: baseProject,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: onDeleteSpy,
+        }),
+      );
+      panel.unmount();
+
+      // Mount PresetApplyDialog (just viewing preview)
+      const applyDialog = mountToDom(
+        el(PresetApplyDialog, {
+          isOpen: true,
+          preset: BUILT_IN_PRESETS[0]!,
+          project: baseProject,
+          onClose: vi.fn(),
+          onApply: onApplySpy,
+        }),
+      );
+      applyDialog.unmount();
+
+      // Mount SavePresetDialog (without confirming save)
+      const saveDialog = mountToDom(
+        el(SavePresetDialog, {
+          isOpen: true,
+          project: baseProject,
+          onClose: vi.fn(),
+          onSave: onSaveSpy,
+        }),
+      );
+      saveDialog.unmount();
+
+      // Verify zero commands / mutations were dispatched
+      expect(onSaveSpy).not.toHaveBeenCalled();
+      expect(onApplySpy).not.toHaveBeenCalled();
+      expect(onDeleteSpy).not.toHaveBeenCalled();
     });
   });
 });

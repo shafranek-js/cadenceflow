@@ -1,5 +1,6 @@
 import type { HarmonicFunctionIdentity } from "./functions";
 import type { PitchClassIdentity, PitchSpelling } from "./pitch";
+import { formatPitchSpelling } from "./spelling";
 
 export type BaseChordQuality = "major" | "minor" | "diminished" | "augmented" | "dominant";
 export type SeventhKind = "minor7" | "major7" | "diminished7" | "half-diminished7";
@@ -58,4 +59,21 @@ export function validateHarmonicVariant(
   if (baseQuality === "diminished" && variant.suspensions.length > 0)
     errors.push("Suspensions are not supported on diminished base quality in v1");
   return { valid: errors.length === 0, errors };
+}
+
+export function formatChordSymbol(chord: ChordDefinition): string {
+  const rootStr = formatPitchSpelling(chord.spelling.root);
+  if (chord.baseQuality === "minor") {
+    return `${rootStr}m`;
+  }
+  if (chord.baseQuality === "diminished") {
+    return chord.variant?.seventh === "diminished7" ? `${rootStr}°7` : `${rootStr}°`;
+  }
+  if (chord.baseQuality === "augmented") {
+    return `${rootStr}+`;
+  }
+  if (chord.baseQuality === "dominant") {
+    return `${rootStr}7`;
+  }
+  return rootStr;
 }
