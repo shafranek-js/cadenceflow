@@ -25,6 +25,7 @@ import {
   type SetCardViewOverrideCommand,
 } from "./matrixViewCommands";
 import { setTonic, type SetTonicCommand } from "./harmonyContextCommands";
+import { restoreCustomPresets, type RestoreCustomPresetsCommand } from "./presetCommands";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -38,6 +39,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setStepDuration(project, command as SetStepDurationCommand).project;
     case "progression/restore":
       return restoreProgression(project, command as RestoreProgressionCommand).project;
+    case "presets/restore-custom":
+      return restoreCustomPresets(project, command as RestoreCustomPresetsCommand).project;
     case "branch/restore-state":
       return restoreBranchState(project, command as RestoreBranchStateCommand).project;
     case "matrix-template/restore-module":
