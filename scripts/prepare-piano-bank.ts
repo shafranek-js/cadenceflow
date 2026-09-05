@@ -125,12 +125,16 @@ export async function downloadAndEncodeSample(
   outputDir: string,
   format = "ogg",
 ): Promise<string> {
+  const finalAudio = resolve(outputDir, `${root.name}v${layer}.${format}`);
+  const { existsSync, statSync } = await import("node:fs");
+  if (existsSync(finalAudio) && statSync(finalAudio).size > 0) {
+    return finalAudio;
+  }
+
   const encodedName = encodeURIComponent(root.sfzName);
   const sourceUrl = `https://raw.githubusercontent.com/sfzinstruments/SalamanderGrandPiano/${PINNED_SALAMANDER_REVISION}/Samples/${encodedName}v${layer}.flac`;
   const tempFlac = resolve(outputDir, `temp_${root.name}v${layer}.flac`);
-  const finalAudio = resolve(outputDir, `${root.name}v${layer}.${format}`);
 
-  console.log(`Downloading ${root.sfzName}v${layer}.flac ...`);
   const res = await fetch(sourceUrl);
   if (!res.ok) {
     throw new Error(`Failed to fetch ${sourceUrl}: HTTP ${res.status}`);
@@ -154,6 +158,75 @@ export async function downloadAndEncodeSample(
   return finalAudio;
 }
 
+export async function verifyBank(_samplesDir?: string) {
+  const { statSync } = await import("node:fs");
+  const manifest = buildManifest("ogg", 48000);
+  console.log("\n--- Full Piano Bank Verification ---");
+
+  let missingCount = 0;
+  let emptyCount = 0;
+  let pathEscapedCount = 0;
+  const sizes: { path: string; size: number }[] = [];
+
+  for (const region of manifest.regions) {
+    if (region.assetPath.startsWith("/") || region.assetPath.includes("..")) {
+      pathEscapedCount++;
+    }
+    const fullPath = resolve("public/audio/piano-hq", region.assetPath);
+    try {
+      const stat = statSync(fullPath);
+      if (stat.size === 0) {
+        emptyCount++;
+      } else {
+        sizes.push({ path: region.assetPath, size: stat.size });
+      }
+    } catch {
+      missingCount++;
+    }
+  }
+
+  sizes.sort((a, b) => a.size - b.size);
+  const totalBytes = sizes.reduce((acc, curr) => acc + curr.size, 0);
+  const totalMiB = (totalBytes / (1024 * 1024)).toFixed(2);
+  const count = sizes.length;
+  const min = sizes[0] ? sizes[0].size : 0;
+  const max = sizes[sizes.length - 1] ? sizes[sizes.length - 1].size : 0;
+  const avg = count > 0 ? Math.round(totalBytes / count) : 0;
+  const median =
+    count === 0
+      ? 0
+      : count % 2 === 0
+        ? Math.round((sizes[count / 2 - 1].size + sizes[count / 2].size) / 2)
+        : sizes[Math.floor(count / 2)].size;
+
+  console.log(`Region Count: ${manifest.regions.length}`);
+  console.log(`Present Non-Empty Files: ${count}`);
+  console.log(`Missing Files: ${missingCount}`);
+  console.log(`Empty Files: ${emptyCount}`);
+  console.log(`Path Escaped: ${pathEscapedCount}`);
+  console.log(`Total Bytes: ${totalBytes} (${totalMiB} MiB)`);
+  console.log(`Smallest Asset: ${min} bytes (${sizes[0]?.path})`);
+  console.log(`Largest Asset: ${max} bytes (${sizes[sizes.length - 1]?.path})`);
+  console.log(`Average Asset: ${avg} bytes`);
+  console.log(`Median Asset: ${median} bytes`);
+
+  return {
+    manifestRegionCount: manifest.regions.length,
+    presentCount: count,
+    missingCount,
+    emptyCount,
+    pathEscapedCount,
+    totalBytes,
+    totalMiB,
+    min,
+    max,
+    avg,
+    median,
+    smallestAsset: sizes[0]?.path ?? "",
+    largestAsset: sizes[sizes.length - 1]?.path ?? "",
+  };
+}
+
 export async function main() {
   const outputRoot = resolve("public/audio/piano-hq");
   const samplesDir = resolve(outputRoot, "samples");
@@ -174,49 +247,93 @@ export async function main() {
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   console.log(`Wrote complete 480-region piano manifest to ${manifestPath}`);
 
-  // If --fetch-demo or --all passed, download and encode actual samples
+  // Parse args
   const args = process.argv.slice(2);
   const onlyTestFixtures = args.includes("--test-fixtures");
-  const fetchDemo =
+  const allRegions = args.includes("--all");
+  const verifyOnly = args.includes("--verify");
+
+  if (verifyOnly) {
+    await verifyBank(samplesDir);
+    return;
+  }
+
+  const shouldFetch =
+    allRegions ||
     onlyTestFixtures ||
     args.includes("--demo") ||
     args.includes("--fetch-demo") ||
     args.length === 0;
 
-  if (fetchDemo && hasFfmpeg) {
-    console.log(
-      onlyTestFixtures
-        ? "Preparing test fixture samples (C4v2, C4v10, C4v14)..."
-        : "Preparing real Salamander sample assets for demo and browser audio smoke tests...",
-    );
-
-    const demoNotesToDownload: { rootName: string; layers: number[] }[] = onlyTestFixtures
-      ? [{ rootName: "C4", layers: [2, 10, 14] }]
-      : [
-          // C4: layers 2 (low, vel 30), 4 (low-mid, vel 40), 10 (medium, vel 78), 14 (high, vel 110)
-          { rootName: "C4", layers: [2, 4, 10, 14] },
-          { rootName: "C3", layers: [2, 10, 14] },
-          { rootName: "A3", layers: [2, 10] },
-          { rootName: "Ds4", layers: [2, 10] },
-          { rootName: "Fs4", layers: [2, 10] },
-          { rootName: "A4", layers: [2, 10] },
-          { rootName: "C5", layers: [2, 10] },
-        ];
-
-    for (const noteDef of demoNotesToDownload) {
-      const root = SALAMANDER_ROOTS.find((r) => r.name === noteDef.rootName);
-      if (!root) continue;
-      for (const layer of noteDef.layers) {
-        try {
-          await downloadAndEncodeSample(root, layer, samplesDir, "ogg");
-          console.log(`Ready: ${root.name}v${layer}.ogg`);
-        } catch (err) {
-          console.warn(`Could not prepare ${root.name}v${layer}:`, err);
+  if (shouldFetch && hasFfmpeg) {
+    if (allRegions) {
+      console.log("Preparing FULL 480-region Salamander piano bank (30 roots × 16 layers)...");
+      const allTasks: { root: PianoRootDefinition; layer: number }[] = [];
+      for (const root of SALAMANDER_ROOTS) {
+        for (const v of VELOCITY_RANGES) {
+          allTasks.push({ root, layer: v.layer });
         }
       }
-    }
 
-    console.log("Audio samples prepared successfully.");
+      // Run with concurrency pool of 8
+      const concurrency = 8;
+      let completed = 0;
+      let failed = 0;
+
+      const worker = async () => {
+        while (allTasks.length > 0) {
+          const task = allTasks.shift();
+          if (!task) break;
+          try {
+            await downloadAndEncodeSample(task.root, task.layer, samplesDir, "ogg");
+            completed++;
+            if (completed % 20 === 0 || completed === 480) {
+              console.log(`Progress: ${completed}/480 prepared (${failed} failed)`);
+            }
+          } catch (err) {
+            failed++;
+            console.warn(`Failed ${task.root.name}v${task.layer}:`, err);
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+      console.log(`Bank preparation complete: ${completed} prepared, ${failed} failed.`);
+      await verifyBank(samplesDir);
+    } else {
+      console.log(
+        onlyTestFixtures
+          ? "Preparing test fixture samples (C4v2, C4v10, C4v14)..."
+          : "Preparing real Salamander sample assets for demo and browser audio smoke tests...",
+      );
+
+      const demoNotesToDownload: { rootName: string; layers: number[] }[] = onlyTestFixtures
+        ? [{ rootName: "C4", layers: [2, 10, 14] }]
+        : [
+            { rootName: "C4", layers: [2, 4, 10, 14] },
+            { rootName: "C3", layers: [2, 10, 14] },
+            { rootName: "A3", layers: [2, 10] },
+            { rootName: "Ds4", layers: [2, 10] },
+            { rootName: "Fs4", layers: [2, 10] },
+            { rootName: "A4", layers: [2, 10] },
+            { rootName: "C5", layers: [2, 10] },
+          ];
+
+      for (const noteDef of demoNotesToDownload) {
+        const root = SALAMANDER_ROOTS.find((r) => r.name === noteDef.rootName);
+        if (!root) continue;
+        for (const layer of noteDef.layers) {
+          try {
+            await downloadAndEncodeSample(root, layer, samplesDir, "ogg");
+            console.log(`Ready: ${root.name}v${layer}.ogg`);
+          } catch (err) {
+            console.warn(`Could not prepare ${root.name}v${layer}:`, err);
+          }
+        }
+      }
+
+      console.log("Audio samples prepared successfully.");
+    }
   }
 }
 

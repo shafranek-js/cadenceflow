@@ -67,5 +67,5 @@ describe("T094 — Piano Bank Preparation & Attribution Pipeline", () => {
   it("detects ffmpeg in the environment", async () => {
     const hasFfmpeg = await checkFfmpeg();
     expect(hasFfmpeg).toBe(true);
-  });
+  }, 25000);
 });

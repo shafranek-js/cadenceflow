@@ -5,12 +5,43 @@
 .app-header {
   display: flex;
   gap: 12px;
-  align-items: baseline;
+  align-items: center;
   color: var(--text-muted);
 }
 .app-header strong {
   color: inherit;
   font-size: 1.1rem;
+}
+.piano-audio-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.audio-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8b949e;
+}
+.audio-status-dot.dot-ready {
+  background: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.5);
+}
+.audio-status-dot.dot-loading {
+  background: #58a6ff;
+}
+.audio-status-dot.dot-fallback {
+  background: #d29922;
+}
+.audio-status-dot.dot-error {
+  background: #f85149;
 }
 .bootstrap-panel {
   margin-top: 24px;

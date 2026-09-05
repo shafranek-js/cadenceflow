@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppStore } from "./appStore";
 import { addMatrixPreview, type AddMatrixPreviewCommand } from "./commands/matrixCommands";
 import {
@@ -50,6 +50,9 @@ import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
 import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
+import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
+import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
+import type { AudioProviderState } from "../audio/contracts";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
 import type { ChordStep } from "../domain/progression/step";
 import {
@@ -99,6 +102,19 @@ export function App() {
   );
   const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
+  const [audioState, setAudioState] = useState<AudioProviderState>("idle");
+  const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
+
+  useEffect(() => {
+    const provider = new HqSamplePianoProvider({
+      onStateChange: (s) => setAudioState(s),
+    });
+    audioProviderRef.current = provider;
+    setAudioState("loading");
+    provider.prepare().catch(() => {
+      // Handled and reflected in provider state
+    });
+  }, []);
 
   const selectedProgressionStep = project.progression.selectedStepId
     ? project.progression.steps.find(
@@ -377,6 +393,7 @@ export function App() {
         {project.temporaryBranch ? (
           <span className="branch-status">What-if branch active</span>
         ) : null}
+        <PianoAudioStatus state={audioState} />
       </header>
       <div className="studio-grid">
         <HarmonicMatrix

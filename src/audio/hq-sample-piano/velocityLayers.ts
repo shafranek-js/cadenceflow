@@ -42,3 +42,10 @@ export function resolveVelocityLayer(velocity: number): VelocityLayerDefinition 
   }
   return layer;
 }
+
+/**
+ * Convenience helper returning the discrete numeric layer index (1..16).
+ */
+export function mapVelocityToLayer(velocity: number): number {
+  return resolveVelocityLayer(velocity).layer;
+}

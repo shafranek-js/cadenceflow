@@ -17,6 +17,7 @@ export interface HqSamplePianoProviderOptions {
   readonly sampleCache?: SampleCache | undefined;
   readonly fetchFn?: typeof fetch | undefined;
   readonly destination?: AudioNode | undefined;
+  readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
 }
 
 interface ActiveNodeEntry {
@@ -41,6 +42,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
   private audioContext: AudioContext | null = null;
   private readonly destinationNode?: AudioNode | undefined;
   private readonly fetchImpl: typeof fetch;
+  private readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
 
   private sampleCache: SampleCache | null = null;
   private activePlaybacks: ActivePlaybackRecord[] = [];
@@ -52,6 +54,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
     this.initialManifestData = options.manifestData;
     this.audioContext = options.audioContext ?? null;
     this.destinationNode = options.destination;
+    this.onStateChange = options.onStateChange;
     this.fetchImpl =
       options.fetchFn ??
       (typeof fetch !== "undefined"
@@ -60,6 +63,13 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
 
     if (options.sampleCache) {
       this.sampleCache = options.sampleCache;
+    }
+  }
+
+  private setProviderState(nextState: AudioProviderState): void {
+    if (this.providerState !== nextState) {
+      this.providerState = nextState;
+      this.onStateChange?.(nextState);
     }
   }
 
@@ -76,7 +86,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
   }
 
   async prepare(): Promise<void> {
-    this.providerState = "loading";
+    this.setProviderState("loading");
     // Yield to allow callers to observe loading state
     await Promise.resolve();
 
@@ -130,9 +140,9 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
         });
       }
 
-      this.providerState = "ready";
+      this.setProviderState("ready");
     } catch (err) {
-      this.providerState = "error";
+      this.setProviderState("error");
       throw err;
     }
   }
@@ -309,7 +319,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
       };
     } catch (err) {
       // Expose observable fallback state when assets cannot be fetched or decoded
-      this.providerState = "fallback";
+      this.setProviderState("fallback");
       throw err;
     }
   }
