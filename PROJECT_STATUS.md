@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112–T116 accepted  
-**Task progress:** T001–T116 complete, 116 / 158 total tasks  
+**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112–T117 accepted  
+**Task progress:** T001–T117 complete, 117 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) and User Story 6 (**Exact Musical Timing & Transport Runtime**) are fully accepted across all tasks T077–T111.
 
 The previous milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
-The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112–T116 complete, 116 / 158)**.
+The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112–T117 complete, 117 / 158)**.
 
 ## 2. Sources of truth
 
@@ -243,6 +243,18 @@ Implemented and accepted:
 - **Single Transform Action**: Replace, Append, and Insert each produce exactly one logical history entry (never per-step).
 - **Snapshot Redo**: Redo restores exact historical snapshots rather than re-instantiating, re-realizing, or generating new UUIDs. Changing project defaults between Undo and Redo does not contaminate the redone progression.
 - **Failed/Ambiguous/Incompatible Safety**: Failed saves (empty name, whitespace, Rest steps) and failed applications (ambiguous module mapping, incompatible functions) create zero history entries, zero partial steps, and leave Project state bit-for-bit unchanged.
+
+### US7 Batch C — Presets browser, apply dialog, and custom preset save UI — T117
+
+Implemented and accepted:
+- `src/ui/progression/PresetsPanel.tsx`, `src/ui/progression/PresetApplyDialog.tsx`, and `src/ui/progression/SavePresetDialog.tsx` (`T117`):
+  - Presets browser displaying curated built-in functional catalog (6 neutral presets) and project-owned Custom Presets section.
+  - Contextual quality-aware preview dynamically reflecting current key/module (`formatChordSymbol` in `src/domain/harmony/chord.ts`), e.g. `G · Em · C · D` in G Major, `Gm · Cm · D · Gm` in G Tonal Minor, and flat-key spelling `F · Bb · C · F` in F Major.
+  - Informational-only preview dispatching zero project mutations or history commands until explicit Save/Apply/Delete confirmation.
+  - Insertion modes: Replace Progression (clears selection), Append to End (preserves selection), and Insert at Selected Step (inserts immediately before selected step; disabled with explanatory text when no step is selected). Simplified "Use Preset" button for empty progressions.
+  - Validation: rejects empty/whitespace names, blocks saving progressions containing Rest steps with accessible warning.
+  - Modal accessibility: shared `useModalFocus` hook (`src/ui/common/useModalFocus.ts`) providing initial focus placement (`#preset-name-input` on Save dialog), Tab/Shift+Tab focus trap, focus restoration on close, and topmost-only Escape handling. Stacked modal inertness marks underlying `PresetsPanel` as `inert` and `aria-hidden="true"` when child dialogs are open.
+  - Responsive layouts: fluid card grid with `minmax(280px, 1fr)`, text wrapping on chords/durations, and validated viewports for mobile (`390×844`), compact desktop (`1280×720`), and full desktop (`1920×1080`).
 
 ## 4. Key technical decisions that must be preserved
 
