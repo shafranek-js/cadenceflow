@@ -1,4 +1,10 @@
-import { compareRational, rational, type Rational } from "./rational";
+import {
+  compareRational,
+  divideRational,
+  multiplyRational,
+  rational,
+  type Rational,
+} from "./rational";
 import type { Meter } from "./meter";
 
 export type DurationDisplayHint =
@@ -20,30 +26,67 @@ export function musicalDuration(
   return displayHint ? Object.freeze({ beats, displayHint }) : Object.freeze({ beats });
 }
 
-export function durationBars(_bars: Rational | number, _meter: Meter): MusicalDuration {
-  throw new Error("Not implemented: T101 durationBars");
+export function barsToBeats(bars: Rational, meter: Meter): Rational {
+  const barLengthBeats = rational(meter.numerator * 4, meter.denominator);
+  return multiplyRational(bars, barLengthBeats);
 }
 
-export function durationDotted(_base: MusicalDuration): MusicalDuration {
-  throw new Error("Not implemented: T101 durationDotted");
+export function beatsToBars(beats: Rational, meter: Meter): Rational {
+  const barLengthBeats = rational(meter.numerator * 4, meter.denominator);
+  return divideRational(beats, barLengthBeats);
 }
 
-export function durationTriplet(_base: MusicalDuration): MusicalDuration {
-  throw new Error("Not implemented: T101 durationTriplet");
+export function durationBars(bars: Rational | number, meter: Meter): MusicalDuration {
+  let barsRational: Rational;
+  if (typeof bars === "number") {
+    if (!Number.isFinite(bars) || !Number.isInteger(bars) || bars <= 0) {
+      throw new RangeError("bars must be a positive integer when specified as a number");
+    }
+    barsRational = rational(bars, 1);
+  } else {
+    if (compareRational(bars, rational(0, 1)) <= 0) {
+      throw new RangeError("bars must be positive");
+    }
+    barsRational = bars;
+  }
+  const beats = barsToBeats(barsRational, meter);
+  return musicalDuration(beats);
 }
 
-export function barsToBeats(_bars: Rational, _meter: Meter): Rational {
-  throw new Error("Not implemented: T101 barsToBeats");
+export function durationDotted(base: MusicalDuration): MusicalDuration {
+  const beats = multiplyRational(base.beats, rational(3, 2));
+  return musicalDuration(beats);
 }
 
-export function beatsToBars(_beats: Rational, _meter: Meter): Rational {
-  throw new Error("Not implemented: T101 beatsToBars");
+export function durationTriplet(base: MusicalDuration): MusicalDuration {
+  const beats = multiplyRational(base.beats, rational(2, 3));
+  return musicalDuration(beats);
 }
 
-export function formatMusicalDuration(_duration: MusicalDuration): string {
-  throw new Error("Not implemented: T101 formatMusicalDuration");
+export function formatMusicalDuration(duration: MusicalDuration): string {
+  const { numerator, denominator } = duration.beats;
+  return denominator === 1 ? `${numerator}` : `${numerator}/${denominator}`;
 }
 
-export function parseMusicalDuration(_text: string): MusicalDuration {
-  throw new Error("Not implemented: T101 parseMusicalDuration");
+export function parseMusicalDuration(text: string): MusicalDuration {
+  if (typeof text !== "string") {
+    throw new TypeError("duration text must be a string");
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new RangeError("duration text cannot be empty");
+  }
+  const match = /^([+-]?\d+)(?:\/([+-]?\d+))?$/.exec(trimmed);
+  if (!match) {
+    throw new RangeError(`malformed musical duration text: "${text}"`);
+  }
+  const num = parseInt(match[1], 10);
+  const den = match[2] !== undefined ? parseInt(match[2], 10) : 1;
+  if (den === 0) {
+    throw new RangeError("denominator cannot be zero");
+  }
+  if (num <= 0 || den < 0) {
+    throw new RangeError("duration must be positive");
+  }
+  return musicalDuration(rational(num, den));
 }

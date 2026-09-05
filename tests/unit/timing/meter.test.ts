@@ -7,7 +7,11 @@ import {
   pulseToBeats,
 } from "../../../src/domain/timing/meter";
 import { musicalDuration } from "../../../src/domain/timing/duration";
-import { equalRational, rational } from "../../../src/domain/timing/rational";
+import {
+  addRational,
+  equalRational,
+  rational,
+} from "../../../src/domain/timing/rational";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 
@@ -164,6 +168,14 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       // Pulse 7 (bar end) -> 7 * (4/8) = 7/2 quarter beats
       expect(equalRational(pulseToBeats(7, m78), rational(7, 2))).toBe(true);
     });
+
+    it("rejects invalid pulse indices (negative, beyond numerator, non-integer)", () => {
+      const m78 = meter(7, 8, [2, 2, 3]);
+      expect(() => pulseToBeats(-1, m78)).toThrow(RangeError);
+      expect(() => pulseToBeats(8, m78)).toThrow(RangeError);
+      expect(() => pulseToBeats(2.5, m78)).toThrow(RangeError);
+      expect(() => pulseToBeats(Number.NaN, m78)).toThrow(RangeError);
+    });
   });
 
   describe("3. Beat Accent Projection Contract", () => {
@@ -300,10 +312,10 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
 
       // Total duration in 3/4 is 6 beats = exactly 2 bars (bar boundaries align with steps)
       const totalBeats = reflowed.reduce(
-        (sum, s) => sum + s.duration.beats.numerator / s.duration.beats.denominator,
-        0,
+        (sum, s) => addRational(sum, s.duration.beats),
+        rational(0, 1),
       );
-      expect(totalBeats).toBe(6);
+      expect(equalRational(totalBeats, rational(6, 1))).toBe(true);
 
       // Crucially preserves step identity, order, kind, and non-timing data
       expect(reflowed[0].id).toBe("s1");
@@ -318,6 +330,13 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect(reflowed[2].id).toBe("s3");
       expect(reflowed[2].kind).toBe("chord");
       expect((reflowed[2] as ChordStep).harmonicFunction.functionId).toBe("IV");
+    });
+
+    it("never mutates input steps array or step objects during meter change", () => {
+      const steps = createMultiStepBarFixture();
+      const origStep0Duration = steps[0].duration.beats;
+      applyMeterChange(steps, oldMeter44, newMeter34, "reflow");
+      expect(steps[0].duration.beats).toBe(origStep0Duration);
     });
 
     it("policy 'preserve-beat-lengths': preserves exact beat count and shifts bar boundaries relative to steps", () => {

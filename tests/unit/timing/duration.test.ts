@@ -228,9 +228,14 @@ describe("T097 — Exact Musical Duration Contract", () => {
       expect(() => musicalDuration(rational(-1, 4))).toThrow(RangeError);
     });
 
-    it("rejects negative bar counts in durationBars", () => {
+    it("rejects negative, zero, fractional, or non-finite numbers in durationBars", () => {
       const m44 = meter(4, 4);
       expect(() => durationBars(-1, m44)).toThrow(RangeError);
+      expect(() => durationBars(0, m44)).toThrow(RangeError);
+      expect(() => durationBars(0.5, m44)).toThrow(RangeError);
+      expect(() => durationBars(1.5, m44)).toThrow(RangeError);
+      expect(() => durationBars(Number.NaN, m44)).toThrow(RangeError);
+      expect(() => durationBars(Number.POSITIVE_INFINITY, m44)).toThrow(RangeError);
       expect(() => durationBars(rational(-1, 2), m44)).toThrow(RangeError);
     });
 
