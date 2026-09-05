@@ -69,6 +69,17 @@ export class LookAheadScheduler {
   }
 
   /**
+   * Returns the current musical playback position in seconds without modifying state.
+   */
+  getElapsedSeconds(): number {
+    if (this.state === "running") {
+      const now = this.clock.now();
+      return Math.max(0, now - this.startAudioTime);
+    }
+    return this.pausedPositionSeconds;
+  }
+
+  /**
    * Start scheduling the given canonical AudioNoteEvents from the beginning.
    *
    * @param events Canonical events to schedule.
@@ -145,6 +156,7 @@ export class LookAheadScheduler {
 
   /**
    * Resume scheduling from paused or specified musical position.
+   * Schedules unplayed remainder and continuing duration of any notes crossing the resume point.
    */
   resume(fromSeconds?: number): void {
     if (this.state === "disposed") {
@@ -154,6 +166,55 @@ export class LookAheadScheduler {
     const now = this.clock.now();
     this.startAudioTime = now - offset;
     this.pausedPositionSeconds = offset;
+
+    // Reset scheduled indices to cleanly handle cancelled active playbacks and remaining durations
+    this.scheduledIndices.clear();
+
+    const chunkToSchedule: AudioNoteEvent[] = [];
+
+    for (let i = 0; i < this.eventsQueue.length; i++) {
+      const evt = this.eventsQueue[i]!;
+      const evtEnd = evt.startSeconds + evt.durationSeconds;
+
+      if (evtEnd <= offset) {
+        // Event ended completely before resume point: do not reschedule
+        this.scheduledIndices.add(i);
+      } else if (evt.startSeconds < offset) {
+        // Event spans across resume point: schedule remaining duration continuation
+        const remainingDuration = evtEnd - offset;
+        const remainingEvent: AudioNoteEvent = {
+          pitch: evt.pitch,
+          startSeconds: 0,
+          durationSeconds: remainingDuration,
+          velocity: evt.velocity,
+          channelRole: evt.channelRole,
+        };
+        chunkToSchedule.push(remainingEvent);
+        this.scheduledIndices.add(i);
+        this.scheduledEntries.push({
+          event: remainingEvent,
+          targetAudioTime: now,
+        });
+        this.onEventScheduled?.(remainingEvent, now);
+      }
+      // Events starting at or after offset are left un-indexed and scheduled by tick()
+    }
+
+    if (chunkToSchedule.length > 0) {
+      try {
+        const chunkClock: AudioClock = {
+          now: () => now,
+        };
+        const playback = this.provider.schedule(chunkToSchedule, chunkClock);
+        this.activePlaybacks.push(playback);
+      } catch (err) {
+        this.clearTickTimer();
+        this.state = "idle";
+        this.onError?.(err);
+        return;
+      }
+    }
+
     this.state = "running";
 
     this.tick();
