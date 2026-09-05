@@ -83,6 +83,25 @@ export function computeMeterAccents(meter: Meter): readonly MeterAccent[] {
   return Object.freeze(accents);
 }
 
+/**
+ * Reflows a progression to a new meter using proportional bar scaling:
+ *   newDuration = oldDuration * newBarLength / oldBarLength
+ *
+ * Invariants:
+ * - Exact 1-to-1 mapping: step count, IDs, kinds, and order remain identical.
+ * - No splitting, clipping, duplication, or padding RestSteps.
+ * - Incomplete final bars are valid and preserved without padding.
+ * - All harmonic and performance state (chord, voicing, bass, velocities) is preserved.
+ * - Only duration.beats is scaled using exact Rational arithmetic.
+ */
+export function reflowProgression(
+  steps: readonly ProgressionStep[],
+  oldMeter: Meter,
+  newMeter: Meter,
+): readonly ProgressionStep[] {
+  return applyMeterChange(steps, oldMeter, newMeter, "reflow");
+}
+
 export function applyMeterChange(
   steps: readonly ProgressionStep[],
   oldMeter: Meter,
@@ -94,7 +113,7 @@ export function applyMeterChange(
   }
 
   // policy === "reflow"
-  // Calculate scale factor: (newMeter.barLengthBeats) / (oldMeter.barLengthBeats)
+  // Proportional bar scaling: newDuration = oldDuration * newBarLength / oldBarLength
   const oldBarBeats = rational(oldMeter.numerator * 4, oldMeter.denominator);
   const newBarBeats = rational(newMeter.numerator * 4, newMeter.denominator);
   const scaleFactor = divideRational(newBarBeats, oldBarBeats);

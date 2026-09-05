@@ -112,6 +112,34 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       expect(timeline.totalDurationBeats).toEqual(rational(3, 1));
     });
 
+    it("calculates meter-sensitive totalBars accurately for non-4/4 meters (7/8)", () => {
+      const m78 = meter(7, 8, [2, 2, 3]);
+      // Bar length in canonical beats: 7 * 4 / 8 = 7/2 canonical quarter-note beats
+
+      // Test 1: progression total = 7/2 canonical beats -> totalBars = 1
+      const oneBarSteps: ProgressionStep[] = [
+        makeCanonicalChordStep("s1", 7, 2), // 7/2 beats = 1 bar in 7/8
+      ];
+      const tl1 = createProgressionTimeline(oneBarSteps, m78);
+      expect(tl1.totalDurationBeats).toEqual(rational(7, 2));
+      expect(tl1.totalBars).toEqual(rational(1, 1));
+      expect(tl1.steps[0].startBar).toBe(0);
+      expect(tl1.steps[0].endBar).toBe(1);
+
+      // Test 2: progression total = 7 canonical beats -> totalBars = 2
+      const twoBarSteps: ProgressionStep[] = [
+        makeCanonicalChordStep("s1", 7, 2),
+        makeCanonicalChordStep("s2", 7, 2),
+      ];
+      const tl2 = createProgressionTimeline(twoBarSteps, m78);
+      expect(tl2.totalDurationBeats).toEqual(rational(7, 1));
+      expect(tl2.totalBars).toEqual(rational(2, 1));
+      expect(tl2.steps[0].startBar).toBe(0);
+      expect(tl2.steps[0].endBar).toBe(1);
+      expect(tl2.steps[1].startBar).toBe(1);
+      expect(tl2.steps[1].endBar).toBe(2);
+    });
+
     it("handles an empty progression by returning a zero-duration empty timeline", () => {
       const timeline = createProgressionTimeline([], m44);
       expect(timeline.steps).toHaveLength(0);

@@ -5,6 +5,7 @@ import {
   globalTiming,
   meter,
   pulseToBeats,
+  reflowProgression,
 } from "../../../src/domain/timing/meter";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { addRational, equalRational, rational } from "../../../src/domain/timing/rational";
@@ -320,12 +321,44 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect((reflowed[0] as ChordStep).harmonicVariant).toEqual(EMPTY_HARMONIC_VARIANT);
       expect((reflowed[0] as ChordStep).performance.masterVelocity).toBe(80);
 
+      expect(reflowed).toHaveLength(steps.length);
+      expect(reflowed.map((step) => step.id)).toEqual(steps.map((step) => step.id));
+      expect(reflowed.map((step) => step.kind)).toEqual(steps.map((step) => step.kind));
+
       expect(reflowed[1].id).toBe("s2");
       expect(reflowed[1].kind).toBe("rest");
 
       expect(reflowed[2].id).toBe("s3");
       expect(reflowed[2].kind).toBe("chord");
       expect((reflowed[2] as ChordStep).harmonicFunction.functionId).toBe("IV");
+    });
+
+    it("reflow preserves incomplete final bars without adding padding RestSteps", () => {
+      // 4/4 -> 3/4 with input durations [1, 1] (total 2 beats, incomplete final bar)
+      const incompleteSteps = [
+        createCanonicalChordStep("c1", 1, 1, "I"),
+        createCanonicalChordStep("c2", 1, 1, "V"),
+      ];
+      const reflowed = applyMeterChange(incompleteSteps, oldMeter44, newMeter34, "reflow");
+
+      expect(reflowed).toHaveLength(2);
+      expect(reflowed.map((step) => step.id)).toEqual(incompleteSteps.map((step) => step.id));
+      expect(reflowed.map((step) => step.kind)).toEqual(incompleteSteps.map((step) => step.kind));
+
+      // In 3/4: newDuration = 1 * (3 / 4) = 3/4 beat each
+      expect(reflowed[0].duration.beats).toEqual(rational(3, 4));
+      expect(reflowed[1].duration.beats).toEqual(rational(3, 4));
+
+      // No padding RestStep added; total is 3/2 beats
+      const totalBeats = reflowed.reduce(
+        (sum, s) => addRational(sum, s.duration.beats),
+        rational(0, 1),
+      );
+      expect(equalRational(totalBeats, rational(3, 2))).toBe(true);
+
+      // Verify reflowProgression convenience helper matches applyMeterChange with 'reflow'
+      const helperResult = reflowProgression(incompleteSteps, oldMeter44, newMeter34);
+      expect(helperResult).toEqual(reflowed);
     });
 
     it("never mutates input steps array or step objects during meter change", () => {

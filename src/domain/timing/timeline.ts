@@ -60,12 +60,10 @@ export function createProgressionTimeline(
     const endBeats = addRational(startBeats, durationBeats);
     currentBeats = endBeats;
 
-    const startBar = Math.floor(
-      (startBeats.numerator / startBeats.denominator) * (meter.denominator / (meter.numerator * 4)),
-    );
-    const endBar = Math.floor(
-      (endBeats.numerator / endBeats.denominator) * (meter.denominator / (meter.numerator * 4)),
-    );
+    const startBarRat = divideRational(startBeats, barLengthBeats);
+    const startBar = Math.floor(startBarRat.numerator / startBarRat.denominator);
+    const endBarRat = divideRational(endBeats, barLengthBeats);
+    const endBar = Math.floor(endBarRat.numerator / endBarRat.denominator);
 
     entries.push(
       Object.freeze({

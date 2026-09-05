@@ -27,15 +27,34 @@ export interface TimedEvent {
   readonly durationBeats: Rational;
 }
 
+export const SWING_QUANTIZATION_BASE = 10000;
+
+/**
+ * Deterministically converts normalized swingAmount (0..1) into an exact Rational:
+ *   amountUnits = Math.round(swingAmount * SWING_QUANTIZATION_BASE)
+ *   amountRational = rational(amountUnits, SWING_QUANTIZATION_BASE)
+ *
+ * Prevents floating-point drift and non-deterministic timeline accumulation.
+ */
+export function quantizeSwingAmount(swingAmount: number): Rational {
+  if (!Number.isFinite(swingAmount) || swingAmount < 0 || swingAmount > 1) {
+    throw new RangeError("swingAmount must be within 0..1");
+  }
+  const amountUnits = Math.round(swingAmount * SWING_QUANTIZATION_BASE);
+  return rational(amountUnits, SWING_QUANTIZATION_BASE);
+}
+
 /**
  * Projects playback timing for a list of timed events according to groove settings.
  * Pure projection: original event objects are not mutated.
  *
  * Swing mapping:
  * - Default subdivision unit U is 1/2 beat (eighth notes).
+ * - Events are grouped strictly by musical grid position (startBeats / U), NEVER by array adjacency.
+ * - Polyphonic/simultaneous notes share identical grid positions and transform identically.
  * - Only events with duration === U on the 2m * U / (2m + 1) * U grid are eligible.
  * - Eligible on-beat event at 2m * U is paired with off-beat event at (2m + 1) * U.
- * - Swing displacement Delta = (swingAmount / 3) * U in exact Rational.
+ * - Swing displacement Delta = (quantizeSwingAmount(swingAmount) / 3) * U in exact Rational.
  * - On-beat: duration = U + Delta.
  * - Off-beat: start = originalStart + Delta, duration = U - Delta.
  * - Pair sum is strictly invariant: (U + Delta) + (U - Delta) = 2U.
@@ -52,7 +71,8 @@ export function projectSwingTiming<T extends TimedEvent>(
 
   const U = subdivisionUnit ?? rational(1, 2);
 
-  // Identify which grid indices have events with duration equal to U
+  // Identify which grid indices have events with duration equal to U.
+  // Grouping is by musical grid position, independent of input array order.
   const slotsWithEligibleEvents = new Set<number>();
   for (const event of events) {
     if (equalRational(event.durationBeats, U)) {
@@ -64,8 +84,8 @@ export function projectSwingTiming<T extends TimedEvent>(
   }
 
   // Convert swing amount to exact rational displacement:
-  // Delta = U * (swingAmount / 3)
-  const amountRational = rational(Math.round(grooveSettings.swingAmount * 10000), 10000);
+  // Delta = U * (amountRational / 3)
+  const amountRational = quantizeSwingAmount(grooveSettings.swingAmount);
   const maxSwingFactor = rational(1, 3);
   const delta = multiplyRational(U, multiplyRational(amountRational, maxSwingFactor));
 

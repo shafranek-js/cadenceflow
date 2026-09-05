@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { groove, projectSwingTiming, type TimedEvent } from "../../../src/domain/timing/swing";
+import {
+  groove,
+  projectSwingTiming,
+  quantizeSwingAmount,
+  SWING_QUANTIZATION_BASE,
+  type TimedEvent,
+} from "../../../src/domain/timing/swing";
 import {
   addRational,
   compareRational,
@@ -263,6 +269,113 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
         expect(run1[i].startBeats.denominator).toBe(run2[i].startBeats.denominator);
         expect(run1[i].durationBeats.numerator).toBe(run2[i].durationBeats.numerator);
         expect(run1[i].durationBeats.denominator).toBe(run2[i].durationBeats.denominator);
+      }
+    });
+  });
+
+  describe("7. Deterministic Amount Rationalization", () => {
+    it("quantizes representative swingAmount values to exact deterministic Rationals", () => {
+      expect(SWING_QUANTIZATION_BASE).toBe(10000);
+
+      // 0.1 -> 1000/10000 = 1/10
+      const r01 = quantizeSwingAmount(0.1);
+      expect(r01).toEqual(rational(1, 10));
+
+      // 0.3 -> 3000/10000 = 3/10
+      const r03 = quantizeSwingAmount(0.3);
+      expect(r03).toEqual(rational(3, 10));
+
+      // 0.55 -> 5500/10000 = 11/20
+      const r055 = quantizeSwingAmount(0.55);
+      expect(r055).toEqual(rational(11, 20));
+
+      // 0.7 -> 7000/10000 = 7/10
+      const r07 = quantizeSwingAmount(0.7);
+      expect(r07).toEqual(rational(7, 10));
+
+      // 1.0 -> 10000/10000 = 1/1
+      const r10 = quantizeSwingAmount(1.0);
+      expect(r10).toEqual(rational(1, 1));
+    });
+
+    it("produces identical numerators and denominators on repeated calls with same input", () => {
+      for (const val of [0.1, 0.3, 0.55, 0.7, 1.0]) {
+        const first = quantizeSwingAmount(val);
+        const second = quantizeSwingAmount(val);
+        expect(first.numerator).toBe(second.numerator);
+        expect(first.denominator).toBe(second.denominator);
+      }
+    });
+  });
+
+  describe("8. Polyphonic Simultaneous Notes and Grid-Based Independence", () => {
+    it("preserves exact simultaneity for chords on the same subdivision regardless of input order", () => {
+      // First subdivision (start 0, dur 1/2): C4 and E4
+      const c4 = createNote("c4", 0, 1, 1, 2, "C4");
+      const e4 = createNote("e4", 0, 1, 1, 2, "E4");
+
+      // Second subdivision (start 1/2, dur 1/2): D4 and F4
+      const d4 = createNote("d4", 1, 2, 1, 2, "D4");
+      const f4 = createNote("f4", 1, 2, 1, 2, "F4");
+
+      const gSwing = groove("swing", 0.6);
+
+      // Order A: standard chronological order [C4, E4, D4, F4]
+      const notesOrderA = [c4, e4, d4, f4];
+      const projectedA = projectSwingTiming(notesOrderA, gSwing);
+
+      // Both first-subdivision notes remain simultaneous
+      expect(equalRational(projectedA[0].startBeats, projectedA[1].startBeats)).toBe(true);
+      expect(equalRational(projectedA[0].durationBeats, projectedA[1].durationBeats)).toBe(true);
+      expect(equalRational(projectedA[0].startBeats, rational(0, 1))).toBe(true);
+
+      // Both second-subdivision notes remain simultaneous with delayed start
+      expect(equalRational(projectedA[2].startBeats, projectedA[3].startBeats)).toBe(true);
+      expect(equalRational(projectedA[2].durationBeats, projectedA[3].durationBeats)).toBe(true);
+      expect(equalRational(projectedA[2].startBeats, projectedA[0].durationBeats)).toBe(true);
+
+      // Shuffled orders:
+      // Order B: interleaved [C4, D4, E4, F4]
+      const notesOrderB = [c4, d4, e4, f4];
+      const projectedB = projectSwingTiming(notesOrderB, gSwing);
+
+      // Order C: reverse [F4, D4, E4, C4]
+      const notesOrderC = [f4, d4, e4, c4];
+      const projectedC = projectSwingTiming(notesOrderC, gSwing);
+
+      // Find projected note by ID across orders and verify bit-for-bit identical timing
+      for (const id of ["c4", "e4", "d4", "f4"]) {
+        const noteA = projectedA.find((n) => n.id === id);
+        const noteB = projectedB.find((n) => n.id === id);
+        const noteC = projectedC.find((n) => n.id === id);
+        expect(noteA).toBeDefined();
+        expect(noteB).toBeDefined();
+        expect(noteC).toBeDefined();
+
+        expect(equalRational(noteA!.startBeats, noteB!.startBeats)).toBe(true);
+        expect(equalRational(noteA!.durationBeats, noteB!.durationBeats)).toBe(true);
+        expect(equalRational(noteA!.startBeats, noteC!.startBeats)).toBe(true);
+        expect(equalRational(noteA!.durationBeats, noteC!.durationBeats)).toBe(true);
+      }
+    });
+
+    it("leaves isolated/unpaired events untouched so they do not acquire duration from neighboring unrelated events", () => {
+      // Event 1: isolated note on beat 0 with no offbeat note at 1/2
+      const isolatedBeat0 = createNote("iso0", 0, 1, 1, 2, "C4");
+
+      // Event 2: quarter note on beat 1 (duration 1, not eligible for 8th swing)
+      const quarterNote = createNote("q1", 1, 1, 1, 1, "G4");
+
+      // Event 3: isolated offbeat note at 2.5 (5/2) with no onbeat note at 2 (4/2)
+      const isolatedOffbeat = createNote("isoOff", 5, 2, 1, 2, "B4");
+
+      const notes = [isolatedBeat0, quarterNote, isolatedOffbeat];
+      const projected = projectSwingTiming(notes, groove("swing", 0.6));
+
+      expect(projected).toHaveLength(3);
+      for (let i = 0; i < notes.length; i++) {
+        expect(equalRational(projected[i].startBeats, notes[i].startBeats)).toBe(true);
+        expect(equalRational(projected[i].durationBeats, notes[i].durationBeats)).toBe(true);
       }
     });
   });
