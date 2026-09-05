@@ -159,11 +159,7 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
     });
 
     // Chord 1 (2 beats = 1.0s), Rest 1 (2 beats = 1.0s), Chord 2 (2 beats = 1.0s)
-    const steps = [
-      makeChord("c1", 2, 1, "I"),
-      makeRest("r1", 2, 1),
-      makeChord("c2", 2, 1, "V"),
-    ];
+    const steps = [makeChord("c1", 2, 1, "I"), makeRest("r1", 2, 1), makeChord("c2", 2, 1, "V")];
 
     controller.start({
       steps,
@@ -181,9 +177,7 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
     expect(at0.length).toBeGreaterThan(0);
 
     // Between 1.0s and 2.0s: REST! No piano notes should start!
-    const duringRest = allEvents.filter(
-      (e) => e.startSeconds >= 1.0 && e.startSeconds < 2.0,
-    );
+    const duringRest = allEvents.filter((e) => e.startSeconds >= 1.0 && e.startSeconds < 2.0);
     expect(duringRest).toHaveLength(0);
 
     // Chord 2 starts at 2.0s
@@ -242,9 +236,7 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
     // Advance clock past note 2 and note 3
     clock.advance(2.0); // Elapsed in audio session = 0.5 + 2.0 = 2.5s
 
-    const allEvents = provider.scheduledBatches
-      .slice(batchesBeforeResume)
-      .flatMap((b) => b.events);
+    const allEvents = provider.scheduledBatches.slice(batchesBeforeResume).flatMap((b) => b.events);
 
     // Note 1 continuation should have remaining duration ~0.45s, not full 1.0s restart
     const continuationNote = allEvents.find((e) => e.startSeconds === 0);
@@ -279,7 +271,7 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       context: "major",
     });
 
-    let firstBatch = provider.scheduledBatches[0]!.events;
+    const firstBatch = provider.scheduledBatches[0]!.events;
     expect(firstBatch[0]!.durationSeconds).toBeCloseTo(4.0 * 0.95, 2);
     controller.stop();
 
@@ -293,7 +285,7 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       context: "major",
     });
 
-    let secondBatch = provider.scheduledBatches[provider.scheduledBatches.length - 1]!.events;
+    const secondBatch = provider.scheduledBatches[provider.scheduledBatches.length - 1]!.events;
     expect(secondBatch[0]!.durationSeconds).toBeCloseTo(2.0 * 0.95, 2);
     controller.stop();
   });

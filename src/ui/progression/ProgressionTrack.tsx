@@ -1,11 +1,14 @@
 import type { ChangeEvent, DragEvent } from "react";
 import type { Project } from "../../domain/project/project";
 import type { CardViewId, StepPerformance } from "../../domain/progression/step";
+import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 
 export function ProgressionTrack({
   project,
   previewFunctionId,
+  currentPlayingStepIndex,
+  loopState,
   onSelectStep,
   onEditPerformance,
   onSetStepView,
@@ -17,6 +20,8 @@ export function ProgressionTrack({
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
+  readonly currentPlayingStepIndex?: number | null;
+  readonly loopState?: LoopState;
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onSetStepView: (stepId: string, view: CardViewId) => void;
@@ -26,6 +31,15 @@ export function ProgressionTrack({
   readonly onRemove: (stepId: string) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
 }) {
+  const loopIndices = (() => {
+    if (!loopState?.enabled || !loopState.region) return null;
+    const start = project.progression.steps.findIndex(
+      (s) => s.id === loopState.region?.startStepId,
+    );
+    const end = project.progression.steps.findIndex((s) => s.id === loopState.region?.endStepId);
+    if (start === -1 || end === -1 || start > end) return null;
+    return { start, end };
+  })();
   const chordViews = project.progression.steps
     .filter((step) => step.kind === "chord")
     .map((step) => step.cardView);
@@ -62,9 +76,20 @@ export function ProgressionTrack({
         </label>
       </div>
       <div className="progression-step-cards">
-        {project.progression.steps.map((step, index) =>
-          step.kind === "rest" ? (
-            <div key={step.id} className="progression-rest-card" data-testid="progression-step">
+        {project.progression.steps.map((step, index) => {
+          const isPlaying = currentPlayingStepIndex === index;
+          const isInLoop = Boolean(
+            loopIndices && index >= loopIndices.start && index <= loopIndices.end,
+          );
+
+          return step.kind === "rest" ? (
+            <div
+              key={step.id}
+              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""}`}
+              data-testid="progression-step"
+              data-playing={isPlaying ? "true" : undefined}
+              data-in-loop={isInLoop ? "true" : undefined}
+            >
               Rest
             </div>
           ) : (
@@ -79,6 +104,8 @@ export function ProgressionTrack({
                 step={step}
                 tonic={project.tonic}
                 selected={project.progression.selectedStepId === step.id}
+                playing={isPlaying}
+                inLoop={isInLoop}
                 canReplace={Boolean(previewFunctionId)}
                 onSelect={() => onSelectStep(step.id)}
                 onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
@@ -92,8 +119,8 @@ export function ProgressionTrack({
                 }
               />
             </div>
-          ),
-        )}
+          );
+        })}
       </div>
     </div>
   );

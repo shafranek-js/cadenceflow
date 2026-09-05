@@ -3,7 +3,6 @@ import { LookAheadScheduler } from "./scheduler";
 import { realizeProgressionAudioEvents } from "./eventRealizer";
 import { generateCountInEvents, generateMetronomeBarEvents } from "./metronome";
 import { projectSwingTiming, type TimedEvent } from "../domain/timing/swing";
-import { createProgressionTimeline, type ProgressionTimeline } from "../domain/timing/timeline";
 import type { Meter } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
@@ -95,7 +94,9 @@ export class PlaybackController {
     this.stopCurrentSession();
 
     let startingStepIndex = 0;
-    const resolvedLoop = params.loopState ? resolveLoopRegion(params.loopState, params.steps) : null;
+    const resolvedLoop = params.loopState
+      ? resolveLoopRegion(params.loopState, params.steps)
+      : null;
     if (resolvedLoop) {
       startingStepIndex = resolvedLoop.startStepIndex;
     }
@@ -191,7 +192,17 @@ export class PlaybackController {
     const sessionId = this.activeSessionId;
     if (!params || !sessionId) return false;
 
-    const { steps, meter, tempoBpm, groove, tonic, context, loopState, metronomeEnabled, countInEnabled } = params;
+    const {
+      steps,
+      meter,
+      tempoBpm,
+      groove,
+      tonic,
+      context,
+      loopState,
+      metronomeEnabled,
+      countInEnabled,
+    } = params;
 
     const resolvedLoop = loopState ? resolveLoopRegion(loopState, steps) : null;
 
@@ -204,7 +215,8 @@ export class PlaybackController {
       sliceEnd = resolvedLoop.endStepIndex + 1;
       this.loopDurationBeatsNumerator = resolvedLoop.durationBeats.numerator;
       this.loopDurationBeatsDenominator = resolvedLoop.durationBeats.denominator;
-      this.loopDurationSeconds = (this.loopDurationBeatsNumerator / this.loopDurationBeatsDenominator) * (60 / tempoBpm);
+      this.loopDurationSeconds =
+        (this.loopDurationBeatsNumerator / this.loopDurationBeatsDenominator) * (60 / tempoBpm);
     }
 
     const activeSteps = steps.slice(sliceStart, sliceEnd);
@@ -231,7 +243,6 @@ export class PlaybackController {
     const audioEvents: AudioNoteEvent[] = [];
     const boundaries: StepTimeBoundary[] = [];
 
-    let currentBeatsAccumulator = 0;
     let currentSecondsAccumulator = countInDurationSeconds;
 
     for (let i = 0; i < activeSteps.length; i++) {
@@ -276,8 +287,11 @@ export class PlaybackController {
 
           const swung = projectSwingTiming(timedEvents, groove);
           for (const s of swung) {
-            const swungStartSec = countInDurationSeconds + (s.startBeats.numerator / s.startBeats.denominator) * secondsPerBeat;
-            const swungDurSec = (s.durationBeats.numerator / s.durationBeats.denominator) * secondsPerBeat;
+            const swungStartSec =
+              countInDurationSeconds +
+              (s.startBeats.numerator / s.startBeats.denominator) * secondsPerBeat;
+            const swungDurSec =
+              (s.durationBeats.numerator / s.durationBeats.denominator) * secondsPerBeat;
             audioEvents.push({
               pitch: s.pitch,
               startSeconds: swungStartSec,
@@ -292,14 +306,13 @@ export class PlaybackController {
       }
       // If step.kind === "rest", silence is emitted (no pitched events added)
 
-      currentBeatsAccumulator += stepDurationBeatsNum / stepDurationBeatsDen;
       currentSecondsAccumulator = stepEndSeconds;
     }
 
     // 3. Add metronome clicks during playback if enabled
     if (metronomeEnabled) {
       const totalPlaybackSeconds = currentSecondsAccumulator - countInDurationSeconds;
-      const barDurationSec = (meter.numerator * 4 / meter.denominator) * secondsPerBeat;
+      const barDurationSec = ((meter.numerator * 4) / meter.denominator) * secondsPerBeat;
       const totalBars = Math.ceil(totalPlaybackSeconds / barDurationSec);
 
       for (let b = 0; b < totalBars; b++) {

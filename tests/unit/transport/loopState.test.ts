@@ -5,7 +5,6 @@ import {
   resolveLoopRegion,
   setLoopMode,
   setLoopRange,
-  type LoopState,
 } from "../../../src/ui/transport/loopState";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";

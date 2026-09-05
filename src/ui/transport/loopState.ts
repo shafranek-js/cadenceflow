@@ -118,10 +118,7 @@ export function revalidateLoopState(
   if (state.mode === "all") {
     const firstStep = steps[0]!;
     const lastStep = steps[steps.length - 1]!;
-    if (
-      state.region.startStepId !== firstStep.id ||
-      state.region.endStepId !== lastStep.id
-    ) {
+    if (state.region.startStepId !== firstStep.id || state.region.endStepId !== lastStep.id) {
       return Object.freeze({
         mode: "all",
         enabled: true,

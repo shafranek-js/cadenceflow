@@ -6,7 +6,7 @@ import type {
   ScheduledPlayback,
 } from "./contracts";
 import { computeMeterAccents, pulseToBeats, type Meter } from "../domain/timing/meter";
-import { divideRational, multiplyRational, rational, type Rational } from "../domain/timing/rational";
+import { rational, type Rational } from "../domain/timing/rational";
 
 export interface MetronomeClickPitches {
   readonly primary: number;
@@ -65,7 +65,7 @@ export function generateMetronomeBarEvents(
 
     let pitch: number;
     let velocity: number;
-    let clickDuration = 0.03;
+    let clickDuration: number;
 
     if (item.accent === "primary") {
       pitch = pitches.primary;
@@ -137,7 +137,7 @@ export class MetronomeClickProvider implements InstrumentAudioProvider {
     // Synchronous click generator is immediately ready
   }
 
-  schedule(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback {
+  schedule(events: readonly AudioNoteEvent[], _clock: AudioClock): ScheduledPlayback {
     const batchId = `metronome-batch-${++this.batchCounter}`;
     const cancellationHandles: Array<() => void> = [];
 

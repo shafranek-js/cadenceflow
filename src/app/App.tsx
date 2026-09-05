@@ -55,6 +55,31 @@ import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
 import type { AudioProviderState } from "../audio/contracts";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
 import type { ChordStep } from "../domain/progression/step";
+import { TransportBar } from "../ui/transport/TransportBar";
+import { TransportStore, type TransportState } from "../ui/transport/transportStore";
+import {
+  INITIAL_LOOP_STATE,
+  revalidateLoopState,
+  setLoopMode,
+  setLoopRange,
+  type LoopMode,
+  type LoopState,
+} from "../ui/transport/loopState";
+import { PlaybackController } from "../audio/playbackController";
+import { MetronomeClickProvider } from "../audio/metronome";
+import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
+import type { GrooveSettings } from "../domain/timing/swing";
+import type { MusicalDuration } from "../domain/timing/duration";
+import {
+  setTempo,
+  setMeter,
+  setGroove,
+  setStepDuration,
+  type SetTempoCommand,
+  type SetMeterCommand,
+  type SetGrooveCommand,
+  type SetStepDurationCommand,
+} from "./commands/timingCommands";
 import {
   patchMatrixTemplate,
   resetCardTemplate,
@@ -104,6 +129,29 @@ export function App() {
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
   const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
+
+  const transportStore = useMemo(() => new TransportStore(), []);
+  const [transportState, setTransportState] = useState<TransportState>(transportStore.getState());
+  const [loopState, setLoopState] = useState<LoopState>(INITIAL_LOOP_STATE);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [countInEnabled, setCountInEnabled] = useState(false);
+  const playbackControllerRef = useRef<PlaybackController | null>(null);
+
+  useEffect(() => {
+    return transportStore.subscribe(() => {
+      setTransportState(transportStore.getState());
+    });
+  }, [transportStore]);
+
+  useEffect(() => {
+    setLoopState((prev) => revalidateLoopState(prev, project.progression.steps));
+  }, [project.progression.steps]);
+
+  useEffect(() => {
+    return () => {
+      playbackControllerRef.current?.stop();
+    };
+  }, []);
 
   useEffect(() => {
     const provider = new HqSamplePianoProvider({
@@ -381,6 +429,125 @@ export function App() {
     store.dispatch(command, setBranchIntent);
   };
 
+  const getPlaybackController = () => {
+    if (!audioProviderRef.current) return null;
+    if (!playbackControllerRef.current) {
+      const clock = audioProviderRef.current.clock;
+      const metronomeProvider = new MetronomeClickProvider(audioProviderRef.current.audioCtx);
+      playbackControllerRef.current = new PlaybackController({
+        clock,
+        pianoProvider: audioProviderRef.current,
+        metronomeProvider,
+        transportStore,
+      });
+    }
+    return playbackControllerRef.current;
+  };
+
+  const handlePlay = () => {
+    const controller = getPlaybackController();
+    if (!controller) return;
+    controller.start({
+      steps: project.progression.steps,
+      meter: project.globalTiming.meter,
+      tempoBpm: project.globalTiming.tempoBpm,
+      groove: project.groove,
+      tonic: project.tonic,
+      context: {
+        tonic: project.tonic,
+        mode: getHarmonicModule(project.activeModule).mode,
+        moduleId: project.activeModule,
+        spellingContext: {
+          tonic: project.tonic,
+          mode: getHarmonicModule(project.activeModule).mode,
+        },
+      },
+      loopState,
+      metronomeEnabled,
+      countInEnabled,
+    });
+  };
+
+  const handlePlayFromHere = (stepId: string) => {
+    const controller = getPlaybackController();
+    if (!controller) return;
+    controller.playFromHere(stepId, {
+      steps: project.progression.steps,
+      meter: project.globalTiming.meter,
+      tempoBpm: project.globalTiming.tempoBpm,
+      groove: project.groove,
+      tonic: project.tonic,
+      context: {
+        tonic: project.tonic,
+        mode: getHarmonicModule(project.activeModule).mode,
+        moduleId: project.activeModule,
+        spellingContext: {
+          tonic: project.tonic,
+          mode: getHarmonicModule(project.activeModule).mode,
+        },
+      },
+      loopState,
+      metronomeEnabled,
+      countInEnabled,
+    });
+  };
+
+  const handlePause = () => {
+    playbackControllerRef.current?.pause();
+  };
+
+  const handleResume = () => {
+    playbackControllerRef.current?.resume();
+  };
+
+  const handleStop = () => {
+    playbackControllerRef.current?.stop();
+  };
+
+  const changeTempo = (tempoBpm: number) => {
+    const command: SetTempoCommand = {
+      type: "timing/set-tempo",
+      payload: { tempoBpm, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setTempo);
+  };
+
+  const changeMeter = (newMeter: Meter, policy: MeterChangePolicy) => {
+    const command: SetMeterCommand = {
+      type: "timing/set-meter",
+      payload: { meter: newMeter, policy, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setMeter);
+  };
+
+  const changeGroove = (groove: GrooveSettings) => {
+    const command: SetGrooveCommand = {
+      type: "timing/set-groove",
+      payload: { groove, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setGroove);
+  };
+
+  const changeStepDuration = (stepId: string, duration: MusicalDuration) => {
+    const command: SetStepDurationCommand = {
+      type: "timing/set-step-duration",
+      payload: { stepId, duration, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setStepDuration);
+  };
+
+  const handleSetLoopMode = (mode: LoopMode) => {
+    setLoopState((prev) => setLoopMode(prev, mode, project.progression.steps));
+  };
+
+  const handleSetLoopRange = (startStepId: string, endStepId: string) => {
+    try {
+      setLoopState(setLoopRange(startStepId, endStepId, project.progression.steps));
+    } catch {
+      // Ignore invalid range
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -395,6 +562,26 @@ export function App() {
         ) : null}
         <PianoAudioStatus state={audioState} />
       </header>
+      <TransportBar
+        project={project}
+        transportState={transportState}
+        loopState={loopState}
+        metronomeEnabled={metronomeEnabled}
+        countInEnabled={countInEnabled}
+        onPlay={handlePlay}
+        onPlayFromHere={handlePlayFromHere}
+        onPause={handlePause}
+        onResume={handleResume}
+        onStop={handleStop}
+        onSetTempo={changeTempo}
+        onSetMeter={changeMeter}
+        onSetGroove={changeGroove}
+        onSetStepDuration={changeStepDuration}
+        onSetLoopMode={handleSetLoopMode}
+        onSetLoopRange={handleSetLoopRange}
+        onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
+        onToggleCountIn={() => setCountInEnabled((v) => !v)}
+      />
       <div className="studio-grid">
         <HarmonicMatrix
           project={project}
@@ -465,6 +652,8 @@ export function App() {
         </div>
         <ProgressionTrack
           project={project}
+          currentPlayingStepIndex={transportState.currentStepIndex}
+          loopState={loopState}
           {...(matrixSession.previewFunctionId
             ? { previewFunctionId: matrixSession.previewFunctionId }
             : {})}

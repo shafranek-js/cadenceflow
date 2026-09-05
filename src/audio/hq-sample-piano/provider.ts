@@ -85,6 +85,18 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
     return this.sampleCache;
   }
 
+  get audioCtx(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  get clock(): AudioClock {
+    return {
+      now: () =>
+        this.audioContext?.currentTime ??
+        (typeof performance !== "undefined" ? performance.now() / 1000 : 0),
+    };
+  }
+
   async prepare(): Promise<void> {
     this.setProviderState("loading");
     // Yield to allow callers to observe loading state

@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   generateCountInEvents,
   generateMetronomeBarEvents,
-  getBarDurationSeconds,
-  getBarLengthBeats,
   MetronomeClickProvider,
 } from "../../../src/audio/metronome";
 import { meter } from "../../../src/domain/timing/meter";
