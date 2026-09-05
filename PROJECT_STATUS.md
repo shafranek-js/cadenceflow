@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T120 accepted  
-**Task progress:** T001–T120 complete, 120 / 158 total tasks  
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T122, T124–T125 accepted  
+**Task progress:** T001–T122, T124–T125 complete, 124 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (2 / 11 complete, overall 120 / 158)**.
+The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (6 / 11 complete, overall 124 / 158)**.
 
 ## 2. Sources of truth
 
@@ -336,6 +336,21 @@ Defined executable test contracts for CadenceFlow v1 project persistence and aut
 - **Last-Active Pointer**: `lastActiveProjectId` is stored in a dedicated Dexie `metadata` key-value store, not `localStorage`. Atomic delete cleans up the pointer if the active project is deleted.
 - **Strict State Exclusion**: Session Undo/Redo history, audio buffers/caches, and transport playback states are strictly excluded from persistence and initialized clean upon load.
 
+### US8 Batch B — portable codec, migrations, and dexie repository — T121, T122, T124, T125
+
+Implemented and accepted:
+- `src/persistence/db.ts` (`T121`): Canonical `projects + metadata` Dexie architecture. IndexedDB table `projects` indexed by `id`, `name`, `updatedAt`, `schemaVersion`, `revision`. Metadata store `metadata` with key `lastActiveProjectId`. Zero separate autosave semantic store.
+- `src/persistence/projectRepository.ts` (`T122`): Named project repository list/load/save/delete. Stores canonical portable `.cadenceflow` JSON payload in `ProjectRecord.payload`. Validation-before-write using `encodePortableProject`. Atomic transactional deletion with automatic cleanup of `lastActiveProjectId` pointer when active project is deleted.
+- `src/persistence/portableProject.ts` (`T124`): Pure `.cadenceflow` codec validated with Ajv 2020 against JSON Schema draft 2020-12 (`cadenceflow-project.schema.json`). Reversible explicit codec bridge for `tonic` (`number` $\leftrightarrow$ `{ semitone }`). Strict deterministic and reversible grammar for `DurationDisplayHint` (`beats`, `beats:<label>`, `bars:<n>`, `dotted:<n>/<d>`, `triplet:<n>/<d>`) with explicit rejection of malformed or unknown strings. Strict exclusion of session history, audio caches, and transport playback states.
+- `src/domain/project/migrations.ts` (`T125`): Pure schema version migration chain. Current genesis schema version 1 passes through directly; explicit rejection of future versions (`schemaVersion > CURRENT_PROJECT_SCHEMA_VERSION`) with `UnsupportedProjectVersionError`.
+
+#### Accepted US8 Batch B Boundaries & Invariants
+- **Canonical Store Pair**: Dexie database contains strictly two stores: `projects` (canonical project snapshots) and `metadata` (`lastActiveProjectId` pointer). No redundant or secondary autosave snapshot store.
+- **Canonical Payload Equality**: Payload stored in `projects[id].payload` is bit-for-bit identical to `encodePortableProject(project)`. Persistence-only `revision` is isolated to the Dexie record wrapper and never appears in `.cadenceflow` exports.
+- **Validation Before Write**: Saving a project validates the wire payload against the schema prior to database execution; invalid writes throw and leave stored state, revision, and metadata untouched.
+- **Strict Grammar**: `DurationDisplayHint` enforces strict v1 grammar without silent fallback.
+- **Single Source of Schema Truth**: Ajv 2020 draft 2020-12 compiles `specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json`.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -469,11 +484,11 @@ Active milestone is **Phase 11: User Story 8 — Save and reopen complete work s
 
 - **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
-- **T121**: [ ] Implement Dexie database schema and project records in `src/persistence/db.ts`.
-- **T122**: [ ] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
+- **T121**: [x] Implement Dexie database schema and project records in `src/persistence/db.ts`.
+- **T122**: [x] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
 - **T123**: [ ] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
-- **T124**: [ ] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
-- **T125**: [ ] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
+- **T124**: [x] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
+- **T125**: [x] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
 - **T126**: [ ] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
 - **T127**: [ ] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
 - **T128**: [ ] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.

@@ -291,11 +291,11 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T120 [P] [US8] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`
 ### Implementation
 
-- [ ] T121 [US8] Implement Dexie database schema and project records in `src/persistence/db.ts`
-- [ ] T122 [US8] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`
+- [x] T121 [US8] Implement Dexie database schema and project records in `src/persistence/db.ts`
+- [x] T122 [US8] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`
 - [ ] T123 [US8] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`
-- [ ] T124 [US8] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts` using `specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json` as contract
-- [ ] T125 [US8] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`
+- [x] T124 [US8] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts` using `specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json` as contract
+- [x] T125 [US8] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`
 - [ ] T126 [US8] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`
 - [ ] T127 [US8] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`
 - [ ] T128 [US8] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`
