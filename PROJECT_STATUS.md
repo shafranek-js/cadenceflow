@@ -1,16 +1,16 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 10 / User Story 7 (Presets) IN PROGRESS; T112–T117 accepted  
-**Task progress:** T001–T117 complete, 117 / 158 total tasks  
+**Current implementation stage:** Phase 10 / User Story 7 (Presets) ACCEPTED / COMPLETE; T112–T118 accepted  
+**Task progress:** T001–T118 complete, 118 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
-Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) and User Story 6 (**Exact Musical Timing & Transport Runtime**) are fully accepted across all tasks T077–T111.
+Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
-The previous milestone **Phase 9: User Story 6** is **ACCEPTED / COMPLETE** across all tasks T097–T111.
-The current milestone is **Phase 10: User Story 7** — functional presets (T112–T118) — **IN PROGRESS (T112–T117 complete, 117 / 158)**.
+The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
+The next milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **NOT STARTED (0 / 11 complete, overall 118 / 158)**.
 
 ## 2. Sources of truth
 
@@ -256,6 +256,65 @@ Implemented and accepted:
   - Modal accessibility: shared `useModalFocus` hook (`src/ui/common/useModalFocus.ts`) providing initial focus placement (`#preset-name-input` on Save dialog), Tab/Shift+Tab focus trap, focus restoration on close, and topmost-only Escape handling. Stacked modal inertness marks underlying `PresetsPanel` as `inert` and `aria-hidden="true"` when child dialogs are open.
   - Responsive layouts: fluid card grid with `minmax(280px, 1fr)`, text wrapping on chords/durations, and validated viewports for mobile (`390×844`), compact desktop (`1280×720`), and full desktop (`1920×1080`).
 
+### US7 Batch D — Playwright acceptance, final closure, and invariants — T118
+
+US7 / Phase 10 fully accepted and closed across all tasks T112–T118. Overall project progress: 118 / 158.
+
+- `tests/e2e/us7-presets.spec.ts` (`T118`): 18 comprehensive real-browser E2E acceptance scenarios verifying:
+  1. Presets browser renders built-in/custom functional material with neutral names and no genre taxonomy.
+  2. Current progression can be saved as Custom Preset with modal autofocus and whitespace validation.
+  3. Saved Preset exposes functional identities + durations only, stripping harmonic variants and performance overrides.
+  4. Cross-key re-realization dynamically re-evaluates chord quality symbols across keys (e.g. C Major `C · Am · F · G` -> D Major `D · Bm · G · A`).
+  5. Tonal Minor realization correctly realizes minor presets (e.g. `Minor i–iv–V–i` -> `Gm · Cm · D · Gm`).
+  6. Replace Progression replaces entire progression and is fully undoable/redoable.
+  7. Append to End appends preset steps to existing progression and is fully undoable/redoable.
+  8. Insert at Selected Step places preset steps immediately before the selected step and is fully undoable/redoable.
+  9. Insert mode is disabled with descriptive explanation when no step is selected.
+  10. Empty progression uses simplified "Use Preset" flow.
+  11. Rest-containing Save is rejected explicitly with non-destructive warning callout.
+  12. Ambiguous cross-module mappings are protected with candidate diagnostics and disabled Apply.
+  13. Incompatible mappings are strictly protected where reachable.
+  14. Current session Piano defaults are instantiated on applied preset steps at application time.
+  15. Custom Preset Delete + Undo/Redo restores and removes presets atomically.
+  16. Modal keyboard and focus management: initial focus placement, Tab focus trapping, nested modal Escape hierarchy, and focus restoration to trigger.
+  17. Responsive layout smoke tests confirm zero document-level horizontal overflow across 1920×1080, 1280×720, and 390×844 viewports.
+  18. Passive browsing, opening/closing dialogs, and inspecting previews creates zero history entries.
+
+#### Final Accepted US7 Architecture & Invariants
+
+- **Functional Harmonic Templates**: Presets are functional harmonic templates, not saved song files or transport configurations.
+- **Canonical PresetStep Contract**: Canonical `PresetStep` stores exactly:
+  - `HarmonicFunctionIdentity`
+  - exact `MusicalDuration`
+- **Strict Exclusion of Performance State**: Presets do not store:
+  - `HarmonicVariant`;
+  - voicing;
+  - articulation;
+  - register;
+  - bass;
+  - dynamics;
+  - MIDI velocity;
+  - note-level velocity;
+  - rendered chord names;
+  - audio/runtime state.
+- **Dynamic Re-Realization**: Presets re-realize through current Key/Mode/spelling rules.
+- **Supported Harmonic Systems**: Major and Tonal Minor are supported through the existing harmony engine.
+- **Ambiguous Mapping Protection**: Ambiguous mappings are explicit and never guessed.
+- **Incompatible Mapping Protection**: Incompatible mappings do not mutate Progression.
+- **Project Ownership**: Custom Presets belong to `Project.customPresets`.
+- **Rest Step Exclusion**: v1 Custom Presets do not support Rest Steps; saving a progression containing Rest fails explicitly and atomically.
+- **Apply Modes**:
+  - Replace Progression (clears prior selection);
+  - Append to End (preserves valid prior selection);
+  - Insert at Selected Step (inserts immediately **before** selected Step, preserves selected original Step).
+- **Session History Atomicity**: Successful Save/Apply/Delete operations participate in `SessionHistory` as one logical mutation.
+- **Failure Zero History**: Failed/ambiguous/incompatible operations create no history entry.
+- **Committed Snapshot Redo**: Redo restores committed snapshots rather than re-realizing with new defaults.
+- **Application-Time Defaults**: Newly applied Preset Steps use current performance defaults at application time.
+- **Neutral Built-in Catalog**: Built-in catalog contains six neutral functional presets with neutral functional names and IDs (no genre taxonomy).
+- **Quality-Aware UI Previews**: Contextual UI previews show quality-aware realized chords without mutating Preset data.
+- **Modal Accessibility**: Presets modal stack uses accepted focus/inert/topmost semantics.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -331,6 +390,18 @@ The working folder has no Git metadata, so this is a verified list of the main c
 - `tests/integration/timing-audio-projection.test.ts`
 - `tests/integration/pitch-projection-consistency.test.ts`
 - `tests/integration/audio-provider-contract.test.ts`
+- `src/domain/progression/presets.ts`
+- `src/domain/progression/builtInPresets.ts`
+- `src/app/commands/presetCommands.ts`
+- `src/ui/progression/PresetsPanel.tsx`
+- `src/ui/progression/PresetApplyDialog.tsx`
+- `src/ui/progression/SavePresetDialog.tsx`
+- `src/ui/common/useModalFocus.ts`
+- `tests/unit/progression/presets.test.ts`
+- `tests/unit/progression/built-in-presets.test.ts`
+- `tests/unit/app/preset-commands.test.ts`
+- `tests/unit/ui/presets-ui.test.ts`
+- `tests/integration/preset-history.test.ts`
 - `tests/e2e/us1-build-progression.spec.ts`
 - `tests/e2e/us2-branching.spec.ts`
 - `tests/e2e/us3-step-independence.spec.ts`
@@ -339,6 +410,7 @@ The working folder has no Git metadata, so this is a verified list of the main c
 - `tests/e2e/us5-piano-performance.spec.ts`
 - `tests/e2e/us5-audio-playback.spec.ts`
 - `tests/e2e/us6-timing-transport.spec.ts`
+- `tests/e2e/us7-presets.spec.ts`
 
 ## 6. Verification performed
 
@@ -346,12 +418,18 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 - Toolchain: `pnpm 10.12.4` pinned via `packageManager` in `package.json`, `typescript 6.0.3` pinned.
 - `pnpm run build` (`tsc -b && vite build`) → **PASS** (0 errors).
-- `pnpm test` (Vitest, 42 test files, 290 tests) → **PASS** (`290 / 290` GREEN).
-- `pnpm run test:e2e:chromium` (Playwright Chromium, 22 tests across US1–US6) → **PASS** (`22 / 22` GREEN).
+- `pnpm test` (Vitest, 47 test files, 373 tests) → **PASS** (`373 / 373` GREEN).
+- `tests/e2e/us7-presets.spec.ts` (Playwright Chromium, 18 tests) → **PASS** (`18 / 18` GREEN).
+- `pnpm run test:e2e:chromium` (Playwright Chromium, 40 tests across US1–US7) → **PASS** (`40 / 40` GREEN).
 - `pnpm run lint` (ESLint 9) → **PASS** (0 errors, 0 warnings).
 - `pnpm run format:check` (Prettier) → **PASS** (all files formatted).
 - Spec integrity: 1077 lines, 182 FRs, 17 SCs, 0 TODOs / TBD / NEEDS CLARIFICATION placeholders.
 - Verified visual evidence archive:
+  - Path: `review-artifacts/us7-final/us7-final-evidence.zip`
+  - Size: `1,451,719 bytes`
+  - SHA-256: `453d99d3dcb1a8411b0f8687a107fcb916dd8543a191263bef1d971da86f36b4`
+  - Contents: 13 PNGs (`01`–`13`), verified integrity (all 13 entries readable).
+- Prior US6 visual evidence archive:
   - Path: `review-artifacts/us6-final/us6-final-evidence.zip`
   - Size: `1,845,685 bytes`
   - SHA-256: `97f4919b3431db74898c53736fc9ded9f33d01c7ff0be9315f1ec0bd9fd8b29a`
@@ -362,19 +440,23 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US7–US10**: Pending start and implementation of US7 presets.
+4. **US8–US10**: Pending start and implementation of US8 persistence.
 
-## 8. Next development sequence: Phase 10 / US7 — T113–T118
- 
-Active milestone is **Phase 10: User Story 7 — Use functional presets as reusable composition material (Priority: P2)**:
- 
-- **T112**: [x] Preset serialization, re-realization across keys/modes, and insertion transformation tests in `tests/unit/progression/presets.test.ts`.
-- **T113**: [ ] Functional preset model with harmonic identities + per-step musical durations only in `src/domain/progression/presets.ts`.
-- **T114**: [ ] Curated built-in preset catalog data in `src/domain/progression/builtInPresets.ts`.
-- **T115**: [ ] Save as Custom Preset command stripping performance realization data in `src/app/commands/presetCommands.ts`.
-- **T116**: [ ] `Replace Progression`, `Append to End`, and `Insert at Selected Step` transformations in `src/domain/progression/presets.ts` and `src/app/commands/presetCommands.ts`.
-- **T117**: [ ] Presets browser, apply dialog, and Custom Preset save UI in `src/ui/progression/PresetsPanel.tsx` and `src/ui/progression/PresetApplyDialog.tsx`.
-- **T118**: [ ] Playwright acceptance for cross-key functional preset reuse and all insertion modes in `tests/e2e/us7-presets.spec.ts`.
+## 8. Next development sequence: Phase 11 / US8 — T119–T129
+
+Active milestone is **Phase 11: User Story 8 — Save and reopen complete work safely (Priority: P2)**:
+
+- **T119**: [ ] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
+- **T120**: [ ] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
+- **T121**: [ ] Implement Dexie database schema and project records in `src/persistence/db.ts`.
+- **T122**: [ ] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
+- **T123**: [ ] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
+- **T124**: [ ] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
+- **T125**: [ ] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
+- **T126**: [ ] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
+- **T127**: [ ] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
+- **T128**: [ ] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
+- **T129**: [ ] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-persistence.spec.ts`.
 
 ## 9. Handoff operating model
 
