@@ -1795,6 +1795,13 @@
 }
 
 @media (max-width: 480px) {
+  html,
+  body,
+  .app-shell {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   .presets-panel {
     width: 96vw;
     max-height: 92vh;

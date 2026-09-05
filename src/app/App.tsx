@@ -372,6 +372,14 @@ export function App() {
           e.preventDefault();
           store.undo();
         }
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.shiftKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y")
+      ) {
+        if (store.canRedo) {
+          e.preventDefault();
+          store.redo();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -646,6 +654,8 @@ export function App() {
         onToggleCountIn={() => setCountInEnabled((v) => !v)}
         onUndo={() => store.undo()}
         canUndo={store.canUndo}
+        onRedo={() => store.redo()}
+        canRedo={store.canRedo}
       />
       <div className="studio-grid">
         <HarmonicMatrix

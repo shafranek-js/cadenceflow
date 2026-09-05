@@ -135,7 +135,7 @@ export function PresetsPanel({
                               : "preview-incompatible"
                         }`}
                       >
-                        <span className="preview-label">Context ({contextLabel}):</span>
+                        <span className="preview-label">Context ({contextLabel}): </span>
                         <span className="preview-text">{realization.text}</span>
                       </div>
                     </div>
@@ -216,7 +216,7 @@ export function PresetsPanel({
                                 : "preview-incompatible"
                           }`}
                         >
-                          <span className="preview-label">Context ({contextLabel}):</span>
+                          <span className="preview-label">Context ({contextLabel}): </span>
                           <span className="preview-text">{realization.text}</span>
                         </div>
                       </div>

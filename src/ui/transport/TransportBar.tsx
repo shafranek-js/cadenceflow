@@ -37,6 +37,8 @@ export interface TransportBarProps {
   readonly onToggleCountIn: () => void;
   readonly onUndo?: () => void;
   readonly canUndo?: boolean;
+  readonly onRedo?: () => void;
+  readonly canRedo?: boolean;
 }
 
 export function TransportBar({
@@ -60,6 +62,8 @@ export function TransportBar({
   onToggleCountIn,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
 }: TransportBarProps) {
   const tempoInputId = useId();
   const meterNumId = useId();
@@ -342,6 +346,22 @@ export function TransportBar({
               ↶
             </span>
             <span className="transport-btn-label">Undo</span>
+          </button>
+        )}
+
+        {onRedo && (
+          <button
+            type="button"
+            className="transport-button transport-redo"
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label="Redo"
+            title="Redo last undone action (Ctrl+Shift+Z or Ctrl+Y)"
+          >
+            <span className="transport-btn-icon" aria-hidden="true">
+              ↷
+            </span>
+            <span className="transport-btn-label">Redo</span>
           </button>
         )}
 
