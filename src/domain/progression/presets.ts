@@ -1,16 +1,15 @@
 import type { HarmonicFunctionIdentity } from "../harmony/functions";
-import type { HarmonicVariant } from "../harmony/chord";
-import type { MusicalDuration } from "../timing/duration";
+import type { DurationDisplayHint, MusicalDuration } from "../timing/duration";
 import type { Progression } from "./progression";
 import type { ChordStep } from "./step";
 import type { HarmonicContext } from "../harmony/modules/types";
 import type { ProjectDefaults } from "../project/defaults";
+import type { ModuleSwitchResolution } from "../harmony/moduleSwitch";
 
 export type PresetSource = "builtIn" | "custom";
 
 export interface PresetStep {
   readonly harmonicFunction: HarmonicFunctionIdentity;
-  readonly harmonicVariant?: HarmonicVariant;
   readonly duration: MusicalDuration;
 }
 
@@ -26,10 +25,9 @@ export type PresetApplyMode = "replace" | "append" | "insert";
 
 export interface SerializablePresetStep {
   readonly harmonicFunction: HarmonicFunctionIdentity;
-  readonly harmonicVariant?: HarmonicVariant;
   readonly duration: {
     readonly beats: { readonly numerator: number; readonly denominator: number };
-    readonly displayHint?: unknown;
+    readonly displayHint?: DurationDisplayHint;
   };
 }
 
@@ -41,6 +39,14 @@ export interface SerializablePreset {
   readonly steps: readonly SerializablePresetStep[];
 }
 
+export type SaveCustomPresetResult =
+  | { readonly kind: "success"; readonly preset: FunctionalPreset }
+  | {
+      readonly kind: "unsupported-progression";
+      readonly reason: "rest-step";
+      readonly message: string;
+    };
+
 export type PresetRealizationResult =
   | { readonly kind: "success"; readonly steps: readonly ChordStep[] }
   | {
@@ -51,8 +57,7 @@ export type PresetRealizationResult =
       readonly kind: "ambiguous";
       readonly ambiguousSteps: readonly {
         readonly stepIndex: number;
-        readonly function: HarmonicFunctionIdentity;
-        readonly alternatives: readonly HarmonicFunctionIdentity[];
+        readonly resolution: ModuleSwitchResolution;
       }[];
     };
 
@@ -78,7 +83,7 @@ export function saveCustomPresetFromProgression(
   _name: string,
   _progression: Progression,
   _options?: { readonly id?: string; readonly description?: string },
-): FunctionalPreset {
+): SaveCustomPresetResult {
   throw new Error("Not implemented: T115 saveCustomPresetFromProgression");
 }
 

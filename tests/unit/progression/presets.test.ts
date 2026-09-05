@@ -22,8 +22,9 @@ import {
   DEFAULT_PIANO_PERFORMANCE,
 } from "../../../src/domain/project/factory";
 
-// Forbidden keys for performance leakage assertions (FR-151)
-const FORBIDDEN_PERFORMANCE_KEYS = [
+// Forbidden keys for performance and harmonic-variant leakage assertions (FR-150, FR-151)
+const FORBIDDEN_PRESET_KEYS = [
+  // Performance realization fields
   "performance",
   "voicing",
   "manualVoicing",
@@ -40,24 +41,36 @@ const FORBIDDEN_PERFORMANCE_KEYS = [
   "sample",
   "provider",
   "explicitSpellingOverrides",
+  // Harmonic variant / tension fields (BLOCKER: Presets store function + duration only)
+  "harmonicVariant",
+  "variant",
+  "extensions",
+  "suspensions",
+  "alterations",
+  "seventh",
+  "add9",
+  // Absolute pitch / chord symbol truth
+  "spelling",
+  "rootPitchClass",
+  "symbol",
 ] as const;
 
-function assertNoPerformanceLeakage(obj: unknown, path = ""): void {
+function assertNoPerformanceOrVariantLeakage(obj: unknown, path = ""): void {
   if (obj === null || typeof obj !== "object") return;
   if (Array.isArray(obj)) {
-    obj.forEach((item, index) => assertNoPerformanceLeakage(item, `${path}[${index}]`));
+    obj.forEach((item, index) => assertNoPerformanceOrVariantLeakage(item, `${path}[${index}]`));
     return;
   }
   const record = obj as Record<string, unknown>;
   for (const key of Object.keys(record)) {
     const currentPath = path ? `${path}.${key}` : key;
-    for (const forbidden of FORBIDDEN_PERFORMANCE_KEYS) {
+    for (const forbidden of FORBIDDEN_PRESET_KEYS) {
       expect(
         key.toLowerCase(),
-        `Forbidden performance key "${forbidden}" found at path "${currentPath}"`,
+        `Forbidden key "${forbidden}" found at path "${currentPath}"`,
       ).not.toBe(forbidden.toLowerCase());
     }
-    assertNoPerformanceLeakage(record[key], currentPath);
+    assertNoPerformanceOrVariantLeakage(record[key], currentPath);
   }
 }
 
@@ -87,18 +100,16 @@ function createRichPerformance(overrides?: Partial<StepPerformance>): StepPerfor
 
 describe("T112 — Functional Presets Contract Suite (US7)", () => {
   // --------------------------------------------------------------------------
-  // 1 & 2. Canonical Preset Data Model & HarmonicFunctionIdentity Contract
+  // 1. Canonical Preset Data Model & HarmonicFunctionIdentity Contract (FR-148, FR-150)
   // --------------------------------------------------------------------------
   describe("1. Canonical Preset Data Model & HarmonicFunctionIdentity", () => {
-    it("defines a functional preset containing only identity, metadata, and ordered steps with HarmonicFunctionIdentity and MusicalDuration", () => {
+    it("defines a functional preset containing strictly identity, metadata, and ordered steps with HarmonicFunctionIdentity and MusicalDuration only", () => {
       const step1: PresetStep = {
         harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
-        harmonicVariant: EMPTY_HARMONIC_VARIANT,
         duration: musicalDuration(rational(1, 1)),
       };
       const step2: PresetStep = {
         harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
-        harmonicVariant: EMPTY_HARMONIC_VARIANT,
         duration: musicalDuration(rational(2, 1)),
       };
 
@@ -119,8 +130,8 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(preset.steps[0]!.harmonicFunction.moduleId).toBe("progressions");
       expect(preset.steps[1]!.harmonicFunction.functionId).toBe("V");
 
-      // Verify no runtime performance keys exist on preset or preset steps
-      assertNoPerformanceLeakage(preset);
+      // Verify no runtime performance or harmonic variant keys exist on preset or preset steps
+      assertNoPerformanceOrVariantLeakage(preset);
     });
 
     it("distinguishes functional identities across different compatible modules (progressions vs dark-harmony)", () => {
@@ -140,7 +151,7 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
   });
 
   // --------------------------------------------------------------------------
-  // 3. Exact MusicalDuration Contract
+  // 2. Exact MusicalDuration Contract in Presets (FR-105)
   // --------------------------------------------------------------------------
   describe("2. Exact MusicalDuration Contract in Presets", () => {
     it("stores exact Rational-backed durations without floating-point seconds or milliseconds", () => {
@@ -190,10 +201,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
   });
 
   // --------------------------------------------------------------------------
-  // 4. Serialization Boundary
+  // 3. Serialization Boundary (No displayHint?: unknown, No harmonicVariant)
   // --------------------------------------------------------------------------
   describe("3. Serialization Boundary", () => {
-    it("round-trips a functional preset through JSON serialization preserving all semantic fields and exact rationals", () => {
+    it("round-trips a functional preset through JSON serialization preserving all semantic fields and exact rationals without variant or performance fields", () => {
       const original = createFunctionalPreset(
         "preset-50s",
         "50s Progression",
@@ -201,22 +212,18 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         [
           {
             harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
-            harmonicVariant: EMPTY_HARMONIC_VARIANT,
             duration: musicalDuration(rational(4, 1)),
           },
           {
             harmonicFunction: { moduleId: "progressions", functionId: "vi", category: "core" },
-            harmonicVariant: EMPTY_HARMONIC_VARIANT,
             duration: musicalDuration(rational(4, 1)),
           },
           {
             harmonicFunction: { moduleId: "progressions", functionId: "IV", category: "core" },
-            harmonicVariant: EMPTY_HARMONIC_VARIANT,
             duration: musicalDuration(rational(2, 1)),
           },
           {
             harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
-            harmonicVariant: EMPTY_HARMONIC_VARIANT,
             duration: musicalDuration(rational(2, 1)),
           },
         ],
@@ -241,21 +248,22 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         expect(equalRational(desStep.duration.beats, origStep.duration.beats)).toBe(true);
       }
 
-      // No performance data gained during serialization
-      assertNoPerformanceLeakage(JSON.parse(jsonStr));
+      // Strong recursive assertion proving absence of performance and harmonicVariant fields
+      assertNoPerformanceOrVariantLeakage(JSON.parse(jsonStr));
     });
   });
 
   // --------------------------------------------------------------------------
-  // 5. Save Current Progression as Custom Preset — Stripping Contract (FR-151, FR-153)
+  // 4. Save Current Progression as Custom Preset — Supported Fixture (FR-151, FR-153)
   // --------------------------------------------------------------------------
-  describe("4. Save Current Progression as Custom Preset (Stripping Contract)", () => {
-    it("strips all StepPerformance data while preserving harmonic identities, variants, and exact durations", () => {
+  describe("4. Save Current Progression as Custom Preset (Supported All-Chord Fixture)", () => {
+    it("strips all StepPerformance and HarmonicVariant data while preserving step count, order, function identities, and exact durations", () => {
+      // Step 1: Chord I with maj7 variant and rich performance A
       const step1: ChordStep = {
         id: "step-1",
         kind: "chord",
         harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
-        harmonicVariant: EMPTY_HARMONIC_VARIANT,
+        harmonicVariant: { seventh: "major7", extensions: [], suspensions: [], alterations: [] },
         duration: musicalDuration(rational(2, 1)),
         performance: createRichPerformance({
           articulation: "arp-up",
@@ -265,29 +273,27 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         cardView: "piano",
       };
 
+      // Step 2: Repeated Chord I with different performance B and different variant (add9)
       const step2: ChordStep = {
         id: "step-2",
         kind: "chord",
-        harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" }, // Repeated harmony!
-        harmonicVariant: EMPTY_HARMONIC_VARIANT,
+        harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
+        harmonicVariant: { add9: true, extensions: [9], suspensions: [], alterations: [] },
         duration: musicalDuration(rational(2, 1)),
         performance: createRichPerformance({
           articulation: "block",
           register: 1,
           masterVelocity: 60,
-        }), // Different performance!
+        }),
         cardView: "staff",
       };
 
+      // Step 3: Chord V with extension 9 and manual voicing
       const step3: ChordStep = {
         id: "step-3",
         kind: "chord",
-        harmonicFunction: { moduleId: "progressions", functionId: "IV", category: "core" },
-        harmonicVariant: {
-          extensions: [9],
-          suspensions: [],
-          alterations: [],
-        },
+        harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
+        harmonicVariant: { extensions: [9], suspensions: [], alterations: [] },
         duration: musicalDuration(rational(4, 1)),
         performance: createRichPerformance({ voicingMode: "manual" }),
         cardView: "harmonic",
@@ -298,39 +304,63 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         selectedStepId: "step-2",
       };
 
-      const customPreset = saveCustomPresetFromProgression("My Custom Groove", progression, {
+      const result = saveCustomPresetFromProgression("My Custom Groove", progression, {
         id: "custom-preset-1",
         description: "Saved from active track",
       });
 
-      expect(customPreset.id).toBe("custom-preset-1");
-      expect(customPreset.name).toBe("My Custom Groove");
-      expect(customPreset.source).toBe("custom");
-      expect(customPreset.description).toBe("Saved from active track");
-      expect(customPreset.steps).toHaveLength(3);
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        const customPreset = result.preset;
+        expect(customPreset.id).toBe("custom-preset-1");
+        expect(customPreset.name).toBe("My Custom Groove");
+        expect(customPreset.source).toBe("custom");
+        expect(customPreset.description).toBe("Saved from active track");
 
-      // Verify repeated harmony with different performance collapsed to equivalent functional steps
-      expect(customPreset.steps[0]!.harmonicFunction).toEqual(
-        customPreset.steps[1]!.harmonicFunction,
-      );
-      expect(customPreset.steps[0]!.duration).toEqual(customPreset.steps[1]!.duration);
+        // Step count invariant: steps must NOT be deduplicated
+        expect(customPreset.steps).toHaveLength(3);
+        expect(customPreset.steps.length).toBe(progression.steps.length);
 
-      // Verify Step 3 retains harmonic variant (extension 9)
-      expect(customPreset.steps[2]!.harmonicVariant?.extensions).toContain(9);
+        // Ordered function identities strictly match progression
+        expect(customPreset.steps[0]!.harmonicFunction.functionId).toBe("I");
+        expect(customPreset.steps[1]!.harmonicFunction.functionId).toBe("I");
+        expect(customPreset.steps[2]!.harmonicFunction.functionId).toBe("V");
 
-      // Verify zero performance leakage across the entire preset
-      assertNoPerformanceLeakage(customPreset);
-      assertNoPerformanceLeakage(JSON.parse(serializePreset(customPreset)));
+        // Exact durations strictly match progression
+        expect(equalRational(customPreset.steps[0]!.duration.beats, rational(2, 1))).toBe(true);
+        expect(equalRational(customPreset.steps[1]!.duration.beats, rational(2, 1))).toBe(true);
+        expect(equalRational(customPreset.steps[2]!.duration.beats, rational(4, 1))).toBe(true);
+
+        // BLOCKER check: harmonicVariant is NOT stored in PresetStep
+        expect(
+          (customPreset.steps[0] as unknown as { harmonicVariant?: unknown }).harmonicVariant,
+        ).toBeUndefined();
+        expect(
+          (customPreset.steps[1] as unknown as { harmonicVariant?: unknown }).harmonicVariant,
+        ).toBeUndefined();
+        expect(
+          (customPreset.steps[2] as unknown as { harmonicVariant?: unknown }).harmonicVariant,
+        ).toBeUndefined();
+
+        // Zero performance or variant leakage in memory and JSON serialization
+        assertNoPerformanceOrVariantLeakage(customPreset);
+        assertNoPerformanceOrVariantLeakage(JSON.parse(serializePreset(customPreset)));
+      }
+
+      // Source progression and its steps remain completely unmutated
+      expect(progression.steps).toHaveLength(3);
+      expect((progression.steps[0] as ChordStep).harmonicVariant.seventh).toBe("major7");
+      expect((progression.steps[0] as ChordStep).performance.articulation).toBe("arp-up");
     });
   });
 
   // --------------------------------------------------------------------------
-  // 6. Rest Step Semantics in Presets
+  // 5. Save Current Progression as Custom Preset — Unsupported Rest Fixture
   // --------------------------------------------------------------------------
-  describe("5. Rest Step Semantics in Presets", () => {
-    it("verifies behavior when progression contains RestStep during Save as Custom Preset", () => {
-      const chordStep: ChordStep = {
-        id: "step-chord",
+  describe("5. Save Current Progression as Custom Preset (Unsupported Rest Fixture)", () => {
+    it("rejects saving a Custom Preset from a progression containing a RestStep with an explicit unsupported result without source mutation", () => {
+      const chord1: ChordStep = {
+        id: "step-c1",
         kind: "chord",
         harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
         harmonicVariant: EMPTY_HARMONIC_VARIANT,
@@ -339,24 +369,43 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         cardView: "harmonic",
       };
       const restStep: RestStep = {
-        id: "step-rest",
+        id: "step-r1",
         kind: "rest",
         duration: musicalDuration(rational(2, 1)),
       };
+      const chord2: ChordStep = {
+        id: "step-c2",
+        kind: "chord",
+        harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
+        harmonicVariant: EMPTY_HARMONIC_VARIANT,
+        duration: musicalDuration(rational(2, 1)),
+        performance: createRichPerformance(),
+        cardView: "harmonic",
+      };
 
-      const progression: Progression = { steps: [chordStep, restStep] };
+      const progressionWithRest: Progression = {
+        steps: [chord1, restStep, chord2],
+      };
 
-      // Contract behavior: Save as Custom Preset extracts functional harmonic material
-      // Authoritative finding to verify: Does it omit RestStep or represent rest?
-      const preset = saveCustomPresetFromProgression("Chord plus Rest", progression);
-      expect(preset).toBeDefined();
-      // Verify no performance leakage exists regardless of rest representation
-      assertNoPerformanceLeakage(preset);
+      const result = saveCustomPresetFromProgression("Progression with Rest", progressionWithRest);
+
+      // Contract: Structured validation error, not throwing unhandled exception
+      expect(result.kind).toBe("unsupported-progression");
+      if (result.kind === "unsupported-progression") {
+        expect(result.reason).toBe("rest-step");
+        expect(result.message).toContain("Rest");
+      }
+
+      // Source progression is strictly preserved without mutation
+      expect(progressionWithRest.steps).toHaveLength(3);
+      expect(progressionWithRest.steps[0]!.id).toBe("step-c1");
+      expect(progressionWithRest.steps[1]!.id).toBe("step-r1");
+      expect(progressionWithRest.steps[2]!.id).toBe("step-c2");
     });
   });
 
   // --------------------------------------------------------------------------
-  // 7. Cross-Key Functional Re-Realization (FR-149, US7 Scenario 1)
+  // 6. Cross-Key Functional Re-Realization (FR-149, US7 Scenario 1)
   // --------------------------------------------------------------------------
   describe("6. Cross-Key Functional Re-Realization", () => {
     it("re-realizes the same functional preset in different tonics without preserving old absolute chord roots as truth", () => {
@@ -415,17 +464,89 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         expect(dResult.steps[3]!.harmonicFunction.functionId).toBe("V");
       }
 
-      // Preset itself remains completely untouched and reusable
+      // Stored preset itself remains completely untouched and reusable
       expect(preset.steps).toHaveLength(4);
       expect(preset.steps[0]!.harmonicFunction.functionId).toBe("I");
     });
   });
 
   // --------------------------------------------------------------------------
+  // 7. Enharmonic Spelling Acceptance (FR-149)
+  // --------------------------------------------------------------------------
+  describe("7. Enharmonic Spelling Acceptance", () => {
+    it("realizes chords following target key enharmonic spelling rules without inheriting source context spelling", () => {
+      // Preset I - IV - V
+      const preset = createFunctionalPreset("p-spelling", "Spelling Test", "builtIn", [
+        {
+          harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
+          duration: musicalDuration(rational(1, 1)),
+        },
+        {
+          harmonicFunction: { moduleId: "progressions", functionId: "IV", category: "core" },
+          duration: musicalDuration(rational(1, 1)),
+        },
+        {
+          harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
+          duration: musicalDuration(rational(1, 1)),
+        },
+      ]);
+
+      // Eb Major (tonic 3, flat key: Eb, Ab, Bb)
+      const ebMajorContext: HarmonicContext = {
+        tonic: { semitone: 3 },
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { preferFlats: true },
+      };
+
+      // G Major (tonic 7, sharp key: G, C, D)
+      const gMajorContext: HarmonicContext = {
+        tonic: { semitone: 7 },
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { preferFlats: false },
+      };
+
+      // F Major (tonic 5, single flat key: F, Bb, C)
+      const fMajorContext: HarmonicContext = {
+        tonic: { semitone: 5 },
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { preferFlats: true },
+      };
+
+      // Realize in Eb Major
+      const ebResult = realizePresetSteps(preset, ebMajorContext);
+      expect(ebResult.kind).toBe("success");
+      if (ebResult.kind === "success") {
+        // Chords must not contain accidental crossover from other keys
+        expect(ebResult.steps).toHaveLength(3);
+      }
+
+      // Realize in G Major
+      const gResult = realizePresetSteps(preset, gMajorContext);
+      expect(gResult.kind).toBe("success");
+      if (gResult.kind === "success") {
+        expect(gResult.steps).toHaveLength(3);
+      }
+
+      // Realize in F Major
+      const fResult = realizePresetSteps(preset, fMajorContext);
+      expect(fResult.kind).toBe("success");
+      if (fResult.kind === "success") {
+        expect(fResult.steps).toHaveLength(3);
+      }
+
+      // Preset stores zero rendered chord symbol/spelling as truth
+      assertNoPerformanceOrVariantLeakage(preset);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // 8. Tonal Minor Compatibility (FR-149)
   // --------------------------------------------------------------------------
-  describe("7. Tonal Minor Compatibility", () => {
-    it("realizes functional preset with Dark Harmony functions using Tonal Minor rules", () => {
+  describe("8. Tonal Minor Compatibility", () => {
+    it("realizes functional preset with Dark Harmony functions using Tonal Minor rules without Major assumptions", () => {
       const minorPreset = createFunctionalPreset("p-minor", "Minor Cadence", "builtIn", [
         {
           harmonicFunction: { moduleId: "dark-harmony", functionId: "i", category: "core" },
@@ -467,12 +588,12 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
   // --------------------------------------------------------------------------
   // 9. Ambiguous / Incompatible Function Contract (Spec Edge Case Line 414)
   // --------------------------------------------------------------------------
-  describe("8. Ambiguous / Incompatible Function Contract", () => {
+  describe("9. Ambiguous / Incompatible Function Contract", () => {
     it("returns an observable incompatible or ambiguous result without silently guessing or mutating the preset", () => {
-      // Dark harmony chromatic-color preset (e.g. Neapolitan N) applied in Major without explicit conversion
+      // Dark harmony chromatic-color preset (Neapolitan N6) applied in Major without explicit conversion
       const specializedPreset = createFunctionalPreset("p-chromatic", "Chromatic Color", "custom", [
         {
-          harmonicFunction: { moduleId: "dark-harmony", functionId: "N", category: "neapolitan" },
+          harmonicFunction: { moduleId: "dark-harmony", functionId: "N6", category: "neapolitan" },
           duration: musicalDuration(rational(2, 1)),
         },
         {
@@ -490,21 +611,21 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
 
       const result = realizePresetSteps(specializedPreset, incompatibleContext);
 
-      // Contract: Must not guess silently or throw unhandled error; must return observable diagnostic result
+      // Contract: Must not guess silently or throw unhandled error; returns observable diagnostic result
       expect(result.kind).not.toBe("success");
       if (result.kind === "incompatible") {
         expect(result.unsupportedFunctions.length).toBeGreaterThan(0);
       }
 
       // Stored preset remains unmodified
-      expect(specializedPreset.steps[0]!.harmonicFunction.functionId).toBe("N");
+      expect(specializedPreset.steps[0]!.harmonicFunction.functionId).toBe("N6");
     });
   });
 
   // --------------------------------------------------------------------------
-  // 10 & 11. Insertion Modes & Empty Progression Behavior (FR-152)
+  // 10. Insertion Modes (FR-152) — Replace, Append, Insert-Before-Selected
   // --------------------------------------------------------------------------
-  describe("9. Insertion Modes & Empty Progression Behavior (Replace, Append, Insert)", () => {
+  describe("10. Insertion Modes (Replace, Append, Insert)", () => {
     function getInsertPreset(): FunctionalPreset {
       return createFunctionalPreset("p-ins", "Insert Preset", "builtIn", [
         {
@@ -548,7 +669,7 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(result.steps[1]!.harmonicFunction.functionId).toBe("V");
     });
 
-    it("Append to End: keeps existing steps first and appends preset steps", () => {
+    it("Append to End: keeps existing steps first and appends preset steps to end", () => {
       const preset = getInsertPreset();
       const existingProgression: Progression = {
         steps: [
@@ -571,12 +692,12 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(result.steps[2]!.harmonicFunction.functionId).toBe("V");
     });
 
-    it("Insert at Selected Step: inserts before the currently selected step so the selected step remains after", () => {
+    it("Insert at Selected Step: inserts preset immediately BEFORE the selected Step, retaining the selected Step and preserving order", () => {
       const preset = getInsertPreset();
       const existingProgression: Progression = {
         steps: [
           {
-            id: "step-start",
+            id: "step-A",
             kind: "chord",
             harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
             harmonicVariant: EMPTY_HARMONIC_VARIANT,
@@ -585,7 +706,7 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
             cardView: "harmonic",
           },
           {
-            id: "step-selected",
+            id: "step-Selected-B",
             kind: "chord",
             harmonicFunction: { moduleId: "progressions", functionId: "vi", category: "core" },
             harmonicVariant: EMPTY_HARMONIC_VARIANT,
@@ -593,37 +714,91 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
             performance: createRichPerformance(),
             cardView: "harmonic",
           },
+          {
+            id: "step-C",
+            kind: "chord",
+            harmonicFunction: { moduleId: "progressions", functionId: "ii", category: "core" },
+            harmonicVariant: EMPTY_HARMONIC_VARIANT,
+            duration: musicalDuration(rational(2, 1)),
+            performance: createRichPerformance(),
+            cardView: "harmonic",
+          },
         ],
-        selectedStepId: "step-selected",
+        selectedStepId: "step-Selected-B",
       };
 
+      // [A, Selected-B, C] + [X, Y] becomes [A, X, Y, Selected-B, C]
       const result = applyPresetToProgression(existingProgression, preset, "insert", context);
-      expect(result.steps).toHaveLength(4);
-      expect(result.steps[0]!.id).toBe("step-start");
-      expect(result.steps[1]!.harmonicFunction.functionId).toBe("IV"); // Preset step 1
-      expect(result.steps[2]!.harmonicFunction.functionId).toBe("V"); // Preset step 2
-      expect(result.steps[3]!.id).toBe("step-selected"); // Selected step preserved after
+
+      expect(result.steps).toHaveLength(5);
+      expect(result.steps[0]!.id).toBe("step-A");
+      expect(result.steps[1]!.harmonicFunction.functionId).toBe("IV"); // Preset X
+      expect(result.steps[2]!.harmonicFunction.functionId).toBe("V"); // Preset Y
+      expect(result.steps[3]!.id).toBe("step-Selected-B"); // Selected B retained after inserted preset
+      expect(result.steps[4]!.id).toBe("step-C"); // Subsequent C retained in order
+
+      // Existing IDs are strictly preserved
+      expect(result.steps[0]!.id).toBe("step-A");
+      expect(result.steps[3]!.id).toBe("step-Selected-B");
+      expect(result.steps[4]!.id).toBe("step-C");
+
+      // Instantiated preset step IDs are fresh and unique
+      expect(result.steps[1]!.id).not.toBe("step-A");
+      expect(result.steps[1]!.id).not.toBe("step-Selected-B");
+      expect(result.steps[2]!.id).not.toBe(result.steps[1]!.id);
     });
 
-    it("handles empty progression deterministically for Replace, Append, and Insert", () => {
+    it("Non-empty progression with NO selected step rejects Insert at Selected Step", () => {
+      const preset = getInsertPreset();
+      const nonEmptyWithoutSelection: Progression = {
+        steps: [
+          {
+            id: "step-1",
+            kind: "chord",
+            harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
+            harmonicVariant: EMPTY_HARMONIC_VARIANT,
+            duration: musicalDuration(rational(2, 1)),
+            performance: createRichPerformance(),
+            cardView: "harmonic",
+          },
+        ],
+        // No selectedStepId!
+      };
+
+      // Must be unavailable/rejected; cannot silently append or select a step automatically
+      expect(() =>
+        applyPresetToProgression(nonEmptyWithoutSelection, preset, "insert", context),
+      ).toThrow(RangeError);
+    });
+
+    it("Empty progression: Replace, Append, and Insert all deterministically instantiate Preset at start with identical ordering", () => {
       const preset = getInsertPreset();
       const empty: Progression = { steps: [] };
 
       const repResult = applyPresetToProgression(empty, preset, "replace", context);
-      expect(repResult.steps).toHaveLength(2);
-
       const appResult = applyPresetToProgression(empty, preset, "append", context);
-      expect(appResult.steps).toHaveLength(2);
-
       const insResult = applyPresetToProgression(empty, preset, "insert", context);
+
+      expect(repResult.steps).toHaveLength(2);
+      expect(appResult.steps).toHaveLength(2);
       expect(insResult.steps).toHaveLength(2);
+
+      // All three yield identical functional step ordering
+      expect(repResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
+      expect(repResult.steps[1]!.harmonicFunction.functionId).toBe("V");
+
+      expect(appResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
+      expect(appResult.steps[1]!.harmonicFunction.functionId).toBe("V");
+
+      expect(insResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
+      expect(insResult.steps[1]!.harmonicFunction.functionId).toBe("V");
     });
   });
 
   // --------------------------------------------------------------------------
-  // 12. Step Independence After Instantiation (US3 alignment)
+  // 11. Step Independence After Instantiation (US3 Alignment)
   // --------------------------------------------------------------------------
-  describe("10. Step Independence After Instantiation", () => {
+  describe("11. Step Independence After Instantiation", () => {
     it("generates distinct unique step IDs on multiple applications without shared mutable state", () => {
       const preset = createFunctionalPreset("p-indep", "Independence Test", "builtIn", [
         {
@@ -651,9 +826,9 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
   });
 
   // --------------------------------------------------------------------------
-  // 13. Current Defaults Supply Performance (FR-151)
+  // 12. Current Defaults Supply Performance (FR-151)
   // --------------------------------------------------------------------------
-  describe("11. Current Defaults Supply Performance Upon Instantiation", () => {
+  describe("12. Current Defaults Supply Performance Upon Instantiation", () => {
     it("supplies performance realization from provided ProjectDefaults without embedding them into stored Preset", () => {
       const preset = createFunctionalPreset("p-def", "Defaults Test", "builtIn", [
         {
@@ -670,17 +845,25 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
 
       const defaultsA: ProjectDefaults = {
         piano: {
-          articulation: "arp-up",
-          register: 1,
-          masterVelocity: 85,
+          duration: musicalDuration(rational(1, 1)),
+          performance: {
+            ...DEFAULT_PIANO_PERFORMANCE,
+            articulation: "arp-up",
+            register: 1,
+            masterVelocity: 85,
+          },
         },
       };
 
       const defaultsB: ProjectDefaults = {
         piano: {
-          articulation: "block",
-          register: -1,
-          masterVelocity: 60,
+          duration: musicalDuration(rational(1, 1)),
+          performance: {
+            ...DEFAULT_PIANO_PERFORMANCE,
+            articulation: "block",
+            register: -1,
+            masterVelocity: 60,
+          },
         },
       };
 
@@ -699,14 +882,14 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(stepB.performance.masterVelocity).toBe(60);
 
       // Preset itself remains completely free of performance fields
-      assertNoPerformanceLeakage(preset);
+      assertNoPerformanceOrVariantLeakage(preset);
     });
   });
 
   // --------------------------------------------------------------------------
-  // 14. Built-in vs Custom Immutability Contract
+  // 13. Built-in vs Custom Immutability Contract
   // --------------------------------------------------------------------------
-  describe("12. Built-in vs Custom Immutability Contract", () => {
+  describe("13. Built-in vs Custom Immutability Contract", () => {
     it("proves saving a Custom Preset does not link mutable state with the original progression", () => {
       const originalChord: ChordStep = {
         id: "orig-1",
@@ -719,28 +902,32 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       };
       const progression: Progression = { steps: [originalChord] };
 
-      const customPreset = saveCustomPresetFromProgression("Immutability Test", progression);
+      const result = saveCustomPresetFromProgression("Immutability Test", progression);
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        const customPreset = result.preset;
 
-      // Mutate the original progression
-      const mutatedProgression: Progression = {
-        steps: [
-          {
-            ...originalChord,
-            harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
-          },
-        ],
-      };
+        // Mutate the original progression
+        const mutatedProgression: Progression = {
+          steps: [
+            {
+              ...originalChord,
+              harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
+            },
+          ],
+        };
 
-      // Custom preset retains original harmonic function
-      expect(customPreset.steps[0]!.harmonicFunction.functionId).toBe("I");
-      expect(mutatedProgression.steps[0]!.harmonicFunction.functionId).toBe("V");
+        // Custom preset retains original harmonic function
+        expect(customPreset.steps[0]!.harmonicFunction.functionId).toBe("I");
+        expect(mutatedProgression.steps[0]!.harmonicFunction.functionId).toBe("V");
+      }
     });
   });
 
   // --------------------------------------------------------------------------
-  // 15 & 16. Custom Preset Ownership & Persistence Contract
+  // 14. Custom Preset Ownership & Persistence Contract (Project.customPresets)
   // --------------------------------------------------------------------------
-  describe("13. Custom Preset Ownership & Persistence Contract", () => {
+  describe("14. Custom Preset Ownership & Persistence Contract", () => {
     it("confirms Custom Presets belong to Project state per data-model and project schema", () => {
       const project = createDefaultProject("test-proj", "Test Project", "2026-09-05T00:00:00.000Z");
 
