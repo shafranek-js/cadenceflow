@@ -7,38 +7,64 @@ import {
 import { realizePresetSteps } from "../../../src/domain/progression/presets";
 import type { HarmonicContext } from "../../../src/domain/harmony/modules/types";
 
+const FORBIDDEN_GENRE_WORDS = [
+  "jazz",
+  "doo-wop",
+  "andalusian",
+  "cinematic",
+  "authentic",
+  "pop",
+  "rock",
+  "blues",
+];
+
 describe("T114 — Curated Built-in Preset Catalog Data (US7)", () => {
-  it("provides a deeply immutable catalog with at least 2 Major and 2 Tonal Minor presets", () => {
-    expect(BUILT_IN_PRESETS.length).toBeGreaterThanOrEqual(4);
+  it("provides a deeply immutable catalog of exactly 6 neutral functional presets (3 Major, 3 Tonal Minor)", () => {
+    expect(BUILT_IN_PRESETS).toHaveLength(6);
     expect(Object.isFrozen(BUILT_IN_PRESETS)).toBe(true);
 
-    const majorPresets = BUILT_IN_PRESETS.filter((p) =>
-      p.steps.every((s) => s.harmonicFunction.moduleId === "progressions"),
-    );
-    const minorPresets = BUILT_IN_PRESETS.filter((p) =>
-      p.steps.every((s) => s.harmonicFunction.moduleId === "dark-harmony"),
-    );
+    const expectedIds = [
+      "builtin-major-i-vi-iv-v",
+      "builtin-major-i-iv-v-i",
+      "builtin-major-ii-v-i",
+      "builtin-minor-i-iv-v-i",
+      "builtin-minor-i-vii-vi-v",
+      "builtin-minor-iio-v-i",
+    ] as const;
 
-    expect(majorPresets.length).toBeGreaterThanOrEqual(2);
-    expect(minorPresets.length).toBeGreaterThanOrEqual(2);
+    const actualIds = BUILT_IN_PRESETS.map((p) => p.id);
+    expect(actualIds).toEqual(expectedIds);
 
     // Verify getter functions
     expect(getBuiltInPresets()).toBe(BUILT_IN_PRESETS);
-    expect(getBuiltInPresetById(majorPresets[0]!.id)).toBe(majorPresets[0]);
+    for (const id of expectedIds) {
+      const preset = getBuiltInPresetById(id);
+      expect(preset).toBeDefined();
+      expect(preset!.id).toBe(id);
+    }
     expect(getBuiltInPresetById("non-existent-id")).toBeUndefined();
   });
 
-  it("ensures all built-in presets have unique IDs, non-empty names, source 'builtIn', and frozen steps", () => {
-    const ids = new Set<string>();
+  it("ensures all preset names and descriptions are neutral and contain zero genre or authenticity promises", () => {
+    for (const preset of BUILT_IN_PRESETS) {
+      const lowerName = preset.name.toLowerCase();
+      const lowerDesc = (preset.description ?? "").toLowerCase();
+
+      for (const word of FORBIDDEN_GENRE_WORDS) {
+        expect(lowerName).not.toContain(word);
+        expect(lowerDesc).not.toContain(word);
+      }
+
+      // Check required naming pattern
+      expect(preset.name).toMatch(/^(Major|Minor)\s+/);
+      expect(preset.source).toBe("builtIn");
+    }
+  });
+
+  it("ensures deep immutability against consumer mutation attempts", () => {
+    expect(Object.isFrozen(BUILT_IN_PRESETS)).toBe(true);
 
     for (const preset of BUILT_IN_PRESETS) {
-      expect(preset.id).toBeTruthy();
-      expect(ids.has(preset.id)).toBe(false);
-      ids.add(preset.id);
-
-      expect(preset.name.trim()).toBeTruthy();
-      expect(preset.source).toBe("builtIn");
-      expect(preset.steps.length).toBeGreaterThan(0);
       expect(Object.isFrozen(preset)).toBe(true);
       expect(Object.isFrozen(preset.steps)).toBe(true);
 
@@ -46,12 +72,41 @@ describe("T114 — Curated Built-in Preset Catalog Data (US7)", () => {
         expect(Object.isFrozen(step)).toBe(true);
         expect(Object.isFrozen(step.harmonicFunction)).toBe(true);
         expect(Object.isFrozen(step.duration)).toBe(true);
-        expect(step.duration.beats.numerator).toBeGreaterThan(0);
-        expect(step.duration.beats.denominator).toBeGreaterThan(0);
+        expect(Object.isFrozen(step.duration.beats)).toBe(true);
 
-        // Strict invariant: no harmonicVariant or performance on preset step
-        expect((step as Record<string, unknown>).harmonicVariant).toBeUndefined();
-        expect((step as Record<string, unknown>).performance).toBeUndefined();
+        // Attempting to modify properties throws in strict mode
+        expect(() => {
+          (step as Record<string, unknown>).newProp = "mutate";
+        }).toThrow();
+
+        expect(() => {
+          (preset as Record<string, unknown>).name = "mutated";
+        }).toThrow();
+      }
+    }
+  });
+
+  it("guarantees zero performance, voicing, or harmonicVariant fields on built-in presets", () => {
+    const forbiddenKeys = [
+      "performance",
+      "voicing",
+      "manualVoicing",
+      "harmonicVariant",
+      "variant",
+      "extensions",
+      "seventh",
+      "dynamics",
+      "articulation",
+      "register",
+      "bass",
+    ];
+
+    for (const preset of BUILT_IN_PRESETS) {
+      for (const step of preset.steps) {
+        const record = step as Record<string, unknown>;
+        for (const key of forbiddenKeys) {
+          expect(record[key]).toBeUndefined();
+        }
       }
     }
   });

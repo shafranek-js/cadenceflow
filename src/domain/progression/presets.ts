@@ -10,7 +10,7 @@ import type { ProjectDefaults } from "../project/defaults";
 import { DEFAULT_PIANO_PERFORMANCE } from "../project/factory";
 import { EMPTY_HARMONIC_VARIANT } from "../harmony/chord";
 import { realizeChord } from "../harmony/realization";
-import { mapFunctionAcrossModules, type ModuleSwitchResolution } from "../harmony/moduleSwitch";
+import { planModuleSwitch, type ModuleSwitchResolution } from "../harmony/moduleSwitch";
 
 export type PresetSource = "builtIn" | "custom";
 
@@ -185,6 +185,11 @@ export function deserializePreset(json: string): FunctionalPreset {
       throw new TypeError(`Invalid preset step at index ${index}: expected object`);
     }
     const stepRec = rawStep as Record<string, unknown>;
+    if ("seconds" in stepRec || "durationMs" in stepRec || "startSeconds" in stepRec) {
+      throw new TypeError(
+        `Invalid preset step at index ${index}: timing in seconds or milliseconds is forbidden; must use exact Rational beats`,
+      );
+    }
     const hf = stepRec.harmonicFunction as Record<string, unknown> | undefined;
     if (!hf || typeof hf !== "object") {
       throw new TypeError(`Invalid harmonicFunction at step index ${index}`);
@@ -320,6 +325,10 @@ export function realizePresetSteps(
   defaults?: ProjectDefaults,
 ): PresetRealizationResult {
   const unsupportedFunctions: HarmonicFunctionIdentity[] = [];
+  const ambiguousSteps: {
+    readonly stepIndex: number;
+    readonly resolution: ModuleSwitchResolution;
+  }[] = [];
   const realizedSteps: ChordStep[] = [];
 
   const defaultPerformance = defaults?.piano?.performance ?? DEFAULT_PIANO_PERFORMANCE;
@@ -329,31 +338,64 @@ export function realizePresetSteps(
     const step = preset.steps[i]!;
     const sourceFn = step.harmonicFunction;
 
-    const targetFn =
-      sourceFn.moduleId === context.moduleId
-        ? sourceFn
-        : mapFunctionAcrossModules(sourceFn, context.moduleId);
+    if (sourceFn.moduleId === context.moduleId) {
+      try {
+        realizeChord(sourceFn, tonicNumber);
+        realizedSteps.push(
+          Object.freeze({
+            id: `step-${crypto.randomUUID()}`,
+            kind: "chord",
+            harmonicFunction: Object.freeze({ ...sourceFn }),
+            harmonicVariant: EMPTY_HARMONIC_VARIANT,
+            duration: step.duration,
+            performance: snapshotStepPerformance(defaultPerformance),
+            cardView: "harmonic",
+          }),
+        );
+      } catch {
+        unsupportedFunctions.push(sourceFn);
+      }
+    } else {
+      // Cross-module realization using planModuleSwitch
+      const dummyStep = {
+        id: `preset-step-${i}`,
+        kind: "chord" as const,
+        harmonicFunction: sourceFn,
+        harmonicVariant: EMPTY_HARMONIC_VARIANT,
+        duration: step.duration,
+        performance: defaultPerformance,
+        cardView: "harmonic" as const,
+      };
+      const plan = planModuleSwitch([dummyStep], context.moduleId);
+      const resolution = plan.resolutions[0];
 
-    if (!targetFn) {
-      unsupportedFunctions.push(sourceFn);
-      continue;
-    }
-
-    try {
-      realizeChord(targetFn, tonicNumber);
-      realizedSteps.push(
-        Object.freeze({
-          id: `step-${crypto.randomUUID()}`,
-          kind: "chord",
-          harmonicFunction: Object.freeze({ ...targetFn }),
-          harmonicVariant: EMPTY_HARMONIC_VARIANT,
-          duration: step.duration,
-          performance: snapshotStepPerformance(defaultPerformance),
-          cardView: "harmonic",
-        }),
-      );
-    } catch {
-      unsupportedFunctions.push(sourceFn);
+      if (!resolution || (!resolution.automaticTarget && resolution.alternatives.length === 0)) {
+        unsupportedFunctions.push(sourceFn);
+      } else if (!resolution.automaticTarget && resolution.alternatives.length > 0) {
+        ambiguousSteps.push(
+          Object.freeze({
+            stepIndex: i,
+            resolution,
+          }),
+        );
+      } else if (resolution.automaticTarget) {
+        try {
+          realizeChord(resolution.automaticTarget, tonicNumber);
+          realizedSteps.push(
+            Object.freeze({
+              id: `step-${crypto.randomUUID()}`,
+              kind: "chord",
+              harmonicFunction: Object.freeze({ ...resolution.automaticTarget }),
+              harmonicVariant: EMPTY_HARMONIC_VARIANT,
+              duration: step.duration,
+              performance: snapshotStepPerformance(defaultPerformance),
+              cardView: "harmonic",
+            }),
+          );
+        } catch {
+          unsupportedFunctions.push(sourceFn);
+        }
+      }
     }
   }
 
@@ -361,6 +403,13 @@ export function realizePresetSteps(
     return Object.freeze({
       kind: "incompatible",
       unsupportedFunctions: Object.freeze(unsupportedFunctions),
+    });
+  }
+
+  if (ambiguousSteps.length > 0) {
+    return Object.freeze({
+      kind: "ambiguous",
+      ambiguousSteps: Object.freeze(ambiguousSteps),
     });
   }
 
@@ -378,9 +427,14 @@ export function applyPresetToProgression(
   defaults?: ProjectDefaults,
 ): Progression {
   const realization = realizePresetSteps(preset, context, defaults);
-  if (realization.kind !== "success") {
+  if (realization.kind === "incompatible") {
     throw new Error(
       `Cannot apply preset "${preset.name}": contains incompatible harmonic functions for module ${context.moduleId}`,
+    );
+  }
+  if (realization.kind === "ambiguous") {
+    throw new Error(
+      `Cannot apply preset "${preset.name}": contains ambiguous harmonic functions requiring explicit resolution for module ${context.moduleId}`,
     );
   }
 

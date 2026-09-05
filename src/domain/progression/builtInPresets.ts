@@ -6,12 +6,13 @@ import { createFunctionalPreset, type FunctionalPreset } from "./presets";
  * Curated built-in functional preset catalog (FR-148).
  * Stores purely harmonic functions + exact musical durations (FR-150),
  * completely free of performance, voicing, or harmonic variant data (FR-151).
+ * Uses neutral functional naming without genre or authenticity labels.
  */
 export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
   // --- Major Presets (progressions module) ---
   createFunctionalPreset(
-    "builtin-major-pop-50s",
-    "50s / Doo-Wop Progression",
+    "builtin-major-i-vi-iv-v",
+    "Major I–vi–IV–V",
     "builtIn",
     [
       {
@@ -31,12 +32,12 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(2, 1), { kind: "beats" }),
       },
     ],
-    "Classic I - vi - IV - V progression used in Doo-Wop and popular music.",
+    "Functional I - vi - IV - V progression.",
   ),
 
   createFunctionalPreset(
-    "builtin-major-authentic-cadence",
-    "Authentic Cadence",
+    "builtin-major-i-iv-v-i",
+    "Major I–IV–V–I",
     "builtIn",
     [
       {
@@ -56,12 +57,12 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
-    "Foundational I - IV - V - I cadential cycle.",
+    "Functional I - IV - V - I cadential progression.",
   ),
 
   createFunctionalPreset(
-    "builtin-major-jazz-ii-v-i",
-    "Jazz ii - V - I",
+    "builtin-major-ii-v-i",
+    "Major ii–V–I",
     "builtIn",
     [
       {
@@ -77,13 +78,13 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
-    "Essential jazz turnaround and cadential movement.",
+    "Functional ii - V - I cadential progression.",
   ),
 
   // --- Tonal Minor Presets (dark-harmony module) ---
   createFunctionalPreset(
-    "builtin-minor-classic-cadence",
-    "Minor Cadence",
+    "builtin-minor-i-iv-v-i",
+    "Minor i–iv–V–i",
     "builtIn",
     [
       {
@@ -103,12 +104,12 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
-    "Standard tonal minor i - iv - V - i cadence.",
+    "Functional minor i - iv - V - i cadential progression.",
   ),
 
   createFunctionalPreset(
-    "builtin-minor-andalusian",
-    "Andalusian Cadence",
+    "builtin-minor-i-vii-vi-v",
+    "Minor i–VII–VI–V",
     "builtIn",
     [
       {
@@ -128,12 +129,12 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
-    "Descending tetrachord i - VII - VI - V progression.",
+    "Functional minor i - VII - VI - V descending progression.",
   ),
 
   createFunctionalPreset(
-    "builtin-minor-ii-v-i",
-    "Minor ii° - V - i",
+    "builtin-minor-iio-v-i",
+    "Minor ii°–V–i",
     "builtIn",
     [
       {
@@ -149,7 +150,7 @@ export const BUILT_IN_PRESETS: readonly FunctionalPreset[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
-    "Minor-key cadential resolution using diminished supertonic.",
+    "Functional minor ii° - V - i cadential progression.",
   ),
 ]);
 
