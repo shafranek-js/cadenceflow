@@ -1,18 +1,19 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-05  
-**Current implementation stage:** US6 / Phase 9 in progress; timing contracts (T097–T100) accepted; next milestone is US6 domain implementation (T101–T104)  
-**Task progress:** T001–T100 complete, 100 / 158 total tasks  
+**Current implementation stage:** US6 / Phase 9 in progress; exact timing domain (T101–T104) accepted; next milestone is transport runtime and controls (T105–T109)  
+**Task progress:** T001–T104 complete, 104 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
 
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**) is fully accepted across all tasks T077–T096.
 
-The current milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111). Timing contracts T097–T100 are accepted. Canonical timing invariant is established:
-- `1 MusicalDuration beat = one quarter note`
-- Bar length in canonical beats is `meter.numerator * 4 / meter.denominator`.
-- All musical timing arithmetic is exact Rational arithmetic.
+The current milestone is **Phase 9: User Story 6** — timing, meter, grouping, swing, and step-based transport (T097–T111). Exact timing domain implementation T101–T104 is accepted:
+- `1 MusicalDuration beat = quarter note`
+- Exact Rational semantic timeline (zero floating-point accumulation or drift)
+- Reflow = proportional 1:1 duration transformation (`newDuration = oldDuration * newBarLength / oldBarLength`, step count, IDs, kinds, and non-timing performance state strictly preserved, incomplete final bars preserved without padding)
+- Swing = non-destructive playback projection ($\Delta = U \times \frac{A}{3}$ with deterministic quantization $N=10000$, grid-based polyphonic grouping independent of array adjacency/ordering)
 
 ## 2. Sources of truth
 
@@ -130,6 +131,14 @@ Defined and verified executable test contracts for CadenceFlow's exact musical-t
 - `tests/unit/timing/meter.test.ts` (`T098`): meter validation, pulse vs canonical quarter-note beat separation, accent projection hierarchy (`primary`, `secondary`, `subdivision`), and `reflow` vs `preserve-beat-lengths` meter change policies across bar boundaries.
 - `tests/unit/timing/swing.test.ts` (`T099`): straight vs swing projection, pair sum invariance, swing amount ordering, non-destructive preservation, and ineligible subdivision exclusion.
 - `tests/unit/timing/timeline.test.ts` (`T100`): rational progression timeline, rest step duration consumption, harmonic predecessor resolution across rests, contiguous loop region invariant, and 1000-step precision drift immunity.
+
+### US6 Batch B — exact timing domain implementation — T101–T104
+
+Implemented:
+- `src/domain/timing/duration.ts` (`T101`): exact rational duration constructors, parsers, formatters, and bidirectional bar/beat conversions respecting the canonical quarter-note beat invariant.
+- `src/domain/timing/meter.ts` (`T102`): meter and grouping validation, pulse-to-beat conversion, metric accent hierarchy, and proportional 1:1 `reflowProgression` scaling preserving all step identities, kinds, and performance state.
+- `src/domain/timing/swing.ts` (`T103`): straight/swing groove projection with deterministic amount quantization ($N=10000$), grid-based grouping invariant across polyphonic simultaneous notes and array order permutations, and strictly positive off-beat durations.
+- `src/domain/timing/timeline.ts` (`T104`): exact rational progression timeline calculation, rest step silence allocation, harmonic predecessor lookup, and contiguous loop validation with zero drift.
 
 ## 4. Key technical decisions that must be preserved
 

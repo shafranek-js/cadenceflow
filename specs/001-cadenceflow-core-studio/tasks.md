@@ -241,10 +241,10 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T100 [P] [US6] Write timeline/Rest Step/loop-boundary/no-drift tests in `tests/unit/timing/timeline.test.ts`
 ### Implementation
 
-- [ ] T101 [US6] Implement exact duration constructors/parsers for bars, beats, fractional beats, dotted values, and tuplets in `src/domain/timing/duration.ts`
-- [ ] T102 [US6] Implement custom meter validation, beat grouping, accents, and meter-change transformation policies in `src/domain/timing/meter.ts`
-- [ ] T103 [US6] Implement project-level Straight/Swing groove timing projection without modifying semantic durations in `src/domain/timing/swing.ts`
-- [ ] T104 [US6] Implement semantic progression timeline with Rest Steps and step-boundary indexing in `src/domain/timing/timeline.ts`
+- [x] T101 [US6] Implement exact duration constructors/parsers for bars, beats, fractional beats, dotted values, and tuplets in `src/domain/timing/duration.ts`
+- [x] T102 [US6] Implement custom meter validation, beat grouping, accents, and meter-change transformation policies in `src/domain/timing/meter.ts`
+- [x] T103 [US6] Implement project-level Straight/Swing groove timing projection without modifying semantic durations in `src/domain/timing/swing.ts`
+- [x] T104 [US6] Implement semantic progression timeline with Rest Steps and step-boundary indexing in `src/domain/timing/timeline.ts`
 - [ ] T105 [US6] Implement transport state machine for Play/Pause/Resume/Stop/Play From Here with session runtime state in `src/ui/transport/transportStore.ts`
 - [ ] T106 [US6] Integrate transport with look-ahead audio scheduler and paused-position resumption in `src/audio/scheduler.ts`
 - [ ] T107 [US6] Implement contiguous loop-region model and Stop reset-to-loop-start semantics in `src/ui/transport/loopState.ts` and `src/ui/progression/ProgressionTrack.tsx`
