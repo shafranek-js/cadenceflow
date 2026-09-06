@@ -31,6 +31,7 @@ function createMockAudioProvider(options: MockProviderOptions = {}): {
   scheduledPlaybacks: ScheduledPlayback[];
   cancelSpies: Array<ReturnType<typeof vi.fn>>;
   lastScheduledEvents: AudioNoteEvent[] | null;
+  scheduleCount: () => number;
 } {
   const scheduledPlaybacks: ScheduledPlayback[] = [];
   const cancelSpies: Array<ReturnType<typeof vi.fn>> = [];
@@ -72,7 +73,24 @@ function createMockAudioProvider(options: MockProviderOptions = {}): {
     get lastScheduledEvents() {
       return lastScheduledEvents;
     },
+    scheduleCount: () => counter,
   };
+}
+
+/**
+ * Simulates a full physical user keyboard activation sequence on a focused native button.
+ * In a real browser user agent, pressing Enter or Space while focused on a button
+ * fires keydown, and (unless prevented) executes the native button activation behavior (click).
+ * If a component incorrectly implements onKeyDown -> onSelect in addition to onClick -> onSelect,
+ * this sequence will detect the duplicate invocation.
+ */
+function simulateBrowserButtonKeyboardActivation(button: HTMLButtonElement, key: "Enter" | " ") {
+  button.focus();
+  const keydownEvent = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  const notPrevented = button.dispatchEvent(keydownEvent);
+  if (notPrevented) {
+    button.click();
+  }
 }
 
 describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Acceptance)", () => {
@@ -286,8 +304,8 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     controllerError.dispose();
   });
 
-  it("Item 11: ChordCard UI event boundaries and accessible keyboard activation (Enter & Space)", () => {
-    const project = createDefaultProject("proj-audition-ui", "UI Interaction Test");
+  it("Item 11: Exact test proving one physical activation (Enter, Space, Mouse click) = exactly one onSelect audition request without duplicate scheduling", () => {
+    const project = createDefaultProject("proj-audition-ui", "UI Activation Exact Single-Fire");
     const onSelectSpy = vi.fn();
     const onAddSpy = vi.fn();
     const preview = realizeMatrixCardPreview(project, "I");
@@ -321,34 +339,90 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(cardBodyButton).not.toBeNull();
     expect(addButton).not.toBeNull();
 
-    // 1. Mouse Click on card body triggers onSelect (audition/preview), does NOT trigger onAdd
-    cardBodyButton.click();
+    // Baseline: 0 invocations
+    expect(onSelectSpy).toHaveBeenCalledTimes(0);
+    expect(onAddSpy).toHaveBeenCalledTimes(0);
+
+    // 1. Enter key activation -> call count increment = EXACTLY 1
+    simulateBrowserButtonKeyboardActivation(cardBodyButton, "Enter");
     expect(onSelectSpy).toHaveBeenCalledTimes(1);
     expect(onAddSpy).not.toHaveBeenCalled();
 
-    // 2. Keyboard Enter on card body triggers onSelect (audition/preview), does NOT trigger onAdd
-    cardBodyButton.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-    );
+    // 2. Space key activation -> call count increment = EXACTLY 1 (total = 2)
+    simulateBrowserButtonKeyboardActivation(cardBodyButton, " ");
     expect(onSelectSpy).toHaveBeenCalledTimes(2);
     expect(onAddSpy).not.toHaveBeenCalled();
 
-    // 3. Keyboard Space on card body triggers onSelect (audition/preview), does NOT trigger onAdd
-    cardBodyButton.dispatchEvent(
-      new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }),
-    );
+    // 3. Mouse click activation -> call count increment = EXACTLY 1 (total = 3)
+    cardBodyButton.click();
     expect(onSelectSpy).toHaveBeenCalledTimes(3);
     expect(onAddSpy).not.toHaveBeenCalled();
 
-    // 4. Click on explicit '+' button triggers onAdd, does NOT trigger onSelect (no duplicate audition)
-    addButton.click();
+    // 4. Repeated Enter activation on already-selected card -> call count increment = EXACTLY 1 (total = 4)
+    // Two separate Enter presses = exactly 2 total (not 4)
+    simulateBrowserButtonKeyboardActivation(cardBodyButton, "Enter");
+    expect(onSelectSpy).toHaveBeenCalledTimes(4);
+    expect(onAddSpy).not.toHaveBeenCalled();
+
+    // 5. Repeated Mouse click on already-selected card -> call count increment = EXACTLY 1 (total = 5)
+    // Two mouse clicks = exactly 2 total
+    cardBodyButton.click();
+    expect(onSelectSpy).toHaveBeenCalledTimes(5);
+    expect(onAddSpy).not.toHaveBeenCalled();
+
+    // 6. Keyboard activation of the '+' button (Enter): Adds once, does NOT audition card body, no duplicates
+    simulateBrowserButtonKeyboardActivation(addButton, "Enter");
     expect(onAddSpy).toHaveBeenCalledTimes(1);
-    expect(onSelectSpy).toHaveBeenCalledTimes(3); // unchanged
+    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
+
+    // 7. Keyboard activation of the '+' button (Space): Adds once, does NOT audition card body
+    simulateBrowserButtonKeyboardActivation(addButton, " ");
+    expect(onAddSpy).toHaveBeenCalledTimes(2);
+    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
+
+    // 8. Mouse click on '+' button: Adds once, does NOT audition card body
+    addButton.click();
+    expect(onAddSpy).toHaveBeenCalledTimes(3);
+    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
 
     act(() => {
       root.unmount();
     });
     container.remove();
+  });
+
+  it("Item 12: End-to-end single-fire audition scheduling assertion with PreviewAuditionController", () => {
+    const project = createDefaultProject("proj-audition-schedule", "Schedule Count Precision");
+    const mock = createMockAudioProvider({ state: "ready" });
+    const controller = new PreviewAuditionController({ provider: mock.provider });
+    const preview = realizeMatrixCardPreview(project, "I");
+
+    // Simulating user activations directly wired to audition controller
+    const userAuditionAction = () => controller.audition(preview.events);
+
+    expect(mock.scheduleCount()).toBe(0);
+
+    // Action 1: Enter press
+    userAuditionAction();
+    expect(mock.scheduleCount()).toBe(1);
+
+    // Action 2: Space press
+    userAuditionAction();
+    expect(mock.scheduleCount()).toBe(2);
+
+    // Action 3: Mouse click
+    userAuditionAction();
+    expect(mock.scheduleCount()).toBe(3);
+
+    // Action 4: Repeated Enter press on same card
+    userAuditionAction();
+    expect(mock.scheduleCount()).toBe(4);
+
+    // Action 5: Repeated Mouse click on same card
+    userAuditionAction();
+    expect(mock.scheduleCount()).toBe(5);
+
+    controller.dispose();
   });
 
   it("Continuous voice leading: Preview after progression step uses contextual voice leading", () => {

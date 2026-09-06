@@ -8,14 +8,25 @@ test("US1 builds a four-step progression only through explicit Add", async ({ pa
 
   const first = page.getByTestId("chord-card-I");
 
-  // Ordinary chord-card activation -> Preview/Audition -> progression count unchanged
+  // Ordinary chord-card activation via mouse -> Preview/Audition -> progression count unchanged
   await first.locator(".chord-main").click();
   await expect(first).toHaveClass(/is-selected/);
   await expect(first.locator(".chord-main")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("progression-step")).toHaveCount(0);
 
-  // Repeated activation of same card -> still preview/audition, progression still unchanged
-  await first.locator(".chord-main").click();
+  // Keyboard activation on card I via Enter -> still preview/audition, progression still unchanged
+  await first.locator(".chord-main").focus();
+  await page.keyboard.press("Enter");
+  await expect(first).toHaveClass(/is-selected/);
+  await expect(page.getByTestId("progression-step")).toHaveCount(0);
+
+  // Repeated Enter activation on same card -> still preview/audition, progression still unchanged
+  await page.keyboard.press("Enter");
+  await expect(first).toHaveClass(/is-selected/);
+  await expect(page.getByTestId("progression-step")).toHaveCount(0);
+
+  // Keyboard activation on card I via Space -> still preview/audition, progression still unchanged
+  await page.keyboard.press("Space");
   await expect(first).toHaveClass(/is-selected/);
   await expect(page.getByTestId("progression-step")).toHaveCount(0);
 
@@ -29,8 +40,10 @@ test("US1 builds a four-step progression only through explicit Add", async ({ pa
   await expect(cardVi).toHaveClass(/is-selected/);
   await expect(page.getByTestId("progression-step")).toHaveCount(1);
 
-  // Explicitly add vi
-  await cardVi.getByRole("button", { name: /Add vi to progression/i }).click();
+  // Keyboard activation of '+' button on card vi using Enter -> adds once to progression without card body audition
+  const addViBtn = cardVi.getByRole("button", { name: /Add vi to progression/i });
+  await addViBtn.focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("progression-step")).toHaveCount(2);
 
   // Keyboard activation of IV with Enter -> Preview/Audition -> progression count remains 2
