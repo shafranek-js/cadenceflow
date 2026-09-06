@@ -1,7 +1,7 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-06  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T125 accepted; US1 corrective acceptance complete  
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T125 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted  
 **Task progress:** T001–T125 complete, 125 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
@@ -210,6 +210,19 @@ US6 / Phase 9 fully accepted and closed. Overall project progress: 111 / 158.
     3. *Semantic Step remainder* (e.g. 2.0 s - 0.6 s = 1.4 s);
     4. *Realized sounding-note remainder* (e.g. 1.9 s - 0.6 s = ~1.3 s).
     These four values are distinct and not implied to be identical.
+
+### US6/US3 corrective acceptance — direct Progression Step Duration editing
+
+- Added direct `Duration` editing inside the expanded selected Step card editor in `My Progression` (`ProgressionStepCard.tsx`, `ProgressionTrack.tsx`) via reusable `StepDurationControl` (`src/ui/progression/StepDurationControl.tsx`).
+- Surfaces musically meaningful preset choices: `Whole — 4 beats`, `Half — 2 beats`, `Quarter — 1 beat`, `Eighth — 1/2 beat`, `Sixteenth — 1/4 beat`, `Dotted Half — 3 beats`, `Dotted Quarter — 3/2 beats`, `Dotted Eighth — 3/4 beat`, `Quarter Triplet — 2/3 beat`, `Eighth Triplet — 1/3 beat`, plus Custom exact Rational input.
+- Step-local isolation guaranteed: changing step duration from 4 to 2 changes only the selected step; neighboring steps, repeated occurrences of the same chord, and dashboard templates remain strictly independent.
+- Exact Rational persistence: Project stores exact canonical beats (e.g. `2/1`, `3/2`, `2/3`, `5/4`).
+- Immediate card summary reflection: card summary updates immediately (`block · v80 · 4` -> `block · v80 · 2`).
+- Undo / Redo session history: committed duration changes dispatch through `timing/set-step-duration` command and support full Undo/Redo without deselecting the step or collapsing the editor.
+- Reset Performance preservation invariant: resetting step performance strictly preserves `step.duration` (regression verified).
+- RestStep parity: Rest steps in `My Progression` share the exact same `StepDurationControl` primitive and `timing/set-step-duration` command path.
+- Responsive layout: verified at 1920×1080 and 1280×720 viewports with zero document-level horizontal overflow and fully accessible action buttons.
+- Covered by 14 focused unit/integration tests (`tests/unit/progression/step-duration-editing.test.ts`) and Playwright E2E Scenario 11 (`tests/e2e/us6-timing-transport.spec.ts`).
 
 ### US7 Batch A — functional preset contracts — T112
 

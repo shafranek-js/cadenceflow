@@ -477,4 +477,95 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(steps.nth(3)).toHaveClass(/is-selected/);
     await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
   });
+
+  test("Scenario 11 — Direct Progression Step Duration editing in My Progression (US6/US3 Corrective UX)", async ({
+    page,
+  }) => {
+    // 1. Create/add multiple steps
+    const cardI = page.getByTestId("chord-card-I");
+    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    const cardIV = page.getByTestId("chord-card-IV");
+    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+
+    const steps = page.locator('[data-testid="progression-step"]');
+    await expect(steps).toHaveCount(2);
+
+    // 2. Select Step 1
+    await steps.first().click();
+    await expect(steps.first()).toHaveClass(/is-selected/);
+
+    // 3. Observe initial duration 4 in card summary
+    await expect(steps.first().locator(".step-view span")).toContainText("4");
+    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+
+    // 4. Expanded Step editor exposes Duration select
+    const durationSelect = steps.first().getByTestId("step-duration-select");
+    await expect(durationSelect).toBeVisible();
+    await expect(durationSelect).toHaveValue("4/1");
+
+    // 5. Change Duration to Half — 2 beats
+    await durationSelect.selectOption("2/1");
+
+    // 6. Assert summary now shows 2
+    await expect(steps.first().locator(".step-view span")).toContainText("2");
+    // Selection remains stable
+    await expect(steps.first()).toHaveClass(/is-selected/);
+
+    // 7. Neighboring Step remains 4
+    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+
+    // 8. Undo -> selected Step back to 4
+    const undoBtn = page.getByRole("button", { name: "Undo" });
+    await undoBtn.click();
+    await expect(steps.first().locator(".step-view span")).toContainText("4");
+    await expect(steps.first()).toHaveClass(/is-selected/);
+    await expect(durationSelect).toHaveValue("4/1");
+    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+
+    // 9. Redo -> 2
+    const redoBtn = page.getByRole("button", { name: "Redo" });
+    await redoBtn.click();
+    await expect(steps.first().locator(".step-view span")).toContainText("2");
+    await expect(steps.first()).toHaveClass(/is-selected/);
+    await expect(durationSelect).toHaveValue("2/1");
+    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+
+    // 10. Reset Performance preserves edited Duration
+    const resetPerfBtn = steps.first().getByRole("button", { name: "Reset Performance" });
+    await resetPerfBtn.click();
+    await expect(steps.first().locator(".step-view span")).toContainText("2");
+
+    // 11. Custom exact duration: 3/2 beats
+    await durationSelect.selectOption("custom");
+    const customInput = steps.first().getByTestId("step-duration-custom-input");
+    const setBtn = steps.first().getByTestId("step-duration-custom-set-btn");
+    await expect(customInput).toBeVisible();
+    await customInput.fill("3/2");
+    await setBtn.click();
+    await expect(steps.first().locator(".step-view span")).toContainText("3/2");
+    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+
+    // Undo custom duration -> back to 2
+    await undoBtn.click();
+    await expect(steps.first().locator(".step-view span")).toContainText("2");
+
+    // 12. Layout & Responsiveness: 1920x1080 and 1280x720
+    for (const viewport of [
+      { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+    ]) {
+      await page.setViewportSize(viewport);
+      // Verify no document-level horizontal overflow
+      const noHorizontalOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth <= document.documentElement.clientWidth;
+      });
+      expect(noHorizontalOverflow).toBe(true);
+
+      // Verify all card-local controls and actions are visible, non-overlapping, and accessible
+      await expect(durationSelect).toBeVisible();
+      await expect(resetPerfBtn).toBeVisible();
+      await expect(steps.first().getByRole("button", { name: "Remove" })).toBeVisible();
+      await expect(steps.first().getByRole("button", { name: "Move step right" })).toBeVisible();
+    }
+  });
 });

@@ -1,8 +1,10 @@
-import type { ChangeEvent, DragEvent } from "react";
+import type { ChangeEvent, DragEvent, MouseEvent } from "react";
 import type { Project } from "../../domain/project/project";
 import type { CardViewId, StepPerformance } from "../../domain/progression/step";
+import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
+import { StepDurationControl } from "./StepDurationControl";
 
 export function ProgressionTrack({
   project,
@@ -11,6 +13,7 @@ export function ProgressionTrack({
   loopState,
   onSelectStep,
   onEditPerformance,
+  onDurationChange,
   onSetStepView,
   onSetAllViews,
   onReplace,
@@ -25,6 +28,7 @@ export function ProgressionTrack({
   readonly loopState?: LoopState;
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
+  readonly onDurationChange?: (stepId: string, duration: MusicalDuration) => void;
   readonly onSetStepView: (stepId: string, view: CardViewId) => void;
   readonly onSetAllViews: (view: CardViewId) => void;
   readonly onReplace: (stepId: string, functionId: string) => void;
@@ -94,10 +98,12 @@ export function ProgressionTrack({
             loopIndices && index >= loopIndices.start && index <= loopIndices.end,
           );
 
+          const isSelected = project.progression.selectedStepId === step.id;
+
           return step.kind === "rest" ? (
             <div
               key={step.id}
-              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${project.progression.selectedStepId === step.id ? "is-selected" : ""}`}
+              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${isSelected ? "is-selected" : ""}`}
               data-testid="progression-step"
               data-playing={isPlaying ? "true" : undefined}
               data-in-loop={isInLoop ? "true" : undefined}
@@ -105,7 +111,33 @@ export function ProgressionTrack({
               role="button"
               tabIndex={0}
             >
-              Rest
+              <div className="step-view">
+                <strong>Rest</strong>
+                <span>{formatMusicalDuration(step.duration)}</span>
+              </div>
+              {isSelected ? (
+                <div
+                  className="step-editor"
+                  onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}
+                >
+                  {onDurationChange ? (
+                    <StepDurationControl
+                      value={step.duration}
+                      onChange={(duration) => onDurationChange(step.id, duration)}
+                    />
+                  ) : null}
+                  <div className="step-actions">
+                    <button
+                      type="button"
+                      className="remove-btn"
+                      onClick={() => onRemove(step.id)}
+                      aria-label="Remove Rest step"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div
@@ -118,12 +150,13 @@ export function ProgressionTrack({
               <ProgressionStepCard
                 step={step}
                 tonic={project.tonic}
-                selected={project.progression.selectedStepId === step.id}
+                selected={isSelected}
                 playing={isPlaying}
                 inLoop={isInLoop}
                 canReplace={Boolean(previewFunctionId)}
                 onSelect={() => onSelectStep(step.id)}
                 onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
+                onDurationChange={(duration) => onDurationChange?.(step.id, duration)}
                 onViewChange={(view) => onSetStepView(step.id, view)}
                 onReplace={() => previewFunctionId && onReplace(step.id, previewFunctionId)}
                 onReset={() => onReset(step.id)}

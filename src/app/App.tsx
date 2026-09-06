@@ -791,6 +791,7 @@ export function App() {
             : {})}
           onSelectStep={selectProgressionStep}
           onEditPerformance={editProgressionPerformance}
+          onDurationChange={changeStepDuration}
           onSetStepView={setProgressionStepView}
           onSetAllViews={setProgressionViews}
           onReplace={replaceProgressionStep}

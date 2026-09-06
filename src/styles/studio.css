@@ -284,6 +284,8 @@
   display: grid;
   align-content: start;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 .harmony-details {
   padding: 16px;
@@ -618,6 +620,63 @@
   font-size: 0.68rem;
 }
 
+.step-duration-control {
+  display: grid;
+  gap: 4px;
+}
+.step-duration-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.step-duration-control select {
+  width: 100%;
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.step-duration-custom {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+.step-duration-custom-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.step-duration-custom-input-group {
+  display: flex;
+  gap: 4px;
+}
+.step-duration-custom-input-group input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.step-duration-custom-input-group input.has-error {
+  border-color: var(--error, #e53935);
+}
+.step-duration-set-btn {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text);
+}
+.step-duration-control .duration-error-message {
+  font-size: 0.65rem;
+  color: var(--error, #e53935);
+}
+
 /* Piano Performance Inspector */
 .piano-performance-inspector {
   display: flex;
@@ -628,6 +687,9 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 0.8rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }
 .performance-inspector-header h3 {
   margin: 0;

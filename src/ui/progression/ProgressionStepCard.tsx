@@ -7,10 +7,11 @@ import type {
   StepPerformance,
 } from "../../domain/progression/step";
 import { realizeProgressionStepPitches } from "../../instruments/piano/profile";
-import { formatMusicalDuration } from "../../domain/timing/duration";
+import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import { PianoCardView } from "../piano/PianoCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { StepCardViewSwitcher } from "./StepCardViewSwitcher";
+import { StepDurationControl } from "./StepDurationControl";
 import { StepActions } from "./StepActions";
 
 const ARTICULATIONS: readonly PianoArticulation[] = [
@@ -30,6 +31,7 @@ export function ProgressionStepCard({
   canReplace,
   onSelect,
   onPerformanceChange,
+  onDurationChange,
   onViewChange,
   onReplace,
   onReset,
@@ -45,6 +47,7 @@ export function ProgressionStepCard({
   readonly canReplace: boolean;
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
+  readonly onDurationChange?: (duration: MusicalDuration) => void;
   readonly onViewChange: (view: ChordStep["cardView"]) => void;
   readonly onReplace: () => void;
   readonly onReset: () => void;
@@ -132,6 +135,9 @@ export function ProgressionStepCard({
               ))}
             </select>
           </label>
+          {onDurationChange ? (
+            <StepDurationControl value={step.duration} onChange={onDurationChange} />
+          ) : null}
           <StepActions
             canReplace={canReplace}
             onReplace={onReplace}
