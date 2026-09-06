@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-05  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T122, T124–T125 accepted  
-**Task progress:** T001–T122, T124–T125 complete, 124 / 158 total tasks  
+**Handoff date:** 2026-09-06  
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T125 accepted; US1 corrective acceptance complete  
+**Task progress:** T001–T125 complete, 125 / 158 total tasks  
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (6 / 11 complete, overall 124 / 158)**.
+The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (7 / 11 complete, overall 125 / 158)**.
 
 ## 2. Sources of truth
 
@@ -46,6 +46,17 @@ Implemented:
 - Harmonic/Piano/Staff Card Views.
 - Matrix/Inspector shell and tonic selection.
 - Manhattan-routing helper and architecture boundary tests/scaffolds.
+
+### US1 corrective acceptance — Matrix card Preview/Audition
+
+- Formally fulfilled the audible audition requirement of FR-016 and US1 Acceptance Scenario 1.
+- Ordinary Matrix chord card activation triggers contextual preview and audibly auditions the chord using the canonical piano/audio realization pipeline (`realizeMatrixCardPreview` + `PreviewAuditionController`).
+- Explicit `+` remains the isolated Add action without triggering card audition.
+- Invariant guaranteed: Piano Card View pitches = Staff Card View pitches = audition AudioNoteEvent pitches.
+- Preview playback operates an isolated preview scope that cancels/replaces prior preview playback without stopping progression transport.
+- Repeated activations of the same card re-trigger attacks from t = 0.
+- Audition is non-mutating: leaves Progression, custom presets, Project semantics, and undo history untouched.
+- Keyboard accessibility: Enter and Space trigger the same preview/audition path.
 
 ### US4 + US4A — Tonal Minor and Dark Harmony — T039–T054
 
@@ -486,7 +497,7 @@ Active milestone is **Phase 11: User Story 8 — Save and reopen complete work s
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
 - **T121**: [x] Implement Dexie database schema and project records in `src/persistence/db.ts`.
 - **T122**: [x] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
-- **T123**: [ ] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
+- **T123**: [x] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
 - **T124**: [x] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
 - **T125**: [x] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
 - **T126**: [ ] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.

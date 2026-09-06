@@ -31,7 +31,18 @@ export function ChordCard({
       className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected" : ""}`}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
     >
-      <button className="chord-main" type="button" onClick={onSelect} aria-pressed={selected}>
+      <button
+        className="chord-main"
+        type="button"
+        onClick={onSelect}
+        onKeyDown={(event: React.KeyboardEvent<HTMLButtonElement>) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        aria-pressed={selected}
+      >
         {view === "harmonic" && (
           <>
             <strong>{model.chord.harmonicFunction.functionId}</strong>
@@ -45,7 +56,10 @@ export function ChordCard({
         <button
           type="button"
           className="add-chord"
-          onClick={onAdd}
+          onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+            event.stopPropagation();
+            onAdd();
+          }}
           aria-label={`Add ${model.chord.harmonicFunction.functionId} to progression`}
         >
           +

@@ -8,9 +8,8 @@ import {
 } from "../../domain/harmony/functions";
 import { getHarmonicModule } from "../../domain/harmony/moduleRegistry";
 import { expandedStripEntries } from "../../domain/harmony/topology";
-import { realizeChord } from "../../domain/harmony/realization";
 import type { RecommendationResult } from "../../domain/recommendations/engine";
-import { realizeBasicPreview } from "../../instruments/piano/profile";
+import { realizeMatrixCardPreview, resolvePreviousHarmonicContext } from "./previewRealization";
 import { ChordCard } from "../chord-card/ChordCard";
 import { FunctionalLayer } from "./FunctionalLayer";
 import { ModuleSelector } from "./ModuleSelector";
@@ -60,9 +59,10 @@ export function HarmonicMatrix({
     contextualByLayer.set("secondary-diminished", contextualFunctionIds);
   }
 
+  const previousHarmonicContext = resolvePreviousHarmonicContext(project);
+
   const renderCard = (identity: HarmonicFunctionIdentity) => {
-    const chord = realizeChord(identity, project.tonic);
-    const realized = realizeBasicPreview(chord);
+    const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
     const template = project.moduleTemplateStates[project.activeModule].cards[identity.functionId];
     const override = template?.cardViewOverride;
     const view = override ?? project.presentation.globalMatrixCardView;
@@ -74,8 +74,8 @@ export function HarmonicMatrix({
       <ChordCard
         key={cardKey(identity)}
         model={{
-          chord,
-          realizedPitches: realized.pitches,
+          chord: preview.chord,
+          realizedPitches: preview.pitches,
           recommendationStatus:
             best === identity.functionId
               ? "best"

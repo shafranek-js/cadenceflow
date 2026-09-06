@@ -66,6 +66,11 @@ import {
   type LoopState,
 } from "../ui/transport/loopState";
 import { PlaybackController } from "../audio/playbackController";
+import { PreviewAuditionController } from "../audio/previewAudition";
+import {
+  realizeMatrixCardPreview,
+  resolvePreviousHarmonicContext,
+} from "../ui/matrix/previewRealization";
 import { MetronomeClickProvider } from "../audio/metronome";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
@@ -153,6 +158,7 @@ export function App() {
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [countInEnabled, setCountInEnabled] = useState(false);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
+  const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
 
   useEffect(() => {
     return transportStore.subscribe(() => {
@@ -167,6 +173,7 @@ export function App() {
   useEffect(() => {
     return () => {
       playbackControllerRef.current?.stop();
+      previewAuditionControllerRef.current?.dispose();
     };
   }, []);
 
@@ -270,8 +277,26 @@ export function App() {
     };
     store.dispatch(command, addBranchPreview);
   };
-  const preview = (functionId: string) =>
-    project.temporaryBranch ? addToBranch(functionId) : store.selectMatrixPreview(functionId);
+  const auditionMatrixCard = (functionId: string) => {
+    const currentProject = store.project;
+    const previousContext = resolvePreviousHarmonicContext(currentProject);
+    const previewRealization = realizeMatrixCardPreview(
+      currentProject,
+      functionId,
+      previousContext,
+    );
+    const auditionController = getPreviewAuditionController();
+    auditionController?.audition(previewRealization.events);
+  };
+
+  const preview = (functionId: string) => {
+    if (project.temporaryBranch) {
+      addToBranch(functionId);
+    } else {
+      store.selectMatrixPreview(functionId);
+    }
+    auditionMatrixCard(functionId);
+  };
   const add = (functionId: string) =>
     project.temporaryBranch ? addToBranch(functionId) : addToProgression(functionId);
 
@@ -487,6 +512,18 @@ export function App() {
       });
     }
     return playbackControllerRef.current;
+  };
+
+  const getPreviewAuditionController = () => {
+    if (!audioProviderRef.current) return null;
+    if (!previewAuditionControllerRef.current) {
+      const clock = audioProviderRef.current.clock;
+      previewAuditionControllerRef.current = new PreviewAuditionController({
+        provider: audioProviderRef.current,
+        clock,
+      });
+    }
+    return previewAuditionControllerRef.current;
   };
 
   const handlePlay = () => {
