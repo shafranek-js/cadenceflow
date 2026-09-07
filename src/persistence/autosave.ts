@@ -11,6 +11,7 @@ export interface AutosaveOptions {
   readonly repo?: ProjectRepository;
   readonly debounceMs?: number;
   readonly clock?: { now(): number };
+  readonly onSaveComplete?: (project: Project) => void;
 }
 
 export interface AutosaveEngine {
@@ -24,6 +25,7 @@ export interface AutosaveEngine {
 export class DebouncedAutosaveEngine implements AutosaveEngine {
   private readonly repo: ProjectRepository;
   private readonly debounceMs: number;
+  private readonly onSaveComplete: ((project: Project) => void) | undefined;
   private pendingProject: Project | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private inFlightPromise: Promise<void> | null = null;
@@ -32,6 +34,7 @@ export class DebouncedAutosaveEngine implements AutosaveEngine {
   constructor(options?: AutosaveOptions) {
     this.repo = options?.repo ?? createProjectRepository(options?.db);
     this.debounceMs = options?.debounceMs ?? 300;
+    this.onSaveComplete = options?.onSaveComplete;
   }
 
   scheduleAutosave(project: Project): void {
@@ -71,6 +74,7 @@ export class DebouncedAutosaveEngine implements AutosaveEngine {
       try {
         await this.repo.saveProject(toSave);
         await this.repo.setLastActiveProjectId(toSave.id);
+        this.onSaveComplete?.(toSave);
       } finally {
         this.inFlightPromise = null;
       }
