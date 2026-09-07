@@ -3,18 +3,13 @@ import type { Project } from "../../domain/project/project";
 import type { Meter, MeterChangePolicy } from "../../domain/timing/meter";
 import { meter } from "../../domain/timing/meter";
 import type { GrooveSettings } from "../../domain/timing/swing";
-import {
-  durationDotted,
-  durationTriplet,
-  formatMusicalDuration,
-  musicalDuration,
-  parseMusicalDuration,
-  type MusicalDuration,
-} from "../../domain/timing/duration";
+import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import { rational } from "../../domain/timing/rational";
 import type { TransportState } from "./transportStore";
 import type { LoopMode, LoopState } from "./loopState";
 import { MetronomeControls } from "./MetronomeControls";
+import { StepDurationControl } from "../timing/StepDurationControl";
+import { formatDurationBeats } from "../timing/stepDuration";
 
 export interface TransportBarProps {
   readonly project: Project;
@@ -69,7 +64,6 @@ export function TransportBar({
   const meterNumId = useId();
   const meterDenId = useId();
   const meterGroupingId = useId();
-  const customDurationId = useId();
   const swingSliderId = useId();
 
   // Local Meter state
@@ -93,18 +87,6 @@ export function TransportBar({
   const selectedStep = selectedStepId
     ? project.progression.steps.find((s) => s.id === selectedStepId)
     : undefined;
-  const [customDurationText, setCustomDurationText] = useState("");
-  const [customDurationError, setCustomDurationError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (selectedStep) {
-      setCustomDurationText(formatMusicalDuration(selectedStep.duration));
-      setCustomDurationError(null);
-    } else {
-      setCustomDurationText("");
-      setCustomDurationError(null);
-    }
-  }, [selectedStep]);
 
   // Parse & validate grouping input
   const parseGrouping = (
@@ -168,36 +150,6 @@ export function TransportBar({
       setGroupingError(null);
     } catch (err) {
       setGroupingError(String(err));
-    }
-  };
-
-  // Quick duration presets
-  const handlePresetDuration = (beatsNumerator: number, beatsDenominator = 1) => {
-    if (!selectedStepId) return;
-    const dur = musicalDuration(rational(beatsNumerator, beatsDenominator));
-    onSetStepDuration(selectedStepId, dur);
-  };
-
-  const handleDottedDuration = () => {
-    if (!selectedStepId || !selectedStep) return;
-    const dur = durationDotted(selectedStep.duration);
-    onSetStepDuration(selectedStepId, dur);
-  };
-
-  const handleTripletDuration = () => {
-    if (!selectedStepId || !selectedStep) return;
-    const dur = durationTriplet(selectedStep.duration);
-    onSetStepDuration(selectedStepId, dur);
-  };
-
-  const handleApplyCustomDuration = () => {
-    if (!selectedStepId || !customDurationText.trim()) return;
-    try {
-      const dur = parseMusicalDuration(customDurationText);
-      onSetStepDuration(selectedStepId, dur);
-      setCustomDurationError(null);
-    } catch (_err) {
-      setCustomDurationError("Invalid format (e.g. 1, 1/2, 3/4)");
     }
   };
 
@@ -529,120 +481,14 @@ export function TransportBar({
         aria-label="Step Duration Editor"
       >
         <span className="transport-label">
-          Step Duration{" "}
-          {selectedStep ? `(${formatMusicalDuration(selectedStep.duration)} beats)` : ""}
+          Step Duration {selectedStep ? `(${formatDurationBeats(selectedStep.duration)})` : ""}
         </span>
-        <div className="duration-buttons-group">
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={() => handlePresetDuration(4, 1)}
-            disabled={!selectedStepId}
-            title="Whole Note (4 canonical beats)"
-            aria-label="Whole Note (4 canonical beats)"
-            data-testid="duration-preset-whole"
-          >
-            Whole
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={() => handlePresetDuration(2, 1)}
-            disabled={!selectedStepId}
-            title="Half Note (2 canonical beats)"
-            aria-label="Half Note (2 canonical beats)"
-            data-testid="duration-preset-half"
-          >
-            Half
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={() => handlePresetDuration(1, 1)}
-            disabled={!selectedStepId}
-            title="Quarter Note (1 canonical beat)"
-            aria-label="Quarter Note (1 canonical beat)"
-            data-testid="duration-preset-quarter"
-          >
-            Quarter
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={() => handlePresetDuration(1, 2)}
-            disabled={!selectedStepId}
-            title="Eighth Note (1/2 canonical beat)"
-            aria-label="Eighth Note (1/2 canonical beat)"
-            data-testid="duration-preset-eighth"
-          >
-            Eighth
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={() => handlePresetDuration(1, 4)}
-            disabled={!selectedStepId}
-            title="Sixteenth Note (1/4 canonical beat)"
-            aria-label="Sixteenth Note (1/4 canonical beat)"
-            data-testid="duration-preset-sixteenth"
-          >
-            Sixteenth
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={handleDottedDuration}
-            disabled={!selectedStepId}
-            title="Dotted (× 1.5 beats)"
-            aria-label="Dotted (× 1.5 beats)"
-            data-testid="duration-preset-dotted"
-          >
-            Dot
-          </button>
-          <button
-            type="button"
-            className="duration-btn"
-            onClick={handleTripletDuration}
-            disabled={!selectedStepId}
-            title="Triplet (× 2/3 beat)"
-            aria-label="Triplet (× 2/3 beat)"
-            data-testid="duration-preset-triplet"
-          >
-            Trip
-          </button>
-
-          <div className="custom-duration-group">
-            <label htmlFor={customDurationId} className="custom-duration-label">
-              Beats:
-            </label>
-            <input
-              id={customDurationId}
-              type="text"
-              value={customDurationText}
-              onChange={(e) => setCustomDurationText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleApplyCustomDuration()}
-              placeholder="e.g. 3/4"
-              className={`custom-duration-input ${customDurationError ? "has-error" : ""}`}
-              disabled={!selectedStepId}
-              aria-label="Duration in canonical quarter-note beats"
-              title="Duration in canonical quarter-note beats (e.g. 3/4, 2, 1/2)"
-            />
-            <button
-              type="button"
-              className="custom-duration-apply-btn"
-              onClick={handleApplyCustomDuration}
-              disabled={!selectedStepId}
-              aria-label="Set custom duration in beats"
-            >
-              Set
-            </button>
-          </div>
-        </div>
-        {customDurationError ? (
-          <span className="duration-error-message" role="alert">
-            {customDurationError}
-          </span>
-        ) : null}
+        <StepDurationControl
+          variant="buttons"
+          value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
+          onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
+          disabled={!selectedStepId}
+        />
       </div>
 
       {/* 5. Groove / Swing Controls */}

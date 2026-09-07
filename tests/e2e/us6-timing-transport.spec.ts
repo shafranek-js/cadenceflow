@@ -566,6 +566,11 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
       await expect(resetPerfBtn).toBeVisible();
       await expect(steps.first().getByRole("button", { name: "Remove" })).toBeVisible();
       await expect(steps.first().getByRole("button", { name: "Move step right" })).toBeVisible();
+
+      // US10 layout follow-up: .piano-performance-inspector uses overflow-x:auto because the
+      // inspector panel content (articulation/velocity/register controls) genuinely overflows
+      // at 1280×720.  A proper responsive layout for the inspector is deferred to US10.
+      // No assertion here; overflow-x:auto is the accepted interim behaviour.
     }
   });
 });

@@ -106,4 +106,107 @@ describe("T109 — Step Duration UI Semantics & Preset Mappings", () => {
       expect(() => parseMusicalDuration("invalid")).toThrow(RangeError);
     });
   });
+
+  describe("4. Shared Duration Architecture & Canonical Preset Source", () => {
+    it("proves single shared preset source contains all 10 presets with matching exact rational beats", async () => {
+      const { DURATION_PRESETS, QUICK_DURATION_BUTTON_PRESETS } =
+        await import("../../../src/ui/timing/stepDuration");
+
+      expect(DURATION_PRESETS).toHaveLength(10);
+      expect(QUICK_DURATION_BUTTON_PRESETS).toHaveLength(5);
+
+      const whole = DURATION_PRESETS.find((p) => p.id === "4/1")!;
+      expect(whole.label).toBe("Whole — 4 beats");
+      expect(whole.shortLabel).toBe("Whole");
+      expect(whole.beats).toEqual(rational(4, 1));
+      expect(whole.isQuickButton).toBe(true);
+
+      const half = DURATION_PRESETS.find((p) => p.id === "2/1")!;
+      expect(half.label).toBe("Half — 2 beats");
+      expect(half.shortLabel).toBe("Half");
+      expect(half.beats).toEqual(rational(2, 1));
+      expect(half.isQuickButton).toBe(true);
+
+      const quarter = DURATION_PRESETS.find((p) => p.id === "1/1")!;
+      expect(quarter.label).toBe("Quarter — 1 beat");
+      expect(quarter.beats).toEqual(rational(1, 1));
+
+      const eighth = DURATION_PRESETS.find((p) => p.id === "1/2")!;
+      expect(eighth.label).toBe("Eighth — 1/2 beat");
+      expect(eighth.beats).toEqual(rational(1, 2));
+
+      const sixteenth = DURATION_PRESETS.find((p) => p.id === "1/4")!;
+      expect(sixteenth.label).toBe("Sixteenth — 1/4 beat");
+      expect(sixteenth.beats).toEqual(rational(1, 4));
+
+      const quarterTrip = DURATION_PRESETS.find((p) => p.id === "2/3")!;
+      expect(quarterTrip.label).toBe("Quarter Triplet — 2/3 beat");
+      expect(quarterTrip.beats).toEqual(rational(2, 3));
+
+      const eighthTrip = DURATION_PRESETS.find((p) => p.id === "1/3")!;
+      expect(eighthTrip.label).toBe("Eighth Triplet — 1/3 beat");
+      expect(eighthTrip.beats).toEqual(rational(1, 3));
+    });
+
+    it("formats user-facing labels consistently across all standard values and custom fractions", async () => {
+      const { formatDurationDisplayName, formatDurationBeats } =
+        await import("../../../src/ui/timing/stepDuration");
+
+      expect(formatDurationDisplayName(musicalDuration(rational(4, 1)))).toBe("Whole — 4 beats");
+      expect(formatDurationDisplayName(musicalDuration(rational(2, 1)))).toBe("Half — 2 beats");
+      expect(formatDurationDisplayName(musicalDuration(rational(1, 1)))).toBe("Quarter — 1 beat");
+      expect(formatDurationDisplayName(musicalDuration(rational(1, 2)))).toBe("Eighth — 1/2 beat");
+      expect(formatDurationDisplayName(musicalDuration(rational(2, 3)))).toBe(
+        "Quarter Triplet — 2/3 beat",
+      );
+      expect(formatDurationDisplayName(musicalDuration(rational(1, 3)))).toBe(
+        "Eighth Triplet — 1/3 beat",
+      );
+
+      // Custom fraction falls back to beats representation
+      expect(formatDurationDisplayName(musicalDuration(rational(5, 4)))).toBe("5/4 beats");
+      expect(formatDurationBeats(musicalDuration(rational(1, 1)))).toBe("1 beat");
+      expect(formatDurationBeats(musicalDuration(rational(2, 1)))).toBe("2 beats");
+      expect(formatDurationBeats(musicalDuration(rational(3, 4)))).toBe("3/4 beats");
+    });
+
+    it("normalizes custom exact durations 5/4, 2/3, 1/3 and unreduced fractions identically", async () => {
+      const { parseCustomDuration } = await import("../../../src/ui/timing/stepDuration");
+
+      const r54 = parseCustomDuration("5/4");
+      expect(r54.error).toBeUndefined();
+      expect(r54.duration?.beats).toEqual(rational(5, 4));
+
+      const r23 = parseCustomDuration("2/3");
+      expect(r23.error).toBeUndefined();
+      expect(r23.duration?.beats).toEqual(rational(2, 3));
+
+      const r13 = parseCustomDuration("1/3");
+      expect(r13.error).toBeUndefined();
+      expect(r13.duration?.beats).toEqual(rational(1, 3));
+
+      // Unreduced fraction normalizes to reduced canonical rational
+      const r64 = parseCustomDuration("6/4");
+      expect(r64.error).toBeUndefined();
+      expect(r64.duration?.beats).toEqual(rational(3, 2));
+
+      const r26 = parseCustomDuration("2/6");
+      expect(r26.error).toBeUndefined();
+      expect(r26.duration?.beats).toEqual(rational(1, 3));
+    });
+
+    it("rejects invalid inputs identically with consistent error strings", async () => {
+      const { parseCustomDuration } = await import("../../../src/ui/timing/stepDuration");
+
+      expect(parseCustomDuration("")).toEqual({ error: "Duration cannot be empty" });
+      expect(parseCustomDuration("   ")).toEqual({ error: "Duration cannot be empty" });
+      expect(parseCustomDuration("1/0")).toEqual({ error: "Invalid format (e.g. 1, 1/2, 3/4)" });
+      expect(parseCustomDuration("-1/2")).toEqual({ error: "Invalid format (e.g. 1, 1/2, 3/4)" });
+      expect(parseCustomDuration("0")).toEqual({ error: "Invalid format (e.g. 1, 1/2, 3/4)" });
+      expect(parseCustomDuration("malformed")).toEqual({
+        error: "Invalid format (e.g. 1, 1/2, 3/4)",
+      });
+      expect(parseCustomDuration("3/4/5")).toEqual({ error: "Invalid format (e.g. 1, 1/2, 3/4)" });
+    });
+  });
 });

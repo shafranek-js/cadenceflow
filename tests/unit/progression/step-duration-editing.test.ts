@@ -24,6 +24,9 @@ import {
 import { StepDurationControl } from "../../../src/ui/progression/StepDurationControl";
 import { ProgressionStepCard } from "../../../src/ui/progression/ProgressionStepCard";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportBar } from "../../../src/ui/transport/TransportBar";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
+import type { LoopState } from "../../../src/ui/transport/loopState";
 
 // Setup JSDOM globals
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -624,6 +627,483 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       act(() => {
         root.unmount();
       });
+    });
+  });
+
+  describe("4. Bidirectional Synchronization & Shared TransportBar Integration", () => {
+    const dummyLoopState: LoopState = {
+      mode: "disabled",
+      region: null,
+    };
+
+    it("My Progression 4 -> 2 updates Project and TransportBar immediately reflects 2", () => {
+      const p0 = createDefaultProject("test-dual-1", "Dual 1");
+      const step1 = createMatrixChordStep(p0, "I", "s1");
+      const store = new AppStore({
+        ...p0,
+        progression: {
+          ...p0.progression,
+          steps: [step1],
+          selectedStepId: "s1",
+        },
+      });
+
+      const transportStore = new TransportStore();
+      const root = createRoot(container);
+
+      function DualSurfaceView() {
+        const proj = store.project;
+        const selected = proj.progression.steps.find(
+          (s) => s.id === proj.progression.selectedStepId,
+        );
+
+        return createElement(
+          "div",
+          null,
+          createElement(TransportBar, {
+            project: proj,
+            transportState: transportStore.getState(),
+            loopState: dummyLoopState,
+            metronomeEnabled: false,
+            countInEnabled: false,
+            onPlay: vi.fn(),
+            onPlayFromHere: vi.fn(),
+            onPause: vi.fn(),
+            onResume: vi.fn(),
+            onStop: vi.fn(),
+            onSetTempo: vi.fn(),
+            onSetMeter: vi.fn(),
+            onSetGroove: vi.fn(),
+            onSetStepDuration: (stepId, dur) => {
+              store.dispatch(
+                {
+                  type: "timing/set-step-duration",
+                  payload: { stepId, duration: dur, nowIso: new Date().toISOString() },
+                },
+                setStepDuration,
+              );
+            },
+            onSetLoopMode: vi.fn(),
+            onSetLoopRange: vi.fn(),
+            onToggleMetronome: vi.fn(),
+            onToggleCountIn: vi.fn(),
+          }),
+          selected &&
+            createElement(ProgressionStepCard, {
+              step: selected,
+              tonic: proj.tonic,
+              selected: true,
+              canReplace: false,
+              onSelect: vi.fn(),
+              onPerformanceChange: vi.fn(),
+              onDurationChange: (dur) => {
+                store.dispatch(
+                  {
+                    type: "timing/set-step-duration",
+                    payload: {
+                      stepId: selected.id,
+                      duration: dur,
+                      nowIso: new Date().toISOString(),
+                    },
+                  },
+                  setStepDuration,
+                );
+              },
+              onViewChange: vi.fn(),
+              onReplace: vi.fn(),
+              onReset: vi.fn(),
+              onRemove: vi.fn(),
+              onMoveLeft: vi.fn(),
+              onMoveRight: vi.fn(),
+            }),
+        );
+      }
+
+      // Initial render: 4 beats
+      act(() => {
+        root.render(createElement(DualSurfaceView));
+      });
+
+      const transportLabel = container.querySelector(".transport-step-duration .transport-label");
+      expect(transportLabel?.textContent).toContain("4 beats");
+      const cardSummary = container.querySelector(".step-view > span");
+      expect(cardSummary?.textContent).toContain("· 4");
+
+      // Action: Change 4 -> 2 in My Progression Card Editor
+      const cardSelect = container.querySelector(
+        '[data-testid="step-duration-select"]',
+      ) as HTMLSelectElement;
+      expect(cardSelect).not.toBeNull();
+
+      act(() => {
+        cardSelect.value = "2/1";
+        cardSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
+      // Re-render to propagate store update
+      act(() => {
+        root.render(createElement(DualSurfaceView));
+      });
+
+      // Store updated
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(2, 1));
+      // My Progression summary reflects · 2
+      expect(container.querySelector(".step-view > span")?.textContent).toContain("· 2");
+      // TransportBar reflects 2 beats
+      expect(
+        container.querySelector(".transport-step-duration .transport-label")?.textContent,
+      ).toContain("2 beats");
+      const transportInput = container.querySelector(
+        '.transport-step-duration input[type="text"]',
+      ) as HTMLInputElement;
+      expect(transportInput.value).toBe("2");
+
+      act(() => {
+        root.unmount();
+      });
+    });
+
+    it("TransportBar 2 -> 3/2 updates Project and My Progression immediately reflects 3/2", () => {
+      const p0 = createDefaultProject("test-dual-2", "Dual 2");
+      const step1: ChordStep = {
+        ...createMatrixChordStep(p0, "I", "s1"),
+        duration: musicalDuration(rational(2, 1)),
+      };
+      const store = new AppStore({
+        ...p0,
+        progression: {
+          ...p0.progression,
+          steps: [step1],
+          selectedStepId: "s1",
+        },
+      });
+
+      const transportStore = new TransportStore();
+      const root = createRoot(container);
+
+      function DualSurfaceView() {
+        const proj = store.project;
+        const selected = proj.progression.steps.find(
+          (s) => s.id === proj.progression.selectedStepId,
+        );
+
+        return createElement(
+          "div",
+          null,
+          createElement(TransportBar, {
+            project: proj,
+            transportState: transportStore.getState(),
+            loopState: dummyLoopState,
+            metronomeEnabled: false,
+            countInEnabled: false,
+            onPlay: vi.fn(),
+            onPlayFromHere: vi.fn(),
+            onPause: vi.fn(),
+            onResume: vi.fn(),
+            onStop: vi.fn(),
+            onSetTempo: vi.fn(),
+            onSetMeter: vi.fn(),
+            onSetGroove: vi.fn(),
+            onSetStepDuration: (stepId, dur) => {
+              store.dispatch(
+                {
+                  type: "timing/set-step-duration",
+                  payload: { stepId, duration: dur, nowIso: new Date().toISOString() },
+                },
+                setStepDuration,
+              );
+            },
+            onSetLoopMode: vi.fn(),
+            onSetLoopRange: vi.fn(),
+            onToggleMetronome: vi.fn(),
+            onToggleCountIn: vi.fn(),
+          }),
+          selected &&
+            createElement(ProgressionStepCard, {
+              step: selected,
+              tonic: proj.tonic,
+              selected: true,
+              canReplace: false,
+              onSelect: vi.fn(),
+              onPerformanceChange: vi.fn(),
+              onDurationChange: (dur) => {
+                store.dispatch(
+                  {
+                    type: "timing/set-step-duration",
+                    payload: {
+                      stepId: selected.id,
+                      duration: dur,
+                      nowIso: new Date().toISOString(),
+                    },
+                  },
+                  setStepDuration,
+                );
+              },
+              onViewChange: vi.fn(),
+              onReplace: vi.fn(),
+              onReset: vi.fn(),
+              onRemove: vi.fn(),
+              onMoveLeft: vi.fn(),
+              onMoveRight: vi.fn(),
+            }),
+        );
+      }
+
+      act(() => {
+        root.render(createElement(DualSurfaceView));
+      });
+
+      // Initial check: 2 beats
+      expect(
+        container.querySelector(".transport-step-duration .transport-label")?.textContent,
+      ).toContain("2 beats");
+      expect(container.querySelector(".step-view > span")?.textContent).toContain("· 2");
+
+      // Action: Change 2 -> 3/2 in TransportBar via custom input
+      const transportCustomInput = container.querySelector(
+        '.transport-step-duration input[type="text"]',
+      ) as HTMLInputElement;
+      const transportSetBtn = container.querySelector(
+        ".transport-step-duration .custom-duration-apply-btn",
+      ) as HTMLButtonElement;
+
+      expect(transportCustomInput).not.toBeNull();
+      expect(transportSetBtn).not.toBeNull();
+
+      act(() => {
+        setInputValue(transportCustomInput, "3/2");
+        transportSetBtn.click();
+      });
+
+      // Re-render
+      act(() => {
+        root.render(createElement(DualSurfaceView));
+      });
+
+      // Store updated to 3/2
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(3, 2));
+
+      // TransportBar reflects 3/2 beats
+      expect(
+        container.querySelector(".transport-step-duration .transport-label")?.textContent,
+      ).toContain("3/2 beats");
+
+      // My Progression summary immediately reflects · 3/2
+      expect(container.querySelector(".step-view > span")?.textContent).toContain("· 3/2");
+
+      // My Progression card dropdown reflects 3/2 preset
+      const cardSelect = container.querySelector(
+        '[data-testid="step-duration-select"]',
+      ) as HTMLSelectElement;
+      expect(cardSelect.value).toBe("3/2");
+
+      act(() => {
+        root.unmount();
+      });
+    });
+
+    it("normalizes custom exact durations 5/4, 2/3, 1/3 identically across buttons and select variants", () => {
+      const onButtonsChange = vi.fn();
+      const onSelectChange = vi.fn();
+      const root = createRoot(container);
+
+      act(() => {
+        root.render(
+          createElement(
+            "div",
+            null,
+            createElement(StepDurationControl, {
+              variant: "buttons",
+              value: musicalDuration(rational(4, 1)),
+              onChange: onButtonsChange,
+            }),
+            createElement(StepDurationControl, {
+              variant: "select",
+              value: musicalDuration(rational(4, 1)),
+              onChange: onSelectChange,
+            }),
+          ),
+        );
+      });
+
+      // Select variant: switch to custom mode
+      const select = container.querySelector(
+        '[data-testid="step-duration-select"]',
+      ) as HTMLSelectElement;
+      act(() => {
+        select.value = "custom";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
+      const buttonsInput = container.querySelector(
+        '.duration-buttons-group input[type="text"]',
+      ) as HTMLInputElement;
+      const buttonsSetBtn = container.querySelector(
+        ".duration-buttons-group .custom-duration-apply-btn",
+      ) as HTMLButtonElement;
+
+      const selectInput = container.querySelector(
+        '[data-testid="step-duration-custom-input"]',
+      ) as HTMLInputElement;
+      const selectSetBtn = container.querySelector(
+        '[data-testid="step-duration-custom-set-btn"]',
+      ) as HTMLButtonElement;
+
+      for (const fraction of ["5/4", "2/3", "1/3"]) {
+        onButtonsChange.mockClear();
+        onSelectChange.mockClear();
+
+        act(() => {
+          setInputValue(buttonsInput, fraction);
+          buttonsSetBtn.click();
+        });
+        act(() => {
+          setInputValue(selectInput, fraction);
+          selectSetBtn.click();
+        });
+
+        expect(onButtonsChange).toHaveBeenCalledTimes(1);
+        expect(onSelectChange).toHaveBeenCalledTimes(1);
+
+        const durButtons = onButtonsChange.mock.calls[0][0] as MusicalDuration;
+        const durSelect = onSelectChange.mock.calls[0][0] as MusicalDuration;
+
+        expect(durButtons.beats).toEqual(durSelect.beats);
+      }
+
+      act(() => {
+        root.unmount();
+      });
+    });
+
+    it("rejects invalid inputs identically on both variants with consistent error alert", () => {
+      const onButtonsChange = vi.fn();
+      const onSelectChange = vi.fn();
+      const root = createRoot(container);
+
+      act(() => {
+        root.render(
+          createElement(
+            "div",
+            null,
+            createElement(StepDurationControl, {
+              variant: "buttons",
+              value: musicalDuration(rational(4, 1)),
+              onChange: onButtonsChange,
+            }),
+            createElement(StepDurationControl, {
+              variant: "select",
+              value: musicalDuration(rational(4, 1)),
+              onChange: onSelectChange,
+            }),
+          ),
+        );
+      });
+
+      // Switch select variant to custom
+      const select = container.querySelector(
+        '[data-testid="step-duration-select"]',
+      ) as HTMLSelectElement;
+      act(() => {
+        select.value = "custom";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
+      const buttonsInput = container.querySelector(
+        '.duration-buttons-group input[type="text"]',
+      ) as HTMLInputElement;
+      const buttonsSetBtn = container.querySelector(
+        ".duration-buttons-group .custom-duration-apply-btn",
+      ) as HTMLButtonElement;
+
+      const selectInput = container.querySelector(
+        '[data-testid="step-duration-custom-input"]',
+      ) as HTMLInputElement;
+      const selectSetBtn = container.querySelector(
+        '[data-testid="step-duration-custom-set-btn"]',
+      ) as HTMLButtonElement;
+
+      const invalidInputs = ["1/0", "-1/2", "0", "not-a-fraction", "3/4/5"];
+
+      for (const invalid of invalidInputs) {
+        onButtonsChange.mockClear();
+        onSelectChange.mockClear();
+
+        act(() => {
+          setInputValue(buttonsInput, invalid);
+          buttonsSetBtn.click();
+        });
+        act(() => {
+          setInputValue(selectInput, invalid);
+          selectSetBtn.click();
+        });
+
+        expect(onButtonsChange).not.toHaveBeenCalled();
+        expect(onSelectChange).not.toHaveBeenCalled();
+
+        const alerts = container.querySelectorAll('[role="alert"]');
+        expect(alerts.length).toBe(2);
+        expect(alerts[0]?.textContent).toBe("Invalid format (e.g. 1, 1/2, 3/4)");
+        expect(alerts[1]?.textContent).toBe("Invalid format (e.g. 1, 1/2, 3/4)");
+      }
+
+      act(() => {
+        root.unmount();
+      });
+    });
+
+    it("both surfaces execute the canonical timing/set-step-duration command and support Undo/Redo", () => {
+      const p0 = createDefaultProject("test-dual-3", "Dual 3");
+      const step = createMatrixChordStep(p0, "I", "s1"); // 4 beats
+      const store = new AppStore({
+        ...p0,
+        progression: {
+          ...p0.progression,
+          steps: [step],
+          selectedStepId: "s1",
+        },
+      });
+
+      // Step card duration mutation
+      const set2Command: SetStepDurationCommand = {
+        type: "timing/set-step-duration",
+        payload: {
+          stepId: "s1",
+          duration: musicalDuration(rational(2, 1)),
+          nowIso: new Date().toISOString(),
+        },
+      };
+      store.dispatch(set2Command, setStepDuration);
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(2, 1));
+      expect(store.canUndo).toBe(true);
+
+      // TransportBar duration mutation
+      const set32Command: SetStepDurationCommand = {
+        type: "timing/set-step-duration",
+        payload: {
+          stepId: "s1",
+          duration: musicalDuration(rational(3, 2)),
+          nowIso: new Date().toISOString(),
+        },
+      };
+      store.dispatch(set32Command, setStepDuration);
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(3, 2));
+
+      // Undo TransportBar change -> reverts to 2 beats
+      store.undo();
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(2, 1));
+
+      // Undo Card change -> reverts to 4 beats
+      store.undo();
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(4, 1));
+
+      // Redo Card change -> 2 beats
+      store.redo();
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(2, 1));
+
+      // Redo TransportBar change -> 3/2 beats
+      store.redo();
+      expect(store.project.progression.steps[0]!.duration.beats).toEqual(rational(3, 2));
     });
   });
 });
