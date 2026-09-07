@@ -296,9 +296,9 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T123 [US8] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`
 - [x] T124 [US8] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts` using `specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json` as contract
 - [x] T125 [US8] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`
-- [ ] T126 [US8] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`
-- [ ] T127 [US8] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`
-- [ ] T128 [US8] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`
+- [x] T126 [US8] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`
+- [x] T127 [US8] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`
+- [x] T128 [US8] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`
 - [ ] T129 [US8] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-persistence.spec.ts`
 
 **Checkpoint**: Named local projects autosave/recover complete semantic state, and portable `.cadenceflow` files round-trip without session Undo history or audio cache.

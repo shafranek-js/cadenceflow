@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-06  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T125 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted  
-**Task progress:** T001–T125 complete, 125 / 158 total tasks  
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T128 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted
+**Task progress:** T001–T128 complete, 128 / 158 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (7 / 11 complete, overall 125 / 158)**.
+The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (10 / 11 complete, overall 128 / 158)**.
 
 ## 2. Sources of truth
 
@@ -375,6 +375,21 @@ Implemented and accepted:
 - **Strict Grammar**: `DurationDisplayHint` enforces strict v1 grammar without silent fallback.
 - **Single Source of Schema Truth**: Ajv 2020 draft 2020-12 compiles `specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json`.
 
+### US8 Batch C — project management and portable file actions — T126–T128
+
+Implemented and accepted:
+- `src/app/projectController.ts` (`T126`–`T128`): application boundary for atomic project identity transitions, last-session recovery, autosave lifecycle, collision-safe IDs, and fresh session history after replacement. Startup initialization is idempotent under React StrictMode and an active-project open performs a safe flush/no-op instead of loading a stale snapshot.
+- `src/ui/projects/ProjectManager.tsx` (`T126`): accessible New/Open/Rename/Delete project UI with active-project recovery and deterministic active-project deletion fallback.
+- `src/ui/projects/PortableProjectActions.tsx` (`T127`): Save Project As, production-path `.cadenceflow` export/download, and file import through the UI with non-destructive decode failures.
+- `src/app/commands/projectCommands.ts` and `src/domain/project/name.ts` (`T128`): pure rename command and normalized project-name validation.
+- `tests/integration/project-controller.test.ts`, `tests/unit/persistence/project-name.test.ts`, and `tests/e2e/us8-project-actions.spec.ts`: focused controller, validation, and browser coverage for project lifecycle, persistence, portable round-trip, collision handling, and fresh history.
+
+#### Accepted US8 Batch C Boundaries & Invariants
+- **Atomic Identity Replacement**: Successful New/Open/Delete/Save As/Import transitions flush outgoing state, stop transient playback/preview runtime, persist the target, update `lastActiveProjectId`, and replace the loaded project as one application-level transition.
+- **StrictMode-Safe Startup**: `initializeSession()` does not overwrite an existing `local-dev` project or create duplicate projects during repeated React initialization; startup autosave begins only after successful recovery or initialization.
+- **Fresh Session History**: Project replacement and portable import initialize Undo/Redo empty while preserving the imported or recovered semantic project state.
+- **Portable Collision Safety**: Importing a document whose project ID already exists creates a new imported identity and never overwrites the existing local project.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -411,7 +426,7 @@ Implemented and accepted:
 
 ### Persistence/export direction
 
-- Portable `.cadenceflow` schema exists as a contract, but persistence implementation is scheduled for US8.
+- Portable `.cadenceflow` persistence, named projects, autosave recovery, and project-management UI are implemented and accepted through T126–T128; final composition acceptance remains T129.
 - MIDI and MusicXML implementation is scheduled for US9 and must project directly from canonical semantic/performance data; neither should be reverse-engineered from the other.
 
 ## 5. Main files implemented/changed in the completed stage
@@ -500,7 +515,7 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8–US10**: Pending start and implementation of US8 persistence.
+4. **US8 T129**: Final end-to-end composition acceptance remains pending; US9 is not started.
 
 ## 8. Next development sequence: Phase 11 / US8 — T119–T129
 
@@ -513,9 +528,9 @@ Active milestone is **Phase 11: User Story 8 — Save and reopen complete work s
 - **T123**: [x] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
 - **T124**: [x] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
 - **T125**: [x] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
-- **T126**: [ ] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
-- **T127**: [ ] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
-- **T128**: [ ] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
+- **T126**: [x] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
+- **T127**: [x] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
+- **T128**: [x] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
 - **T129**: [ ] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-persistence.spec.ts`.
 
 ## 9. Handoff operating model
@@ -529,4 +544,3 @@ From this point, development continues in controlled batches:
 5. Accepted review updates `tasks.md`, `PROJECT_STATUS.md`, and the handoff package.
 
 See `DEVELOPMENT_WORKFLOW.md` and `NEXT_DEVELOPER_TASK.md` for the exact next assignment and review protocol.
-
