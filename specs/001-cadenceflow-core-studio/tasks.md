@@ -314,15 +314,15 @@ description: "Executable implementation task list for CadenceFlow v1"
 ### Tests
 
 - [x] T130 [P] [US9] Write MIDI event-projection golden tests for order, exact pitches, rests, timing, velocity, and per-note overrides in `tests/unit/export/midi.test.ts`
-- [ ] T131 [P] [US9] Write MusicXML semantic golden tests for spelling, harmony, durations, key/mode, meter, tempo, dynamics, rests, and unsupported-semantic mapping behavior in `tests/unit/export/musicxml.test.ts`
+- [x] T131 [P] [US9] Write MusicXML semantic golden tests for spelling, harmony, durations, key/mode, meter, tempo, dynamics, rests, and unsupported-semantic mapping behavior in `tests/unit/export/musicxml.test.ts`
 ### Implementation
 
 - [x] T132 [US9] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`
 - [x] T133 [US9] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`
-- [ ] T134 [US9] Implement semantic-to-MusicXML projection independent of MIDI in `src/export/musicxml/projection.ts`
-- [ ] T135 [US9] Implement explicit CadenceFlow-to-MusicXML mapping/omission rules in `src/export/musicxml/mapping.ts`
-- [ ] T136 [US9] Implement MusicXML 4.0 writer in `src/export/musicxml/writer.ts`
-- [ ] T137 [US9] Complete offline MusicXML XSD validation tooling and cached schema fixtures in `scripts/validate-musicxml.ts` and `tests/fixtures/exports/musicxml/`
+- [x] T134 [US9] Implement semantic-to-MusicXML projection independent of MIDI in `src/export/musicxml/projection.ts`
+- [x] T135 [US9] Implement explicit CadenceFlow-to-MusicXML mapping/omission rules in `src/export/musicxml/mapping.ts`
+- [x] T136 [US9] Implement MusicXML 4.0 writer in `src/export/musicxml/writer.ts`
+- [x] T137 [US9] Complete offline MusicXML XSD validation tooling and cached schema fixtures in `scripts/validate-musicxml.ts` and `tests/fixtures/exports/musicxml/`
 - [ ] T138 [US9] Implement export commands/UI with empty-progression validation in `src/ui/projects/ExportActions.tsx`
 - [ ] T139 [US9] Write integration test comparing playback event realization, MIDI projection, and MusicXML semantic projection to the same canonical fixture in `tests/integration/export-projection-consistency.test.ts`
 - [ ] T140 [US9] Write Playwright acceptance for MIDI/MusicXML export availability and empty-project error state in `tests/e2e/us9-export.spec.ts`
