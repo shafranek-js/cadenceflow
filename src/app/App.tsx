@@ -225,13 +225,12 @@ export function App() {
     setProjectReady(false);
     void (async () => {
       try {
-        await projectController.recoverLastSession();
+        await projectController.initializeSession("CadenceFlow");
         projectController.startAutosave();
         await projectController.flush();
         if (!cancelled) await refreshProjectList();
       } catch (error) {
         if (!cancelled) setProjectError(formatProjectOperationError(error));
-        projectController.startAutosave();
       } finally {
         if (!cancelled) setProjectReady(true);
       }

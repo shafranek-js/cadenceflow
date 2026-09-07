@@ -28,13 +28,20 @@ afterEach(async () => {
   );
 });
 
-function createHarness(initial = createDefaultProject("project-a", "Project A")) {
+function createHarness(
+  initial = createDefaultProject("project-a", "Project A"),
+  options?: {
+    readonly debounceMs?: number;
+    readonly startAutosave?: boolean;
+    readonly ids?: readonly string[];
+  },
+) {
   const db = createCadenceFlowDb(`CadenceFlowProjectController-${crypto.randomUUID()}`);
   databases.push(db);
   const repo: ProjectRepository = createProjectRepository(db);
-  const autosave = createAutosaveEngine({ repo, debounceMs: 0 });
+  const autosave = createAutosaveEngine({ repo, debounceMs: options?.debounceMs ?? 0 });
   const store = new AppStore(initial);
-  const ids = ["project-b", "project-c", "project-d", "project-e"];
+  const ids = [...(options?.ids ?? ["project-b", "project-c", "project-d", "project-e"])];
   const controller = new ProjectController({
     store,
     repo,
@@ -43,7 +50,7 @@ function createHarness(initial = createDefaultProject("project-a", "Project A"))
     now: () => "2026-09-07T12:00:00.000Z",
   });
   controllers.push(controller);
-  controller.startAutosave();
+  if (options?.startAutosave !== false) controller.startAutosave();
   return { controller, repo, store, db };
 }
 
@@ -101,6 +108,20 @@ describe("US8 Batch C — ProjectController lifecycle and session boundaries", (
     expect(store.history.undoDepth).toBe(0);
     expect(store.history.redoDepth).toBe(0);
     expect(await repo.getLastActiveProjectId()).toBe("project-b");
+  });
+
+  it("opening the active project flushes pending changes without restoring a stale snapshot", async () => {
+    const { controller, repo, store } = createHarness(undefined, { debounceMs: 100_000 });
+    await controller.flush();
+    addHistory(store);
+
+    await controller.openNamedProject("project-a");
+
+    expect(store.project.globalTiming.tempoBpm).toBe(128);
+    expect(store.history.undoDepth).toBe(1);
+    expect((await repo.loadProject("project-a"))?.globalTiming.tempoBpm).toBe(128);
+    await controller.flush();
+    expect((await repo.loadProject("project-a"))?.globalTiming.tempoBpm).toBe(128);
   });
 
   it("flushes pending outgoing autosave before switching active project identity", async () => {
@@ -225,6 +246,37 @@ describe("US8 Batch C — ProjectController lifecycle and session boundaries", (
 
     expect(store.project.id).toBe("project-a");
     expect(await repo.getLastActiveProjectId()).toBeNull();
+  });
+
+  it("startup fallback preserves an existing colliding record and is StrictMode-idempotent", async () => {
+    const placeholder = createDefaultProject("local-dev", "CadenceFlow");
+    const { controller, repo, store } = createHarness(placeholder, {
+      startAutosave: false,
+      ids: ["local-dev", "fresh-start"],
+    });
+    const existing = setTempo(createDefaultProject("local-dev", "Saved Orphan"), {
+      type: "timing/set-tempo",
+      payload: { tempoBpm: 140, nowIso: "2026-09-07T12:01:00.000Z" },
+    }).project;
+    await repo.saveProject(existing);
+    await repo.setLastActiveProjectId("missing-project");
+    addHistory(store);
+
+    const [first, second] = await Promise.all([
+      controller.initializeSession("CadenceFlow"),
+      controller.initializeSession("CadenceFlow"),
+    ]);
+    controller.startAutosave();
+    await controller.flush();
+
+    expect(first.id).toBe("fresh-start");
+    expect(second.id).toBe("fresh-start");
+    expect(store.project.id).toBe("fresh-start");
+    expect(store.history.undoDepth).toBe(0);
+    expect(await repo.getLastActiveProjectId()).toBe("fresh-start");
+    expect((await repo.loadProject("local-dev"))?.name).toBe("Saved Orphan");
+    expect((await repo.loadProject("local-dev"))?.globalTiming.tempoBpm).toBe(140);
+    expect(await repo.listProjects()).toHaveLength(2);
   });
 
   it("Save Project As creates a new active ID while preserving the original semantic project", async () => {

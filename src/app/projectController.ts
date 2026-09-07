@@ -128,6 +128,32 @@ export class ProjectController {
     return recovered;
   }
 
+  /**
+   * Establishes the startup project exactly once, even when React StrictMode
+   * invokes the startup effect twice. A missing or stale recovery pointer
+   * creates a collision-free default project instead of persisting the
+   * transient App placeholder identity.
+   */
+  async initializeSession(rawFallbackName: string): Promise<Project> {
+    return this.runExclusive(async () => {
+      const recovered = await this.autosave.loadAutosavedProject();
+      if (recovered) {
+        this.beforeProjectSwitch();
+        this.store.replaceLoadedProject(recovered);
+        return recovered;
+      }
+
+      const project = createDefaultProject(
+        await this.nextAvailableId(),
+        normalizeProjectName(rawFallbackName),
+        this.now(),
+      );
+      await this.prepareIdentityReplacement();
+      await this.persistAndActivate(project);
+      return project;
+    });
+  }
+
   async listProjects(): Promise<readonly ProjectMetadata[]> {
     const projects = await this.repo.listProjects();
     return Object.freeze(
@@ -152,9 +178,16 @@ export class ProjectController {
 
   async openNamedProject(id: string): Promise<Project> {
     return this.runExclusive(async () => {
+      // Persist the outgoing runtime before reading any repository snapshot.
+      // Loading first can re-activate stale data when `id` is already active.
+      await this.autosave.flush();
+      if (id === this.store.project.id) {
+        return this.store.project;
+      }
+
       const project = await this.repo.loadProject(id);
       if (!project) throw new ProjectNotFoundError(id);
-      await this.prepareIdentityReplacement();
+      this.beforeProjectSwitch();
       await this.repo.setLastActiveProjectId(project.id);
       this.store.replaceLoadedProject(project);
       return project;
