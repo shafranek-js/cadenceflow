@@ -2,7 +2,6 @@ import type { AudioClock, AudioNoteEvent, InstrumentAudioProvider } from "./cont
 import { LookAheadScheduler } from "./scheduler";
 import { realizeProgressionAudioEvents } from "./eventRealizer";
 import { generateCountInEvents, generateMetronomeBarEvents } from "./metronome";
-import { projectSwingTiming, type TimedEvent } from "../domain/timing/swing";
 import type { Meter } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
@@ -259,7 +258,16 @@ export class PlaybackController {
     }
 
     // 2. Realize progression steps into events and step boundaries
-    const audioEvents: AudioNoteEvent[] = [];
+    const audioEvents: AudioNoteEvent[] = [
+      ...realizeProgressionAudioEvents({
+        steps: activeSteps,
+        tonic,
+        context,
+        tempoBpm,
+        groove,
+        initialStartSeconds: countInDurationSeconds,
+      }),
+    ];
     const boundaries: StepTimeBoundary[] = [];
 
     let currentSecondsAccumulator = countInDurationSeconds;
@@ -279,51 +287,6 @@ export class PlaybackController {
         startSeconds: stepStartSeconds,
         endSeconds: stepEndSeconds,
       });
-
-      if (step.kind === "chord") {
-        // Realize chord performance audio events
-        const realized = realizeProgressionAudioEvents({
-          steps: [step],
-          tonic,
-          context,
-          tempoBpm,
-          initialStartSeconds: stepStartSeconds,
-        });
-
-        // If groove is swing, apply swing projection on 8th-note subdivisions
-        if (groove.feel === "swing" && groove.swingAmount > 0) {
-          // Convert events to timed beat events for swing projection
-          const timedEvents: Array<AudioNoteEvent & TimedEvent> = realized.map((evt) => {
-            const relSeconds = evt.startSeconds - countInDurationSeconds;
-            const relBeats = relSeconds / secondsPerBeat;
-            const durBeats = evt.durationSeconds / secondsPerBeat;
-            return {
-              ...evt,
-              startBeats: { numerator: Math.round(relBeats * 1000), denominator: 1000 },
-              durationBeats: { numerator: Math.round(durBeats * 1000), denominator: 1000 },
-            };
-          });
-
-          const swung = projectSwingTiming(timedEvents, groove);
-          for (const s of swung) {
-            const swungStartSec =
-              countInDurationSeconds +
-              (s.startBeats.numerator / s.startBeats.denominator) * secondsPerBeat;
-            const swungDurSec =
-              (s.durationBeats.numerator / s.durationBeats.denominator) * secondsPerBeat;
-            audioEvents.push({
-              pitch: s.pitch,
-              startSeconds: swungStartSec,
-              durationSeconds: swungDurSec,
-              velocity: s.velocity,
-              channelRole: s.channelRole,
-            });
-          }
-        } else {
-          audioEvents.push(...realized);
-        }
-      }
-      // If step.kind === "rest", silence is emitted (no pitched events added)
 
       currentSecondsAccumulator = stepEndSeconds;
     }

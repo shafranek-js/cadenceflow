@@ -11,12 +11,10 @@ import { globalTiming, meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import { groove } from "../../../src/domain/timing/swing";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
-import { realizeChord } from "../../../src/domain/harmony/realization";
-import { modeForModule } from "../../../src/domain/harmony/functions";
-import { pianoProfile } from "../../../src/instruments/piano/profile";
 import {
   MIDI_PPQ,
   projectProjectToMidi,
+  quantizeRationalToMidiTicks,
   type MidiProjection,
 } from "../../../src/export/midi/eventProjection";
 import { writeStandardMidiFile } from "../../../src/export/midi/writer";
@@ -247,50 +245,40 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     const second = chord(base, "I", "context-i", 1, 1, { register: 2 });
     const project = projectWithSteps([first, second]);
     const projection = projectProjectToMidi(project);
-    const context = {
-      tonic: project.tonic,
-      moduleId: project.activeModule,
-      mode: modeForModule(project.activeModule),
-      spellingContext: { tonic: project.tonic, mode: modeForModule(project.activeModule) },
-    } as const;
-    const ivChord = realizeChord(first.harmonicFunction, project.tonic);
-    const firstRealization = pianoProfile.realizeChord({
-      context,
-      chord: { ...ivChord, variant: first.harmonicVariant },
-      performance: first.performance,
-    });
-    const iChord = realizeChord(second.harmonicFunction, project.tonic);
-    const secondRealization = pianoProfile.realizeChord({
-      context,
-      chord: { ...iChord, variant: second.harmonicVariant },
-      performance: second.performance,
-      previousPitches: firstRealization.pitches,
-      previousBassPitch: firstRealization.bassPitch,
-    });
 
+    // Literal golden values: the expected table does not call the production realizer.
     expect(
-      projection.notes
-        .filter((note) => note.stepIndex === 0)
-        .map((note) => note.pitch)
-        .sort((a, b) => a - b),
-    ).toEqual(
-      [firstRealization.bassPitch, ...firstRealization.pitches]
-        .filter((pitch): pitch is NonNullable<typeof pitch> => Boolean(pitch))
-        .map((pitch) => pitch.midiNumber)
-        .sort((a, b) => a - b),
-    );
-    expect(
-      projection.notes
-        .filter((note) => note.stepIndex === 1)
-        .map((note) => note.pitch)
-        .sort((a, b) => a - b),
-    ).toEqual(
-      [secondRealization.bassPitch, ...secondRealization.pitches]
-        .filter((pitch): pitch is NonNullable<typeof pitch> => Boolean(pitch))
-        .map((pitch) => pitch.midiNumber)
-        .sort((a, b) => a - b),
-    );
-    expect(secondRealization.bassPitch?.midiNumber).toBe(52);
+      projection.notes.map((note) => [note.stepIndex, note.role, note.pitch, note.startTick]),
+    ).toEqual([
+      [0, "bass", 53, 0],
+      [0, "upper", 57, 0],
+      [0, "upper", 60, 0],
+      [0, "upper", 65, 0],
+      [1, "bass", 52, 120],
+      [1, "upper", 79, 120],
+      [1, "upper", 84, 120],
+      [1, "upper", 88, 120],
+    ]);
+  });
+
+  it("documents half-up tick quantization and preserves valid sub-tick steps", () => {
+    expect(quantizeRationalToMidiTicks(rational(1, 240))).toBe(1);
+    expect(quantizeRationalToMidiTicks(rational(1, 241))).toBe(0);
+
+    const base = createDefaultProject("sub-tick-fixture", "Sub-tick Fixture");
+    const project = projectWithSteps([
+      chord(base, "I", "tiny-chord-1", 1, 1000),
+      rest("tiny-rest", 1, 1000),
+      chord(base, "V", "tiny-chord-2", 1, 1000),
+    ]);
+    const projection = projectProjectToMidi(project);
+
+    expect(projection.totalTicks).toBe(3);
+    expect([
+      ...new Set(projection.notes.map((note) => `${note.stepIndex}:${note.startTick}`)),
+    ]).toEqual(["0:0", "2:2"]);
+    expect(projection.notes.every((note) => note.endTick > note.startTick)).toBe(true);
+    expect(() => writeStandardMidiFile(projection)).not.toThrow();
   });
 });
 

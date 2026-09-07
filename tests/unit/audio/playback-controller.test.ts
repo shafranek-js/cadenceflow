@@ -153,6 +153,39 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
     expect(transportStore.getState().status).toBe("stopped");
   });
 
+  it("shares contextual voice leading and eighth-note swing with export projection", () => {
+    const clock = new FakeAudioClock(0);
+    const provider = new MockAudioProvider();
+    const transportStore = new TransportStore();
+    const controller = new PlaybackController({
+      clock,
+      pianoProvider: provider,
+      transportStore,
+      lookAheadHorizonSeconds: 10,
+    });
+    const contextualI = Object.freeze({
+      ...makeChord("context-i", 1, 2, "I"),
+      performance: Object.freeze({ ...DEFAULT_PERF, register: 2 as const }),
+    });
+
+    controller.start({
+      steps: [makeChord("context-iv", 1, 2, "IV"), contextualI],
+      meter: meter(4, 4),
+      tempoBpm: 120,
+      groove: groove("swing", 0.55),
+      tonic: 0,
+      context: "major",
+    });
+
+    const events = provider.scheduledBatches.flatMap((batch) => batch.events);
+    const secondStepEvents = events.filter((event) => event.startSeconds > 0.1);
+    expect([...new Set(secondStepEvents.map((event) => event.startSeconds))]).toHaveLength(1);
+    expect(secondStepEvents[0]!.startSeconds).toBeCloseTo(71 / 120 / 2, 6);
+    expect(secondStepEvents.map((event) => event.pitch).sort((a, b) => a - b)).toEqual([
+      52, 79, 84, 88,
+    ]);
+  });
+
   it("omits pitched events for Rest Steps while advancing timeline duration", () => {
     const clock = new FakeAudioClock(0.0);
     const provider = new MockAudioProvider();
