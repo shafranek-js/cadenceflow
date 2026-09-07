@@ -313,12 +313,12 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T130 [P] [US9] Write MIDI event-projection golden tests for order, exact pitches, rests, timing, velocity, and per-note overrides in `tests/unit/export/midi.test.ts`
+- [x] T130 [P] [US9] Write MIDI event-projection golden tests for order, exact pitches, rests, timing, velocity, and per-note overrides in `tests/unit/export/midi.test.ts`
 - [ ] T131 [P] [US9] Write MusicXML semantic golden tests for spelling, harmony, durations, key/mode, meter, tempo, dynamics, rests, and unsupported-semantic mapping behavior in `tests/unit/export/musicxml.test.ts`
 ### Implementation
 
-- [ ] T132 [US9] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`
-- [ ] T133 [US9] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`
+- [x] T132 [US9] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`
+- [x] T133 [US9] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`
 - [ ] T134 [US9] Implement semantic-to-MusicXML projection independent of MIDI in `src/export/musicxml/projection.ts`
 - [ ] T135 [US9] Implement explicit CadenceFlow-to-MusicXML mapping/omission rules in `src/export/musicxml/mapping.ts`
 - [ ] T136 [US9] Implement MusicXML 4.0 writer in `src/export/musicxml/writer.ts`

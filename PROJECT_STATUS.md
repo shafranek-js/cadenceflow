@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-06  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) ACCEPTED / COMPLETE; T119–T129 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted
-**Task progress:** T001–T129 complete, 129 / 158 total tasks
+**Current implementation stage:** Phase 12 / User Story 9 (Export) IN PROGRESS; MIDI Batch A T130/T132/T133 accepted; T131 and MusicXML T134–T140 pending; US8 complete
+**Task progress:** 132 accepted tasks, 132 / 158 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **ACCEPTED / COMPLETE (11 / 11 complete, overall 129 / 158)**.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. The current milestone is **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — with MIDI Batch A (**T130, T132, T133**) **ACCEPTED** and MusicXML work pending (overall 132 / 158).
 
 ## 2. Sources of truth
 
@@ -398,7 +398,19 @@ Accepted after the final persistence corrections:
 
 #### Accepted US8 Batch D Evidence
 - Final persistence acceptance baseline: Vitest `494 / 494`; Chromium `45 / 45`, with no retry.
-- US8 / Phase 11 is fully accepted and closed across T119–T129. US9 remains not started.
+- US8 / Phase 11 is fully accepted and closed across T119–T129. US9 MIDI Batch A is accepted; MusicXML work remains pending.
+
+### US9 Batch A — direct MIDI projection and deterministic SMF — T130, T132, T133
+
+Accepted implementation basis:
+- `src/export/midi/eventProjection.ts` (`T132`): direct canonical semantic/performance-to-MIDI projection using the piano realization, exact beat-domain timing, contextual voice leading, independent bass, articulation, Rest/trailing-Rest timing, swing boundary, and half-up tick quantization with minimum one-tick allocation for positive sub-tick steps and notes.
+- `src/export/midi/writer.ts` (`T133`): deterministic format-0, single-track Standard MIDI File writer with tempo/meter metadata, stable note tie ordering, VLQ delta encoding, and semantic end-of-track timing.
+- `tests/unit/export/midi.test.ts` (`T130`): literal pitch/velocity/timing goldens, independent Rest/swing/contextual realization coverage, independent SMF parsing, VLQ, determinism, and immutability checks.
+
+#### Accepted US9 MIDI Batch A Boundaries & Evidence
+- Playback and MIDI share the canonical beat-domain performance projection and contextual voice-leading chain through the correction commit.
+- Focused corrected audio/playback/MIDI suite: `3 files / 31 tests` PASS. Full Node 24 Vitest baseline: `55 files / 505 tests` PASS. Full Chromium: `45 / 45` PASS with `0` retries.
+- Accepted progress is `132 / 158`; T131 and T134–T140 remain unchecked. MusicXML is the next scoped batch.
 
 ## 4. Key technical decisions that must be preserved
 
@@ -437,7 +449,7 @@ Accepted after the final persistence corrections:
 ### Persistence/export direction
 
 - Portable `.cadenceflow` persistence, named projects, autosave recovery, project-management UI, and final composition acceptance are implemented and accepted through T126–T129.
-- MIDI and MusicXML implementation is scheduled for US9 and must project directly from canonical semantic/performance data; neither should be reverse-engineered from the other.
+- MIDI projection and deterministic SMF writing are accepted through T130/T132/T133. MusicXML remains a separate pending US9 projection and validation path; neither export is reconstructed from the other.
 
 ## 5. Main files implemented/changed in the completed stage
 
@@ -503,7 +515,7 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 - Toolchain: `pnpm 10.12.4` pinned via `packageManager` in `package.json`, `typescript 6.0.3` pinned.
 - `pnpm run build` (`tsc -b && vite build`) → **PASS** (0 errors).
-- Vitest full suite (54 test files, 494 tests) → **PASS** (`494 / 494` GREEN).
+- Vitest full suite (55 test files, 505 tests) → **PASS** (`505 / 505` GREEN).
 - `tests/e2e/us7-presets.spec.ts` (Playwright Chromium, 18 tests) → **PASS** (`18 / 18` GREEN).
 - `pnpm run test:e2e:chromium` (Playwright Chromium, 45 tests across US1–US8) → **PASS** (`45 / 45` GREEN).
 - `pnpm run lint` (ESLint 9) → **PASS** (0 errors, 0 warnings).
@@ -525,11 +537,11 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 is not started.
+4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 MIDI Batch A is accepted, with T131 and T134–T140 pending.
 
-## 8. Next development sequence: Phase 12 / US9 — T130–T140
+## 8. Next development sequence: Phase 12 / US9 — T131, T134–T140
 
-Active milestone is **Phase 12: User Story 9 — Transfer the composition to notation and DAW workflows (Priority: P2)**. US8 is complete; T130–T140 remain unchecked:
+Active milestone is **Phase 12: User Story 9 — Transfer the composition to notation and DAW workflows (Priority: P2)**. MIDI Batch A is accepted; the remaining scope is T131 and T134–T140:
 
 - **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
@@ -542,6 +554,12 @@ Active milestone is **Phase 12: User Story 9 — Transfer the composition to not
 - **T127**: [x] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
 - **T128**: [x] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
 - **T129**: [x] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-project-actions.spec.ts`.
+- **T130**: [x] Write MIDI event-projection golden tests for order, exact pitches, rests, timing, velocity, and per-note overrides in `tests/unit/export/midi.test.ts`.
+- **T131**: [ ] Write MusicXML semantic golden tests for spelling, harmony, durations, key/mode, meter, tempo, dynamics, rests, and unsupported-semantic mapping behavior in `tests/unit/export/musicxml.test.ts`.
+- **T132**: [x] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`.
+- **T133**: [x] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`.
+- **T134–T137**: [ ] Implement MusicXML semantic projection, explicit mapping policy, MusicXML 4.0 writer, and offline XSD validation.
+- **T138–T140**: [ ] Implement export UI, cross-projection integration acceptance, and browser export acceptance.
 
 ## 9. Handoff operating model
 
