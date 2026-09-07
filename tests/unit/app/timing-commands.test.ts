@@ -5,6 +5,7 @@ import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 import { groove } from "../../../src/domain/timing/swing";
 import {
+  createSetStepDurationCommand,
   setMeter,
   setTempo,
   setGroove,
@@ -164,6 +165,20 @@ describe("T102/T109 — Timing Commands Integration & Reflow Invariants", () => 
   });
 
   describe("2. Other Timing Commands", () => {
+    it("creates the canonical timing/set-step-duration command", () => {
+      const duration = musicalDuration(rational(3, 2));
+      const command = createSetStepDurationCommand("step-1", duration, "2026-09-05T12:00:00.000Z");
+
+      expect(command).toEqual({
+        type: "timing/set-step-duration",
+        payload: {
+          stepId: "step-1",
+          duration,
+          nowIso: "2026-09-05T12:00:00.000Z",
+        },
+      });
+    });
+
     it("setTempo updates tempo and creates accurate inverse", () => {
       const initialProject = createProjectWithThreeSteps();
       const cmd: SetTempoCommand = {

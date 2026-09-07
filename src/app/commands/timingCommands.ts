@@ -166,6 +166,17 @@ export type SetStepDurationCommand = ProjectCommand<SetStepDurationPayload> & {
   readonly type: "timing/set-step-duration";
 };
 
+export function createSetStepDurationCommand(
+  stepId: string,
+  duration: MusicalDuration,
+  nowIso: string,
+): SetStepDurationCommand {
+  return {
+    type: "timing/set-step-duration",
+    payload: { stepId, duration, nowIso },
+  };
+}
+
 export function setStepDuration(project: Project, command: SetStepDurationCommand): AppliedCommand {
   const targetStepIndex = project.progression.steps.findIndex(
     (s) => s.id === command.payload.stepId,

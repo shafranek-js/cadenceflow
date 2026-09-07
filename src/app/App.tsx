@@ -76,6 +76,7 @@ import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import type { MusicalDuration } from "../domain/timing/duration";
 import {
+  createSetStepDurationCommand,
   setTempo,
   setMeter,
   setGroove,
@@ -83,7 +84,6 @@ import {
   type SetTempoCommand,
   type SetMeterCommand,
   type SetGrooveCommand,
-  type SetStepDurationCommand,
 } from "./commands/timingCommands";
 import {
   patchMatrixTemplate,
@@ -611,10 +611,7 @@ export function App() {
   };
 
   const changeStepDuration = (stepId: string, duration: MusicalDuration) => {
-    const command: SetStepDurationCommand = {
-      type: "timing/set-step-duration",
-      payload: { stepId, duration, nowIso: new Date().toISOString() },
-    };
+    const command = createSetStepDurationCommand(stepId, duration, new Date().toISOString());
     store.dispatch(command, setStepDuration);
   };
 
