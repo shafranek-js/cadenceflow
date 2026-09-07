@@ -16,11 +16,17 @@ type AcceptanceSnapshot = {
   readonly performance: {
     readonly articulation: string;
     readonly voicingMode: string;
+    readonly manualVoicingMidi: readonly string[];
     readonly register: string;
     readonly bassNote: string;
     readonly bassOctave: string;
     readonly masterVelocity: string;
-    readonly perNoteOverrides: string;
+    readonly perNoteOverrideSummary: string;
+    readonly perNoteOverrides: readonly {
+      readonly note: string;
+      readonly midi: string;
+      readonly velocity: string;
+    }[];
   };
   readonly timing: {
     readonly tempo: string;
@@ -47,34 +53,24 @@ async function openProjectMenu(page: Page) {
   await expect(page.getByRole("menu", { name: "Project actions" })).toBeVisible();
 }
 
-async function waitForProductionAutosave(page: Page, minimumCount: number): Promise<void> {
-  await page.waitForFunction(
-    ({ expectedName, minimum }) => {
-      const state = (
-        window as unknown as {
-          __cadenceflow_persistence__?: {
-            autosaveCount: number;
-            lastAutosavedProjectName: string;
-          };
-        }
-      ).__cadenceflow_persistence__;
-      return Boolean(
-        state && state.autosaveCount > minimum && state.lastAutosavedProjectName === expectedName,
-      );
-    },
-    { expectedName: ACCEPTANCE_PROJECT_NAME, minimum: minimumCount },
-  );
-}
-
-async function readAutosaveCount(page: Page): Promise<number> {
-  return page.evaluate(
-    () =>
-      (
-        window as unknown as {
-          __cadenceflow_persistence__?: { autosaveCount: number };
-        }
-      ).__cadenceflow_persistence__?.autosaveCount ?? 0,
-  );
+async function waitForProductionAutosave(page: Page): Promise<void> {
+  await page.waitForFunction((expectedName) => {
+    const state = (
+      window as unknown as {
+        __cadenceflow_persistence__?: {
+          lastScheduledProjectSnapshot: string;
+          lastCompletedProjectSnapshot: string;
+          lastAutosavedProjectName: string;
+        };
+      }
+    ).__cadenceflow_persistence__;
+    return Boolean(
+      state &&
+      state.lastScheduledProjectSnapshot.length > 0 &&
+      state.lastCompletedProjectSnapshot === state.lastScheduledProjectSnapshot &&
+      state.lastAutosavedProjectName === expectedName,
+    );
+  }, ACCEPTANCE_PROJECT_NAME);
 }
 
 async function countProjectsThroughUi(page: Page): Promise<number> {
@@ -108,6 +104,31 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
     }),
   );
   const performanceInspector = page.locator("section.piano-performance-inspector");
+  const perNoteOverrides = await performanceInspector
+    .locator(".per-note-velocity-row")
+    .evaluateAll((rows) =>
+      rows.flatMap((row) => {
+        const input = row.querySelector<HTMLInputElement>(
+          'input[aria-label^="Velocity override for "]',
+        );
+        if (!input) return [];
+        return [
+          {
+            note: row.querySelector(".note-label")?.textContent?.trim() ?? "",
+            midi: row.querySelector(".note-midi")?.textContent?.trim() ?? "",
+            velocity: input.value,
+          },
+        ];
+      }),
+    );
+  await performanceInspector.getByRole("button", { name: "Open Piano Voicing Editor" }).click();
+  const voicingModal = page.locator(".piano-voicing-editor-modal");
+  await expect(voicingModal).toBeVisible();
+  const manualVoicingMidi = await voicingModal
+    .locator('input[aria-label^="MIDI note for pitch "]')
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+  await voicingModal.getByRole("button", { name: "Cancel" }).click();
+  await expect(voicingModal).not.toBeVisible();
   const templateCard = page.getByTestId("chord-card-i");
   await templateCard.getByRole("button", { name: "Settings for i" }).click();
   const templateInspector = page.getByRole("region", { name: "Template settings for i" });
@@ -138,6 +159,7 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
       voicingMode: await performanceInspector
         .getByLabel("Voicing Mode", { exact: true })
         .inputValue(),
+      manualVoicingMidi,
       register: await performanceInspector.getByLabel("Register offset").inputValue(),
       bassNote: await performanceInspector.getByLabel("Bass Note", { exact: true }).inputValue(),
       bassOctave: await performanceInspector
@@ -146,9 +168,10 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
       masterVelocity: await performanceInspector
         .getByLabel("Master Velocity", { exact: true })
         .inputValue(),
-      perNoteOverrides: (
+      perNoteOverrideSummary: (
         await performanceInspector.locator(".per-note-overrides-summary").innerText()
       ).trim(),
+      perNoteOverrides,
     },
     timing: {
       tempo: await page.getByLabel("Tempo in BPM").inputValue(),
@@ -295,8 +318,6 @@ test.describe("US8 Batch C — project actions", () => {
     await page.getByTestId("project-name-input").fill(ACCEPTANCE_PROJECT_NAME);
     await page.getByRole("button", { name: "Create Project" }).click();
     await expect(page.getByTestId("project-menu-toggle")).toContainText(ACCEPTANCE_PROJECT_NAME);
-    const autosaveCountBeforeFixture = await readAutosaveCount(page);
-
     // Project context: non-default tonic plus explicit Dark Harmony / Tonal Minor module.
     await page
       .getByRole("complementary", { name: "Set The Key" })
@@ -323,7 +344,16 @@ test.describe("US8 Batch C — project actions", () => {
     await page.getByRole("button", { name: "Open Piano Voicing Editor" }).click();
     const voicingModal = page.locator(".piano-voicing-editor-modal");
     await expect(voicingModal).toBeVisible();
+    const manualVoicingBeforeTranspose = await voicingModal
+      .locator('input[aria-label^="MIDI note for pitch "]')
+      .evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)));
+    const expectedManualVoicingMidi = manualVoicingBeforeTranspose.map((midi) => String(midi + 12));
     await voicingModal.getByRole("button", { name: "+1 Octave" }).click();
+    expect(
+      await voicingModal
+        .locator('input[aria-label^="MIDI note for pitch "]')
+        .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)),
+    ).toEqual(expectedManualVoicingMidi);
     await voicingModal.getByRole("button", { name: "Apply Manual Voicing" }).click();
     await expect(voicingModal).not.toBeVisible();
     await page.getByRole("button", { name: "MIDI velocity view" }).click();
@@ -334,6 +364,7 @@ test.describe("US8 Batch C — project actions", () => {
     const upperVelocityRow = page.locator(".per-note-velocity-row:has(.role-upper)").first();
     await upperVelocityRow.getByRole("button", { name: /Override/ }).click();
     await upperVelocityRow.getByRole("spinbutton").fill("110");
+    await expect(upperVelocityRow.getByRole("spinbutton")).toHaveValue("110");
     await expect(page.locator(".per-note-overrides-summary")).toContainText(
       "1 note velocity override active",
     );
@@ -378,9 +409,12 @@ test.describe("US8 Batch C — project actions", () => {
     await page.getByRole("button", { name: "Stop", exact: true }).click();
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
 
-    await waitForProductionAutosave(page, autosaveCountBeforeFixture);
+    await waitForProductionAutosave(page);
     const fixtureSnapshot = await captureUs8AcceptanceSnapshot(page);
     expect(fixtureSnapshot.projectName).toBe(ACCEPTANCE_PROJECT_NAME);
+    expect(fixtureSnapshot.performance.manualVoicingMidi).toEqual(expectedManualVoicingMidi);
+    expect(fixtureSnapshot.performance.perNoteOverrides).toHaveLength(1);
+    expect(fixtureSnapshot.performance.perNoteOverrides[0]?.velocity).toBe("110");
     await assertTemporaryBranch(page, fixtureSnapshot.progression.length);
     const projectCountBeforeReload = await countProjectsThroughUi(page);
 

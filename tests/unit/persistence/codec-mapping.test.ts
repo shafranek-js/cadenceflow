@@ -345,6 +345,51 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       autosave.dispose();
     });
+
+    it("reports the exact scheduled snapshot that completes after a debounced burst", async () => {
+      const scheduled: string[] = [];
+      const completed: string[] = [];
+      let lastSavedProject: Project | null = null;
+
+      const mockRepo: ProjectRepository = {
+        async listProjects() {
+          return [];
+        },
+        async loadProject(id: string) {
+          return lastSavedProject?.id === id ? lastSavedProject : null;
+        },
+        async saveProject(project: Project) {
+          lastSavedProject = project;
+        },
+        async deleteProject() {},
+        async getLastActiveProjectId() {
+          return lastSavedProject?.id ?? null;
+        },
+        async setLastActiveProjectId() {},
+        async clearLastActiveProjectId() {},
+      };
+      const autosave = createAutosaveEngine({
+        repo: mockRepo,
+        debounceMs: 100,
+        onSaveScheduled(project) {
+          scheduled.push(project.name);
+        },
+        onSaveComplete(project) {
+          completed.push(project.name);
+        },
+      });
+
+      autosave.scheduleAutosave(createDefaultProject("p-observed", "Version A"));
+      autosave.scheduleAutosave(createDefaultProject("p-observed", "Version B"));
+      autosave.scheduleAutosave(createDefaultProject("p-observed", "Version C"));
+      await autosave.flush();
+
+      expect(scheduled).toEqual(["Version A", "Version B", "Version C"]);
+      expect(completed).toEqual(["Version C"]);
+      expect(lastSavedProject?.name).toBe("Version C");
+
+      autosave.dispose();
+    });
   });
 
   describe("Completion-Inversion & Latest-Write Race Protection (Item 13)", () => {

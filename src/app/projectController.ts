@@ -11,7 +11,7 @@ import {
   sanitizePortableProjectFilename,
 } from "../persistence/portableProject";
 import { createAutosaveEngine, type AutosaveEngine } from "../persistence/autosave";
-import { reportAutosaveComplete } from "../persistence/testHooks";
+import { reportAutosaveComplete, reportAutosaveScheduled } from "../persistence/testHooks";
 import {
   createProjectRepository,
   type ProjectMetadata,
@@ -103,7 +103,11 @@ export class ProjectController {
     this.repo = options.repo ?? createProjectRepository();
     this.autosave =
       options.autosave ??
-      createAutosaveEngine({ repo: this.repo, onSaveComplete: reportAutosaveComplete });
+      createAutosaveEngine({
+        repo: this.repo,
+        onSaveScheduled: reportAutosaveScheduled,
+        onSaveComplete: reportAutosaveComplete,
+      });
     this.createId = options.createId ?? createProjectId;
     this.now = options.now ?? (() => new Date().toISOString());
     this.beforeProjectSwitch = options.beforeProjectSwitch ?? (() => {});
