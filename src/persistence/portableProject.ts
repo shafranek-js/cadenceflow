@@ -44,6 +44,25 @@ export class InvalidPortableProjectError extends Error {
 }
 
 /**
+ * Derives a filesystem-safe presentation filename for a portable project.
+ * This never changes the user-visible Project.name stored in the semantic model.
+ */
+export function sanitizePortableProjectFilename(name: string): string {
+  const withoutExtension = name.replace(/\.cadenceflow$/i, "");
+  const sanitized = [...withoutExtension]
+    .map((character) =>
+      character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character) ? "-" : character,
+    )
+    .join("")
+    .replace(/[. ]+$/g, "")
+    .trim();
+  const base = sanitized || "Untitled Project";
+  const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+  const safeBase = reserved.test(base) ? `Project-${base}` : base;
+  return `${safeBase}.cadenceflow`;
+}
+
+/**
  * Pure deterministic encoder for DurationDisplayHint into strict schema wire string.
  */
 export function encodeDurationDisplayHint(hint?: DurationDisplayHint): string | undefined {

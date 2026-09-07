@@ -26,6 +26,7 @@ import {
 } from "./matrixViewCommands";
 import { setTonic, type SetTonicCommand } from "./harmonyContextCommands";
 import { restoreCustomPresets, type RestoreCustomPresetsCommand } from "./presetCommands";
+import { renameProject, type RenameProjectCommand } from "./projectCommands";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -53,6 +54,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setCardViewOverride(project, command as SetCardViewOverrideCommand).project;
     case "harmony/set-tonic":
       return setTonic(project, command as SetTonicCommand).project;
+    case "project/rename":
+      return renameProject(project, command as RenameProjectCommand).project;
     default:
       return project;
   }

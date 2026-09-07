@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppStore } from "./appStore";
+import { formatProjectOperationError, ProjectController } from "./projectController";
 import { addMatrixPreview, type AddMatrixPreviewCommand } from "./commands/matrixCommands";
 import {
   setCardViewOverride,
@@ -126,6 +127,8 @@ import { PresetsPanel } from "../ui/progression/PresetsPanel";
 import { PresetApplyDialog } from "../ui/progression/PresetApplyDialog";
 import { SavePresetDialog } from "../ui/progression/SavePresetDialog";
 import type { StepPerformanceOverrides } from "../domain/project/defaults";
+import { ProjectManager } from "../ui/projects/ProjectManager";
+import { PortableProjectActions } from "../ui/projects/PortableProjectActions";
 
 function useStore(store: AppStore) {
   const [, force] = useState(0);
@@ -159,6 +162,35 @@ export function App() {
   const [countInEnabled, setCountInEnabled] = useState(false);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
   const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
+  const [projectReady, setProjectReady] = useState(false);
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const [projectList, setProjectList] = useState<
+    Awaited<ReturnType<ProjectController["listProjects"]>>
+  >([]);
+
+  const stopProjectRuntime = useCallback(() => {
+    playbackControllerRef.current?.stop();
+    previewAuditionControllerRef.current?.stop();
+    transportStore.stop();
+    setLoopState(INITIAL_LOOP_STATE);
+    setPendingSwitch(null);
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
+    setPresetsPanelOpen(false);
+    setSavePresetDialogOpen(false);
+    setApplyDialogPreset(null);
+  }, [transportStore]);
+
+  const projectController = useMemo(() => new ProjectController({ store }), [store]);
+
+  useEffect(() => {
+    projectController.setBeforeProjectSwitch(stopProjectRuntime);
+  }, [projectController, stopProjectRuntime]);
+
+  const refreshProjectList = useCallback(async () => {
+    setProjectList(await projectController.listProjects());
+  }, [projectController]);
 
   useEffect(() => {
     return transportStore.subscribe(() => {
@@ -187,6 +219,27 @@ export function App() {
       // Handled and reflected in provider state
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProjectReady(false);
+    void (async () => {
+      try {
+        await projectController.recoverLastSession();
+        projectController.startAutosave();
+        await projectController.flush();
+        if (!cancelled) await refreshProjectList();
+      } catch (error) {
+        if (!cancelled) setProjectError(formatProjectOperationError(error));
+        projectController.startAutosave();
+      } finally {
+        if (!cancelled) setProjectReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectController, refreshProjectList]);
 
   const selectedProgressionStep = project.progression.selectedStepId
     ? project.progression.steps.find(
@@ -653,6 +706,57 @@ export function App() {
     setPresetsPanelOpen(false);
   };
 
+  const runProjectAction = async (action: () => Promise<unknown>): Promise<void> => {
+    setProjectBusy(true);
+    setProjectError(null);
+    try {
+      await action();
+      await refreshProjectList();
+    } catch (error) {
+      setProjectError(formatProjectOperationError(error));
+      throw error;
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+
+  const handleNewProject = (name: string) =>
+    runProjectAction(() => projectController.createNewProject(name));
+  const handleOpenProject = (id: string) =>
+    runProjectAction(() => projectController.openNamedProject(id));
+  const handleRenameProject = (name: string) =>
+    runProjectAction(() => projectController.renameActiveProject(name));
+  const handleDeleteProject = (id: string) =>
+    runProjectAction(() => projectController.deleteProject(id));
+  const handleSaveProjectAs = (name: string) =>
+    runProjectAction(() => projectController.saveProjectAs(name));
+  const handleOpenProjectFile = (text: string) =>
+    runProjectAction(() => projectController.openPortableProject(text));
+  const handleExportProject = () => {
+    try {
+      setProjectError(null);
+      return projectController.exportProject();
+    } catch (error) {
+      setProjectError(formatProjectOperationError(error));
+      throw error;
+    }
+  };
+
+  if (!projectReady) {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <strong>CadenceFlow</strong>
+          <span>Restoring last project…</span>
+        </header>
+        <section className="bootstrap-panel" aria-live="polite">
+          <h1>Opening your studio</h1>
+          <p>Checking the last active project and preparing a fresh session history.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -662,6 +766,24 @@ export function App() {
             ? "Progressions · Major"
             : "Dark Harmony · Tonal Minor"}
         </span>
+        <ProjectManager
+          project={project}
+          projects={projectList}
+          busy={projectBusy}
+          error={projectError}
+          onNewProject={handleNewProject}
+          onOpenProject={handleOpenProject}
+          onRenameProject={handleRenameProject}
+          onDeleteProject={handleDeleteProject}
+        >
+          <PortableProjectActions
+            project={project}
+            busy={projectBusy}
+            onSaveProjectAs={handleSaveProjectAs}
+            onExport={handleExportProject}
+            onOpenProjectFile={handleOpenProjectFile}
+          />
+        </ProjectManager>
         {project.temporaryBranch ? (
           <span className="branch-status">What-if branch active</span>
         ) : null}

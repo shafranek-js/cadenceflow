@@ -12,6 +12,115 @@
   color: inherit;
   font-size: 1.1rem;
 }
+.project-manager {
+  position: relative;
+  z-index: 20;
+}
+.project-selector-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text, #f4f5f7);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.project-selector-button:hover:not(:disabled),
+.project-selector-button[aria-expanded="true"] {
+  border-color: var(--accent, #58a6ff);
+  background: rgba(88, 166, 255, 0.1);
+}
+.project-selector-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.project-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(360px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+}
+.project-menu-current,
+.project-open-select-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+.project-open-select {
+  width: 100%;
+  padding: 7px 9px;
+}
+.project-menu-actions,
+.project-portable-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.project-menu-actions button,
+.project-portable-actions button {
+  width: 100%;
+  text-align: left;
+}
+.project-portable-actions {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.project-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.project-error {
+  margin: 2px 0 0;
+  color: #f85149;
+  font-size: 0.76rem;
+}
+.project-dialog {
+  width: min(460px, 94vw);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  color: var(--text, #f4f5f7);
+}
+.project-dialog-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.danger-btn {
+  padding: 6px 10px;
+  border: 1px solid rgba(248, 81, 73, 0.45);
+  border-radius: 6px;
+  background: rgba(248, 81, 73, 0.08);
+  color: #f85149;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.danger-btn:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.16);
+  border-color: #f85149;
+}
+.danger-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
 .piano-audio-status {
   margin-left: auto;
   display: inline-flex;
