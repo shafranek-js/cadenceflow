@@ -159,9 +159,7 @@ function writeHarmony(event: MusicXmlHarmonyEvent, level: number): string[] {
   lines.push(element("root-step", harmony.root.step, level + 2));
   if (harmony.root.alter !== 0) lines.push(element("root-alter", harmony.root.alter, level + 2));
   lines.push(closeElement("root", level + 1));
-  lines.push(
-    `${"  ".repeat(level + 1)}<kind${xmlAttribute("text", harmony.text)}>${escapeXml(harmony.kind)}</kind>`,
-  );
+  lines.push(element("kind", harmony.kind, level + 1));
   for (const degree of harmony.degrees) {
     lines.push(emptyElement("degree", level + 1));
     lines.push(element("degree-value", degree.value, level + 2));

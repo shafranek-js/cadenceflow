@@ -81,7 +81,6 @@ export interface MusicXmlHarmonyDegree {
 export interface MusicXmlHarmonyMapping {
   readonly root: MusicXmlPitchSpelling;
   readonly kind: MusicXmlHarmonyKind;
-  readonly text: string;
   readonly degrees: readonly MusicXmlHarmonyDegree[];
 }
 
@@ -92,8 +91,9 @@ export interface MusicXmlDynamicMapping {
 
 export type MusicXmlArticulation = "arpeggiate-up" | "arpeggiate-down";
 
-const MAJOR_KEY_FIFTHS: readonly number[] = [0, 7, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
-const MINOR_KEY_FIFTHS: readonly number[] = [-3, 4, -1, 6, 1, -4, 3, -2, 5, 0, 7, 2];
+// Matches defaultTonicSpelling: Db major, Eb minor and Bb minor use flats.
+const MAJOR_KEY_FIFTHS: readonly number[] = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
+const MINOR_KEY_FIFTHS: readonly number[] = [-3, 4, -1, -6, 1, -4, 3, -2, 5, 0, -5, 2];
 
 function freezeDiagnostics(
   diagnostics: readonly MusicXmlDiagnostic[],
@@ -263,7 +263,6 @@ export function mapChordToMusicXmlHarmony(
   const mapping: MusicXmlHarmonyMapping = Object.freeze({
     root: mapPitchSpellingToMusicXml(chord.spelling.root),
     kind,
-    text: chord.spelling.symbol,
     degrees: degreesForVariant(variant),
   });
 

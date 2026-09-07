@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   createDefaultProject,
   DEFAULT_PIANO_PERFORMANCE,
@@ -173,6 +177,14 @@ function pitchMidi(note: MusicXmlNoteEvent): number {
 }
 
 describe("US9 MusicXML mapping policy", () => {
+  it("preserves the canonical key spelling for every tonic in both modes", () => {
+    expect(
+      Array.from({ length: 12 }, (_, tonic) => mapTonicToMusicXmlKey(tonic, "major").fifths),
+    ).toEqual([0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5]);
+    expect(
+      Array.from({ length: 12 }, (_, tonic) => mapTonicToMusicXmlKey(tonic, "tonal-minor").fifths),
+    ).toEqual([-3, 4, -1, -6, 1, -4, 3, -2, 5, 0, -5, 2]);
+  });
   it("maps Major and Tonal Minor keys without leaking CadenceFlow mode names", () => {
     expect(mapTonicToMusicXmlKey(0, "major")).toEqual({ fifths: 0, mode: "major" });
     expect(mapTonicToMusicXmlKey(2, "tonal-minor")).toEqual({ fifths: -1, mode: "minor" });
@@ -199,7 +211,6 @@ describe("US9 MusicXML mapping policy", () => {
     expect(mapped.value).toEqual({
       root: { step: "A", alter: 0 },
       kind: "dominant",
-      text: "A",
       degrees: [
         { value: 9, alter: 0, type: "add" },
         { value: 11, alter: 0, type: "add" },
@@ -271,7 +282,6 @@ describe("US9 MusicXML mapping policy", () => {
     ).toEqual({
       root: { step: "C", alter: 0 },
       kind: "major",
-      text: "C",
       degrees: [{ value: 9, alter: 0, type: "add" }],
     });
   });
@@ -432,6 +442,70 @@ describe("US9 MusicXML semantic projection", () => {
 });
 
 describe("US9 MusicXML writer and safety contract", () => {
+  it("validates fresh writer output and rejects invalid XML through the offline CLI", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "cadenceflow-musicxml-review-"));
+    const validate = (path: string) =>
+      spawnSync(
+        process.execPath,
+        [resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/validate-musicxml.ts"), path],
+        { encoding: "utf8", timeout: 20000 },
+      );
+    try {
+      const generated = writeMusicXml(projectProjectToMusicXml(acceptanceProject()));
+      const path = join(directory, "fresh acceptance.musicxml");
+      await writeFile(path, generated, "utf8");
+      const valid = validate(path);
+      expect(valid.error).toBeUndefined();
+      expect(valid.status, valid.stderr).toBe(0);
+      expect(generated).toBe(
+        await readFile(
+          resolve("tests/fixtures/exports/musicxml/valid/cadenceflow-acceptance.musicxml"),
+          "utf8",
+        ).then((text) => text.replaceAll("\r\n", "\n")),
+      );
+      const invalid = validate(
+        resolve("tests/fixtures/exports/musicxml/invalid/missing-required-score-part.musicxml"),
+      );
+      expect(invalid.status).toBe(1);
+      expect(invalid.stderr).toContain("XSD validation failed");
+      await writeFile(path, generated.replace("<step>D</step>", "<step>H</step>"), "utf8");
+      const corrupted = validate(path);
+      expect(corrupted.status).toBe(1);
+      expect(corrupted.stderr).toContain("XSD validation failed");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it.each(["arp-up", "arp-down"] as const)(
+    "marks every upper voice for %s, excluding bass and tied continuations",
+    (articulation) => {
+      const base = crossingProject();
+      const first = base.progression.steps[0] as ChordStep;
+      const project = {
+        ...base,
+        progression: { steps: [{ ...first, performance: { ...first.performance, articulation } }] },
+      };
+      const projection = projectProjectToMusicXml(project);
+      const firstNotes = projection.measures[0]!.events.filter(
+        (event): event is MusicXmlNoteEvent => event.kind === "note",
+      );
+      expect(
+        firstNotes.filter((note) => note.role === "upper").map((note) => note.arpeggiate),
+      ).toEqual(Array(3).fill(articulation === "arp-up" ? "arpeggiate-up" : "arpeggiate-down"));
+      expect(
+        firstNotes
+          .filter((note) => note.role === "bass")
+          .every((note) => note.arpeggiate === undefined),
+      ).toBe(true);
+      expect(
+        notes(projection)
+          .filter((note) => note.ties.includes("stop"))
+          .every((note) => note.arpeggiate === undefined),
+      ).toBe(true);
+      expect(writeMusicXml(projection).match(/<arpeggiate /g)).toHaveLength(3);
+    },
+  );
   it("writes deterministic, escaped, structured MusicXML with tempo, harmony, chord, rests, ties, and dynamics", () => {
     const projection = projectProjectToMusicXml(acceptanceProject());
     const xml = writeMusicXml(projection);
@@ -444,7 +518,8 @@ describe("US9 MusicXML writer and safety contract", () => {
     expect(xml).toContain("<beats>2+2+3</beats>");
     expect(xml).toContain("<per-minute>140</per-minute>");
     expect(xml).toContain('<sound tempo="140"/>');
-    expect(xml).toContain('<kind text="A">dominant</kind>');
+    expect(xml).toContain("<kind>dominant</kind>");
+    expect(xml).not.toContain("<kind text=");
     expect(xml).toContain("<degree-value>9</degree-value>");
     expect(xml).toContain("<chord/>");
     expect(xml).toContain("<rest/>");

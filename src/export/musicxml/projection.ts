@@ -364,7 +364,8 @@ function addFragment(
         octave: pitch.octave,
       }),
       ties: Object.freeze([...ties]),
-      ...(isFirstFragment && pitchIndex === 0 && projectedChord.arpeggiate
+      // Piano arpeggiation affects upper voices; the independent bass stays on beat.
+      ...(isFirstFragment && role === "upper" && projectedChord.arpeggiate
         ? { arpeggiate: projectedChord.arpeggiate }
         : {}),
     });
