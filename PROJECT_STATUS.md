@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-06  
-**Current implementation stage:** Phase 11 / User Story 8 (Persistence) IN PROGRESS; T119–T128 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted
-**Task progress:** T001–T128 complete, 128 / 158 total tasks
+**Current implementation stage:** Phase 11 / User Story 8 (Persistence) ACCEPTED / COMPLETE; T119–T129 accepted; US1 corrective acceptance complete; US6/US3 direct step duration editing accepted
+**Task progress:** T001–T129 complete, 129 / 158 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **IN PROGRESS (10 / 11 complete, overall 128 / 158)**.
+The current milestone is **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — **ACCEPTED / COMPLETE (11 / 11 complete, overall 129 / 158)**.
 
 ## 2. Sources of truth
 
@@ -390,6 +390,16 @@ Implemented and accepted:
 - **Fresh Session History**: Project replacement and portable import initialize Undo/Redo empty while preserving the imported or recovered semantic project state.
 - **Portable Collision Safety**: Importing a document whose project ID already exists creates a new imported identity and never overwrites the existing local project.
 
+### US8 Batch D — final persistence acceptance — T129
+
+Accepted after the final persistence corrections:
+- `tests/e2e/us8-project-actions.spec.ts` (`T129`): deterministic Chromium acceptance for autosave restart recovery, portable project round-trip, exact Manual Voicing state, exact per-note velocity overrides, and collision-safe project identity behavior.
+- `tests/unit/persistence/codec-mapping.test.ts`: deterministic debounced autosave burst coverage proving scheduled snapshots converge to the latest completed/saved snapshot.
+
+#### Accepted US8 Batch D Evidence
+- Final persistence acceptance baseline: Vitest `494 / 494`; Chromium `45 / 45`, with no retry.
+- US8 / Phase 11 is fully accepted and closed across T119–T129. US9 remains not started.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -426,7 +436,7 @@ Implemented and accepted:
 
 ### Persistence/export direction
 
-- Portable `.cadenceflow` persistence, named projects, autosave recovery, and project-management UI are implemented and accepted through T126–T128; final composition acceptance remains T129.
+- Portable `.cadenceflow` persistence, named projects, autosave recovery, project-management UI, and final composition acceptance are implemented and accepted through T126–T129.
 - MIDI and MusicXML implementation is scheduled for US9 and must project directly from canonical semantic/performance data; neither should be reverse-engineered from the other.
 
 ## 5. Main files implemented/changed in the completed stage
@@ -493,9 +503,9 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 - Toolchain: `pnpm 10.12.4` pinned via `packageManager` in `package.json`, `typescript 6.0.3` pinned.
 - `pnpm run build` (`tsc -b && vite build`) → **PASS** (0 errors).
-- `pnpm test` (Vitest, 47 test files, 373 tests) → **PASS** (`373 / 373` GREEN).
+- Vitest full suite (54 test files, 494 tests) → **PASS** (`494 / 494` GREEN).
 - `tests/e2e/us7-presets.spec.ts` (Playwright Chromium, 18 tests) → **PASS** (`18 / 18` GREEN).
-- `pnpm run test:e2e:chromium` (Playwright Chromium, 40 tests across US1–US7) → **PASS** (`40 / 40` GREEN).
+- `pnpm run test:e2e:chromium` (Playwright Chromium, 45 tests across US1–US8) → **PASS** (`45 / 45` GREEN).
 - `pnpm run lint` (ESLint 9) → **PASS** (0 errors, 0 warnings).
 - `pnpm run format:check` (Prettier) → **PASS** (all files formatted).
 - Spec integrity: 1077 lines, 182 FRs, 17 SCs, 0 TODOs / TBD / NEEDS CLARIFICATION placeholders.
@@ -515,11 +525,11 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8 T129**: Final end-to-end composition acceptance remains pending; US9 is not started.
+4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 is not started.
 
-## 8. Next development sequence: Phase 11 / US8 — T119–T129
+## 8. Next development sequence: Phase 12 / US9 — T130–T140
 
-Active milestone is **Phase 11: User Story 8 — Save and reopen complete work safely (Priority: P2)**:
+Active milestone is **Phase 12: User Story 9 — Transfer the composition to notation and DAW workflows (Priority: P2)**. US8 is complete; T130–T140 remain unchecked:
 
 - **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
@@ -531,7 +541,7 @@ Active milestone is **Phase 11: User Story 8 — Save and reopen complete work s
 - **T126**: [x] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
 - **T127**: [x] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
 - **T128**: [x] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
-- **T129**: [ ] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-persistence.spec.ts`.
+- **T129**: [x] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-project-actions.spec.ts`.
 
 ## 9. Handoff operating model
 

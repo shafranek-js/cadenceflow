@@ -299,7 +299,7 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T126 [US8] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`
 - [x] T127 [US8] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`
 - [x] T128 [US8] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`
-- [ ] T129 [US8] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-persistence.spec.ts`
+- [x] T129 [US8] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-project-actions.spec.ts`
 
 **Checkpoint**: Named local projects autosave/recover complete semantic state, and portable `.cadenceflow` files round-trip without session Undo history or audio cache.
 
