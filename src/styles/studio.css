@@ -75,6 +75,32 @@
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+.project-export-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.project-export-heading,
+.project-export-empty,
+.project-export-status {
+  margin: 0;
+  font-size: 0.76rem;
+}
+.project-export-heading {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.project-export-empty {
+  color: var(--text-muted);
+}
+.project-export-status-success {
+  color: var(--accent, #58a6ff);
+}
+.project-export-status-error {
+  color: #f85149;
+}
 .project-file-input {
   position: absolute;
   width: 1px;

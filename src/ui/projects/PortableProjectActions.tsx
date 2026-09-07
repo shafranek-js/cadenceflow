@@ -3,9 +3,10 @@ import type { Project } from "../../domain/project/project";
 import { normalizeProjectName } from "../../domain/project/name";
 import type { PortableProjectExport } from "../../app/projectController";
 import { useModalFocus } from "../common/useModalFocus";
+import { ExportActions } from "./ExportActions";
 
 export interface PortableProjectActionsProps {
-  readonly project: Pick<Project, "name">;
+  readonly project: Project;
   readonly busy?: boolean;
   readonly onSaveProjectAs: (name: string) => void | Promise<void>;
   readonly onExport: () => PortableProjectExport;
@@ -123,6 +124,7 @@ export function PortableProjectActions({
           data-testid="project-file-input"
           onChange={(event) => void handleFileChange(event)}
         />
+        <ExportActions project={project} busy={busy} />
       </div>
       {actionError ? (
         <p className="project-error" role="alert" data-testid="portable-project-error">
