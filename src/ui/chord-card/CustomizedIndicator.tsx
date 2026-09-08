@@ -3,6 +3,7 @@ export function CustomizedIndicator({ count }: { readonly count: number }) {
   return (
     <span
       className="customized-indicator"
+      role="img"
       title={`Customized · ${count} overrides`}
       aria-label={`Customized · ${count} overrides`}
     >

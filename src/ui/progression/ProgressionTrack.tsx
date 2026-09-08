@@ -5,6 +5,7 @@ import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing
 import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { StepDurationControl } from "./StepDurationControl";
+import { activateFromKeyboard } from "../studio/focusManagement";
 
 export function ProgressionTrack({
   project,
@@ -108,6 +109,9 @@ export function ProgressionTrack({
               data-playing={isPlaying ? "true" : undefined}
               data-in-loop={isInLoop ? "true" : undefined}
               onClick={() => onSelectStep(step.id)}
+              onKeyDown={(event) => activateFromKeyboard(event, () => onSelectStep(step.id))}
+              aria-label={`Progression rest step${isPlaying ? ", Playing" : ""}`}
+              aria-current={isPlaying ? "step" : undefined}
               role="button"
               tabIndex={0}
             >
@@ -115,6 +119,11 @@ export function ProgressionTrack({
                 <strong>Rest</strong>
                 <span>{formatMusicalDuration(step.duration)}</span>
               </div>
+              {isPlaying ? (
+                <span className="step-state-indicator playing-indicator">
+                  <span aria-hidden="true">▶</span> Playing
+                </span>
+              ) : null}
               {isSelected ? (
                 <div
                   className="step-editor"

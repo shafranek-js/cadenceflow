@@ -14,10 +14,10 @@ export function FunctionalLayer({
       <h3>{label}</h3>
       <div className="matrix-layer-cards">{children}</div>
       {expanded ? (
-        <div className="matrix-expanded-strip" aria-label={`${label} contextual options`}>
+        <section className="matrix-expanded-strip" aria-label={`${label} contextual options`}>
           <span className="expanded-label">Contextual</span>
           {expanded}
-        </div>
+        </section>
       ) : null}
     </section>
   );

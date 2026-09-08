@@ -11,14 +11,14 @@ export function RecommendationInspector({
 }) {
   if (!candidate)
     return (
-      <aside className="inspector">
+      <section className="inspector" aria-label="Recommendation inspector">
         <h2>Inspector</h2>
         <p>Select a chord to explore its harmonic context.</p>
-      </aside>
+      </section>
     );
   const explanation = explainRecommendation(candidate, mode);
   return (
-    <aside className="inspector">
+    <section className="inspector" aria-label="Recommendation inspector">
       <h2>{candidate.functionId}</h2>
       <strong>{explanation.headline}</strong>
       <ul>
@@ -26,6 +26,6 @@ export function RecommendationInspector({
           <li key={detail}>{detail}</li>
         ))}
       </ul>
-    </aside>
+    </section>
   );
 }

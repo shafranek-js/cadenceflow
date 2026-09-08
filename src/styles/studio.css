@@ -2062,3 +2062,208 @@
     max-height: 90vh;
   }
 }
+
+/* US10 Batch B: presentation controls, semantic state, and keyboard focus */
+button,
+input,
+select,
+textarea,
+summary {
+  color: var(--text);
+}
+
+button,
+select,
+input {
+  border-color: var(--border);
+  background-color: var(--surface-2);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 3px solid var(--focus) !important;
+  outline-offset: 2px;
+}
+
+.presentation-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.presentation-control-label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.presentation-control-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.presentation-control-options button {
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.68rem;
+}
+
+.presentation-control-options button:hover:not(:disabled),
+.presentation-control-options button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+
+.presentation-control-options button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--selected);
+  font-weight: 700;
+}
+
+.chord-card {
+  color: var(--text);
+}
+
+.chord-card.is-selected {
+  outline: 2px solid var(--selected);
+  outline-offset: 1px;
+}
+
+.chord-card.recommendation-best {
+  border-color: var(--recommendation-best);
+  box-shadow: inset 0 0 0 2px var(--recommendation-best);
+}
+
+.chord-card.recommendation-alternative {
+  border-color: var(--recommendation-alternative);
+  box-shadow: inset 0 0 0 1px var(--recommendation-alternative);
+}
+
+.recommendation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.recommendation-best-badge {
+  color: var(--recommendation-best);
+}
+
+.recommendation-alternative-badge {
+  color: var(--recommendation-alternative);
+}
+
+.card-view-switcher button[aria-pressed="true"] {
+  outline: 2px solid var(--selected);
+  outline-offset: -2px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.customized-indicator {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.progression-step-card,
+.progression-rest-card {
+  color: var(--text);
+}
+
+.progression-step-card.is-selected,
+.progression-rest-card.is-selected {
+  outline: 2px solid var(--selected);
+  outline-offset: 1px;
+}
+
+.progression-step-card.is-playing,
+.progression-rest-card.is-playing {
+  outline-color: var(--playing) !important;
+  border-color: var(--playing);
+  background: color-mix(in srgb, var(--playing) 12%, var(--surface-2)) !important;
+  box-shadow: 0 0 0 1px var(--playing);
+}
+
+.step-state-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--playing);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.branch-status {
+  border-color: var(--branch);
+  color: var(--branch);
+  font-weight: 700;
+}
+
+.transport-status-badge.status-playing {
+  background: color-mix(in srgb, var(--success) 15%, var(--surface));
+  color: var(--success);
+}
+
+.transport-status-badge.status-playing .status-dot {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.transport-status-badge.status-paused {
+  background: color-mix(in srgb, var(--warning) 15%, var(--surface));
+  color: var(--warning);
+}
+
+.transport-status-badge.status-paused .status-dot {
+  background: var(--warning);
+}
+
+.transport-status-badge.status-stopped {
+  color: var(--text-muted);
+}
+
+.transport-error-badge,
+.project-error,
+.project-export-status-error,
+.error-text {
+  color: var(--error);
+}
+
+.studio-grid,
+.matrix-expanded-strip,
+.register-control,
+.inspector-group,
+.custom-bass-editor,
+.dynamics-presets,
+.per-note-velocity-editor {
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .presentation-control {
+    align-items: flex-start;
+  }
+}

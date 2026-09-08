@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { FOCUSABLE_SELECTOR } from "../studio/focusManagement";
 
 export interface UseModalFocusOptions {
   readonly isOpen: boolean;
@@ -7,9 +8,6 @@ export interface UseModalFocusOptions {
   readonly initialFocusRef?: RefObject<HTMLElement | null>;
   readonly restoreFocusRef?: RefObject<HTMLElement | null>;
 }
-
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function useModalFocus<T extends HTMLElement = HTMLElement>({
   isOpen,

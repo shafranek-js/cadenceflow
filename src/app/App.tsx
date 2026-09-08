@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppStore } from "./appStore";
 import { formatProjectOperationError, ProjectController } from "./projectController";
 import { addMatrixPreview, type AddMatrixPreviewCommand } from "./commands/matrixCommands";
@@ -130,6 +130,15 @@ import type { StepPerformanceOverrides } from "../domain/project/defaults";
 import { ProjectManager } from "../ui/projects/ProjectManager";
 import { PortableProjectActions } from "../ui/projects/PortableProjectActions";
 import { StudioWorkspace } from "../ui/studio/StudioWorkspace";
+import { ThemeControl } from "../ui/settings/ThemeControl";
+import { ExpertiseModeControl } from "../ui/settings/ExpertiseModeControl";
+import {
+  setTheme,
+  setExpertiseMode,
+  type SetThemeCommand,
+  type SetExpertiseModeCommand,
+} from "./commands/presentationCommands";
+import type { PresentationMode, ThemeMode } from "../domain/project/project";
 
 function useStore(store: AppStore) {
   const [, force] = useState(0);
@@ -240,6 +249,11 @@ export function App() {
       cancelled = true;
     };
   }, [projectController, refreshProjectList]);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = project.presentation.theme;
+    document.documentElement.style.colorScheme = project.presentation.theme;
+  }, [project.presentation.theme]);
 
   const selectedProgressionStep = project.progression.selectedStepId
     ? project.progression.steps.find(
@@ -470,6 +484,20 @@ export function App() {
       payload: { view, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, setGlobalCardView);
+  };
+  const changeTheme = (theme: ThemeMode) => {
+    const command: SetThemeCommand = {
+      type: "presentation/set-theme",
+      payload: { theme, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setTheme);
+  };
+  const changeExpertiseMode = (expertiseMode: PresentationMode) => {
+    const command: SetExpertiseModeCommand = {
+      type: "presentation/set-expertise-mode",
+      payload: { expertiseMode, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setExpertiseMode);
   };
   const cardView = (functionId: string, view: CardViewId) => {
     const command: SetCardViewOverrideCommand = {
@@ -785,8 +813,15 @@ export function App() {
               onOpenProjectFile={handleOpenProjectFile}
             />
           </ProjectManager>
+          <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
+          <ExpertiseModeControl
+            value={project.presentation.expertiseMode}
+            onChange={changeExpertiseMode}
+          />
           {project.temporaryBranch ? (
-            <span className="branch-status">What-if branch active</span>
+            <span className="branch-status" role="status">
+              What-if branch active
+            </span>
           ) : null}
           <PianoAudioStatus state={audioState} />
         </>

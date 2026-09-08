@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import type { HarmonicFunctionIdentity } from "../../domain/harmony/functions";
 import type { ModuleSwitchPlan } from "../../domain/harmony/moduleSwitch";
+import { useModalFocus } from "../common/useModalFocus";
 
 export function ModuleSwitchDialog({
   plan,
@@ -17,6 +18,10 @@ export function ModuleSwitchDialog({
   const [selections, setSelections] = useState<Readonly<Record<string, string>>>(() =>
     Object.freeze(Object.fromEntries(ambiguous.map((item) => [item.stepId, "keep-original"]))),
   );
+  const dialogRef = useModalFocus<HTMLElement>({
+    isOpen: true,
+    onClose: onCancel,
+  });
 
   const confirm = () => {
     const resolved: Record<string, HarmonicFunctionIdentity | "keep-original"> = {};
@@ -34,6 +39,7 @@ export function ModuleSwitchDialog({
   return (
     <div className="dialog-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="module-switch-dialog"
         role="dialog"
         aria-modal="true"

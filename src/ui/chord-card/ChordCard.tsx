@@ -31,7 +31,18 @@ export function ChordCard({
       className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected" : ""}`}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
     >
-      <button className="chord-main" type="button" onClick={onSelect} aria-pressed={selected}>
+      <button
+        className="chord-main"
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        aria-label={`Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}`}
+        aria-describedby={
+          model.recommendationStatus !== "none"
+            ? `recommendation-${model.chord.harmonicFunction.functionId}`
+            : undefined
+        }
+      >
         {view === "harmonic" && (
           <>
             <strong>{model.chord.harmonicFunction.functionId}</strong>
@@ -66,7 +77,13 @@ export function ChordCard({
         />
       </div>
       {model.recommendationStatus !== "none" && (
-        <span className="recommendation-badge">
+        <span
+          className={`recommendation-badge recommendation-${model.recommendationStatus}-badge`}
+          id={`recommendation-${model.chord.harmonicFunction.functionId}`}
+          role="img"
+          aria-label={`Recommendation: ${model.recommendationStatus === "best" ? "Best Match" : "Alternative"}`}
+        >
+          <span aria-hidden="true">{model.recommendationStatus === "best" ? "★ " : "↝ "}</span>
           {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
         </span>
       )}

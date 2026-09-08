@@ -30,7 +30,7 @@ export function RegisterControl({ value, disabled = false, onChange }: RegisterC
   };
 
   return (
-    <div className="register-control" aria-label="Step register control">
+    <div className="register-control" role="group" aria-label="Step register control">
       <label htmlFor="step-register-select">Register</label>
       <select
         id="step-register-select"

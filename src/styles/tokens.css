@@ -1,5 +1,4 @@
 :root {
-  color-scheme: dark;
   font-family:
     Inter,
     ui-sans-serif,
@@ -8,12 +7,57 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background: #111318;
-  color: #f4f5f7;
+  color-scheme: dark;
+  background: var(--background);
+  color: var(--text);
+  --background: #111318;
   --surface: #181b21;
+  --surface-1: #181b21;
   --surface-2: #222630;
-  --text-muted: #aab0bd;
-  --border: #343a46;
+  --surface-3: #303846;
+  --text: #f4f5f7;
+  --text-muted: #c0c7d2;
+  --border: #596273;
+  --border-subtle: #343a46;
+  --accent: #8fd0ff;
+  --focus: #8fd0ff;
+  --selected: #7cc4ff;
+  --previewed: #c3a0ff;
+  --recommendation-best: #ffe17a;
+  --recommendation-alternative: #8fe7f0;
+  --playing: #80c8ff;
+  --branch: #f1c36d;
+  --warning: #f1c36d;
+  --error: #ff8c84;
+  --success: #68db82;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f4f7fb;
+  --surface: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #eaf0f6;
+  --surface-3: #d8e2ed;
+  --text: #132033;
+  --text-muted: #405269;
+  --border: #72869d;
+  --border-subtle: #9eafc0;
+  --accent: #075eaf;
+  --focus: #005fcc;
+  --selected: #075eaf;
+  --previewed: #6d28d9;
+  --recommendation-best: #7a4d00;
+  --recommendation-alternative: #006978;
+  --playing: #075eaf;
+  --branch: #8a4b00;
+  --warning: #8a4b00;
+  --error: #b42318;
+  --success: #137333;
 }
 
 * {
@@ -23,7 +67,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #111318;
+  background: var(--background);
+  color: var(--text);
 }
 button,
 input,

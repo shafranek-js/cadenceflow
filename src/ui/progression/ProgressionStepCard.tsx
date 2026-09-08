@@ -13,6 +13,7 @@ import { StaffCardView } from "../staff/StaffCardView";
 import { StepCardViewSwitcher } from "./StepCardViewSwitcher";
 import { StepDurationControl } from "./StepDurationControl";
 import { StepActions } from "./StepActions";
+import { activateFromKeyboard } from "../studio/focusManagement";
 
 const ARTICULATIONS: readonly PianoArticulation[] = [
   "block",
@@ -66,7 +67,16 @@ export function ProgressionStepCard({
       data-playing={playing ? "true" : undefined}
       data-in-loop={inLoop ? "true" : undefined}
       onClick={onSelect}
+      onKeyDown={(event) => activateFromKeyboard(event, onSelect)}
+      tabIndex={0}
+      aria-label={`Progression step ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`}
+      aria-current={playing ? "step" : undefined}
     >
+      {playing ? (
+        <span className="step-state-indicator playing-indicator">
+          <span aria-hidden="true">▶</span> Playing
+        </span>
+      ) : null}
       <div className="step-view">
         {step.cardView === "harmonic" ? (
           <>

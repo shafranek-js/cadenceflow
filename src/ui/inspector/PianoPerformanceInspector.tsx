@@ -232,7 +232,7 @@ export function PianoPerformanceInspector({
       </header>
 
       {/* Voicing Mode & Manual Voicing Editor */}
-      <div className="inspector-group" aria-label="Voicing mode controls">
+      <div className="inspector-group" role="group" aria-label="Voicing mode controls">
         <label htmlFor="voicing-mode-select">Voicing Mode</label>
         <select
           id="voicing-mode-select"
@@ -256,7 +256,7 @@ export function PianoPerformanceInspector({
       </div>
 
       {/* Register Control */}
-      <div className="inspector-group" aria-label="Register controls">
+      <div className="inspector-group" role="group" aria-label="Register controls">
         <RegisterControl
           value={perf.register}
           disabled={isManual}
@@ -268,7 +268,7 @@ export function PianoPerformanceInspector({
       </div>
 
       {/* Independent Bass Controls */}
-      <div className="inspector-group" aria-label="Bass voice controls">
+      <div className="inspector-group" role="group" aria-label="Bass voice controls">
         <h4>Independent Bass</h4>
         <div className="subgroup">
           <label htmlFor="bass-choice-select">Bass Note</label>
@@ -287,7 +287,7 @@ export function PianoPerformanceInspector({
         </div>
 
         {perf.bass.choice === "custom" ? (
-          <div className="custom-bass-editor" aria-label="Custom Bass Note Editor">
+          <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
             <label htmlFor="custom-bass-midi-input">
               Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
             </label>
@@ -337,7 +337,7 @@ export function PianoPerformanceInspector({
       </div>
 
       {/* Articulation Control */}
-      <div className="inspector-group" aria-label="Articulation controls">
+      <div className="inspector-group" role="group" aria-label="Articulation controls">
         <label htmlFor="piano-articulation-select">Articulation</label>
         <select
           id="piano-articulation-select"
@@ -354,7 +354,7 @@ export function PianoPerformanceInspector({
       </div>
 
       {/* Dynamics & Velocity Controls */}
-      <div className="inspector-group" aria-label="Dynamics and velocity controls">
+      <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
         <h4>Dynamics & Velocity</h4>
         <div
           className="view-preference-toggle"
@@ -412,7 +412,7 @@ export function PianoPerformanceInspector({
         )}
 
         {/* Dynamics Presets */}
-        <div className="dynamics-presets" aria-label="Dynamics presets">
+        <div className="dynamics-presets" role="group" aria-label="Dynamics presets">
           <label htmlFor="dynamics-preset-select">Apply Dynamics Preset</label>
           <select
             id="dynamics-preset-select"
@@ -456,7 +456,11 @@ export function PianoPerformanceInspector({
         </div>
 
         {/* Per-Note Velocity Editor */}
-        <div className="per-note-velocity-editor" aria-label="Per-note velocity editor">
+        <div
+          className="per-note-velocity-editor"
+          role="group"
+          aria-label="Per-note velocity editor"
+        >
           <h5>Per-Note Velocity Overrides</h5>
           <div className="per-note-list">
             {notesToDisplay.map((note) => {
