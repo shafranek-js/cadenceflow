@@ -1,12 +1,22 @@
 .app-shell {
+  width: 100%;
+  max-width: 100%;
   min-height: 100vh;
+  min-width: 0;
   padding: 20px 24px;
 }
 .app-header {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+  max-width: 100%;
+  min-width: 0;
   color: var(--text-muted);
+}
+.app-header > * {
+  max-width: 100%;
+  min-width: 0;
 }
 .app-header strong {
   color: inherit;
@@ -197,7 +207,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 18px;
+}
+.studio-grid > * {
+  max-width: 100%;
+  min-width: 0;
 }
 .matrix-panel,
 .inspector,
@@ -964,6 +980,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  max-width: 100%;
+  min-width: 0;
   gap: 12px;
   padding: 8px 16px;
   background: var(--surface, #181c24);
@@ -974,7 +992,10 @@
 
 .transport-section {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  max-width: 100%;
+  min-width: 0;
   gap: 8px;
   padding-right: 12px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);

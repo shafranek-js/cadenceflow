@@ -1,0 +1,33 @@
+.progression-strip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.progression-strip > *,
+.progression-track,
+.progression-heading,
+.progression-title-group,
+.progression-preset-actions,
+.branch-controls,
+.branch-comparison {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.progression-heading,
+.progression-preset-actions {
+  flex-wrap: wrap;
+}
+
+.progression-step-cards {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.progression-step-cards > div {
+  flex: 0 0 170px;
+  min-width: 170px;
+}

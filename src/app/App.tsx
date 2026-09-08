@@ -129,6 +129,7 @@ import { SavePresetDialog } from "../ui/progression/SavePresetDialog";
 import type { StepPerformanceOverrides } from "../domain/project/defaults";
 import { ProjectManager } from "../ui/projects/ProjectManager";
 import { PortableProjectActions } from "../ui/projects/PortableProjectActions";
+import { StudioWorkspace } from "../ui/studio/StudioWorkspace";
 
 function useStore(store: AppStore) {
   const [, force] = useState(0);
@@ -757,62 +758,66 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <strong>CadenceFlow</strong>
-        <span>
-          {project.activeModule === "progressions"
-            ? "Progressions · Major"
-            : "Dark Harmony · Tonal Minor"}
-        </span>
-        <ProjectManager
-          project={project}
-          projects={projectList}
-          busy={projectBusy}
-          error={projectError}
-          onNewProject={handleNewProject}
-          onOpenProject={handleOpenProject}
-          onRenameProject={handleRenameProject}
-          onDeleteProject={handleDeleteProject}
-        >
-          <PortableProjectActions
+    <StudioWorkspace
+      header={
+        <>
+          <strong>CadenceFlow</strong>
+          <span>
+            {project.activeModule === "progressions"
+              ? "Progressions · Major"
+              : "Dark Harmony · Tonal Minor"}
+          </span>
+          <ProjectManager
             project={project}
+            projects={projectList}
             busy={projectBusy}
-            onSaveProjectAs={handleSaveProjectAs}
-            onExport={handleExportProject}
-            onOpenProjectFile={handleOpenProjectFile}
-          />
-        </ProjectManager>
-        {project.temporaryBranch ? (
-          <span className="branch-status">What-if branch active</span>
-        ) : null}
-        <PianoAudioStatus state={audioState} />
-      </header>
-      <TransportBar
-        project={project}
-        transportState={transportState}
-        loopState={loopState}
-        metronomeEnabled={metronomeEnabled}
-        countInEnabled={countInEnabled}
-        onPlay={handlePlay}
-        onPlayFromHere={handlePlayFromHere}
-        onPause={handlePause}
-        onResume={handleResume}
-        onStop={handleStop}
-        onSetTempo={changeTempo}
-        onSetMeter={changeMeter}
-        onSetGroove={changeGroove}
-        onSetStepDuration={changeStepDuration}
-        onSetLoopMode={handleSetLoopMode}
-        onSetLoopRange={handleSetLoopRange}
-        onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
-        onToggleCountIn={() => setCountInEnabled((v) => !v)}
-        onUndo={() => store.undo()}
-        canUndo={store.canUndo}
-        onRedo={() => store.redo()}
-        canRedo={store.canRedo}
-      />
-      <div className="studio-grid">
+            error={projectError}
+            onNewProject={handleNewProject}
+            onOpenProject={handleOpenProject}
+            onRenameProject={handleRenameProject}
+            onDeleteProject={handleDeleteProject}
+          >
+            <PortableProjectActions
+              project={project}
+              busy={projectBusy}
+              onSaveProjectAs={handleSaveProjectAs}
+              onExport={handleExportProject}
+              onOpenProjectFile={handleOpenProjectFile}
+            />
+          </ProjectManager>
+          {project.temporaryBranch ? (
+            <span className="branch-status">What-if branch active</span>
+          ) : null}
+          <PianoAudioStatus state={audioState} />
+        </>
+      }
+      transport={
+        <TransportBar
+          project={project}
+          transportState={transportState}
+          loopState={loopState}
+          metronomeEnabled={metronomeEnabled}
+          countInEnabled={countInEnabled}
+          onPlay={handlePlay}
+          onPlayFromHere={handlePlayFromHere}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStop={handleStop}
+          onSetTempo={changeTempo}
+          onSetMeter={changeMeter}
+          onSetGroove={changeGroove}
+          onSetStepDuration={changeStepDuration}
+          onSetLoopMode={handleSetLoopMode}
+          onSetLoopRange={handleSetLoopRange}
+          onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
+          onToggleCountIn={() => setCountInEnabled((v) => !v)}
+          onUndo={() => store.undo()}
+          canUndo={store.canUndo}
+          onRedo={() => store.redo()}
+          canRedo={store.canRedo}
+        />
+      }
+      matrix={
         <HarmonicMatrix
           project={project}
           {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
@@ -829,7 +834,9 @@ export function App() {
           onResetCurrentModule={() => resetMatrix("current-module")}
           onResetAllModules={() => resetMatrix("all-modules")}
         />
-        <aside className="inspector-stack">
+      }
+      inspector={
+        <>
           <RecommendationInspector
             candidate={inspected}
             mode={project.presentation.expertiseMode}
@@ -865,124 +872,130 @@ export function App() {
             />
           )}
           <HarmonyDetails chord={previewChord} />
-        </aside>
-      </div>
-      <section className="progression-strip" aria-label="My Progression">
-        <div className="progression-heading">
-          <div className="progression-title-group">
-            <h2>My Progression</h2>
-            <div className="progression-preset-actions">
-              <button
-                type="button"
-                className="secondary-btn presets-trigger-btn"
-                onClick={() => setPresetsPanelOpen(true)}
-                data-testid="progression-presets-btn"
-              >
-                Presets
-              </button>
-              <button
-                type="button"
-                className="secondary-btn save-preset-trigger-btn"
-                onClick={() => setSavePresetDialogOpen(true)}
-                data-testid="progression-save-preset-btn"
-              >
-                Save as Preset
-              </button>
+        </>
+      }
+      progression={
+        <>
+          <div className="progression-heading">
+            <div className="progression-title-group">
+              <h2>My Progression</h2>
+              <div className="progression-preset-actions">
+                <button
+                  type="button"
+                  className="secondary-btn presets-trigger-btn"
+                  onClick={() => setPresetsPanelOpen(true)}
+                  data-testid="progression-presets-btn"
+                >
+                  Presets
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn save-preset-trigger-btn"
+                  onClick={() => setSavePresetDialogOpen(true)}
+                  data-testid="progression-save-preset-btn"
+                >
+                  Save as Preset
+                </button>
+              </div>
             </div>
+            <BranchControls
+              project={project}
+              selectedBranchStepIds={selectedBranchStepIds}
+              onStart={startExploration}
+              onRejoin={setRejoin}
+              onCommitWhole={commitWhole}
+              onCommitSelected={commitSelected}
+              onDiscard={discard}
+            />
           </div>
-          <BranchControls
+          <ProgressionTrack
             project={project}
-            selectedBranchStepIds={selectedBranchStepIds}
-            onStart={startExploration}
-            onRejoin={setRejoin}
-            onCommitWhole={commitWhole}
-            onCommitSelected={commitSelected}
-            onDiscard={discard}
+            currentPlayingStepIndex={transportState.currentStepIndex}
+            loopState={loopState}
+            {...(matrixSession.previewFunctionId
+              ? { previewFunctionId: matrixSession.previewFunctionId }
+              : {})}
+            onSelectStep={selectProgressionStep}
+            onEditPerformance={editProgressionPerformance}
+            onDurationChange={changeStepDuration}
+            onSetStepView={setProgressionStepView}
+            onSetAllViews={setProgressionViews}
+            onReplace={replaceProgressionStep}
+            onReset={resetProgressionStep}
+            onRemove={removeProgressionStep}
+            onReorder={reorderProgressionStep}
+            onAddRest={addRest}
           />
-        </div>
-        <ProgressionTrack
-          project={project}
-          currentPlayingStepIndex={transportState.currentStepIndex}
-          loopState={loopState}
-          {...(matrixSession.previewFunctionId
-            ? { previewFunctionId: matrixSession.previewFunctionId }
-            : {})}
-          onSelectStep={selectProgressionStep}
-          onEditPerformance={editProgressionPerformance}
-          onDurationChange={changeStepDuration}
-          onSetStepView={setProgressionStepView}
-          onSetAllViews={setProgressionViews}
-          onReplace={replaceProgressionStep}
-          onReset={resetProgressionStep}
-          onRemove={removeProgressionStep}
-          onReorder={reorderProgressionStep}
-          onAddRest={addRest}
-        />
-        <BranchComparison
-          project={project}
-          selectedStepIds={selectedBranchStepIds}
-          onSelectedStepIdsChange={(ids) => setSelectedBranchStepIds(Object.freeze(ids))}
-        />
-      </section>
-      {pendingSwitch ? (
-        <ModuleSwitchDialog
-          plan={pendingSwitch}
-          onCancel={() => setPendingSwitch(null)}
-          onConfirm={(resolutions) =>
-            applyModuleSwitch(pendingSwitch.destinationModule, resolutions)
-          }
-        />
-      ) : null}
-      {voicingEditorOpen && selectedProgressionStep && (
-        <PianoVoicingEditor
-          isOpen={voicingEditorOpen}
-          stepLabel={selectedProgressionStep.harmonicFunction.functionId}
-          initialPitches={
-            selectedProgressionStep.performance.manualVoicing?.length
-              ? selectedProgressionStep.performance.manualVoicing
-              : realizeProgressionStepPitches(selectedProgressionStep, project.tonic)
-          }
-          onClose={() => setVoicingEditorOpen(false)}
-          onSave={(pitches) => {
-            editProgressionPerformance(selectedProgressionStep.id, {
-              voicingMode: "manual",
-              manualVoicing: pitches,
-            });
-          }}
-          onResetToAuto={() => {
-            editProgressionPerformance(selectedProgressionStep.id, {
-              voicingMode: "auto",
-            });
-            setVoicingEditorOpen(false);
-          }}
-        />
-      )}
-      <PresetsPanel
-        isOpen={presetsPanelOpen}
-        isTopmost={!applyDialogPreset && !savePresetDialogOpen}
-        project={project}
-        onClose={() => setPresetsPanelOpen(false)}
-        onOpenApplyDialog={(preset) => {
-          setApplyDialogPreset(preset);
-        }}
-        onOpenSaveDialog={() => {
-          setSavePresetDialogOpen(true);
-        }}
-        onDeleteCustomPreset={handleDeleteCustomPreset}
-      />
-      <PresetApplyDialog
-        isOpen={Boolean(applyDialogPreset)}
-        preset={applyDialogPreset}
-        project={project}
-        onClose={() => setApplyDialogPreset(null)}
-        onApply={handleApplyPreset}
-      />
-      <SavePresetDialog
-        isOpen={savePresetDialogOpen}
-        project={project}
-        onClose={() => setSavePresetDialogOpen(false)}
-        onSave={handleSaveCustomPreset}
-      />
-    </main>
+          <BranchComparison
+            project={project}
+            selectedStepIds={selectedBranchStepIds}
+            onSelectedStepIdsChange={(ids) => setSelectedBranchStepIds(Object.freeze(ids))}
+          />
+        </>
+      }
+      overlays={
+        <>
+          {pendingSwitch ? (
+            <ModuleSwitchDialog
+              plan={pendingSwitch}
+              onCancel={() => setPendingSwitch(null)}
+              onConfirm={(resolutions) =>
+                applyModuleSwitch(pendingSwitch.destinationModule, resolutions)
+              }
+            />
+          ) : null}
+          {voicingEditorOpen && selectedProgressionStep && (
+            <PianoVoicingEditor
+              isOpen={voicingEditorOpen}
+              stepLabel={selectedProgressionStep.harmonicFunction.functionId}
+              initialPitches={
+                selectedProgressionStep.performance.manualVoicing?.length
+                  ? selectedProgressionStep.performance.manualVoicing
+                  : realizeProgressionStepPitches(selectedProgressionStep, project.tonic)
+              }
+              onClose={() => setVoicingEditorOpen(false)}
+              onSave={(pitches) => {
+                editProgressionPerformance(selectedProgressionStep.id, {
+                  voicingMode: "manual",
+                  manualVoicing: pitches,
+                });
+              }}
+              onResetToAuto={() => {
+                editProgressionPerformance(selectedProgressionStep.id, {
+                  voicingMode: "auto",
+                });
+                setVoicingEditorOpen(false);
+              }}
+            />
+          )}
+          <PresetsPanel
+            isOpen={presetsPanelOpen}
+            isTopmost={!applyDialogPreset && !savePresetDialogOpen}
+            project={project}
+            onClose={() => setPresetsPanelOpen(false)}
+            onOpenApplyDialog={(preset) => {
+              setApplyDialogPreset(preset);
+            }}
+            onOpenSaveDialog={() => {
+              setSavePresetDialogOpen(true);
+            }}
+            onDeleteCustomPreset={handleDeleteCustomPreset}
+          />
+          <PresetApplyDialog
+            isOpen={Boolean(applyDialogPreset)}
+            preset={applyDialogPreset}
+            project={project}
+            onClose={() => setApplyDialogPreset(null)}
+            onApply={handleApplyPreset}
+          />
+          <SavePresetDialog
+            isOpen={savePresetDialogOpen}
+            project={project}
+            onClose={() => setSavePresetDialogOpen(false)}
+            onSave={handleSaveCustomPreset}
+          />
+        </>
+      }
+    />
   );
 }

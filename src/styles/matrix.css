@@ -1,0 +1,40 @@
+.studio-matrix-area {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.studio-matrix-area > .matrix-panel {
+  width: 100%;
+  max-width: 100%;
+}
+
+.matrix-toolbar,
+.matrix-workbench,
+.matrix-grid,
+.matrix-layer,
+.matrix-layer-cards,
+.matrix-expanded-strip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.matrix-toolbar {
+  flex-wrap: wrap;
+}
+
+.matrix-toolbar > *,
+.matrix-toolbar-actions,
+.module-selector {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.matrix-toolbar-actions,
+.module-selector {
+  flex-wrap: wrap;
+}
+
+.matrix-layer-cards {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
