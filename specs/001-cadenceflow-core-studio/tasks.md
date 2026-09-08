@@ -323,9 +323,9 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T135 [US9] Implement explicit CadenceFlow-to-MusicXML mapping/omission rules in `src/export/musicxml/mapping.ts`
 - [x] T136 [US9] Implement MusicXML 4.0 writer in `src/export/musicxml/writer.ts`
 - [x] T137 [US9] Complete offline MusicXML XSD validation tooling and cached schema fixtures in `scripts/validate-musicxml.ts` and `tests/fixtures/exports/musicxml/`
-- [ ] T138 [US9] Implement export commands/UI with empty-progression validation in `src/ui/projects/ExportActions.tsx`
-- [ ] T139 [US9] Write integration test comparing playback event realization, MIDI projection, and MusicXML semantic projection to the same canonical fixture in `tests/integration/export-projection-consistency.test.ts`
-- [ ] T140 [US9] Write Playwright acceptance for MIDI/MusicXML export availability and empty-project error state in `tests/e2e/us9-export.spec.ts`
+- [x] T138 [US9] Implement export commands/UI with empty-progression validation in `src/ui/projects/ExportActions.tsx`
+- [x] T139 [US9] Write integration test comparing playback event realization, MIDI projection, and MusicXML semantic projection to the same canonical fixture in `tests/integration/export-projection-consistency.test.ts`
+- [x] T140 [US9] Write Playwright acceptance for MIDI/MusicXML export availability and empty-project error state in `tests/e2e/us9-export.spec.ts`
 
 **Checkpoint**: MIDI and MusicXML are independent projections of the same semantic/performance model and preserve all representable pitches, timing, spelling, velocity, meter, tempo, dynamics, and rests.
 

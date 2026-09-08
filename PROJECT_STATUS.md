@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-07  
-**Current implementation stage:** Phase 12 / User Story 9 (Export) IN PROGRESS; MIDI Batch A T130/T132/T133 and MusicXML Batch B T131/T134–T137 accepted; final export UI/integration/browser acceptance T138–T140 pending; US8 complete
-**Task progress:** 137 accepted tasks, 137 / 158 total tasks
+**Handoff date:** 2026-09-08
+**Current implementation stage:** Phase 12 / User Story 9 (Export) implementation code-complete; T130–T140 implemented and accepted; the external interoperability gate remains open; US8 complete
+**Task progress:** 140 accepted tasks, 140 / 158 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. The current milestone is **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — with MIDI Batch A (**T130, T132, T133**) and MusicXML Batch B (**T131, T134–T137**) **ACCEPTED**; final export UI/integration/browser acceptance remains pending (overall 137 / 158).
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED** (overall 140 / 158). SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -428,6 +428,21 @@ Accepted implementation basis:
 - Fresh writer output passes offline XSD validation; the intentionally invalid fixture is rejected with exit code `1`.
 - Official schema cache is byte-identical to the prior accepted cache; `spec.md` is unchanged.
 
+### US9 Batch C — export UI, cross-projection integration, and browser acceptance — T138–T140
+
+Accepted implementation basis:
+- `src/ui/projects/ExportActions.tsx` and `src/ui/projects/exportActionSupport.ts` (`T138`): Project-menu MIDI/MusicXML export with explicit empty-progression validation, saved-progression-only export, non-mutating state/history behavior, actionable MusicXML omission diagnostics, and browser Blob URL lifecycle handling.
+- `tests/integration/export-projection-consistency.test.ts` (`T139`): playback event realization, MIDI projection, and MusicXML semantic projection are compared against one canonical fixture.
+- `tests/e2e/us9-export.spec.ts` (`T140`): Chromium acceptance covers successful exports, empty and Rest-only progressions, active-branch exclusion, redo/history preservation, and download failure handling.
+
+Final verified US9 acceptance baseline:
+- Full Vitest: `58 files / 527 tests` PASS.
+- US9 Chromium ×3: `12 / 12` in each run, retries `0`.
+- Full Chromium: `49 / 49`, retries `0`.
+- TypeScript, production build, ESLint, Prettier, and `git diff --check`: PASS.
+
+External interoperability remains an honest open gap: SC-013 and SC-014 have not been verified in independent MIDI/notation applications. The gate is scheduled for closure no later than T150/T157; heavy applications are intentionally not installed in this assignment.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -553,11 +568,11 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 MIDI Batch A and MusicXML Batch B are accepted, with T138–T140 pending.
+4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 12 / US9 — T138–T140
+## 8. Next development sequence: Phase 13 / US10 — T141–T149
 
-Active milestone is **Phase 12: User Story 9 — Transfer the composition to notation and DAW workflows (Priority: P2)**. MIDI Batch A and MusicXML Batch B are accepted; the remaining scope is T138–T140:
+Active milestone is **Phase 13: User Story 10 — Work in one focused wide desktop studio (Priority: P2)**. User Story 9 is implementation code-complete and accepted through T140, with SC-013/SC-014 external interoperability still open. The next controlled scope is T141–T149:
 
 - **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
@@ -575,7 +590,7 @@ Active milestone is **Phase 12: User Story 9 — Transfer the composition to not
 - **T132**: [x] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`.
 - **T133**: [x] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`.
 - **T134–T137**: [x] Implement MusicXML semantic projection, explicit mapping policy, MusicXML 4.0 writer, and offline XSD validation.
-- **T138–T140**: [ ] Implement export UI, cross-projection integration acceptance, and browser export acceptance.
+- **T138–T140**: [x] Implement export UI, cross-projection integration acceptance, and browser export acceptance.
 
 ## 9. Handoff operating model
 
