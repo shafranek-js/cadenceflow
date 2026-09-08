@@ -7,6 +7,23 @@ async function waitForStudio(page: Page): Promise<void> {
 }
 
 test.describe("Progression step dismissal", () => {
+  test("restores keyboard focus to a Rest step after Escape", async ({ page }) => {
+    await waitForStudio(page);
+    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+
+    const restSelect = page.getByRole("button", {
+      name: "Select progression step 1: Rest",
+      exact: true,
+    });
+    await restSelect.click();
+    await expect(page.locator(".progression-rest-card .step-editor")).toBeVisible();
+    await restSelect.focus();
+    await page.keyboard.press("Escape");
+
+    await expect(page.locator(".progression-rest-card .step-editor")).toHaveCount(0);
+    await expect(restSelect).toBeFocused();
+  });
+
   test("supports click and keyboard toggle, Escape focus restoration, and empty-background dismissal", async ({
     page,
   }) => {
