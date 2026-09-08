@@ -14,6 +14,7 @@ export const EMPTY_PROGRESSION_EXPORT_MESSAGE =
 const MIDI_MIME_TYPE = "audio/midi";
 const MUSICXML_MIME_TYPE = "application/vnd.recordare.musicxml+xml";
 const WINDOWS_RESERVED_BASENAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const DOWNLOAD_URL_REVOKE_DELAY_MS = 1_000;
 
 export interface BrowserExportFile {
   readonly filename: string;
@@ -57,7 +58,8 @@ export function sanitizeExportBaseName(rawName: string): string {
     .trim();
   const meaningful = sanitized.replace(/[. -]/g, "");
   if (!meaningful || sanitized === "." || sanitized === "..") return "CadenceFlow";
-  if (WINDOWS_RESERVED_BASENAME.test(sanitized)) return `CadenceFlow-${sanitized}`;
+  const windowsDeviceStem = (sanitized.split(".", 1)[0] ?? "").trimEnd();
+  if (WINDOWS_RESERVED_BASENAME.test(windowsDeviceStem)) return `CadenceFlow-${sanitized}`;
   return sanitized;
 }
 
@@ -102,17 +104,24 @@ export function downloadBrowserExport(file: BrowserExportFile): void {
   const url = URL.createObjectURL(
     new Blob([file.data as unknown as BlobPart], { type: file.mimeType }),
   );
+  const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
   const link = document.createElement("a");
   link.href = url;
   link.download = file.filename;
   link.setAttribute("aria-hidden", "true");
   link.style.display = "none";
   document.body.appendChild(link);
+  let downloadStarted = false;
   try {
     link.click();
+    downloadStarted = true;
   } finally {
     link.remove();
-    URL.revokeObjectURL(url);
+    if (downloadStarted) {
+      globalThis.setTimeout(() => revokeObjectUrl(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
+    } else {
+      revokeObjectUrl(url);
+    }
   }
 }
 

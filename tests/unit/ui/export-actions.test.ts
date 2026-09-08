@@ -33,6 +33,9 @@ describe("T138 — export actions", () => {
     expect(sanitizeExportBaseName("Session: / take?*")).toBe("Session- - take--");
     expect(sanitizeExportBaseName("...   ")).toBe("CadenceFlow");
     expect(sanitizeExportBaseName("CON")).toBe("CadenceFlow-CON");
+    expect(sanitizeExportBaseName("CON.txt")).toBe("CadenceFlow-CON.txt");
+    expect(sanitizeExportBaseName("LPT1.backup")).toBe("CadenceFlow-LPT1.backup");
+    expect(sanitizeExportBaseName("CON .session")).toBe("CadenceFlow-CON .session");
   });
 
   it("keeps Rest-only progression exportable while blocking an empty progression", () => {
@@ -54,7 +57,8 @@ describe("T138 — export actions", () => {
     );
   });
 
-  it("downloads bytes with the format MIME and always releases the Blob URL", () => {
+  it("keeps the Blob URL alive through download dispatch and releases it afterward", () => {
+    vi.useFakeTimers();
     const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
     const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const click = vi
@@ -68,7 +72,32 @@ describe("T138 — export actions", () => {
       });
       expect(createObjectURL).toHaveBeenCalledOnce();
       expect(click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+      vi.runAllTimers();
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:test");
+    } finally {
+      vi.useRealTimers();
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+      click.mockRestore();
+    }
+  });
+
+  it("releases the Blob URL immediately when download dispatch throws", () => {
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-error");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+      throw new Error("dispatch failed");
+    });
+    try {
+      expect(() =>
+        downloadBrowserExport({
+          filename: "Take.mid",
+          mimeType: "audio/midi",
+          data: Uint8Array.from([0x4d, 0x54]),
+        }),
+      ).toThrow("dispatch failed");
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:test-error");
     } finally {
       createObjectURL.mockRestore();
       revokeObjectURL.mockRestore();
