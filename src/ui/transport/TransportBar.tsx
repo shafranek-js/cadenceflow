@@ -5,7 +5,6 @@ import { meter } from "../../domain/timing/meter";
 import type { GrooveSettings } from "../../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import { rational } from "../../domain/timing/rational";
-import type { TransportState } from "./transportStore";
 import type { LoopMode, LoopState } from "./loopState";
 import { MetronomeControls } from "./MetronomeControls";
 import { StepDurationControl } from "../timing/StepDurationControl";
@@ -13,15 +12,9 @@ import { formatDurationBeats } from "../timing/stepDuration";
 
 export interface TransportBarProps {
   readonly project: Project;
-  readonly transportState: TransportState;
   readonly loopState: LoopState;
   readonly metronomeEnabled: boolean;
   readonly countInEnabled: boolean;
-  readonly onPlay: () => void;
-  readonly onPlayFromHere: (stepId: string) => void;
-  readonly onPause: () => void;
-  readonly onResume: () => void;
-  readonly onStop: () => void;
   readonly onSetTempo: (tempoBpm: number) => void;
   readonly onSetMeter: (newMeter: Meter, policy: MeterChangePolicy) => void;
   readonly onSetGroove: (groove: GrooveSettings) => void;
@@ -38,15 +31,9 @@ export interface TransportBarProps {
 
 export function TransportBar({
   project,
-  transportState,
   loopState,
   metronomeEnabled,
   countInEnabled,
-  onPlay,
-  onPlayFromHere,
-  onPause,
-  onResume,
-  onStop,
   onSetTempo,
   onSetMeter,
   onSetGroove,
@@ -203,88 +190,14 @@ export function TransportBar({
     }
   };
 
-  const isPlaying = transportState.status === "playing";
-  const isPaused = transportState.status === "paused";
-  const isStopped = transportState.status === "stopped";
-
   return (
     <nav className="transport-bar" aria-label="Playback Transport">
-      {/* 1. Main Transport Controls */}
+      {/* History remains global; playback transport is owned by My Progression. */}
       <div
-        className="transport-section transport-playback"
+        className="transport-section transport-history"
         role="group"
-        aria-label="Playback Controls"
+        aria-label="History Controls"
       >
-        <button
-          type="button"
-          className="transport-button transport-play"
-          onClick={onPlay}
-          disabled={isPlaying}
-          aria-label="Play"
-          title="Play progression"
-        >
-          <span className="transport-btn-icon" aria-hidden="true">
-            ▶
-          </span>
-          <span className="transport-btn-label">Play</span>
-        </button>
-
-        <button
-          type="button"
-          className="transport-button transport-play-from-here"
-          onClick={() => selectedStepId && onPlayFromHere(selectedStepId)}
-          disabled={isPlaying || !selectedStepId}
-          aria-label="Play From Here"
-          title={selectedStepId ? "Play from selected step" : "Select a step to play from here"}
-        >
-          <span className="transport-btn-icon" aria-hidden="true">
-            ⏩
-          </span>
-          <span className="transport-btn-label">From Here</span>
-        </button>
-
-        <button
-          type="button"
-          className="transport-button transport-pause"
-          onClick={onPause}
-          disabled={!isPlaying}
-          aria-label="Pause"
-          title="Pause playback"
-        >
-          <span className="transport-btn-icon" aria-hidden="true">
-            ⏸
-          </span>
-          <span className="transport-btn-label">Pause</span>
-        </button>
-
-        <button
-          type="button"
-          className="transport-button transport-resume"
-          onClick={onResume}
-          disabled={!isPaused}
-          aria-label="Resume"
-          title="Resume playback"
-        >
-          <span className="transport-btn-icon" aria-hidden="true">
-            ⏯
-          </span>
-          <span className="transport-btn-label">Resume</span>
-        </button>
-
-        <button
-          type="button"
-          className="transport-button transport-stop"
-          onClick={onStop}
-          disabled={isStopped}
-          aria-label="Stop"
-          title="Stop playback"
-        >
-          <span className="transport-btn-icon" aria-hidden="true">
-            ⏹
-          </span>
-          <span className="transport-btn-label">Stop</span>
-        </button>
-
         {onUndo && (
           <button
             type="button"
@@ -315,28 +228,6 @@ export function TransportBar({
             </span>
             <span className="transport-btn-label">Redo</span>
           </button>
-        )}
-
-        <div
-          role="status"
-          aria-live="polite"
-          className={`transport-status-badge status-${transportState.status}`}
-          data-testid="transport-status"
-        >
-          <span className="status-dot" aria-hidden="true" />
-          <span className="status-text">
-            {transportState.status === "playing"
-              ? `Playing${transportState.currentStepIndex !== null ? ` (Step ${transportState.currentStepIndex + 1})` : ""}`
-              : transportState.status === "paused"
-                ? "Paused"
-                : "Stopped"}
-          </span>
-        </div>
-
-        {transportState.error && (
-          <div role="alert" className="transport-error-badge" data-testid="transport-error">
-            {transportState.error}
-          </div>
         )}
       </div>
 

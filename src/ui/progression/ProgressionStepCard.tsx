@@ -13,7 +13,6 @@ import { StaffCardView } from "../staff/StaffCardView";
 import { StepCardViewSwitcher } from "./StepCardViewSwitcher";
 import { StepDurationControl } from "./StepDurationControl";
 import { StepActions } from "./StepActions";
-import { activateFromKeyboard } from "../studio/focusManagement";
 
 const ARTICULATIONS: readonly PianoArticulation[] = [
   "block",
@@ -67,28 +66,37 @@ export function ProgressionStepCard({
       data-playing={playing ? "true" : undefined}
       data-in-loop={inLoop ? "true" : undefined}
       onClick={onSelect}
-      onKeyDown={(event) => activateFromKeyboard(event, onSelect)}
-      tabIndex={0}
-      aria-label={`Progression step ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`}
-      aria-current={playing ? "step" : undefined}
     >
-      {playing ? (
-        <span className="step-state-indicator playing-indicator">
-          <span aria-hidden="true">▶</span> Playing
-        </span>
-      ) : null}
-      <div className="step-view">
-        {step.cardView === "harmonic" ? (
-          <>
-            <strong data-testid="step-function">{step.harmonicFunction.functionId}</strong>
-            <span>
-              {step.performance.articulation} · v{step.performance.masterVelocity} · {durationLabel}
-            </span>
-          </>
+      <button
+        type="button"
+        className="progression-step-select-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+        aria-label={`Select progression step ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`}
+        aria-pressed={selected}
+        aria-current={playing ? "step" : undefined}
+      >
+        {playing ? (
+          <span className="step-state-indicator playing-indicator" aria-hidden="true">
+            ▶ Playing
+          </span>
         ) : null}
-        {step.cardView === "piano" ? <PianoCardView pitches={pitches} /> : null}
-        {step.cardView === "staff" ? <StaffCardView pitches={pitches} /> : null}
-      </div>
+        <span className="step-view">
+          {step.cardView === "harmonic" ? (
+            <>
+              <strong data-testid="step-function">{step.harmonicFunction.functionId}</strong>
+              <span>
+                {step.performance.articulation} · v{step.performance.masterVelocity} ·{" "}
+                {durationLabel}
+              </span>
+            </>
+          ) : null}
+          {step.cardView === "piano" ? <PianoCardView pitches={pitches} /> : null}
+          {step.cardView === "staff" ? <StaffCardView pitches={pitches} /> : null}
+        </span>
+      </button>
       <StepCardViewSwitcher value={step.cardView} stepId={step.id} onChange={onViewChange} />
       {selected ? (
         <div

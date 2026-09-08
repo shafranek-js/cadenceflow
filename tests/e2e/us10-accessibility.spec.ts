@@ -42,12 +42,37 @@ async function expectNoPageHorizontalScroll(page: Page): Promise<void> {
 
 async function contrastRatio(page: Page, locator: Locator): Promise<number> {
   return locator.evaluate((element) => {
-    const parse = (value: string): [number, number, number] => {
+    type Rgba = [number, number, number, number];
+    const parse = (value: string): Rgba => {
       const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (!match) throw new Error(`Expected computed RGB color, received ${value}`);
-      return [Number(match[1]), Number(match[2]), Number(match[3])];
+      const alpha = value.startsWith("rgba")
+        ? Number(value.match(/,\s*([\d.]+)\s*\)$/)?.[1] ?? "1")
+        : 1;
+      return [Number(match[1]), Number(match[2]), Number(match[3]), alpha];
     };
-    const luminance = ([red, green, blue]: [number, number, number]) =>
+    const blend = (foreground: Rgba, background: Rgba): Rgba => {
+      const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+      return [
+        (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) /
+          alpha,
+        (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) /
+          alpha,
+        (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) /
+          alpha,
+        alpha,
+      ];
+    };
+    const effectiveBackground = (target: Element): Rgba => {
+      const layers: Rgba[] = [];
+      for (let current: Element | null = target; current; current = current.parentElement) {
+        layers.push(parse(getComputedStyle(current).backgroundColor));
+      }
+      return layers
+        .reverse()
+        .reduce((background, layer) => blend(layer, background), [255, 255, 255, 1] as Rgba);
+    };
+    const luminance = ([red, green, blue]: Rgba) =>
       [red, green, blue]
         .map((channel) => {
           const normalized = channel / 255;
@@ -55,8 +80,9 @@ async function contrastRatio(page: Page, locator: Locator): Promise<number> {
         })
         .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index]!, 0);
     const styles = getComputedStyle(element);
-    const foreground = luminance(parse(styles.color));
-    const background = luminance(parse(styles.backgroundColor));
+    const effectiveBackgroundColor = effectiveBackground(element);
+    const foreground = luminance(blend(parse(styles.color), effectiveBackgroundColor));
+    const background = luminance(effectiveBackgroundColor);
     return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
   });
 }
@@ -65,6 +91,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
   test("supports Tab, Enter, Space, settings/reset, and keyboard progression reorder", async ({
     page,
   }) => {
+    test.slow();
     await waitForStudio(page);
 
     const matrixCard = page.getByTestId("chord-card-I");
@@ -104,9 +131,13 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await expect(steps).toHaveCount(beforeAdd + 3);
     const identityBeforeReorder = await readProgressionIdentity(page);
     const middleStep = steps.nth(1);
-    await middleStep.focus();
+    const middleStepSelect = middleStep.getByRole("button", {
+      name: /Select progression step IV/,
+    });
+    await middleStepSelect.focus();
     await page.keyboard.press("Enter");
     await expect(middleStep).toHaveAttribute("data-selected", "true");
+    await expect(middleStepSelect).toHaveAttribute("aria-pressed", "true");
 
     const moveLeft = page.getByRole("button", { name: "Move step left" });
     await moveLeft.focus();
@@ -132,6 +163,20 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     );
     await expect(page.locator('[data-testid="progression-step"]').nth(1)).toContainText("IV");
     expect(await readProgressionIdentity(page)).toEqual(identityBeforeReorder);
+
+    expect(await middleStep.getAttribute("role")).toBeNull();
+    expect(await middleStep.getAttribute("tabindex")).toBeNull();
+    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    const restStep = page.locator('[data-testid="progression-step"]').last();
+    const restStepSelect = restStep.getByRole("button", {
+      name: "Select progression rest step",
+      exact: true,
+    });
+    await restStepSelect.focus();
+    await page.keyboard.press("Space");
+    await expect(restStepSelect).toHaveAttribute("aria-pressed", "true");
+    expect(await restStep.getAttribute("role")).toBeNull();
+    expect(await restStep.getAttribute("tabindex")).toBeNull();
   });
 
   test("keeps global and per-card views keyboard-accessible with focus preservation", async ({
@@ -184,10 +229,16 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
       .locator('[data-testid^="chord-card-"]')
       .evaluateAll((cards) => cards.map((card) => card.getAttribute("data-testid")));
 
-    await page.getByRole("button", { name: "Light theme" }).click();
+    const lightTheme = page.getByRole("button", { name: "Light theme" });
+    await lightTheme.focus();
+    await page.keyboard.press("Enter");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    await page.getByRole("button", { name: "Beginner expertise mode" }).click();
-    await page.getByRole("button", { name: "Expert expertise mode" }).click();
+    const beginnerMode = page.getByRole("button", { name: "Beginner expertise mode" });
+    await beginnerMode.focus();
+    await page.keyboard.press("Space");
+    const expertMode = page.getByRole("button", { name: "Expert expertise mode" });
+    await expertMode.focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("button", { name: "Expert expertise mode" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -222,8 +273,14 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
   test("covers module dialog lifecycle, transport states, non-color signals, and contrast", async ({
     page,
   }) => {
+    test.slow();
     await waitForStudio(page);
     await page.getByRole("button", { name: "Add bIII to progression" }).click();
+    await page
+      .locator('[data-testid="progression-step"]')
+      .last()
+      .getByRole("button", { name: /Select progression step bIII/ })
+      .click();
     await page
       .getByTestId("chord-card-I")
       .getByRole("button", { name: /Preview I/ })
@@ -260,14 +317,31 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     const pause = page.getByRole("button", { name: "Pause", exact: true });
     const resume = page.getByRole("button", { name: "Resume", exact: true });
     const stop = page.getByRole("button", { name: "Stop", exact: true });
-    await play.click();
+    const loopAll = page.getByRole("button", { name: "All", exact: true });
+    await loopAll.focus();
+    await page.keyboard.press("Enter");
+    await expect(loopAll).toHaveAttribute("aria-pressed", "true");
+    await play.focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByTestId("transport-status")).toContainText("Playing");
-    await pause.click();
+    await pause.focus();
+    await page.keyboard.press("Space");
     await expect(page.getByTestId("transport-status")).toContainText("Paused");
-    await resume.click();
+    await resume.focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByTestId("transport-status")).toContainText("Playing");
-    await stop.click();
+    await stop.focus();
+    await page.keyboard.press("Space");
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
+
+    const swing = page.getByRole("button", { name: "Toggle Swing Feel" });
+    await swing.focus();
+    await page.keyboard.press("Enter");
+    await expect(swing).toHaveAttribute("aria-pressed", "true");
+    const metronome = page.getByRole("button", { name: "Toggle Metronome" });
+    await metronome.focus();
+    await page.keyboard.press("Space");
+    await expect(metronome).toHaveAttribute("aria-pressed", "true");
 
     await expect(page.getByText("What-if branch active", { exact: true })).not.toBeVisible();
     await page.getByRole("button", { name: "Explore Alternative" }).click();
@@ -283,6 +357,26 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
         page.getByRole("button", { name: theme === "dark" ? "Dark theme" : "Light theme" }),
       );
       const bodyContrast = await contrastRatio(page, page.locator("body"));
+      const selectedPolicyContrast = await contrastRatio(
+        page,
+        page.locator(".meter-policy-toggle .policy-option.is-selected"),
+      );
+      const activeVelocityViewContrast = await contrastRatio(
+        page,
+        page.locator(".view-preference-toggle button.is-active"),
+      );
+      const activeLoopContrast = await contrastRatio(
+        page,
+        page.locator(".loop-mode-btn.is-active"),
+      );
+      const activeGrooveContrast = await contrastRatio(
+        page,
+        page.locator(".groove-toggle-btn.is-active"),
+      );
+      const activeTransportToggleContrast = await contrastRatio(
+        page,
+        page.locator(".transport-toggle-button.is-active").first(),
+      );
       const themeButton = page.getByRole("button", {
         name: theme === "dark" ? "Dark theme" : "Light theme",
       });
@@ -298,13 +392,27 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
           outlineColor: styles.outlineColor,
         };
       });
-      return { controlContrast, bodyContrast, focusEvidence };
+      return {
+        controlContrast,
+        bodyContrast,
+        selectedPolicyContrast,
+        activeVelocityViewContrast,
+        activeLoopContrast,
+        activeGrooveContrast,
+        activeTransportToggleContrast,
+        focusEvidence,
+      };
     };
 
     for (const theme of ["dark", "light"] as const) {
       const evidence = await readThemeEvidence(theme);
       expect(evidence.controlContrast).toBeGreaterThanOrEqual(3);
       expect(evidence.bodyContrast).toBeGreaterThanOrEqual(4.5);
+      expect(evidence.selectedPolicyContrast).toBeGreaterThanOrEqual(4.5);
+      expect(evidence.activeVelocityViewContrast).toBeGreaterThanOrEqual(4.5);
+      expect(evidence.activeLoopContrast).toBeGreaterThanOrEqual(4.5);
+      expect(evidence.activeGrooveContrast).toBeGreaterThanOrEqual(4.5);
+      expect(evidence.activeTransportToggleContrast).toBeGreaterThanOrEqual(4.5);
       expect(evidence.focusEvidence?.outlineStyle).toBe("solid");
       expect(evidence.focusEvidence?.outlineWidth).not.toBe("0px");
       expect(evidence.focusEvidence?.outlineColor).not.toBe("transparent");

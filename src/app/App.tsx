@@ -47,6 +47,7 @@ import { HarmonyDetails } from "../ui/inspector/HarmonyDetails";
 import { CompositionIntentControl } from "../ui/inspector/CompositionIntentControl";
 import { BranchComparison } from "../ui/progression/BranchComparison";
 import { BranchControls } from "../ui/progression/BranchControls";
+import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
@@ -486,6 +487,7 @@ export function App() {
     store.dispatch(command, setGlobalCardView);
   };
   const changeTheme = (theme: ThemeMode) => {
+    if (theme === project.presentation.theme) return;
     const command: SetThemeCommand = {
       type: "presentation/set-theme",
       payload: { theme, nowIso: new Date().toISOString() },
@@ -493,6 +495,7 @@ export function App() {
     store.dispatch(command, setTheme);
   };
   const changeExpertiseMode = (expertiseMode: PresentationMode) => {
+    if (expertiseMode === project.presentation.expertiseMode) return;
     const command: SetExpertiseModeCommand = {
       type: "presentation/set-expertise-mode",
       payload: { expertiseMode, nowIso: new Date().toISOString() },
@@ -829,15 +832,9 @@ export function App() {
       transport={
         <TransportBar
           project={project}
-          transportState={transportState}
           loopState={loopState}
           metronomeEnabled={metronomeEnabled}
           countInEnabled={countInEnabled}
-          onPlay={handlePlay}
-          onPlayFromHere={handlePlayFromHere}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStop={handleStop}
           onSetTempo={changeTempo}
           onSetMeter={changeMeter}
           onSetGroove={changeGroove}
@@ -943,6 +940,15 @@ export function App() {
               onDiscard={discard}
             />
           </div>
+          <ProgressionTransportControls
+            selectedStepId={project.progression.selectedStepId}
+            transportState={transportState}
+            onPlay={handlePlay}
+            onPlayFromHere={handlePlayFromHere}
+            onPause={handlePause}
+            onResume={handleResume}
+            onStop={handleStop}
+          />
           <ProgressionTrack
             project={project}
             currentPlayingStepIndex={transportState.currentStepIndex}
