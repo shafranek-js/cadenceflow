@@ -222,6 +222,17 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     page,
   }) => {
     await waitForStudio(page);
+    const undo = page.getByRole("button", { name: "Undo", exact: true });
+    await expect(undo).toBeDisabled();
+
+    const activeTheme = page.getByRole("button", { name: "Dark theme" });
+    await activeTheme.focus();
+    await page.keyboard.press("Enter");
+    const activeExpertise = page.getByRole("button", { name: "Composer expertise mode" });
+    await activeExpertise.focus();
+    await page.keyboard.press("Space");
+    await expect(undo).toBeDisabled();
+
     await page.getByRole("button", { name: "Add I to progression" }).click();
     await page.getByRole("button", { name: "Add V to progression" }).click();
     const progressionBefore = await readProgressionIdentity(page);

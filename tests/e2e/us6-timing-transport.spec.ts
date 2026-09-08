@@ -564,7 +564,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
       // Verify all card-local controls and actions are visible, non-overlapping, and accessible
       await expect(durationSelect).toBeVisible();
       await expect(resetPerfBtn).toBeVisible();
-      await expect(steps.first().getByRole("button", { name: "Remove" })).toBeVisible();
+      await expect(
+        steps.first().getByRole("button", { name: "Remove", exact: true }),
+      ).toBeVisible();
       await expect(steps.first().getByRole("button", { name: "Move step right" })).toBeVisible();
 
       // US10 layout follow-up: .piano-performance-inspector uses overflow-x:auto because the

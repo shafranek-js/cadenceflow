@@ -7,10 +7,14 @@ export interface MatrixSessionState {
   readonly previewFunctionId?: string;
 }
 
+export interface AppStoreChange {
+  readonly persist: boolean;
+}
+
 export class AppStore {
   #project: Project;
   #matrixSession: MatrixSessionState = Object.freeze({});
-  #listeners = new Set<() => void>();
+  #listeners = new Set<(change: AppStoreChange) => void>();
   readonly history = new SessionHistory();
 
   constructor(project: Project) {
@@ -24,23 +28,23 @@ export class AppStore {
     return this.#matrixSession;
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(listener: (change: AppStoreChange) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
 
-  #notify(): void {
-    for (const listener of this.#listeners) listener();
+  #notify(change: AppStoreChange = { persist: true }): void {
+    for (const listener of this.#listeners) listener(change);
   }
 
   selectMatrixPreview(functionId: string): void {
     this.#matrixSession = Object.freeze({ previewFunctionId: functionId });
-    this.#notify();
+    this.#notify({ persist: false });
   }
 
   clearMatrixPreview(): void {
     this.#matrixSession = Object.freeze({});
-    this.#notify();
+    this.#notify({ persist: false });
   }
 
   dispatch<TCommand extends ProjectCommand>(
@@ -50,10 +54,11 @@ export class AppStore {
     const before = this.#project;
     const applied = handler(before, command);
     this.#project = applied.project;
-    if (command.type !== "progression/select-step") {
+    const persist = command.type !== "progression/select-step";
+    if (persist) {
       this.history.push({ forward: applied.forward ?? command, inverse: applied.inverse });
     }
-    this.#notify();
+    this.#notify({ persist });
   }
 
   undo(): boolean {

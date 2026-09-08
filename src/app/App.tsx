@@ -394,12 +394,18 @@ export function App() {
     };
     store.dispatch(command, resetMatrixScope);
   };
-  const selectProgressionStep = (stepId: string) => {
+  const setProgressionSelection = (stepId?: string) => {
+    if (store.project.progression.selectedStepId === stepId) return;
     const command: SelectStepCommand = {
       type: "progression/select-step",
-      payload: { stepId, nowIso: new Date().toISOString() },
+      payload: { ...(stepId ? { stepId } : {}), nowIso: new Date().toISOString() },
     };
     store.dispatch(command, selectStep);
+  };
+  const selectProgressionStep = (stepId: string) => {
+    setProgressionSelection(
+      store.project.progression.selectedStepId === stepId ? undefined : stepId,
+    );
   };
   const editProgressionPerformance = (stepId: string, performance: Partial<StepPerformance>) => {
     const command: EditStepPerformanceCommand = {
@@ -906,6 +912,7 @@ export function App() {
           <HarmonyDetails chord={previewChord} />
         </>
       }
+      onProgressionBackgroundClick={() => setProgressionSelection()}
       progression={
         <>
           <div className="progression-heading">
@@ -957,6 +964,7 @@ export function App() {
               ? { previewFunctionId: matrixSession.previewFunctionId }
               : {})}
             onSelectStep={selectProgressionStep}
+            onClearSelection={() => setProgressionSelection()}
             onEditPerformance={editProgressionPerformance}
             onDurationChange={changeStepDuration}
             onSetStepView={setProgressionStepView}

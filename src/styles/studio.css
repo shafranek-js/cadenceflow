@@ -749,6 +749,7 @@
 .progression-rest-card {
   flex: 0 0 170px;
   min-height: 94px;
+  position: relative;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2255,12 +2256,38 @@ summary:focus-visible,
   display: grid;
   width: 100%;
   min-height: 52px;
-  padding: 0;
+  padding: 0 20px 0 0;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: inherit;
   cursor: pointer;
+}
+
+.progression-step-remove-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.progression-step-remove-button:hover,
+.progression-step-remove-button:focus-visible {
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 12%, var(--surface-2));
+  color: var(--error);
 }
 
 .progression-step-card.is-selected,

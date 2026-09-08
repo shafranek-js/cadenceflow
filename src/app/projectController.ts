@@ -121,8 +121,8 @@ export class ProjectController {
   startAutosave(): void {
     if (this.autosaveStarted) return;
     this.autosaveStarted = true;
-    this.unsubscribeStore = this.store.subscribe(() => {
-      this.autosave.scheduleAutosave(this.store.project);
+    this.unsubscribeStore = this.store.subscribe((change) => {
+      if (change.persist) this.autosave.scheduleAutosave(this.store.project);
     });
     this.autosave.scheduleAutosave(this.store.project);
   }

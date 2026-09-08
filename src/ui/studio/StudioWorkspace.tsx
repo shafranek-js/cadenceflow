@@ -6,6 +6,7 @@ export interface StudioWorkspaceProps {
   readonly matrix: ReactNode;
   readonly inspector: ReactNode;
   readonly progression: ReactNode;
+  readonly onProgressionBackgroundClick?: () => void;
   readonly overlays?: ReactNode;
 }
 
@@ -22,6 +23,7 @@ export function StudioWorkspace({
   matrix,
   inspector,
   progression,
+  onProgressionBackgroundClick,
   overlays,
 }: StudioWorkspaceProps) {
   return (
@@ -35,7 +37,13 @@ export function StudioWorkspace({
       <section className="studio-grid" aria-label="Studio work area">
         <div className="studio-main-column">
           <div className="studio-matrix-area">{matrix}</div>
-          <section className="progression-strip" aria-label="My Progression">
+          <section
+            className="progression-strip"
+            aria-label="My Progression"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) onProgressionBackgroundClick?.();
+            }}
+          >
             {progression}
           </section>
         </div>

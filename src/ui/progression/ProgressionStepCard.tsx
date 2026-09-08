@@ -13,6 +13,7 @@ import { StaffCardView } from "../staff/StaffCardView";
 import { StepCardViewSwitcher } from "./StepCardViewSwitcher";
 import { StepDurationControl } from "./StepDurationControl";
 import { StepActions } from "./StepActions";
+import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 
 const ARTICULATIONS: readonly PianoArticulation[] = [
   "block",
@@ -67,9 +68,15 @@ export function ProgressionStepCard({
       data-in-loop={inLoop ? "true" : undefined}
       onClick={onSelect}
     >
+      <ProgressionStepRemoveButton
+        accessibleName={`Remove progression step ${step.harmonicFunction.functionId}`}
+        onRemove={onRemove}
+      />
       <button
         type="button"
         className="progression-step-select-button"
+        data-progression-step-select
+        data-step-id={step.id}
         onClick={(event) => {
           event.stopPropagation();
           onSelect();
@@ -97,7 +104,9 @@ export function ProgressionStepCard({
           {step.cardView === "staff" ? <StaffCardView pitches={pitches} /> : null}
         </span>
       </button>
-      <StepCardViewSwitcher value={step.cardView} stepId={step.id} onChange={onViewChange} />
+      <div onClick={(event) => event.stopPropagation()}>
+        <StepCardViewSwitcher value={step.cardView} stepId={step.id} onChange={onViewChange} />
+      </div>
       {selected ? (
         <div
           className="step-editor"

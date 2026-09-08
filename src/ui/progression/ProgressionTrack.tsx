@@ -1,9 +1,16 @@
-import type { ChangeEvent, DragEvent, MouseEvent } from "react";
+import {
+  useRef,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import type { Project } from "../../domain/project/project";
 import type { CardViewId, StepPerformance } from "../../domain/progression/step";
 import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
+import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { StepDurationControl } from "./StepDurationControl";
 
 export function ProgressionTrack({
@@ -12,6 +19,7 @@ export function ProgressionTrack({
   currentPlayingStepIndex,
   loopState,
   onSelectStep,
+  onClearSelection,
   onEditPerformance,
   onDurationChange,
   onSetStepView,
@@ -27,6 +35,7 @@ export function ProgressionTrack({
   readonly currentPlayingStepIndex?: number | null;
   readonly loopState?: LoopState;
   readonly onSelectStep: (stepId: string) => void;
+  readonly onClearSelection?: () => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onDurationChange?: (stepId: string, duration: MusicalDuration) => void;
   readonly onSetStepView: (stepId: string, view: CardViewId) => void;
@@ -37,6 +46,8 @@ export function ProgressionTrack({
   readonly onReorder: (stepId: string, targetIndex: number) => void;
   readonly onAddRest?: () => void;
 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const selectedStepId = project.progression.selectedStepId;
   const loopIndices = (() => {
     if (!loopState?.enabled || !loopState.region) return null;
     const start = project.progression.steps.findIndex(
@@ -60,8 +71,36 @@ export function ProgressionTrack({
     const stepId = event.dataTransfer.getData("text/plain");
     if (stepId) onReorder(stepId, targetIndex);
   };
+  const restoreSelectedStepFocus = (stepId: string) => {
+    const focus = () => {
+      const buttons = trackRef.current?.querySelectorAll<HTMLButtonElement>(
+        "[data-progression-step-select]",
+      );
+      const selectedButton = buttons
+        ? Array.from(buttons).find((button) => button.dataset.stepId === stepId)
+        : undefined;
+      selectedButton?.focus();
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
+    else focus();
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Escape" || !selectedStepId || !onClearSelection) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClearSelection();
+    restoreSelectedStepFocus(selectedStepId);
+  };
+  const handleBackgroundClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) onClearSelection?.();
+  };
   return (
-    <div className="progression-track">
+    <div
+      ref={trackRef}
+      className="progression-track"
+      onClick={handleBackgroundClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="progression-view-control">
         <label>
           Progression View
@@ -91,7 +130,7 @@ export function ProgressionTrack({
           </button>
         ) : null}
       </div>
-      <div className="progression-step-cards">
+      <div className="progression-step-cards" onClick={handleBackgroundClick}>
         {project.progression.steps.map((step, index) => {
           const isPlaying = currentPlayingStepIndex === index;
           const isInLoop = Boolean(
@@ -109,6 +148,10 @@ export function ProgressionTrack({
               data-in-loop={isInLoop ? "true" : undefined}
               onClick={() => onSelectStep(step.id)}
             >
+              <ProgressionStepRemoveButton
+                accessibleName="Remove Rest step"
+                onRemove={() => onRemove(step.id)}
+              />
               <button
                 type="button"
                 className="progression-step-select-button"
