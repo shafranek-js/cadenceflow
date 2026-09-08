@@ -609,6 +609,11 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       expect(restCard).not.toBeNull();
       expect(restCard?.textContent).toContain("Rest");
       expect(restCard?.textContent).toContain("4");
+      expect(
+        Array.from(container.querySelectorAll('[data-testid="progression-step-number"]')).map(
+          (number) => number.textContent,
+        ),
+      ).toEqual(["1", "2"]);
 
       const durationSelect = restCard?.querySelector(
         '[data-testid="step-duration-select"]',

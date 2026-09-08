@@ -20,14 +20,20 @@
 }
 
 .progression-step-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 170px);
+  grid-auto-flow: row;
+  gap: 8px;
+  align-items: start;
+  justify-content: start;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
+  overflow: visible;
 }
 
 .progression-step-cards > div {
-  flex: 0 0 170px;
+  width: 170px;
   min-width: 170px;
+  max-width: 170px;
 }

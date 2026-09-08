@@ -119,6 +119,24 @@ describe("Progression step selection dismissal", () => {
     act(() => root.unmount());
   });
 
+  it("renders visible step numbers in semantic progression order", () => {
+    const { container, root } = renderHarness();
+    const cards = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="progression-step"]'),
+    );
+
+    expect(
+      cards.map(
+        (card) => card.querySelector('[data-testid="progression-step-number"]')?.textContent,
+      ),
+    ).toEqual(["1", "2"]);
+    expect(
+      cards.map((card) => card.querySelector<HTMLButtonElement>("[data-step-id]")?.dataset.stepId),
+    ).toEqual(["step-a", "step-b"]);
+
+    act(() => root.unmount());
+  });
+
   it("dismisses with Escape from editor and view controls", () => {
     const { container, store, root } = renderHarness();
     const first = stepButton(container, 0);

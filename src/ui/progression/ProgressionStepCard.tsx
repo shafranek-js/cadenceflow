@@ -25,6 +25,7 @@ const ARTICULATIONS: readonly PianoArticulation[] = [
 
 export function ProgressionStepCard({
   step,
+  stepNumber = 1,
   tonic,
   selected,
   playing = false,
@@ -41,6 +42,7 @@ export function ProgressionStepCard({
   onMoveRight,
 }: {
   readonly step: ChordStep;
+  readonly stepNumber?: number;
   readonly tonic: PitchClassIdentity;
   readonly selected: boolean;
   readonly playing?: boolean;
@@ -68,6 +70,13 @@ export function ProgressionStepCard({
       data-in-loop={inLoop ? "true" : undefined}
       onClick={onSelect}
     >
+      <span
+        className="progression-step-number"
+        data-testid="progression-step-number"
+        aria-hidden="true"
+      >
+        {stepNumber}
+      </span>
       <ProgressionStepRemoveButton
         accessibleName={`Remove progression step ${step.harmonicFunction.functionId}`}
         onRemove={onRemove}

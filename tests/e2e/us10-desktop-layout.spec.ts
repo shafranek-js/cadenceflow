@@ -6,8 +6,6 @@ type LayoutMetrics = {
   readonly bodyScrollWidth: number;
   readonly innerWidth: number;
   readonly scrollX: number;
-  readonly progressionScrollWidth: number;
-  readonly progressionClientWidth: number;
 };
 
 async function waitForStudio(page: Page): Promise<void> {
@@ -22,15 +20,12 @@ async function waitForStudio(page: Page): Promise<void> {
 
 async function readLayoutMetrics(page: Page): Promise<LayoutMetrics> {
   return page.evaluate(() => {
-    const progression = document.querySelector<HTMLElement>(".progression-step-cards");
     return {
       documentScrollWidth: document.documentElement.scrollWidth,
       documentClientWidth: document.documentElement.clientWidth,
       bodyScrollWidth: document.body.scrollWidth,
       innerWidth: window.innerWidth,
       scrollX: window.scrollX,
-      progressionScrollWidth: progression?.scrollWidth ?? 0,
-      progressionClientWidth: progression?.clientWidth ?? 0,
     };
   });
 }
@@ -40,6 +35,68 @@ async function expectNoPageHorizontalScroll(page: Page): Promise<void> {
   expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.documentClientWidth);
   expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.innerWidth);
   expect(metrics.scrollX).toBe(0);
+}
+
+async function expectWrappedProgressionFlow(page: Page, expectedCount: number): Promise<void> {
+  const evidence = await page.evaluate(() => {
+    const progression = document.querySelector<HTMLElement>(".progression-step-cards");
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="progression-step"]'),
+    );
+    if (!progression) throw new Error("Progression card flow is missing");
+
+    const rects = cards.map((card) => {
+      const rect = card.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: Math.round(rect.top),
+        width: rect.width,
+      };
+    });
+    const rows = Array.from(new Set(rects.map((rect) => rect.top)));
+    const rowMajorOrder = rects.every((rect, index) => {
+      if (index === 0) return true;
+      const previous = rects[index - 1]!;
+      return rect.top > previous.top || (rect.top === previous.top && rect.left > previous.left);
+    });
+    const progressionRect = progression.getBoundingClientRect();
+
+    return {
+      numbers: cards.map((card) =>
+        card.querySelector('[data-testid="progression-step-number"]')?.textContent?.trim(),
+      ),
+      rows,
+      rowMajorOrder,
+      rects,
+      progressionRight: progressionRect.right,
+      progressionScrollWidth: progression.scrollWidth,
+      progressionClientWidth: progression.clientWidth,
+      overflowX: getComputedStyle(progression).overflowX,
+    };
+  });
+
+  expect(evidence.numbers).toEqual(
+    Array.from({ length: expectedCount }, (_, index) => String(index + 1)),
+  );
+  expect(evidence.rows.length).toBeGreaterThan(1);
+  expect(evidence.rowMajorOrder).toBe(true);
+  expect(evidence.progressionScrollWidth).toBeLessThanOrEqual(evidence.progressionClientWidth);
+  expect(evidence.overflowX).toBe("visible");
+  for (const rect of evidence.rects) {
+    expect(rect.width).toBeGreaterThanOrEqual(169);
+    expect(rect.width).toBeLessThanOrEqual(171);
+    expect(rect.left).toBeGreaterThanOrEqual(-1);
+    expect(rect.right).toBeLessThanOrEqual(evidence.progressionRight + 1);
+  }
+}
+
+async function readProgressionStepIds(page: Page): Promise<string[]> {
+  return page
+    .locator('[data-testid="progression-step"]')
+    .evaluateAll((cards) =>
+      cards.map((card) => card.querySelector<HTMLElement>("[data-step-id]")?.dataset.stepId ?? ""),
+    );
 }
 
 async function expectMatrixAndInspectorAdjacent(page: Page): Promise<void> {
@@ -141,19 +198,49 @@ async function exerciseDesktopStudio(page: Page): Promise<void> {
   await expect(page.getByLabel("Global Card View")).toHaveValue("piano");
   await expectNoPageHorizontalScroll(page);
 
-  for (const functionId of ["vi", "IV", "V", "I", "vi", "IV", "V", "I", "vi", "IV", "V"]) {
+  for (const functionId of [
+    "vi",
+    "IV",
+    "V",
+    "I",
+    "vi",
+    "IV",
+    "V",
+    "I",
+    "vi",
+    "IV",
+    "V",
+    "I",
+    "vi",
+    "IV",
+    "V",
+    "I",
+    "vi",
+    "IV",
+    "V",
+    "I",
+  ]) {
     await addChordAndCheck(page, functionId);
   }
 
-  const progression = page.locator(".progression-step-cards");
-  const progressionMetrics = await readLayoutMetrics(page);
-  expect(progressionMetrics.progressionScrollWidth).toBeGreaterThan(
-    progressionMetrics.progressionClientWidth,
-  );
-  await progression.evaluate((element) => {
-    element.scrollLeft = element.scrollWidth;
+  await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(21);
+  await expectWrappedProgressionFlow(page, 21);
+  const idsBeforeDrag = await readProgressionStepIds(page);
+  await page.evaluate(() => {
+    const source = document.querySelectorAll<HTMLElement>("[data-progression-step-drag]")[0];
+    const target = document.querySelectorAll<HTMLElement>("[data-progression-step-drag]")[20];
+    if (!source || !target) throw new Error("Progression drag source or target is missing");
+    const dataTransfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
+    target.dispatchEvent(
+      new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer }),
+    );
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
   });
-  await expect.poll(() => progression.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect
+    .poll(() => readProgressionStepIds(page))
+    .toEqual([...idsBeforeDrag.slice(1), idsBeforeDrag[0]]);
+  await expectWrappedProgressionFlow(page, 21);
   await expectNoPageHorizontalScroll(page);
 
   await page.getByTestId("project-menu-toggle").click();

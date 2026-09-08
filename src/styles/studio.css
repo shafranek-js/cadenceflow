@@ -739,21 +739,47 @@
   color: var(--text-muted);
 }
 .progression-step-cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 170px);
+  grid-auto-flow: row;
   gap: 8px;
-  overflow-x: auto;
-  align-items: flex-start;
+  align-items: start;
+  justify-content: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 96px;
+  overflow: visible;
+}
+.progression-step-cards > div {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
 }
 .progression-step-card,
 .progression-rest-card {
-  flex: 0 0 170px;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
   min-height: 94px;
   position: relative;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
+}
+.progression-step-number {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 1;
+  min-width: 18px;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
 }
 .progression-step-card.is-selected,
 .progression-rest-card.is-selected {

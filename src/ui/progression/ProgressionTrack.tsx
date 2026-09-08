@@ -148,6 +148,13 @@ export function ProgressionTrack({
               data-in-loop={isInLoop ? "true" : undefined}
               onClick={() => onSelectStep(step.id)}
             >
+              <span
+                className="progression-step-number"
+                data-testid="progression-step-number"
+                aria-hidden="true"
+              >
+                {index + 1}
+              </span>
               <ProgressionStepRemoveButton
                 accessibleName="Remove Rest step"
                 onRemove={() => onRemove(step.id)}
@@ -201,12 +208,15 @@ export function ProgressionTrack({
             <div
               key={step.id}
               draggable
+              data-progression-step-drag
+              data-step-id={step.id}
               onDragStart={(event: DragEvent<HTMLDivElement>) => dragStart(event, step.id)}
               onDragOver={(event: DragEvent<HTMLDivElement>) => event.preventDefault()}
               onDrop={(event: DragEvent<HTMLDivElement>) => drop(event, index)}
             >
               <ProgressionStepCard
                 step={step}
+                stepNumber={index + 1}
                 tonic={project.tonic}
                 selected={isSelected}
                 playing={isPlaying}
