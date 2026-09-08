@@ -33,13 +33,15 @@ export function StudioWorkspace({
         {transport}
       </section>
       <section className="studio-grid" aria-label="Studio work area">
-        <div className="studio-matrix-area">{matrix}</div>
+        <div className="studio-main-column">
+          <div className="studio-matrix-area">{matrix}</div>
+          <section className="progression-strip" aria-label="My Progression">
+            {progression}
+          </section>
+        </div>
         <aside className="inspector-stack" aria-label="Inspector">
           {inspector}
         </aside>
-      </section>
-      <section className="progression-strip" aria-label="My Progression">
-        {progression}
       </section>
       {overlays}
     </main>

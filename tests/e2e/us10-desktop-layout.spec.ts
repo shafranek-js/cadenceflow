@@ -61,6 +61,40 @@ async function expectMatrixAndInspectorAdjacent(page: Page): Promise<void> {
   expect(Math.abs(geometry.matrixTop - geometry.inspectorTop)).toBeLessThan(2);
 }
 
+async function expectProgressionBelowMatrix(page: Page): Promise<void> {
+  const geometry = await page.evaluate(() => {
+    const main = document.querySelector<HTMLElement>(".studio-main-column");
+    const matrix = document.querySelector<HTMLElement>(".studio-matrix-area");
+    const progression = main?.querySelector<HTMLElement>(":scope > .progression-strip");
+    const inspector = document.querySelector<HTMLElement>(".studio-grid > .inspector-stack");
+    if (!main || !matrix || !progression || !inspector) {
+      throw new Error("Studio main column or progression area is missing");
+    }
+    const mainRect = main.getBoundingClientRect();
+    const matrixRect = matrix.getBoundingClientRect();
+    const progressionRect = progression.getBoundingClientRect();
+    const inspectorRect = inspector.getBoundingClientRect();
+    return {
+      mainLeft: mainRect.left,
+      mainRight: mainRect.right,
+      matrixLeft: matrixRect.left,
+      matrixRight: matrixRect.right,
+      matrixBottom: matrixRect.bottom,
+      progressionLeft: progressionRect.left,
+      progressionRight: progressionRect.right,
+      progressionTop: progressionRect.top,
+      inspectorLeft: inspectorRect.left,
+    };
+  });
+
+  expect(Math.abs(geometry.mainLeft - geometry.matrixLeft)).toBeLessThan(1);
+  expect(Math.abs(geometry.matrixLeft - geometry.progressionLeft)).toBeLessThan(1);
+  expect(Math.abs(geometry.matrixRight - geometry.progressionRight)).toBeLessThan(1);
+  expect(geometry.progressionTop).toBeGreaterThanOrEqual(geometry.matrixBottom);
+  expect(geometry.mainRight).toBeLessThanOrEqual(geometry.inspectorLeft);
+  expect(geometry.progressionRight).toBeLessThanOrEqual(geometry.inspectorLeft);
+}
+
 async function expectVisibleControlsFit(page: Page): Promise<void> {
   const overflowingControls = await page.locator("button, select, input").evaluateAll((controls) =>
     controls
@@ -95,6 +129,7 @@ async function exerciseDesktopStudio(page: Page): Promise<void> {
   await waitForStudio(page);
   await expectNoPageHorizontalScroll(page);
   await expectMatrixAndInspectorAdjacent(page);
+  await expectProgressionBelowMatrix(page);
   await expectVisibleControlsFit(page);
 
   await addChordAndCheck(page, "I");
