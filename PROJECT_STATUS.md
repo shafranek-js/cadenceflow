@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-08
-**Current implementation stage:** Phase 12 / User Story 9 (Export) implementation code-complete; T130–T140 implemented and accepted; the external interoperability gate remains open; US8 complete
-**Task progress:** 140 accepted tasks, 140 / 158 total tasks
+**Current implementation stage:** Phase 13 / User Story 10 (Studio) Batch A accepted; T141, T143, and T144 implemented and accepted; Batch B theme, expertise, and accessibility work is in progress; US10 remains open and the external interoperability gate remains open
+**Task progress:** 143 accepted tasks, 143 / 158 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED** (overall 140 / 158). SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED** (overall 140 / 158). **Phase 13: User Story 10** — Work in one focused wide desktop studio — has its responsive desktop shell Batch A (**T141, T143, T144**) **ACCEPTED** (overall 143 / 158); theme, expertise, and accessibility Batch B remains pending. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -443,6 +443,15 @@ Final verified US9 acceptance baseline:
 
 External interoperability remains an honest open gap: SC-013 and SC-014 have not been verified in independent MIDI/notation applications. The gate is scheduled for closure no later than T150/T157; heavy applications are intentionally not installed in this assignment.
 
+### US10 Batch A — responsive desktop Studio shell — T141, T143, T144
+
+Accepted implementation basis:
+- `src/ui/studio/StudioWorkspace.tsx` and `src/app/App.tsx` (`T143`): stable slot-based Studio composition for project context, Transport, Harmonic Matrix, Inspector, My Progression, and overlays; App retains project, history, transport, and command ownership.
+- `src/styles/studio.css`, `src/styles/matrix.css`, and `src/styles/progression.css` (`T144`): full-width desktop layout with Matrix and Inspector side by side, wrapping header/Transport groups, and progression-local horizontal overflow.
+- `tests/e2e/us10-desktop-layout.spec.ts` (`T141`): production UI acceptance at 1280×720 and 1920×1080 with page-level overflow checks and local progression scrolling.
+
+Batch A verification: focused US10 Chromium `2 / 2` PASS, repeat-each `6 / 6` PASS, and final full Chromium `51 / 51` PASS with workers `1` and retries `0`. Theme, expertise, and accessibility behavior remain the next review scope; US10 and Phase 13 are not complete.
+
 ## 4. Key technical decisions that must be preserved
 
 ### Architecture boundaries
@@ -568,11 +577,11 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: Repository is active and clean on `master` branch.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 are accepted, with SC-013/SC-014 external interoperability still open.
+4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 13 / US10 — T141–T149
+## 8. Next development sequence: Phase 13 / US10 — Batch B T142, T145–T148
 
-Active milestone is **Phase 13: User Story 10 — Work in one focused wide desktop studio (Priority: P2)**. User Story 9 is implementation code-complete and accepted through T140, with SC-013/SC-014 external interoperability still open. The next controlled scope is T141–T149:
+Active milestone is **Phase 13: User Story 10 — Work in one focused wide desktop studio (Priority: P2)**. Batch A responsive shell is accepted through T141/T143/T144. The next controlled scope is Batch B T142 and T145–T148; T149 remains explicitly deferred, and SC-013/SC-014 external interoperability remains open:
 
 - **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
 - **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
@@ -591,6 +600,12 @@ Active milestone is **Phase 13: User Story 10 — Work in one focused wide deskt
 - **T133**: [x] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`.
 - **T134–T137**: [x] Implement MusicXML semantic projection, explicit mapping policy, MusicXML 4.0 writer, and offline XSD validation.
 - **T138–T140**: [x] Implement export UI, cross-projection integration acceptance, and browser export acceptance.
+- **T141**: [x] Write Playwright viewport tests for 1280×720 and 1920×1080 with no page-level horizontal scroll.
+- **T142**: [ ] Write keyboard/accessibility tests for chord cards, `+`, settings/reset, Card Views, reorder, module controls, and transport.
+- **T143**: [x] Implement the full-width Studio shell composing Matrix, Inspector, My Progression, and Transport.
+- **T144**: [x] Implement desktop layout/responsive CSS for the supported viewport range.
+- **T145–T148**: [ ] Implement themes, expertise mode, keyboard/focus management, and non-color semantic state signals.
+- **T149**: [ ] Write the final end-to-end Studio journey; deferred from this batch.
 
 ## 9. Handoff operating model
 

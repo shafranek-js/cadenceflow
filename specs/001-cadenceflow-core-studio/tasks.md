@@ -339,12 +339,12 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ### Tests
 
-- [ ] T141 [P] [US10] Write Playwright viewport tests for 1280×720 and 1920×1080 with no page-level horizontal scroll in `tests/e2e/us10-desktop-layout.spec.ts`
+- [x] T141 [P] [US10] Write Playwright viewport tests for 1280×720 and 1920×1080 with no page-level horizontal scroll in `tests/e2e/us10-desktop-layout.spec.ts`
 - [ ] T142 [P] [US10] Write keyboard/accessibility tests for chord cards, `+`, settings/reset, Card Views, reorder, module controls, and transport in `tests/e2e/us10-accessibility.spec.ts`
 ### Implementation
 
-- [ ] T143 [US10] Implement full-width Studio shell composing Matrix, Inspector, My Progression, and Transport in `src/ui/studio/StudioWorkspace.tsx` and `src/app/App.tsx`
-- [ ] T144 [US10] Implement desktop layout/responsive CSS for supported viewport range in `src/styles/studio.css`, `src/styles/matrix.css`, and `src/styles/progression.css`
+- [x] T143 [US10] Implement full-width Studio shell composing Matrix, Inspector, My Progression, and Transport in `src/ui/studio/StudioWorkspace.tsx` and `src/app/App.tsx`
+- [x] T144 [US10] Implement desktop layout/responsive CSS for supported viewport range in `src/styles/studio.css`, `src/styles/matrix.css`, and `src/styles/progression.css`
 - [ ] T145 [US10] Implement dark and high-contrast light theme tokens/persistence in `src/styles/tokens.css` and `src/ui/settings/ThemeControl.tsx`
 - [ ] T146 [US10] Implement Beginner/Composer/Expert presentation-mode control without feature gating in `src/ui/settings/ExpertiseModeControl.tsx`
 - [ ] T147 [US10] Implement global keyboard focus management and accessible names/descriptions for interactive studio controls in `src/ui/studio/focusManagement.ts` and affected UI components
