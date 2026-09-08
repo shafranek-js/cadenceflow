@@ -1,6 +1,8 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it } from "vitest";
 import { AppStore } from "../../src/app/appStore";
+import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
+import { selectStep } from "../../src/app/commands/progressionCommands";
 import { setTempo, type SetTempoCommand } from "../../src/app/commands/timingCommands";
 import { ProjectController } from "../../src/app/projectController";
 import { createDefaultProject } from "../../src/domain/project/factory";
@@ -63,6 +65,32 @@ function addHistory(store: AppStore): void {
 }
 
 describe("US8 Batch C — ProjectController lifecycle and session boundaries", () => {
+  it("autosaves selected-step UI state without adding an Undo entry", async () => {
+    const base = createDefaultProject("project-a", "Project A");
+    const step = createMatrixChordStep(base, "I", "step-a");
+    const initial = Object.freeze({
+      ...base,
+      progression: Object.freeze({
+        ...base.progression,
+        steps: Object.freeze([step]),
+      }),
+    });
+    const { controller, repo, store } = createHarness(initial);
+    await controller.flush();
+
+    store.dispatch(
+      {
+        type: "progression/select-step",
+        payload: { stepId: step.id, nowIso: "2026-09-08T00:00:00.000Z" },
+      },
+      selectStep,
+    );
+    await controller.flush();
+
+    expect(store.history.canUndo).toBe(false);
+    expect((await repo.loadProject(initial.id))?.progression.selectedStepId).toBe(step.id);
+  });
+
   it("creates, persists, names, and activates a fresh project with a unique identity", async () => {
     const { controller, repo, store } = createHarness();
     await controller.flush();

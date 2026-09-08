@@ -156,17 +156,19 @@ export function ProgressionTrack({
                 {index + 1}
               </span>
               <ProgressionStepRemoveButton
-                accessibleName="Remove Rest step"
+                accessibleName={`Remove progression step ${index + 1}: Rest`}
                 onRemove={() => onRemove(step.id)}
               />
               <button
                 type="button"
                 className="progression-step-select-button"
+                data-progression-step-select
+                data-step-id={step.id}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelectStep(step.id);
                 }}
-                aria-label={`Select progression rest step${isPlaying ? ", Playing" : ""}`}
+                aria-label={`Select progression step ${index + 1}: Rest${isPlaying ? ", Playing" : ""}`}
                 aria-pressed={isSelected}
                 aria-current={isPlaying ? "step" : undefined}
               >
@@ -196,7 +198,7 @@ export function ProgressionTrack({
                       type="button"
                       className="remove-btn"
                       onClick={() => onRemove(step.id)}
-                      aria-label="Remove Rest step"
+                      aria-label={`Remove selected progression step ${index + 1}: Rest`}
                     >
                       Remove
                     </button>

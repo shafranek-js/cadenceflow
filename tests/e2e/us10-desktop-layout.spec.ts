@@ -8,6 +8,16 @@ type LayoutMetrics = {
   readonly scrollX: number;
 };
 
+const REQUIRED_VIEWPORTS = [
+  { width: 1280, height: 720 },
+  { width: 1366, height: 768 },
+  { width: 1440, height: 900 },
+  { width: 1600, height: 900 },
+  { width: 1920, height: 1080 },
+] as const;
+
+const REQUIRED_PROGRESSION_COUNTS = [1, 4, 10, 20, 30] as const;
+
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
@@ -84,6 +94,52 @@ async function expectWrappedProgressionFlow(page: Page, expectedCount: number): 
   expect(evidence.progressionScrollWidth).toBeLessThanOrEqual(evidence.progressionClientWidth);
   expect(evidence.overflowX).toBe("visible");
   for (const rect of evidence.rects) {
+    expect(rect.width).toBeGreaterThanOrEqual(169);
+    expect(rect.width).toBeLessThanOrEqual(171);
+    expect(rect.left).toBeGreaterThanOrEqual(-1);
+    expect(rect.right).toBeLessThanOrEqual(evidence.progressionRight + 1);
+  }
+}
+
+async function expectProgressionSequenceAndFit(page: Page, expectedCount: number): Promise<void> {
+  const evidence = await page.evaluate(() => {
+    const progression = document.querySelector<HTMLElement>(".progression-step-cards");
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="progression-step"]'),
+    );
+    if (!progression) throw new Error("Progression card flow is missing");
+    const progressionRect = progression.getBoundingClientRect();
+    const rects = cards.map((card) => {
+      const rect = card.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: Math.round(rect.top), width: rect.width };
+    });
+    return {
+      numbers: cards.map((card) =>
+        card.querySelector('[data-testid="progression-step-number"]')?.textContent?.trim(),
+      ),
+      stepIds: cards.map(
+        (card) => card.querySelector<HTMLElement>("[data-step-id]")?.dataset.stepId ?? "",
+      ),
+      rects,
+      progressionRight: progressionRect.right,
+      progressionScrollWidth: progression.scrollWidth,
+      progressionClientWidth: progression.clientWidth,
+    };
+  });
+
+  expect(evidence.numbers).toEqual(
+    Array.from({ length: expectedCount }, (_, index) => String(index + 1)),
+  );
+  expect(evidence.stepIds.every(Boolean)).toBe(true);
+  expect(new Set(evidence.stepIds).size).toBe(expectedCount);
+  expect(evidence.progressionScrollWidth).toBeLessThanOrEqual(evidence.progressionClientWidth);
+  for (const [index, rect] of evidence.rects.entries()) {
+    const previous = evidence.rects[index - 1];
+    if (previous) {
+      expect(
+        rect.top > previous.top || (rect.top === previous.top && rect.left > previous.left),
+      ).toBe(true);
+    }
     expect(rect.width).toBeGreaterThanOrEqual(169);
     expect(rect.width).toBeLessThanOrEqual(171);
     expect(rect.left).toBeGreaterThanOrEqual(-1);
@@ -182,6 +238,15 @@ async function addChordAndCheck(page: Page, functionId: string): Promise<void> {
   await expectNoPageHorizontalScroll(page);
 }
 
+async function addStepsUntil(page: Page, targetCount: number): Promise<void> {
+  const functions = ["I", "vi", "IV", "V"] as const;
+  const steps = page.locator('[data-testid="progression-step"]');
+  while ((await steps.count()) < targetCount) {
+    const count = await steps.count();
+    await addChordAndCheck(page, functions[count % functions.length]!);
+  }
+}
+
 async function exerciseDesktopStudio(page: Page): Promise<void> {
   await waitForStudio(page);
   await expectNoPageHorizontalScroll(page);
@@ -250,6 +315,25 @@ async function exerciseDesktopStudio(page: Page): Promise<void> {
 }
 
 test.describe("US10 — desktop Studio layout", () => {
+  test("covers every required viewport and 1/4/10/20/30-step progression", async ({ page }) => {
+    test.slow();
+    await waitForStudio(page);
+
+    for (const expectedCount of REQUIRED_PROGRESSION_COUNTS) {
+      await addStepsUntil(page, expectedCount);
+      await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(expectedCount);
+
+      for (const viewport of REQUIRED_VIEWPORTS) {
+        await page.setViewportSize(viewport);
+        await expectNoPageHorizontalScroll(page);
+        await expectMatrixAndInspectorAdjacent(page);
+        await expectProgressionBelowMatrix(page);
+        await expectProgressionSequenceAndFit(page, expectedCount);
+        if (expectedCount >= 20) await expectWrappedProgressionFlow(page, expectedCount);
+      }
+    }
+  });
+
   test.describe("1280×720", () => {
     test.use({ viewport: { width: 1280, height: 720 } });
 

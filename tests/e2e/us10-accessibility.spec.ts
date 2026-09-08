@@ -132,7 +132,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     const identityBeforeReorder = await readProgressionIdentity(page);
     const middleStep = steps.nth(1);
     const middleStepSelect = middleStep.getByRole("button", {
-      name: /Select progression step IV/,
+      name: /Select progression step 2: IV/,
     });
     await middleStepSelect.focus();
     await page.keyboard.press("Enter");
@@ -169,7 +169,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await page.getByRole("button", { name: "Add Rest to progression" }).click();
     const restStep = page.locator('[data-testid="progression-step"]').last();
     const restStepSelect = restStep.getByRole("button", {
-      name: "Select progression rest step",
+      name: `Select progression step ${beforeAdd + 4}: Rest`,
       exact: true,
     });
     await restStepSelect.focus();
@@ -290,7 +290,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await page
       .locator('[data-testid="progression-step"]')
       .last()
-      .getByRole("button", { name: /Select progression step bIII/ })
+      .getByRole("button", { name: /Select progression step 1: bIII/ })
       .click();
     await page
       .getByTestId("chord-card-I")

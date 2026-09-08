@@ -78,7 +78,7 @@ export function ProgressionStepCard({
         {stepNumber}
       </span>
       <ProgressionStepRemoveButton
-        accessibleName={`Remove progression step ${step.harmonicFunction.functionId}`}
+        accessibleName={`Remove progression step ${stepNumber}: ${step.harmonicFunction.functionId}`}
         onRemove={onRemove}
       />
       <button
@@ -90,7 +90,7 @@ export function ProgressionStepCard({
           event.stopPropagation();
           onSelect();
         }}
-        aria-label={`Select progression step ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`}
+        aria-label={`Select progression step ${stepNumber}: ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`}
         aria-pressed={selected}
         aria-current={playing ? "step" : undefined}
       >

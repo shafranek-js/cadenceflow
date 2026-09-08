@@ -51,13 +51,13 @@ test.describe("US10 — direct progression-step removal", () => {
       const card = steps.nth(index);
       await expect(card.getByTestId("progression-step-remove")).toHaveAttribute(
         "aria-label",
-        label === "Rest" ? "Remove Rest step" : `Remove progression step ${label}`,
+        `Remove progression step ${index + 1}: ${label}`,
       );
       await expect(card.locator(".step-editor")).toHaveCount(0);
       await expect(card).not.toHaveAttribute("data-selected", "true");
     }
 
-    await steps.nth(1).getByRole("button", { name: "Remove progression step vi" }).click();
+    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: vi" }).click();
     await expect(steps).toHaveCount(3);
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
 
@@ -66,7 +66,7 @@ test.describe("US10 — direct progression-step removal", () => {
     await page.getByRole("button", { name: "Redo", exact: true }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
 
-    await steps.nth(1).getByRole("button", { name: "Remove Rest step" }).click();
+    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: Rest" }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
@@ -80,14 +80,14 @@ test.describe("US10 — direct progression-step removal", () => {
     await addChord(page, "IV");
 
     const steps = page.locator('[data-testid="progression-step"]');
-    await steps.nth(1).getByRole("button", { name: "Select progression step vi" }).click();
+    await steps.nth(1).getByRole("button", { name: "Select progression step 2: vi" }).click();
     await expect(steps.nth(1)).toHaveAttribute("data-selected", "true");
     await expect(steps.nth(1).locator(".step-editor")).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Performance settings for step vi" }),
     ).toBeVisible();
 
-    await steps.nth(0).getByRole("button", { name: "Remove progression step I" }).click();
+    await steps.nth(0).getByRole("button", { name: "Remove progression step 1: I" }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["vi", "IV"]);
     await expect(steps.first()).toHaveAttribute("data-selected", "true");
     await expect(steps.first().locator(".step-editor")).toBeVisible();
@@ -95,11 +95,11 @@ test.describe("US10 — direct progression-step removal", () => {
       page.getByRole("region", { name: "Performance settings for step vi" }),
     ).toBeVisible();
 
-    await steps.nth(1).getByRole("button", { name: "Remove progression step IV" }).click();
+    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: IV" }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["vi"]);
     await expect(steps.first()).toHaveAttribute("data-selected", "true");
 
-    await steps.first().getByRole("button", { name: "Remove progression step vi" }).click();
+    await steps.first().getByRole("button", { name: "Remove progression step 1: vi" }).click();
     await expect(steps).toHaveCount(0);
     await expect(
       page.getByRole("region", { name: "Performance settings for step vi" }),
@@ -117,7 +117,8 @@ test.describe("US10 — direct progression-step removal", () => {
     const steps = page.locator('[data-testid="progression-step"]');
     const undo = page.getByRole("button", { name: "Undo", exact: true });
     const redo = page.getByRole("button", { name: "Redo", exact: true });
-    const removeVi = () => steps.nth(1).getByRole("button", { name: "Remove progression step vi" });
+    const removeVi = () =>
+      steps.nth(1).getByRole("button", { name: "Remove progression step 2: vi" });
 
     await (await removeVi()).focus();
     await page.keyboard.press("Enter");

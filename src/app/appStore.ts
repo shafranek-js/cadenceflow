@@ -54,11 +54,11 @@ export class AppStore {
     const before = this.#project;
     const applied = handler(before, command);
     this.#project = applied.project;
-    const persist = command.type !== "progression/select-step";
-    if (persist) {
+    const recordHistory = command.type !== "progression/select-step";
+    if (recordHistory) {
       this.history.push({ forward: applied.forward ?? command, inverse: applied.inverse });
     }
-    this.#notify({ persist });
+    this.#notify({ persist: true });
   }
 
   undo(): boolean {

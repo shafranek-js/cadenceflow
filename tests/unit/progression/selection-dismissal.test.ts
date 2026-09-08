@@ -6,6 +6,8 @@ import { AppStore } from "../../../src/app/appStore";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { selectStep } from "../../../src/app/commands/progressionCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
+import { musicalDuration } from "../../../src/domain/timing/duration";
+import { rational } from "../../../src/domain/timing/rational";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,11 +22,16 @@ function renderHarness(): Harness {
   const base = createDefaultProject("selection-dismissal", "Selection Dismissal");
   const stepA = createMatrixChordStep(base, "I", "step-a");
   const stepB = createMatrixChordStep(base, "V", "step-b");
+  const rest = Object.freeze({
+    id: "step-rest",
+    kind: "rest" as const,
+    duration: musicalDuration(rational(1, 1)),
+  });
   const store = new AppStore({
     ...base,
     progression: Object.freeze({
       ...base.progression,
-      steps: Object.freeze([stepA, stepB]),
+      steps: Object.freeze([stepA, stepB, rest]),
     }),
   });
   const container = document.createElement("div");
@@ -129,10 +136,33 @@ describe("Progression step selection dismissal", () => {
       cards.map(
         (card) => card.querySelector('[data-testid="progression-step-number"]')?.textContent,
       ),
-    ).toEqual(["1", "2"]);
+    ).toEqual(["1", "2", "3"]);
     expect(
       cards.map((card) => card.querySelector<HTMLButtonElement>("[data-step-id]")?.dataset.stepId),
-    ).toEqual(["step-a", "step-b"]);
+    ).toEqual(["step-a", "step-b", "step-rest"]);
+
+    expect(
+      cards.map((card) =>
+        card
+          .querySelector<HTMLButtonElement>("[data-progression-step-select]")
+          ?.getAttribute("aria-label"),
+      ),
+    ).toEqual([
+      "Select progression step 1: I",
+      "Select progression step 2: V",
+      "Select progression step 3: Rest",
+    ]);
+    expect(
+      cards.map((card) =>
+        card
+          .querySelector<HTMLButtonElement>('[data-testid="progression-step-remove"]')
+          ?.getAttribute("aria-label"),
+      ),
+    ).toEqual([
+      "Remove progression step 1: I",
+      "Remove progression step 2: V",
+      "Remove progression step 3: Rest",
+    ]);
 
     act(() => root.unmount());
   });
@@ -169,7 +199,25 @@ describe("Progression step selection dismissal", () => {
     act(() => root.unmount());
   });
 
-  it("keeps selection transient: no history entry, no persistence change, and no step mutation", () => {
+  it("restores focus to a Rest step after Escape dismisses its editor", () => {
+    const { container, root } = renderHarness();
+    const rest = stepButton(container, 2);
+
+    act(() => rest.click());
+    expect(container.querySelectorAll(".step-editor")).toHaveLength(1);
+    act(() => rest.focus());
+    act(() => {
+      rest.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(container.querySelector(".step-editor")).toBeNull();
+    expect(document.activeElement).toBe(rest);
+    act(() => root.unmount());
+  });
+
+  it("persists selection changes without recording them in session history", () => {
     const { store, root } = renderHarness();
     const changes: boolean[] = [];
     store.subscribe((change) => changes.push(change.persist));
@@ -189,7 +237,7 @@ describe("Progression step selection dismissal", () => {
     expect(store.history.canUndo).toBe(false);
     expect(store.history.canRedo).toBe(false);
     expect(store.project.progression.steps).toBe(stepsBefore);
-    expect(changes).toEqual([false, false]);
+    expect(changes).toEqual([true, true]);
     act(() => root.unmount());
   });
 });
