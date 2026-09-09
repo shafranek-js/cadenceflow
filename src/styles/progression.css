@@ -83,7 +83,9 @@
   display: grid;
   gap: 4px;
   align-content: center;
+  grid-column: 1 / -1;
   min-height: 96px;
+  min-width: 0;
   padding: 16px;
   border: 1px dashed var(--border);
   border-radius: 10px;
