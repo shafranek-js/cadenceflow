@@ -134,13 +134,20 @@ export function PortableProjectActions({
       ) : null}
 
       {saveAsOpen && (
-        <div className="dialog-backdrop" role="presentation">
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSaveAsOpen(false);
+          }}
+        >
           <section
             ref={dialogRef}
             className="project-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-project-as-title"
+            onClick={(event) => event.stopPropagation()}
           >
             <header className="dialog-header">
               <h2 id="save-project-as-title">Save Project As</h2>

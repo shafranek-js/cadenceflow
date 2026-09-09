@@ -37,13 +37,14 @@ export function ModuleSwitchDialog({
   };
 
   return (
-    <div className="dialog-backdrop" role="presentation">
+    <div className="dialog-backdrop" role="presentation" onClick={onCancel}>
       <section
         ref={dialogRef}
         className="module-switch-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="module-switch-title"
+        onClick={(event) => event.stopPropagation()}
       >
         <h2 id="module-switch-title">Resolve ambiguous harmony</h2>
         <p>

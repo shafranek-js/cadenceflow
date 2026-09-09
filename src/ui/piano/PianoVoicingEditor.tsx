@@ -101,8 +101,11 @@ export function PianoVoicingEditor({
       role="dialog"
       aria-modal="true"
       aria-label={`Manual Piano Voicing Editor for ${stepLabel}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <div className="voicing-editor-card">
+      <div className="voicing-editor-card" onClick={(event) => event.stopPropagation()}>
         <header className="voicing-editor-header">
           <h3>Manual Piano Voicing Editor: {stepLabel}</h3>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Close editor">

@@ -26,6 +26,9 @@ export function PianoAudioStatus({ state }: PianoAudioStatusProps) {
       className={`piano-audio-status is-${state}`}
       data-testid="piano-audio-status"
       data-status={state}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       aria-label={`Piano Audio: ${getLabel(state)}`}
     >
       <span className={`audio-status-dot dot-${state}`} aria-hidden="true" />

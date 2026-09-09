@@ -37,6 +37,7 @@ export function ProjectManager({
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectMetadata | null>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const nameDialogRef = useModalFocus<HTMLElement>({
@@ -58,6 +59,31 @@ export function ProjectManager({
       setSubmissionError(null);
     }
   }, [nameDialogMode, project.name]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleMenuKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setMenuOpen(false);
+      menuToggleRef.current?.focus();
+    };
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target) || menuToggleRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+
+    document.addEventListener("keydown", handleMenuKeyDown);
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => {
+      document.removeEventListener("keydown", handleMenuKeyDown);
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    };
+  }, [menuOpen]);
 
   const nameError = (() => {
     if (submissionError) return submissionError;
@@ -114,6 +140,7 @@ export function ProjectManager({
         className="project-selector-button"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
+        aria-controls="project-actions-menu"
         aria-label={`Project: ${project.name}`}
         data-testid="project-menu-toggle"
         disabled={busy}
@@ -123,7 +150,13 @@ export function ProjectManager({
       </button>
 
       {menuOpen && (
-        <div className="project-menu" role="menu" aria-label="Project actions">
+        <div
+          ref={menuRef}
+          id="project-actions-menu"
+          className="project-menu"
+          role="menu"
+          aria-label="Project actions"
+        >
           <div className="project-menu-current" data-testid="active-project-name">
             Active project: <strong>{project.name}</strong>
           </div>
@@ -210,13 +243,20 @@ export function ProjectManager({
       ) : null}
 
       {nameDialogMode !== null && (
-        <div className="dialog-backdrop" role="presentation">
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setNameDialogMode(null);
+          }}
+        >
           <section
             ref={nameDialogRef}
             className="project-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="project-name-dialog-title"
+            onClick={(event) => event.stopPropagation()}
           >
             <header className="dialog-header">
               <h2 id="project-name-dialog-title">
@@ -277,13 +317,20 @@ export function ProjectManager({
       )}
 
       {deleteTarget !== null && (
-        <div className="dialog-backdrop" role="presentation">
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDeleteTarget(null);
+          }}
+        >
           <section
             ref={deleteDialogRef}
             className="project-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-project-dialog-title"
+            onClick={(event) => event.stopPropagation()}
           >
             <header className="dialog-header">
               <h2 id="delete-project-dialog-title">Delete Project?</h2>

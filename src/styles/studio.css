@@ -2063,13 +2063,6 @@
 }
 
 @media (max-width: 480px) {
-  html,
-  body,
-  .app-shell {
-    overflow-x: hidden;
-    max-width: 100vw;
-  }
-
   .presets-panel {
     width: 96vw;
     max-height: 92vh;
@@ -3130,5 +3123,284 @@ input:disabled {
 
   .transport-group {
     flex-basis: 100%;
+  }
+}
+
+/* US10 Batch 5: semantic state system and accessible interaction polish. */
+:root {
+  scrollbar-color: var(--border) var(--background);
+  scrollbar-width: thin;
+}
+
+html {
+  background: var(--background);
+  color: var(--text);
+  scroll-behavior: auto;
+}
+
+html[data-theme] * {
+  transition-duration: 0s !important;
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  border-color: var(--border-disabled);
+  color: var(--text-disabled);
+  opacity: 1;
+}
+
+button:disabled {
+  background: var(--surface-disabled);
+}
+
+button[aria-pressed="true"],
+.mode-option.is-selected {
+  background: var(--surface-selected);
+}
+
+.presentation-control-options button[aria-pressed="true"],
+.meter-policy-toggle .policy-option.is-selected,
+.view-preference-toggle button.is-active,
+.groove-toggle-btn.is-active,
+.loop-mode-btn.is-active,
+.transport-toggle-button.is-active {
+  background: var(--surface-selected);
+}
+
+.chord-card:hover:not(.is-selected):not(.recommendation-best):not(.recommendation-alternative),
+.module-selector button:hover:not(.is-active),
+.card-view-switcher button:hover:not([aria-pressed="true"]),
+.transport-button:hover:not(:disabled),
+.project-selector-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.chord-card.is-selected {
+  outline-color: var(--selected);
+  background: var(--surface-selected);
+}
+
+.chord-card.is-previewed .chord-main {
+  background: var(--surface-preview);
+}
+
+.chord-card.is-selected.recommendation-best {
+  outline-color: var(--selected);
+  border-color: var(--recommendation-best);
+  box-shadow: inset 0 0 0 2px var(--recommendation-best);
+}
+
+.chord-card.is-selected.recommendation-alternative {
+  outline-color: var(--selected);
+  border-color: var(--recommendation-alternative);
+  box-shadow: inset 0 0 0 1px var(--recommendation-alternative);
+}
+
+.progression-step-card.is-selected,
+.progression-rest-card.is-selected {
+  outline-color: var(--selected);
+  background: var(--surface-selected);
+}
+
+.progression-step-card.is-playing,
+.progression-rest-card.is-playing {
+  border-color: var(--playing);
+  background: var(--surface-preview) !important;
+  box-shadow: 0 0 0 1px var(--playing);
+}
+
+.progression-step-card.is-playing.is-selected,
+.progression-rest-card.is-playing.is-selected {
+  outline-color: var(--selected) !important;
+  box-shadow:
+    0 0 0 1px var(--playing),
+    0 0 0 3px var(--selected);
+}
+
+.progression-step-card.is-in-loop,
+.progression-rest-card.is-in-loop {
+  border-color: var(--completed);
+}
+
+.recommendation-best-badge {
+  background: var(--surface-warning);
+  color: var(--recommendation-best);
+}
+
+.recommendation-alternative-badge {
+  background: var(--surface-preview);
+  color: var(--recommendation-alternative);
+}
+
+.customized-indicator,
+.template-status.is-customized {
+  border-color: var(--customized);
+  color: var(--customized);
+}
+
+.customized-indicator {
+  background: var(--surface-selected);
+}
+
+.template-status.is-inherited,
+.status-badge.inherit {
+  color: var(--text-muted);
+}
+
+.status-badge.override {
+  background: var(--surface-warning);
+  color: var(--warning);
+}
+
+.branch-status,
+.branch-controls.active {
+  border-color: var(--branch);
+  color: var(--branch);
+}
+
+.branch-controls.active {
+  background: var(--surface-warning);
+}
+
+.transport-status-badge.status-playing {
+  background: var(--surface-success);
+  color: var(--ready);
+}
+
+.transport-status-badge.status-paused {
+  background: var(--surface-warning);
+  color: var(--warning);
+}
+
+.transport-status-badge.status-stopped {
+  background: var(--surface-disabled);
+  color: var(--text-muted);
+}
+
+.transport-status-badge.status-playing .status-dot {
+  background: var(--ready);
+  box-shadow: 0 0 6px var(--ready);
+}
+
+.transport-status-badge.status-paused .status-dot {
+  background: var(--warning);
+}
+
+.transport-status-badge.status-stopped .status-dot {
+  background: var(--disabled);
+}
+
+.transport-error-badge,
+.error-box,
+.validation-error-box,
+.empty-warning,
+.project-error,
+.project-export-status-error,
+.error-text {
+  color: var(--destructive);
+}
+
+.transport-error-badge,
+.error-box,
+.validation-error-box,
+.empty-warning {
+  background: var(--surface-error);
+  border-color: var(--destructive);
+}
+
+.warning-box,
+.grouping-error-message,
+.duration-error-message {
+  color: var(--warning);
+}
+
+.warning-box {
+  background: var(--surface-warning);
+  border-color: var(--warning);
+}
+
+.input-error,
+.meter-grouping-input.has-error,
+.step-duration-custom-input-group input.has-error {
+  border-color: var(--destructive);
+  background: var(--surface-error);
+}
+
+.project-export-status-success {
+  color: var(--completed);
+}
+
+.piano-audio-status.is-loading {
+  border-color: var(--loading);
+  color: var(--loading);
+  background: var(--surface-preview);
+}
+
+.piano-audio-status.is-ready {
+  border-color: var(--ready);
+  color: var(--ready);
+  background: var(--surface-success);
+}
+
+.piano-audio-status.is-fallback {
+  border-color: var(--warning);
+  color: var(--warning);
+  background: var(--surface-warning);
+}
+
+.piano-audio-status.is-error {
+  border-color: var(--destructive);
+  color: var(--destructive);
+  background: var(--surface-error);
+}
+
+.audio-status-dot.dot-loading {
+  background: var(--loading);
+}
+
+.audio-status-dot.dot-ready {
+  background: var(--ready);
+  box-shadow: 0 0 6px var(--ready);
+}
+
+.audio-status-dot.dot-fallback {
+  background: var(--warning);
+}
+
+.audio-status-dot.dot-error {
+  background: var(--destructive);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 3px solid var(--focus) !important;
+  outline-offset: 2px;
+  scroll-margin: var(--space-3);
+}
+
+.dialog-backdrop,
+.piano-voicing-editor-modal {
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }
