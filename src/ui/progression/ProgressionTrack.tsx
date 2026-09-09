@@ -13,6 +13,7 @@ import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { StepDurationControl } from "./StepDurationControl";
+import { Icon } from "../common/Icon";
 
 export function ProgressionTrack({
   project,
@@ -146,7 +147,7 @@ export function ProgressionTrack({
             onClick={onAddRest}
             aria-label="Add Rest to progression"
           >
-            + Rest
+            <Icon name="add" /> Rest
           </button>
         ) : null}
       </div>
@@ -210,7 +211,7 @@ export function ProgressionTrack({
                 </span>
                 {isPlaying ? (
                   <span className="step-state-indicator playing-indicator" aria-hidden="true">
-                    ▶ Playing
+                    <Icon name="play" /> Playing
                   </span>
                 ) : null}
               </button>

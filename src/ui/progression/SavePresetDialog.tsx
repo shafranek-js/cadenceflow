@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import type { Project } from "../../domain/project/project";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 
 export interface SavePresetDialogProps {
   readonly isOpen: boolean;
@@ -73,7 +74,7 @@ export function SavePresetDialog({ isOpen, project, onClose, onSave }: SavePrese
             onClick={onClose}
             aria-label="Close save preset dialog"
           >
-            ×
+            <Icon name="close" />
           </button>
         </header>
 

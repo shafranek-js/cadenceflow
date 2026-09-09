@@ -4,6 +4,7 @@ import { normalizeProjectName } from "../../domain/project/name";
 import type { PortableProjectExport } from "../../app/projectController";
 import { useModalFocus } from "../common/useModalFocus";
 import { ExportActions } from "./ExportActions";
+import { Icon } from "../common/Icon";
 
 export interface PortableProjectActionsProps {
   readonly project: Project;
@@ -149,7 +150,7 @@ export function PortableProjectActions({
                 aria-label="Close Save Project As dialog"
                 onClick={() => setSaveAsOpen(false)}
               >
-                ×
+                <Icon name="close" />
               </button>
             </header>
             <form onSubmit={submitSaveAs}>

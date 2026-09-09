@@ -1,3 +1,5 @@
+import { Icon } from "../common/Icon";
+
 export function ProgressionStepRemoveButton({
   accessibleName,
   onRemove,
@@ -18,7 +20,7 @@ export function ProgressionStepRemoveButton({
         onRemove();
       }}
     >
-      <span aria-hidden="true">×</span>
+      <Icon name="remove" />
     </button>
   );
 }

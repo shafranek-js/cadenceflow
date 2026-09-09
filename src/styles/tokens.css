@@ -33,6 +33,31 @@
   --studio-gutter: 24px;
   --panel-gap: 16px;
   --panel-padding: 14px;
+
+  /* Global UI system: non-semantic geometry and type tokens. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-panel: 12px;
+  --radius-card: 10px;
+  --radius-control: 7px;
+  --radius-badge: 999px;
+  --control-height: 32px;
+  --font-size-display: 1.15rem;
+  --font-size-title: 1rem;
+  --font-size-section: 0.86rem;
+  --font-size-body: 0.875rem;
+  --font-size-label: 0.75rem;
+  --font-size-meta: 0.6875rem;
+  --font-size-status: 0.75rem;
+  --line-tight: 1.2;
+  --line-body: 1.45;
+  --line-relaxed: 1.6;
+  --weight-regular: 400;
+  --weight-medium: 600;
+  --weight-strong: 750;
 }
 
 :root[data-theme="dark"] {

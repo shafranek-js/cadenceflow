@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { CustomizedIndicator } from "./CustomizedIndicator";
+import { Icon } from "../common/Icon";
 
 export function ChordCardSettingsButton({
   functionId,
@@ -29,7 +30,7 @@ export function ChordCardSettingsButton({
         title={`Settings for ${functionId}. Ctrl/Cmd+Click: Reset Card to Defaults`}
         aria-label={`Settings for ${functionId}`}
       >
-        ⚙
+        <Icon name="settings" />
       </button>
       <CustomizedIndicator count={customizedCount} />
     </span>

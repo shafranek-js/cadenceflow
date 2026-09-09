@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 import type { Project } from "../../domain/project/project";
+import { Icon } from "../common/Icon";
 
 function stepLabel(step: Project["progression"]["steps"][number], index: number): string {
   return `${index + 1}: ${step.kind === "chord" ? step.harmonicFunction.functionId : "Rest"}`;
@@ -52,7 +53,7 @@ export function BranchControls({
   return (
     <div className="branch-controls active" data-testid="branch-controls-active">
       <span className="branch-phase-label">
-        <span aria-hidden="true">↯</span> Temporary branch
+        <Icon name="branch" /> Temporary branch
       </span>
       {!branch.originAtEnd ? (
         <select

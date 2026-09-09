@@ -1,12 +1,13 @@
 import type { ThemeMode } from "../../domain/project/project";
+import { Icon, type IconName } from "../common/Icon";
 
 const THEMES: readonly {
   readonly value: ThemeMode;
   readonly label: string;
-  readonly icon: string;
+  readonly icon: IconName;
 }[] = [
-  { value: "dark", label: "Dark theme", icon: "◐" },
-  { value: "light", label: "Light theme", icon: "☼" },
+  { value: "dark", label: "Dark theme", icon: "moon" },
+  { value: "light", label: "Light theme", icon: "sun" },
 ];
 
 export function ThemeControl({
@@ -30,7 +31,7 @@ export function ThemeControl({
             title={theme.label}
             onClick={() => onChange(theme.value)}
           >
-            <span aria-hidden="true">{theme.icon}</span>
+            <Icon name={theme.icon} />
             <span>{theme.value}</span>
           </button>
         ))}

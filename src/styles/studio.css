@@ -2906,3 +2906,229 @@ summary:focus-visible,
     flex: 1 1 100%;
   }
 }
+
+/* US10 Batch 4: global UI system. Geometry and type stay independent from semantic state colors. */
+.ui-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  vertical-align: -0.125em;
+}
+
+body {
+  font-size: var(--font-size-body);
+  line-height: var(--line-body);
+}
+
+.app-shell {
+  padding: var(--space-5) var(--studio-gutter);
+}
+
+.app-header {
+  gap: var(--space-3);
+  align-items: flex-start;
+  line-height: var(--line-body);
+}
+
+.app-header-brand,
+.app-header-controls,
+.app-header-status {
+  min-width: 0;
+}
+
+.app-header-brand {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.app-header-brand strong {
+  font-size: var(--font-size-display);
+  font-weight: var(--weight-strong);
+}
+
+.app-header-context {
+  font-size: var(--font-size-body);
+}
+
+.app-header-controls {
+  display: flex;
+  flex: 1 1 560px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-header-status {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-header > .app-header-status:last-child {
+  margin-left: auto;
+}
+
+.transport-bar {
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-body);
+}
+
+.transport-group {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+}
+
+.transport-timing {
+  flex-basis: 640px;
+}
+
+.transport-playback-support {
+  flex: 0 1 auto;
+}
+
+.transport-group .transport-section {
+  padding-right: var(--space-2);
+  border-right-color: var(--border-subtle);
+}
+
+.transport-group .transport-section:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.transport-label {
+  font-size: var(--font-size-label);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.transport-btn-icon,
+.transport-bar .ui-icon,
+.app-header .ui-icon,
+.step-state-indicator .ui-icon,
+.dialog-close-btn .ui-icon,
+.card-settings-button .ui-icon,
+.progression-step-remove-button .ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.transport-button,
+.project-selector-button,
+.presentation-control,
+.tempo-stepper-btn,
+.meter-apply-btn,
+.groove-toggle-btn,
+.loop-mode-btn,
+.transport-toggle-button,
+.add-chord,
+.add-rest-btn,
+.card-settings-button,
+.progression-step-remove-button,
+.step-actions button,
+.dialog-close-btn {
+  min-height: var(--control-height);
+}
+
+.transport-bar input:not([type="radio"]),
+.transport-bar select,
+.app-header-controls select,
+.app-header-controls button {
+  min-height: var(--control-height);
+}
+
+.card-view-switcher button {
+  width: var(--control-height);
+  height: var(--control-height);
+  min-width: var(--control-height);
+}
+
+.matrix-panel,
+.inspector,
+.progression-strip {
+  border-radius: var(--radius-panel);
+}
+
+.chord-card,
+.progression-step-card,
+.progression-rest-card {
+  border-radius: var(--radius-card);
+}
+
+.matrix-toolbar h2,
+.progression-heading h2,
+.inspector h2 {
+  font-size: var(--font-size-title);
+  line-height: var(--line-tight);
+}
+
+.inspector p,
+.harmony-details,
+.project-menu,
+.progression-empty-state {
+  font-size: var(--font-size-body);
+  line-height: var(--line-body);
+}
+
+.matrix-layer h3,
+.expanded-label,
+.tonic-selector > strong {
+  font-size: var(--font-size-label);
+  letter-spacing: 0.04em;
+}
+
+.project-menu,
+.matrix-reset-menu > div,
+.module-switch-dialog,
+.project-dialog,
+.voicing-editor-card {
+  border-radius: var(--radius-panel);
+}
+
+.branch-status,
+.transport-status-badge,
+.customized-indicator {
+  border-radius: var(--radius-badge);
+  font-size: var(--font-size-status);
+}
+
+button:not(:disabled),
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+input[type="text"],
+input[type="number"] {
+  cursor: text;
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .app-header > .app-header-status:last-child {
+    margin-left: 0;
+  }
+
+  .transport-group {
+    flex-basis: 100%;
+  }
+}

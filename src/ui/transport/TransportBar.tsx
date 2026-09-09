@@ -9,6 +9,7 @@ import type { LoopMode, LoopState } from "./loopState";
 import { MetronomeControls } from "./MetronomeControls";
 import { StepDurationControl } from "../timing/StepDurationControl";
 import { formatDurationBeats } from "../timing/stepDuration";
+import { Icon } from "../common/Icon";
 
 export interface TransportBarProps {
   readonly project: Project;
@@ -208,7 +209,7 @@ export function TransportBar({
             title="Undo last action (Ctrl+Z)"
           >
             <span className="transport-btn-icon" aria-hidden="true">
-              ↶
+              <Icon name="undo" />
             </span>
             <span className="transport-btn-label">Undo</span>
           </button>
@@ -224,278 +225,288 @@ export function TransportBar({
             title="Redo last undone action (Ctrl+Shift+Z or Ctrl+Y)"
           >
             <span className="transport-btn-icon" aria-hidden="true">
-              ↷
+              <Icon name="redo" />
             </span>
             <span className="transport-btn-label">Redo</span>
           </button>
         )}
       </div>
 
-      {/* 2. Tempo Controls */}
-      <div className="transport-section transport-tempo" role="group" aria-label="Tempo Controls">
-        <label htmlFor={tempoInputId} className="transport-label">
-          Tempo
-        </label>
-        <div className="tempo-input-group">
-          <button
-            type="button"
-            className="tempo-stepper-btn"
-            onClick={() => onSetTempo(Math.max(30, project.globalTiming.tempoBpm - 5))}
-            aria-label="Decrease tempo by 5 BPM"
-            title="-5 BPM"
-          >
-            -
-          </button>
-          <input
-            id={tempoInputId}
-            type="number"
-            min={30}
-            max={300}
-            value={project.globalTiming.tempoBpm}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              if (Number.isFinite(val) && val >= 30 && val <= 300) {
-                onSetTempo(val);
-              }
-            }}
-            className="tempo-number-input"
-            aria-label="Tempo in BPM"
-          />
-          <button
-            type="button"
-            className="tempo-stepper-btn"
-            onClick={() => onSetTempo(Math.min(300, project.globalTiming.tempoBpm + 5))}
-            aria-label="Increase tempo by 5 BPM"
-            title="+5 BPM"
-          >
-            +
-          </button>
-          <span className="tempo-unit">BPM</span>
-        </div>
-      </div>
-
-      {/* 3. Meter and Grouping Controls */}
-      <div
-        className="transport-section transport-meter"
-        role="group"
-        aria-label="Time Signature and Meter"
-      >
-        <span className="transport-label">Meter</span>
-        <div className="meter-controls-group">
-          <input
-            id={meterNumId}
-            type="number"
-            min={1}
-            max={32}
-            value={meterNum}
-            onChange={handleNumeratorChange}
-            className="meter-num-input"
-            aria-label="Meter numerator"
-          />
-          <span className="meter-divider">/</span>
-          <select
-            id={meterDenId}
-            value={meterDen}
-            onChange={(e) => setMeterDen(parseInt(e.target.value, 10) as Meter["denominator"])}
-            className="meter-den-select"
-            aria-label="Meter denominator"
-          >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={4}>4</option>
-            <option value={8}>8</option>
-            <option value={16}>16</option>
-            <option value={32}>32</option>
-          </select>
-
-          <div className="grouping-control">
+      <div className="transport-group transport-timing" role="group" aria-label="Timing Controls">
+        {/* 2. Tempo Controls */}
+        <div className="transport-section transport-tempo" role="group" aria-label="Tempo Controls">
+          <label htmlFor={tempoInputId} className="transport-label">
+            Tempo
+          </label>
+          <div className="tempo-input-group">
+            <button
+              type="button"
+              className="tempo-stepper-btn"
+              onClick={() => onSetTempo(Math.max(30, project.globalTiming.tempoBpm - 5))}
+              aria-label="Decrease tempo by 5 BPM"
+              title="-5 BPM"
+            >
+              -
+            </button>
             <input
-              id={meterGroupingId}
-              type="text"
-              value={groupingText}
-              onChange={handleGroupingChange}
-              placeholder="e.g. 3+2+2"
-              className={`meter-grouping-input ${groupingError ? "has-error" : ""}`}
-              aria-label="Pulse grouping"
-              title="Pulse grouping pattern (e.g. 3+2+2)"
+              id={tempoInputId}
+              type="number"
+              min={30}
+              max={300}
+              value={project.globalTiming.tempoBpm}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (Number.isFinite(val) && val >= 30 && val <= 300) {
+                  onSetTempo(val);
+                }
+              }}
+              className="tempo-number-input"
+              aria-label="Tempo in BPM"
             />
-          </div>
-
-          <div className="meter-policy-toggle" role="radiogroup" aria-label="Meter Change Policy">
-            <label className={`policy-option ${meterPolicy === "reflow" ? "is-selected" : ""}`}>
-              <input
-                type="radio"
-                name="meter-policy"
-                value="reflow"
-                aria-label="Reflow"
-                checked={meterPolicy === "reflow"}
-                onChange={() => setMeterPolicy("reflow")}
-              />
-              Reflow
-            </label>
-            <label
-              className={`policy-option ${meterPolicy === "preserve-beat-lengths" ? "is-selected" : ""}`}
+            <button
+              type="button"
+              className="tempo-stepper-btn"
+              onClick={() => onSetTempo(Math.min(300, project.globalTiming.tempoBpm + 5))}
+              aria-label="Increase tempo by 5 BPM"
+              title="+5 BPM"
             >
-              <input
-                type="radio"
-                name="meter-policy"
-                value="preserve-beat-lengths"
-                aria-label="Preserve"
-                checked={meterPolicy === "preserve-beat-lengths"}
-                onChange={() => setMeterPolicy("preserve-beat-lengths")}
-              />
-              Preserve
-            </label>
+              +
+            </button>
+            <span className="tempo-unit">BPM</span>
           </div>
-
-          <button
-            type="button"
-            className="meter-apply-btn"
-            onClick={handleApplyMeter}
-            disabled={Boolean(groupingError)}
-            aria-label="Apply Meter Change"
-          >
-            Apply
-          </button>
         </div>
-        {groupingError ? (
-          <span className="grouping-error-message" role="alert">
-            {groupingError}
+
+        {/* 3. Meter and Grouping Controls */}
+        <div
+          className="transport-section transport-meter"
+          role="group"
+          aria-label="Time Signature and Meter"
+        >
+          <span className="transport-label">Meter</span>
+          <div className="meter-controls-group">
+            <input
+              id={meterNumId}
+              type="number"
+              min={1}
+              max={32}
+              value={meterNum}
+              onChange={handleNumeratorChange}
+              className="meter-num-input"
+              aria-label="Meter numerator"
+            />
+            <span className="meter-divider">/</span>
+            <select
+              id={meterDenId}
+              value={meterDen}
+              onChange={(e) => setMeterDen(parseInt(e.target.value, 10) as Meter["denominator"])}
+              className="meter-den-select"
+              aria-label="Meter denominator"
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={4}>4</option>
+              <option value={8}>8</option>
+              <option value={16}>16</option>
+              <option value={32}>32</option>
+            </select>
+
+            <div className="grouping-control">
+              <input
+                id={meterGroupingId}
+                type="text"
+                value={groupingText}
+                onChange={handleGroupingChange}
+                placeholder="e.g. 3+2+2"
+                className={`meter-grouping-input ${groupingError ? "has-error" : ""}`}
+                aria-label="Pulse grouping"
+                title="Pulse grouping pattern (e.g. 3+2+2)"
+              />
+            </div>
+
+            <div className="meter-policy-toggle" role="radiogroup" aria-label="Meter Change Policy">
+              <label className={`policy-option ${meterPolicy === "reflow" ? "is-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="meter-policy"
+                  value="reflow"
+                  aria-label="Reflow"
+                  checked={meterPolicy === "reflow"}
+                  onChange={() => setMeterPolicy("reflow")}
+                />
+                Reflow
+              </label>
+              <label
+                className={`policy-option ${meterPolicy === "preserve-beat-lengths" ? "is-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="meter-policy"
+                  value="preserve-beat-lengths"
+                  aria-label="Preserve"
+                  checked={meterPolicy === "preserve-beat-lengths"}
+                  onChange={() => setMeterPolicy("preserve-beat-lengths")}
+                />
+                Preserve
+              </label>
+            </div>
+
+            <button
+              type="button"
+              className="meter-apply-btn"
+              onClick={handleApplyMeter}
+              disabled={Boolean(groupingError)}
+              aria-label="Apply Meter Change"
+            >
+              Apply
+            </button>
+          </div>
+          {groupingError ? (
+            <span className="grouping-error-message" role="alert">
+              {groupingError}
+            </span>
+          ) : null}
+        </div>
+
+        {/* 4. Selected Step Duration Editor */}
+        <div
+          className="transport-section transport-step-duration"
+          role="group"
+          aria-label="Step Duration Editor"
+        >
+          <span className="transport-label">
+            Step Duration {selectedStep ? `(${formatDurationBeats(selectedStep.duration)})` : ""}
           </span>
-        ) : null}
-      </div>
-
-      {/* 4. Selected Step Duration Editor */}
-      <div
-        className="transport-section transport-step-duration"
-        role="group"
-        aria-label="Step Duration Editor"
-      >
-        <span className="transport-label">
-          Step Duration {selectedStep ? `(${formatDurationBeats(selectedStep.duration)})` : ""}
-        </span>
-        <StepDurationControl
-          variant="buttons"
-          value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
-          onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
-          disabled={!selectedStepId}
-        />
-      </div>
-
-      {/* 5. Groove / Swing Controls */}
-      <div
-        className="transport-section transport-groove"
-        role="group"
-        aria-label="Groove and Swing"
-      >
-        <span className="transport-label">Groove</span>
-        <div className="groove-controls-group">
-          <button
-            type="button"
-            className={`groove-toggle-btn ${project.groove.feel === "swing" ? "is-active" : ""}`}
-            onClick={handleGrooveToggle}
-            aria-pressed={project.groove.feel === "swing"}
-            aria-label="Toggle Swing Feel"
-          >
-            {project.groove.feel === "swing" ? "Swing" : "Straight"}
-          </button>
-
-          {project.groove.feel === "swing" && (
-            <div className="swing-slider-group">
-              <input
-                id={swingSliderId}
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={project.groove.swingAmount}
-                onChange={handleSwingAmountChange}
-                className="swing-slider"
-                aria-label="Swing Amount"
-              />
-              <span className="swing-percent">{Math.round(project.groove.swingAmount * 100)}%</span>
-            </div>
-          )}
+          <StepDurationControl
+            variant="buttons"
+            value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
+            onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
+            disabled={!selectedStepId}
+          />
         </div>
-      </div>
 
-      {/* 6. Loop Controls */}
-      <div className="transport-section transport-loop" role="group" aria-label="Loop Controls">
-        <span className="transport-label">Loop</span>
-        <div className="loop-controls-group">
-          <div className="loop-mode-selector" role="radiogroup" aria-label="Loop Mode">
+        {/* 5. Groove / Swing Controls */}
+        <div
+          className="transport-section transport-groove"
+          role="group"
+          aria-label="Groove and Swing"
+        >
+          <span className="transport-label">Groove</span>
+          <div className="groove-controls-group">
             <button
               type="button"
-              className={`loop-mode-btn ${loopState.mode === "disabled" ? "is-active" : ""}`}
-              onClick={() => onSetLoopMode("disabled")}
-              aria-pressed={loopState.mode === "disabled"}
+              className={`groove-toggle-btn ${project.groove.feel === "swing" ? "is-active" : ""}`}
+              onClick={handleGrooveToggle}
+              aria-pressed={project.groove.feel === "swing"}
+              aria-label="Toggle Swing Feel"
             >
-              Off
+              {project.groove.feel === "swing" ? "Swing" : "Straight"}
             </button>
-            <button
-              type="button"
-              className={`loop-mode-btn ${loopState.mode === "all" ? "is-active" : ""}`}
-              onClick={() => onSetLoopMode("all")}
-              aria-pressed={loopState.mode === "all"}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              className={`loop-mode-btn ${loopState.mode === "range" ? "is-active" : ""}`}
-              onClick={() => onSetLoopMode("range")}
-              aria-pressed={loopState.mode === "range"}
-            >
-              Range
-            </button>
+
+            {project.groove.feel === "swing" && (
+              <div className="swing-slider-group">
+                <input
+                  id={swingSliderId}
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={project.groove.swingAmount}
+                  onChange={handleSwingAmountChange}
+                  className="swing-slider"
+                  aria-label="Swing Amount"
+                />
+                <span className="swing-percent">
+                  {Math.round(project.groove.swingAmount * 100)}%
+                </span>
+              </div>
+            )}
           </div>
-
-          {loopState.mode === "range" && steps.length > 0 && (
-            <div className="loop-range-selectors">
-              <label className="loop-range-label">
-                From:
-                <select
-                  value={loopRegion?.startStepId ?? steps[0]?.id}
-                  onChange={handleLoopRangeStartChange}
-                  className="loop-step-select"
-                  aria-label="Loop start step"
-                >
-                  {steps.map((s, idx) => (
-                    <option key={s.id} value={s.id}>
-                      {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="loop-range-label">
-                To:
-                <select
-                  value={loopRegion?.endStepId ?? steps[steps.length - 1]?.id}
-                  onChange={handleLoopRangeEndChange}
-                  className="loop-step-select"
-                  aria-label="Loop end step"
-                >
-                  {steps.map((s, idx) => (
-                    <option key={s.id} value={s.id}>
-                      {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 7. Metronome and Count-In Controls */}
-      <div className="transport-section transport-metronome">
-        <MetronomeControls
-          metronomeEnabled={metronomeEnabled}
-          countInEnabled={countInEnabled}
-          onToggleMetronome={onToggleMetronome}
-          onToggleCountIn={onToggleCountIn}
-        />
+      <div
+        className="transport-group transport-playback-support"
+        role="group"
+        aria-label="Playback Support"
+      >
+        {/* 6. Loop Controls */}
+        <div className="transport-section transport-loop" role="group" aria-label="Loop Controls">
+          <span className="transport-label">Loop</span>
+          <div className="loop-controls-group">
+            <div className="loop-mode-selector" role="radiogroup" aria-label="Loop Mode">
+              <button
+                type="button"
+                className={`loop-mode-btn ${loopState.mode === "disabled" ? "is-active" : ""}`}
+                onClick={() => onSetLoopMode("disabled")}
+                aria-pressed={loopState.mode === "disabled"}
+              >
+                Off
+              </button>
+              <button
+                type="button"
+                className={`loop-mode-btn ${loopState.mode === "all" ? "is-active" : ""}`}
+                onClick={() => onSetLoopMode("all")}
+                aria-pressed={loopState.mode === "all"}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`loop-mode-btn ${loopState.mode === "range" ? "is-active" : ""}`}
+                onClick={() => onSetLoopMode("range")}
+                aria-pressed={loopState.mode === "range"}
+              >
+                Range
+              </button>
+            </div>
+
+            {loopState.mode === "range" && steps.length > 0 && (
+              <div className="loop-range-selectors">
+                <label className="loop-range-label">
+                  From:
+                  <select
+                    value={loopRegion?.startStepId ?? steps[0]?.id}
+                    onChange={handleLoopRangeStartChange}
+                    className="loop-step-select"
+                    aria-label="Loop start step"
+                  >
+                    {steps.map((s, idx) => (
+                      <option key={s.id} value={s.id}>
+                        {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="loop-range-label">
+                  To:
+                  <select
+                    value={loopRegion?.endStepId ?? steps[steps.length - 1]?.id}
+                    onChange={handleLoopRangeEndChange}
+                    className="loop-step-select"
+                    aria-label="Loop end step"
+                  >
+                    {steps.map((s, idx) => (
+                      <option key={s.id} value={s.id}>
+                        {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 7. Metronome and Count-In Controls */}
+        <div className="transport-section transport-metronome">
+          <MetronomeControls
+            metronomeEnabled={metronomeEnabled}
+            countInEnabled={countInEnabled}
+            onToggleMetronome={onToggleMetronome}
+            onToggleCountIn={onToggleCountIn}
+          />
+        </div>
       </div>
     </nav>
   );

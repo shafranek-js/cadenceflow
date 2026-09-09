@@ -222,3 +222,16 @@
   color: var(--text-muted);
   font-size: 0.78rem;
 }
+
+/* US10 Batch 4 spacing and stable card geometry. */
+.matrix-grid {
+  gap: var(--space-4);
+}
+
+.matrix-layer-cards {
+  gap: var(--space-3);
+}
+
+.chord-card {
+  border-radius: var(--radius-card);
+}

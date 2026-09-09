@@ -14,6 +14,7 @@ import { StepCardViewSwitcher } from "./StepCardViewSwitcher";
 import { StepDurationControl } from "./StepDurationControl";
 import { StepActions } from "./StepActions";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
+import { Icon } from "../common/Icon";
 
 const ARTICULATIONS: readonly PianoArticulation[] = [
   "block",
@@ -96,7 +97,7 @@ export function ProgressionStepCard({
       >
         {playing ? (
           <span className="step-state-indicator playing-indicator" aria-hidden="true">
-            ▶ Playing
+            <Icon name="play" /> Playing
           </span>
         ) : null}
         <span className="step-view">

@@ -806,41 +806,47 @@ export function App() {
     <StudioWorkspace
       header={
         <>
-          <strong>CadenceFlow</strong>
-          <span>
-            {project.activeModule === "progressions"
-              ? "Progressions · Major"
-              : "Dark Harmony · Tonal Minor"}
-          </span>
-          <ProjectManager
-            project={project}
-            projects={projectList}
-            busy={projectBusy}
-            error={projectError}
-            onNewProject={handleNewProject}
-            onOpenProject={handleOpenProject}
-            onRenameProject={handleRenameProject}
-            onDeleteProject={handleDeleteProject}
-          >
-            <PortableProjectActions
+          <div className="app-header-brand" role="group" aria-label="Application">
+            <strong>CadenceFlow</strong>
+            <span className="app-header-context">
+              {project.activeModule === "progressions"
+                ? "Progressions · Major"
+                : "Dark Harmony · Tonal Minor"}
+            </span>
+          </div>
+          <div className="app-header-controls" role="group" aria-label="Application controls">
+            <ProjectManager
               project={project}
+              projects={projectList}
               busy={projectBusy}
-              onSaveProjectAs={handleSaveProjectAs}
-              onExport={handleExportProject}
-              onOpenProjectFile={handleOpenProjectFile}
+              error={projectError}
+              onNewProject={handleNewProject}
+              onOpenProject={handleOpenProject}
+              onRenameProject={handleRenameProject}
+              onDeleteProject={handleDeleteProject}
+            >
+              <PortableProjectActions
+                project={project}
+                busy={projectBusy}
+                onSaveProjectAs={handleSaveProjectAs}
+                onExport={handleExportProject}
+                onOpenProjectFile={handleOpenProjectFile}
+              />
+            </ProjectManager>
+            <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
+            <ExpertiseModeControl
+              value={project.presentation.expertiseMode}
+              onChange={changeExpertiseMode}
             />
-          </ProjectManager>
-          <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
-          <ExpertiseModeControl
-            value={project.presentation.expertiseMode}
-            onChange={changeExpertiseMode}
-          />
+          </div>
           {project.temporaryBranch ? (
-            <span className="branch-status" role="status">
+            <span className="branch-status app-header-status" role="status">
               What-if branch active
             </span>
           ) : null}
-          <PianoAudioStatus state={audioState} />
+          <div className="app-header-status">
+            <PianoAudioStatus state={audioState} />
+          </div>
         </>
       }
       transport={

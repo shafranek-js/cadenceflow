@@ -217,3 +217,17 @@
     transition: none;
   }
 }
+
+/* US10 Batch 4: progression reads as a continuous, wrapped workspace. */
+.progression-track {
+  gap: var(--space-3);
+}
+
+.progression-step-cards {
+  gap: var(--space-2);
+}
+
+.progression-step-card,
+.progression-rest-card {
+  border-radius: var(--radius-card);
+}

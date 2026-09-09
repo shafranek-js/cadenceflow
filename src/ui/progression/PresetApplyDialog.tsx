@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
 import type { Project } from "../../domain/project/project";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 import {
   formatContextLabel,
   formatPresetStepDuration,
@@ -94,7 +95,7 @@ export function PresetApplyDialog({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ×
+            <Icon name="close" />
           </button>
         </header>
 

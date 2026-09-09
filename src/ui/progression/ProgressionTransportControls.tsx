@@ -1,4 +1,5 @@
 import type { TransportState } from "../transport/transportStore";
+import { Icon } from "../common/Icon";
 
 export interface ProgressionTransportControlsProps {
   readonly selectedStepId?: string | undefined;
@@ -45,7 +46,7 @@ export function ProgressionTransportControls({
         title="Play progression"
       >
         <span className="transport-btn-icon" aria-hidden="true">
-          ▶
+          <Icon name="play" />
         </span>
         <span className="transport-btn-label">Play</span>
       </button>
@@ -59,7 +60,7 @@ export function ProgressionTransportControls({
         title={selectedStepId ? "Play from selected step" : "Select a step to play from here"}
       >
         <span className="transport-btn-icon" aria-hidden="true">
-          ⏩
+          <Icon name="from-here" />
         </span>
         <span className="transport-btn-label">From Here</span>
       </button>
@@ -73,7 +74,7 @@ export function ProgressionTransportControls({
         title="Pause playback"
       >
         <span className="transport-btn-icon" aria-hidden="true">
-          ⏸
+          <Icon name="pause" />
         </span>
         <span className="transport-btn-label">Pause</span>
       </button>
@@ -87,7 +88,7 @@ export function ProgressionTransportControls({
         title="Resume playback"
       >
         <span className="transport-btn-icon" aria-hidden="true">
-          ⏯
+          <Icon name="resume" />
         </span>
         <span className="transport-btn-label">Resume</span>
       </button>
@@ -101,7 +102,7 @@ export function ProgressionTransportControls({
         title="Stop playback"
       >
         <span className="transport-btn-icon" aria-hidden="true">
-          ⏹
+          <Icon name="stop" />
         </span>
         <span className="transport-btn-label">Stop</span>
       </button>

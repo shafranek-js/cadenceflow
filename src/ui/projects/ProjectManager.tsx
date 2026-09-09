@@ -3,6 +3,7 @@ import type { Project } from "../../domain/project/project";
 import { MAX_PROJECT_NAME_LENGTH, normalizeProjectName } from "../../domain/project/name";
 import type { ProjectMetadata } from "../../persistence/projectRepository";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 
 export interface ProjectManagerProps {
   readonly project: Pick<Project, "id" | "name">;
@@ -118,7 +119,7 @@ export function ProjectManager({
         disabled={busy}
         onClick={() => setMenuOpen((open) => !open)}
       >
-        <span>Project:</span> <strong>{project.name}</strong> <span aria-hidden="true">▾</span>
+        <span>Project:</span> <strong>{project.name}</strong> <Icon name="disclosure" />
       </button>
 
       {menuOpen && (
@@ -227,7 +228,7 @@ export function ProjectManager({
                 aria-label="Close project name dialog"
                 onClick={() => setNameDialogMode(null)}
               >
-                ×
+                <Icon name="close" />
               </button>
             </header>
             <form onSubmit={submitName}>
@@ -292,7 +293,7 @@ export function ProjectManager({
                 aria-label="Close delete project dialog"
                 onClick={() => setDeleteTarget(null)}
               >
-                ×
+                <Icon name="close" />
               </button>
             </header>
             <div className="dialog-body">

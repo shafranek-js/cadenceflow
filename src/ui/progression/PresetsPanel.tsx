@@ -2,6 +2,7 @@ import type { FunctionalPreset } from "../../domain/progression/presets";
 import { BUILT_IN_PRESETS } from "../../domain/progression/builtInPresets";
 import type { Project } from "../../domain/project/project";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 import {
   formatContextLabel,
   formatPresetStepDuration,
@@ -73,7 +74,7 @@ export function PresetsPanel({
               onClick={onClose}
               aria-label="Close presets panel"
             >
-              ×
+              <Icon name="close" />
             </button>
           </div>
         </header>

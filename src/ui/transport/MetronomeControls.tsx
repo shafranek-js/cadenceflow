@@ -1,3 +1,5 @@
+import { Icon } from "../common/Icon";
+
 export interface MetronomeControlsProps {
   readonly metronomeEnabled: boolean;
   readonly countInEnabled: boolean;
@@ -25,7 +27,7 @@ export function MetronomeControls({
         title="Toggle Metronome"
       >
         <span className="toggle-icon" aria-hidden="true">
-          ⏱
+          <Icon name="metronome" />
         </span>
         <span className="toggle-label">Metro</span>
       </button>
@@ -40,7 +42,7 @@ export function MetronomeControls({
         title="Toggle 1-Bar Count-in"
       >
         <span className="toggle-icon" aria-hidden="true">
-          1️⃣
+          <Icon name="count-in" />
         </span>
         <span className="toggle-label">Count-in</span>
       </button>

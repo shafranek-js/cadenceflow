@@ -8,6 +8,7 @@ import {
 import { validateManualVoicing } from "../../instruments/piano/voicing";
 import { PIANO_RANGE_MAX_MIDI, PIANO_RANGE_MIN_MIDI } from "../../instruments/contracts";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 
 export interface PianoVoicingEditorProps {
   readonly initialPitches: readonly ExactPitch[];
@@ -105,7 +106,7 @@ export function PianoVoicingEditor({
         <header className="voicing-editor-header">
           <h3>Manual Piano Voicing Editor: {stepLabel}</h3>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Close editor">
-            ✕
+            <Icon name="close" />
           </button>
         </header>
 

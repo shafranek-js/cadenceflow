@@ -4,6 +4,7 @@ import { CardViewSwitcher } from "./CardViewSwitcher";
 import { PianoCardView } from "../piano/PianoCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { ChordCardSettingsButton } from "./ChordCardSettingsButton";
+import { Icon } from "../common/Icon";
 
 export function ChordCard({
   model,
@@ -41,7 +42,7 @@ export function ChordCard({
             role="img"
             aria-label={`Recommendation: ${model.recommendationStatus === "best" ? "Best Match" : "Alternative"}`}
           >
-            <span aria-hidden="true">{model.recommendationStatus === "best" ? "★ " : "↝ "}</span>
+            <Icon name={model.recommendationStatus === "best" ? "best" : "alternative"} />
             {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
           </span>
         )}
@@ -78,7 +79,7 @@ export function ChordCard({
           aria-label={`Add ${model.chord.harmonicFunction.functionId} to progression`}
           title="Add to My Progression"
         >
-          +
+          <Icon name="add" />
         </button>
         <CardViewSwitcher
           value={view}
