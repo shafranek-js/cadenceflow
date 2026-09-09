@@ -3,7 +3,7 @@
   max-width: 100%;
   min-height: 100vh;
   min-width: 0;
-  padding: 20px 24px;
+  padding: 20px var(--studio-gutter);
 }
 .app-header {
   display: flex;
@@ -206,7 +206,7 @@
 .studio-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-  gap: 16px;
+  gap: var(--panel-gap);
   align-items: start;
   max-width: 100%;
   min-width: 0;
@@ -219,7 +219,7 @@
 .studio-main-column {
   display: grid;
   align-content: start;
-  gap: 16px;
+  gap: var(--panel-gap);
   max-width: 100%;
   min-width: 0;
 }
@@ -235,7 +235,7 @@
   border-radius: 14px;
 }
 .matrix-panel {
-  padding: 14px;
+  padding: var(--panel-padding);
   min-width: 0;
 }
 .matrix-toolbar {
@@ -339,23 +339,18 @@
   color: var(--text-muted);
 }
 .inspector {
-  padding: 16px;
+  padding: var(--panel-padding);
 }
 .inspector h2 {
   margin-top: 0;
 }
 .progression-strip {
   margin-top: 0;
-  padding: 14px;
+  padding: var(--panel-padding);
 }
 .progression-strip h2 {
   margin: 0 0 10px;
   font-size: 1rem;
-}
-.progression-steps {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
 }
 .progression-step {
   flex: 0 0 92px;

@@ -30,6 +30,9 @@
   --warning: #f1c36d;
   --error: #ff8c84;
   --success: #68db82;
+  --studio-gutter: 24px;
+  --panel-gap: 16px;
+  --panel-padding: 14px;
 }
 
 :root[data-theme="dark"] {

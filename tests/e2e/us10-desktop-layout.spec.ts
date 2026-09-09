@@ -208,6 +208,43 @@ async function expectProgressionBelowMatrix(page: Page): Promise<void> {
   expect(geometry.progressionRight).toBeLessThanOrEqual(geometry.inspectorLeft);
 }
 
+async function expectSharedLayoutSpacing(page: Page): Promise<void> {
+  const spacing = await page.evaluate(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const shell = document.querySelector<HTMLElement>(".app-shell");
+    const grid = document.querySelector<HTMLElement>(".studio-grid");
+    const main = document.querySelector<HTMLElement>(".studio-main-column");
+    const matrix = document.querySelector<HTMLElement>(".matrix-panel");
+    const progression = document.querySelector<HTMLElement>(".progression-strip");
+    const inspector = document.querySelector<HTMLElement>(".inspector");
+    if (!shell || !grid || !main || !matrix || !progression || !inspector) {
+      throw new Error("Studio layout surfaces are missing");
+    }
+
+    return {
+      gutter: rootStyle.getPropertyValue("--studio-gutter").trim(),
+      panelGap: rootStyle.getPropertyValue("--panel-gap").trim(),
+      panelPadding: rootStyle.getPropertyValue("--panel-padding").trim(),
+      shellPaddingInline: getComputedStyle(shell).paddingInline,
+      gridGap: getComputedStyle(grid).gap,
+      mainGap: getComputedStyle(main).gap,
+      matrixPadding: getComputedStyle(matrix).padding,
+      progressionPadding: getComputedStyle(progression).padding,
+      inspectorPadding: getComputedStyle(inspector).padding,
+    };
+  });
+
+  expect(spacing.gutter).toBe("24px");
+  expect(spacing.panelGap).toBe("16px");
+  expect(spacing.panelPadding).toBe("14px");
+  expect(spacing.shellPaddingInline).toBe(spacing.gutter);
+  expect(spacing.gridGap).toBe(spacing.panelGap);
+  expect(spacing.mainGap).toBe(spacing.panelGap);
+  expect(spacing.matrixPadding).toBe(spacing.panelPadding);
+  expect(spacing.progressionPadding).toBe(spacing.panelPadding);
+  expect(spacing.inspectorPadding).toBe(spacing.panelPadding);
+}
+
 async function expectVisibleControlsFit(page: Page): Promise<void> {
   const overflowingControls = await page.locator("button, select, input").evaluateAll((controls) =>
     controls
@@ -326,6 +363,7 @@ test.describe("US10 — desktop Studio layout", () => {
       for (const viewport of REQUIRED_VIEWPORTS) {
         await page.setViewportSize(viewport);
         await expectNoPageHorizontalScroll(page);
+        await expectSharedLayoutSpacing(page);
         await expectMatrixAndInspectorAdjacent(page);
         await expectProgressionBelowMatrix(page);
         await expectProgressionSequenceAndFit(page, expectedCount);

@@ -17,6 +17,9 @@ NEXT_DEVELOPER_TASK.md
 DEVELOPMENT_WORKFLOW.md
 HANDOFF_MANIFEST.sha256
 
+# External visual-polish briefs (orchestration inputs, not product source)
+cadenceflow_visual_polish_batches/
+
 # Spec Kit and integrations
 specs/
 .specify/
