@@ -28,9 +28,24 @@ export function ChordCard({
 }) {
   return (
     <article
-      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected" : ""}`}
+      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""}`}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
+      data-recommendation={model.recommendationStatus}
+      data-customized={customizedCount > 0 ? customizedCount : undefined}
     >
+      <div className="chord-card-status-row">
+        {model.recommendationStatus !== "none" && (
+          <span
+            className={`recommendation-badge recommendation-${model.recommendationStatus}-badge`}
+            id={`recommendation-${model.chord.harmonicFunction.functionId}`}
+            role="img"
+            aria-label={`Recommendation: ${model.recommendationStatus === "best" ? "Best Match" : "Alternative"}`}
+          >
+            <span aria-hidden="true">{model.recommendationStatus === "best" ? "★ " : "↝ "}</span>
+            {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
+          </span>
+        )}
+      </div>
       <button
         className="chord-main"
         type="button"
@@ -44,10 +59,10 @@ export function ChordCard({
         }
       >
         {view === "harmonic" && (
-          <>
+          <span className="chord-card-identity">
             <strong>{model.chord.harmonicFunction.functionId}</strong>
             <span>{model.chord.spelling.symbol}</span>
-          </>
+          </span>
         )}
         {view === "piano" && <PianoCardView pitches={model.realizedPitches} />}
         {view === "staff" && <StaffCardView pitches={model.realizedPitches} />}
@@ -61,6 +76,7 @@ export function ChordCard({
             onAdd();
           }}
           aria-label={`Add ${model.chord.harmonicFunction.functionId} to progression`}
+          title="Add to My Progression"
         >
           +
         </button>
@@ -76,17 +92,6 @@ export function ChordCard({
           onReset={onReset}
         />
       </div>
-      {model.recommendationStatus !== "none" && (
-        <span
-          className={`recommendation-badge recommendation-${model.recommendationStatus}-badge`}
-          id={`recommendation-${model.chord.harmonicFunction.functionId}`}
-          role="img"
-          aria-label={`Recommendation: ${model.recommendationStatus === "best" ? "Best Match" : "Alternative"}`}
-        >
-          <span aria-hidden="true">{model.recommendationStatus === "best" ? "★ " : "↝ "}</span>
-          {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
-        </span>
-      )}
     </article>
   );
 }

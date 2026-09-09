@@ -1,5 +1,6 @@
 import {
   useRef,
+  useState,
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
@@ -47,6 +48,8 @@ export function ProgressionTrack({
   readonly onAddRest?: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const selectedStepId = project.progression.selectedStepId;
   const loopIndices = (() => {
     if (!loopState?.enabled || !loopState.region) return null;
@@ -64,12 +67,29 @@ export function ProgressionTrack({
     chordViews.length && chordViews.every((view) => view === chordViews[0])
       ? chordViews[0]!
       : "mixed";
-  const dragStart = (event: DragEvent<HTMLElement>, stepId: string) =>
+  const dragStart = (event: DragEvent<HTMLElement>, stepId: string) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target?.closest("button, input, select, textarea, label, [data-no-drag]")) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", stepId);
+    setDraggingStepId(stepId);
+  };
+  const dragOver = (event: DragEvent<HTMLElement>, targetIndex: number) => {
+    event.preventDefault();
+    if (draggingStepId) setDropTargetIndex(targetIndex);
+  };
+  const clearDragState = () => {
+    setDraggingStepId(null);
+    setDropTargetIndex(null);
+  };
   const drop = (event: DragEvent<HTMLElement>, targetIndex: number) => {
     event.preventDefault();
     const stepId = event.dataTransfer.getData("text/plain");
     if (stepId) onReorder(stepId, targetIndex);
+    clearDragState();
   };
   const restoreSelectedStepFocus = (stepId: string) => {
     const focus = () => {
@@ -131,6 +151,16 @@ export function ProgressionTrack({
         ) : null}
       </div>
       <div className="progression-step-cards" onClick={handleBackgroundClick}>
+        {project.progression.steps.length === 0 ? (
+          <div
+            className="progression-empty-state"
+            role="status"
+            data-testid="progression-empty-state"
+          >
+            <strong>No steps yet</strong>
+            <span>Preview a chord in the Matrix, then press + to add it.</span>
+          </div>
+        ) : null}
         {project.progression.steps.map((step, index) => {
           const isPlaying = currentPlayingStepIndex === index;
           const isInLoop = Boolean(
@@ -142,11 +172,13 @@ export function ProgressionTrack({
           return step.kind === "rest" ? (
             <div
               key={step.id}
-              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${isSelected ? "is-selected" : ""}`}
+              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${isSelected ? "is-selected" : ""} ${dropTargetIndex === index ? "is-drop-target" : ""}`}
               data-testid="progression-step"
               data-playing={isPlaying ? "true" : undefined}
               data-in-loop={isInLoop ? "true" : undefined}
               onClick={() => onSelectStep(step.id)}
+              onDragOver={(event) => dragOver(event, index)}
+              onDrop={(event) => drop(event, index)}
             >
               <span
                 className="progression-step-number"
@@ -209,12 +241,15 @@ export function ProgressionTrack({
           ) : (
             <div
               key={step.id}
+              className={`progression-drag-item ${dropTargetIndex === index ? "is-drop-target" : ""}`}
               draggable
               data-progression-step-drag
               data-step-id={step.id}
+              data-dragging={draggingStepId === step.id ? "true" : undefined}
               onDragStart={(event: DragEvent<HTMLDivElement>) => dragStart(event, step.id)}
-              onDragOver={(event: DragEvent<HTMLDivElement>) => event.preventDefault()}
+              onDragOver={(event: DragEvent<HTMLDivElement>) => dragOver(event, index)}
               onDrop={(event: DragEvent<HTMLDivElement>) => drop(event, index)}
+              onDragEnd={clearDragState}
             >
               <ProgressionStepCard
                 step={step}

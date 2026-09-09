@@ -24,17 +24,22 @@ export function BranchComparison({
     );
   return (
     <section className="branch-comparison" aria-label="Original versus Alternative">
-      <div>
+      <div data-testid="branch-original-path">
         <h3>Original</h3>
         <div className="branch-path">
           {comparison.originalInterval.length ? (
-            comparison.originalInterval.map((step) => <span key={step.id}>{label(step)}</span>)
+            comparison.originalInterval.map((step, index) => (
+              <span key={step.id}>
+                <small aria-hidden="true">{index + 1}</small>
+                {label(step)}
+              </span>
+            ))
           ) : (
             <em>No replaced steps</em>
           )}
         </div>
       </div>
-      <div>
+      <div data-testid="branch-alternative-path">
         <h3>Alternative</h3>
         <div className="branch-path">
           {comparison.alternative.length ? (
@@ -45,6 +50,7 @@ export function BranchComparison({
                   checked={selectedStepIds.includes(step.id)}
                   onChange={() => toggle(step.id)}
                 />
+                <small aria-hidden="true">{comparison.originalInterval.length + 1}</small>
                 {label(step)}
               </label>
             ))

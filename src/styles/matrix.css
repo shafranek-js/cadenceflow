@@ -35,6 +35,190 @@
 }
 
 .matrix-layer-cards {
-  overflow-x: auto;
+  overflow: visible;
   overscroll-behavior-x: contain;
+}
+
+/* Batch 2 state priority: focus-visible > playing > selected/previewed > recommendation > customized > hover > passive. */
+.matrix-panel {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--background) 28%, transparent);
+}
+
+.matrix-toolbar {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.matrix-toolbar-actions {
+  justify-content: flex-end;
+}
+
+.matrix-grid {
+  gap: 16px;
+}
+
+.matrix-layer {
+  padding-top: 12px;
+}
+
+.matrix-layer:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.matrix-layer-heading {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+}
+
+.matrix-layer h3 {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 0.74rem;
+}
+
+.matrix-layer-cards {
+  gap: 10px;
+}
+
+.chord-card {
+  display: grid;
+  grid-template-rows: 20px minmax(58px, 1fr) auto;
+  gap: 6px;
+  width: 164px;
+  min-width: 164px;
+  min-height: 132px;
+  padding: 8px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.chord-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface-2) 92%, var(--accent));
+}
+
+.chord-card-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 20px;
+}
+
+.chord-card-identity {
+  display: grid;
+  gap: 2px;
+  place-items: center;
+  min-width: 0;
+}
+
+.chord-card-identity span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.chord-main {
+  min-width: 0;
+  min-height: 58px;
+  padding: 2px 0;
+}
+
+.chord-card-actions {
+  justify-content: space-between;
+  min-width: 0;
+  gap: 6px;
+}
+
+.add-chord {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.add-chord:hover {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+}
+
+.card-view-switcher {
+  flex: 0 0 auto;
+  gap: 3px;
+  overflow: visible;
+}
+
+.card-view-switcher button {
+  position: relative;
+  display: grid;
+  width: 24px;
+  height: 26px;
+  min-width: 24px;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 0;
+}
+
+.card-view-switcher button::first-letter {
+  font-size: inherit;
+}
+
+.card-view-glyph {
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.card-view-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.settings-control,
+.card-settings-button {
+  flex: 0 0 auto;
+}
+
+.card-settings-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.recommendation-badge {
+  position: static;
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chord-card.is-selected {
+  outline-color: var(--selected);
+}
+
+.chord-card.is-previewed .chord-main {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--previewed) 10%, transparent);
+}
+
+.matrix-no-recommendation {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }

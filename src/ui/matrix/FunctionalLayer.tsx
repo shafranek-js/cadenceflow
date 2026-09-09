@@ -10,8 +10,10 @@ export function FunctionalLayer({
   readonly expanded?: ReactNode;
 }) {
   return (
-    <section className="matrix-layer" aria-label={label}>
-      <h3>{label}</h3>
+    <section className="matrix-layer" aria-label={label} data-layer={label}>
+      <div className="matrix-layer-heading">
+        <h3>{label}</h3>
+      </div>
       <div className="matrix-layer-cards">{children}</div>
       {expanded ? (
         <section className="matrix-expanded-strip" aria-label={`${label} contextual options`}>

@@ -37,3 +37,183 @@
   min-width: 170px;
   max-width: 170px;
 }
+
+.progression-heading {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.progression-title-group {
+  min-height: 32px;
+}
+
+.progression-heading h2 {
+  letter-spacing: -0.01em;
+}
+
+.progression-transport-controls {
+  margin-top: 10px;
+  padding: 7px 0 10px;
+  border-top: 0;
+  border-bottom-color: var(--border-subtle);
+}
+
+.progression-view-control {
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.progression-view-control label {
+  padding: 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.add-rest-btn {
+  min-height: 30px;
+  margin-left: 0;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.progression-empty-state {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-height: 96px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.progression-empty-state strong {
+  font-size: 0.88rem;
+}
+
+.progression-empty-state span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.progression-drag-item {
+  position: relative;
+  border-radius: 11px;
+}
+
+.progression-drag-item[draggable="true"] {
+  cursor: grab;
+}
+
+.progression-drag-item[data-dragging="true"] {
+  cursor: grabbing;
+  opacity: 0.72;
+}
+
+.progression-drag-item.is-drop-target,
+.progression-rest-card.is-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
+.progression-step-card,
+.progression-rest-card {
+  display: grid;
+  grid-template-rows: auto minmax(52px, 1fr) auto;
+  gap: 6px;
+  min-height: 100px;
+  padding: 10px 8px 8px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.progression-step-number {
+  top: 7px;
+  left: 7px;
+  min-width: 20px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.progression-step-remove-button {
+  top: 5px;
+  right: 5px;
+  width: 28px;
+  height: 28px;
+}
+
+.progression-step-select-button {
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 24px 0 0;
+}
+
+.step-view {
+  min-width: 0;
+}
+
+.step-view > span {
+  max-width: 100%;
+  text-align: center;
+}
+
+.step-editor {
+  min-width: 0;
+}
+
+.step-editor select,
+.step-editor input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.step-actions button {
+  min-height: 26px;
+}
+
+.branch-controls.active {
+  border-color: var(--branch);
+  background: color-mix(in srgb, var(--branch) 8%, var(--surface));
+}
+
+.branch-phase-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--branch);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.branch-comparison > div:first-child {
+  border-color: color-mix(in srgb, var(--border) 80%, var(--text-muted));
+}
+
+.branch-comparison > div:last-child {
+  border-color: var(--branch);
+}
+
+.branch-path > span small,
+.branch-step small {
+  margin-right: 4px;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chord-card,
+  .progression-step-card,
+  .progression-rest-card {
+    transition: none;
+  }
+}

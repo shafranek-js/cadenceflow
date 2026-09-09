@@ -60,6 +60,7 @@ export function HarmonicMatrix({
   }
 
   const previousHarmonicContext = resolvePreviousHarmonicContext(project);
+  const hasRecommendation = Boolean(best || alternatives.size > 0);
 
   const renderCard = (identity: HarmonicFunctionIdentity) => {
     const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
@@ -118,6 +119,15 @@ export function HarmonicMatrix({
           />
         </div>
       </header>
+      {recommendations && !hasRecommendation ? (
+        <p
+          className="matrix-no-recommendation"
+          role="status"
+          data-testid="matrix-no-recommendation"
+        >
+          No strong recommendation for this context. Passive choices remain available.
+        </p>
+      ) : null}
       <div className="matrix-workbench">
         <TonicSelector
           tonic={project.tonic}

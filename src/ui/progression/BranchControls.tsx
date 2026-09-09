@@ -50,7 +50,10 @@ export function BranchControls({
     : project.progression.steps.findIndex((step) => step.id === branch.originStepId);
   const rejoinOptions = project.progression.steps.slice(originIndex + 1);
   return (
-    <div className="branch-controls active">
+    <div className="branch-controls active" data-testid="branch-controls-active">
+      <span className="branch-phase-label">
+        <span aria-hidden="true">↯</span> Temporary branch
+      </span>
       {!branch.originAtEnd ? (
         <select
           aria-label="Branch rejoin"
