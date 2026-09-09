@@ -37,6 +37,9 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
   }) => {
     await waitForStudio(page);
     await expect(page.getByTestId("progression-empty-state")).toContainText(
+      "Choose key → explore Matrix → click to hear → + to add",
+    );
+    await expect(page.getByTestId("progression-empty-state")).toContainText(
       "Preview a chord in the Matrix, then press + to add it.",
     );
 

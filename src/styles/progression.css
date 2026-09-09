@@ -94,6 +94,10 @@
   font-size: 0.88rem;
 }
 
+.progression-first-use-guidance {
+  color: var(--accent);
+}
+
 .progression-empty-state span {
   color: var(--text-muted);
   font-size: 0.78rem;

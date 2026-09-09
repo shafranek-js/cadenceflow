@@ -158,7 +158,9 @@ export function ProgressionTrack({
             role="status"
             data-testid="progression-empty-state"
           >
-            <strong>No steps yet</strong>
+            <strong className="progression-first-use-guidance">
+              Choose key → explore Matrix → click to hear → + to add
+            </strong>
             <span>Preview a chord in the Matrix, then press + to add it.</span>
           </div>
         ) : null}
