@@ -223,11 +223,14 @@ export function PianoPerformanceInspector({
     <section
       className="piano-performance-inspector"
       aria-label={`Performance settings for step ${step.harmonicFunction.functionId}`}
+      data-context="selected-step"
+      data-testid="step-performance-inspector"
     >
       <header className="performance-inspector-header">
         <div>
+          <span className="inspector-context-kicker">Selected step</span>
           <h3>Step Performance: {step.harmonicFunction.functionId}</h3>
-          <span>Piano Voicing & Dynamics</span>
+          <span>Quick edits stay on the card; advanced performance lives here.</span>
         </div>
       </header>
 
@@ -354,175 +357,196 @@ export function PianoPerformanceInspector({
       </div>
 
       {/* Dynamics & Velocity Controls */}
-      <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
-        <h4>Dynamics & Velocity</h4>
-        <div
-          className="view-preference-toggle"
-          role="radiogroup"
-          aria-label="Velocity View Preference"
-        >
-          <button
-            type="button"
-            className={perf.dynamicsViewPreference === "musical" ? "is-active" : ""}
-            onClick={() => handleViewPreferenceToggle("musical")}
-            aria-label="Musical view"
-          >
-            Musical (pp..ff)
-          </button>
-          <button
-            type="button"
-            className={perf.dynamicsViewPreference === "midi" ? "is-active" : ""}
-            onClick={() => handleViewPreferenceToggle("midi")}
-            aria-label="MIDI velocity view"
-          >
-            MIDI (1..127)
-          </button>
-        </div>
-
-        {perf.dynamicsViewPreference === "musical" ? (
-          <div className="musical-dynamic-select">
-            <label htmlFor="musical-dynamic-picker">Dynamic Label</label>
-            <select
-              id="musical-dynamic-picker"
-              value={velocityToMusicalDynamic(perf.masterVelocity)}
-              onChange={(e) => handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)}
-              aria-label="Musical Dynamic Label"
+      <details className="inspector-disclosure dynamics-disclosure" open>
+        <summary>
+          <span>Dynamics &amp; velocity</span>
+          <span className="disclosure-status">Master + per-note</span>
+        </summary>
+        <div className="inspector-disclosure-body">
+          <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
+            <div
+              className="view-preference-toggle"
+              role="radiogroup"
+              aria-label="Velocity View Preference"
             >
-              {MUSICAL_DYNAMICS.map((label) => (
-                <option key={label} value={label}>
-                  {label}
+              <button
+                type="button"
+                className={perf.dynamicsViewPreference === "musical" ? "is-active" : ""}
+                onClick={() => handleViewPreferenceToggle("musical")}
+                aria-label="Musical view"
+              >
+                Musical (pp..ff)
+              </button>
+              <button
+                type="button"
+                className={perf.dynamicsViewPreference === "midi" ? "is-active" : ""}
+                onClick={() => handleViewPreferenceToggle("midi")}
+                aria-label="MIDI velocity view"
+              >
+                MIDI (1..127)
+              </button>
+            </div>
+
+            {perf.dynamicsViewPreference === "musical" ? (
+              <div className="musical-dynamic-select">
+                <label htmlFor="musical-dynamic-picker">Dynamic Label</label>
+                <select
+                  id="musical-dynamic-picker"
+                  value={velocityToMusicalDynamic(perf.masterVelocity)}
+                  onChange={(e) =>
+                    handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)
+                  }
+                  aria-label="Musical Dynamic Label"
+                >
+                  {MUSICAL_DYNAMICS.map((label) => (
+                    <option key={label} value={label}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <span className="velocity-readout">Exact: {perf.masterVelocity}</span>
+              </div>
+            ) : (
+              <div className="midi-velocity-input">
+                <label htmlFor="master-velocity-input">Master Velocity</label>
+                <input
+                  id="master-velocity-input"
+                  type="number"
+                  min={1}
+                  max={127}
+                  value={perf.masterVelocity}
+                  onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
+                  aria-label="Master Velocity"
+                />
+              </div>
+            )}
+
+            {/* Dynamics Presets */}
+            <div className="dynamics-presets" role="group" aria-label="Dynamics presets">
+              <label htmlFor="dynamics-preset-select">Apply Dynamics Preset</label>
+              <select
+                id="dynamics-preset-select"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleApplyPreset(e.target.value as DynamicsPresetId);
+                    e.target.value = "";
+                  }
+                }}
+                aria-label="Apply Dynamics Preset"
+              >
+                <option value="" disabled>
+                  Select Preset...
                 </option>
-              ))}
-            </select>
-            <span className="velocity-readout">Exact: {perf.masterVelocity}</span>
-          </div>
-        ) : (
-          <div className="midi-velocity-input">
-            <label htmlFor="master-velocity-input">Master Velocity</label>
-            <input
-              id="master-velocity-input"
-              type="number"
-              min={1}
-              max={127}
-              value={perf.masterVelocity}
-              onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
-              aria-label="Master Velocity"
-            />
-          </div>
-        )}
+                {PIANO_DYNAMICS_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label} — {p.description}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Dynamics Presets */}
-        <div className="dynamics-presets" role="group" aria-label="Dynamics presets">
-          <label htmlFor="dynamics-preset-select">Apply Dynamics Preset</label>
-          <select
-            id="dynamics-preset-select"
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                handleApplyPreset(e.target.value as DynamicsPresetId);
-                e.target.value = "";
-              }
-            }}
-            aria-label="Apply Dynamics Preset"
-          >
-            <option value="" disabled>
-              Select Preset...
-            </option>
-            {PIANO_DYNAMICS_PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label} — {p.description}
-              </option>
-            ))}
-          </select>
-        </div>
+            {/* Per-note Overrides summary & Clear */}
+            <div className="per-note-overrides-summary">
+              <span>
+                {overrideCount === 0
+                  ? "All notes inheriting Master Velocity"
+                  : `${overrideCount} note velocity override${overrideCount > 1 ? "s" : ""} active`}
+              </span>
+              {overrideCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearOverrides}
+                  className="clear-overrides-btn"
+                  aria-label="Clear per-note overrides"
+                >
+                  Clear Overrides (Balanced)
+                </button>
+              )}
+            </div>
 
-        {/* Per-note Overrides summary & Clear */}
-        <div className="per-note-overrides-summary">
-          <span>
-            {overrideCount === 0
-              ? "All notes inheriting Master Velocity"
-              : `${overrideCount} note velocity override${overrideCount > 1 ? "s" : ""} active`}
-          </span>
-          {overrideCount > 0 && (
-            <button
-              type="button"
-              onClick={handleClearOverrides}
-              className="clear-overrides-btn"
-              aria-label="Clear per-note overrides"
-            >
-              Clear Overrides (Balanced)
-            </button>
-          )}
-        </div>
+            {/* Per-Note Velocity Editor */}
+            <details className="inspector-disclosure per-note-disclosure" open>
+              <summary>
+                <span>Per-note velocity overrides</span>
+                <span className="disclosure-status">
+                  {overrideCount === 0 ? "Inherited" : `${overrideCount} customized`}
+                </span>
+              </summary>
+              <div
+                className="per-note-velocity-editor"
+                role="group"
+                aria-label="Per-note velocity editor"
+              >
+                <p className="inspector-helper">
+                  Each row keeps the exact MIDI velocity or inherits Master.
+                </p>
+                <div className="per-note-list">
+                  {notesToDisplay.map((note) => {
+                    const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
+                    const currentVel = isOverridden
+                      ? perf.perNoteVelocityOverrides[note.noteKey]!
+                      : perf.masterVelocity;
 
-        {/* Per-Note Velocity Editor */}
-        <div
-          className="per-note-velocity-editor"
-          role="group"
-          aria-label="Per-note velocity editor"
-        >
-          <h5>Per-Note Velocity Overrides</h5>
-          <div className="per-note-list">
-            {notesToDisplay.map((note) => {
-              const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
-              const currentVel = isOverridden
-                ? perf.perNoteVelocityOverrides[note.noteKey]!
-                : perf.masterVelocity;
-
-              return (
-                <div key={note.noteKey} className="per-note-velocity-row">
-                  <div className="note-info">
-                    <span className="note-label">{note.label}</span>
-                    <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
-                    <span className={`note-role-badge role-${note.role}`}>
-                      {note.role === "bass" ? "Independent Bass" : "Upper"}
-                    </span>
-                  </div>
-                  <div className="note-velocity-controls">
-                    {isOverridden ? (
-                      <div className="override-active-controls">
-                        <span className="status-badge override">Override: {currentVel}</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={127}
-                          value={currentVel}
-                          onChange={(e) =>
-                            handleSetNoteOverride(note.noteKey, Number(e.target.value))
-                          }
-                          aria-label={`Velocity override for ${note.label}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleResetNoteToInherit(note.noteKey)}
-                          className="reset-inherit-btn"
-                          aria-label={`Reset ${note.label} to inherit master velocity`}
-                        >
-                          Reset to Inherit
-                        </button>
+                    return (
+                      <div key={`${note.role}-${note.noteKey}`} className="per-note-velocity-row">
+                        <div className="note-info">
+                          <span className="note-label">{note.label}</span>
+                          <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
+                          <span className={`note-role-badge role-${note.role}`}>
+                            {note.role === "bass" ? "Independent Bass" : "Upper"}
+                          </span>
+                        </div>
+                        <div className="note-velocity-controls">
+                          {isOverridden ? (
+                            <div className="override-active-controls">
+                              <span className="status-badge override">Override: {currentVel}</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={127}
+                                value={currentVel}
+                                onChange={(e) =>
+                                  handleSetNoteOverride(note.noteKey, Number(e.target.value))
+                                }
+                                aria-label={`Velocity override for ${note.label}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleResetNoteToInherit(note.noteKey)}
+                                className="reset-inherit-btn"
+                                aria-label={`Reset ${note.label} to inherit master velocity`}
+                              >
+                                Reset to Inherit
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inherit-active-controls">
+                              <span className="status-badge inherit">
+                                Inherits Master ({perf.masterVelocity})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleSetNoteOverride(note.noteKey, perf.masterVelocity)
+                                }
+                                className="set-override-btn"
+                                aria-label={`Override velocity for ${note.label}`}
+                              >
+                                Override...
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="inherit-active-controls">
-                        <span className="status-badge inherit">
-                          Inherits Master ({perf.masterVelocity})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleSetNoteOverride(note.noteKey, perf.masterVelocity)}
-                          className="set-override-btn"
-                          aria-label={`Override velocity for ${note.label}`}
-                        >
-                          Override...
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            </details>
           </div>
         </div>
-      </div>
+      </details>
     </section>
   );
 }

@@ -74,6 +74,8 @@ describe("US10 presentation commands", () => {
     expect(new Set([beginner.headline, composer.headline, expert.headline]).size).toBe(3);
     expect(beginner.details.join(" ")).not.toBe(composer.details.join(" "));
     expect(composer.details.join(" ")).not.toBe(expert.details.join(" "));
+    expect(`${composer.headline} ${composer.details.join(" ")}`).not.toMatch(/score|\+\d|-\d/);
+    expect(`${expert.headline} ${expert.details.join(" ")}`).toContain("score");
     expect(candidate.functionId).toBe("V");
     expect(candidate.score).toBe(92);
   });

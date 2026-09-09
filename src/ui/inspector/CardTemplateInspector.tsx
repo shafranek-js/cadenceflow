@@ -34,11 +34,21 @@ export function CardTemplateInspector({
   const keys = matrixCardOverrideKeys(card);
   const count = matrixCardOverrideCount(card);
   return (
-    <section className="card-template-inspector" aria-label={`Template settings for ${functionId}`}>
+    <section
+      className="card-template-inspector"
+      aria-label={`Template settings for ${functionId}`}
+      data-context="matrix-template"
+      data-testid="matrix-template-inspector"
+    >
       <header>
         <div>
+          <span className="inspector-context-kicker">Matrix preview template</span>
           <h3>{functionId} Template</h3>
-          <span>{count ? `Customized · ${count} overrides` : "Inheriting defaults"}</span>
+          <span
+            className={count ? "template-status is-customized" : "template-status is-inherited"}
+          >
+            {count ? `Customized · ${count} overrides` : "Inheriting defaults · Inherited"}
+          </span>
         </div>
         <button type="button" disabled={count === 0} onClick={onReset}>
           Reset Card to Defaults

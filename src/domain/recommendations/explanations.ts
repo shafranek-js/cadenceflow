@@ -35,9 +35,7 @@ export function explainRecommendation(
   if (mode === "composer")
     return {
       headline: primary.code.replaceAll("-", " "),
-      details: top.map(
-        (f) => `${f.source}: ${f.code} (${f.contribution >= 0 ? "+" : ""}${f.contribution})`,
-      ),
+      details: top.slice(1).map((f) => `Also consider ${f.code.replaceAll("-", " ")}.`),
     };
   return {
     headline: `${primary.code} · score ${candidate.score}`,

@@ -20,7 +20,7 @@ export function CompositionIntentControl({
   readonly onChange: (intent: CompositionIntent) => void;
 }) {
   return (
-    <label className="composition-intent">
+    <label className="composition-intent" data-context="composition-intent">
       <span>Composition Intent</span>
       <select
         aria-label="Composition Intent"

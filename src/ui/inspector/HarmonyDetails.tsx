@@ -20,7 +20,12 @@ export function HarmonyDetails({ chord }: { readonly chord: ChordDefinition | nu
           : null;
 
   return (
-    <section className="harmony-details" aria-label="Harmony details">
+    <section
+      className="harmony-details"
+      aria-label="Harmony details"
+      data-context="preview-harmony"
+    >
+      <span className="inspector-context-kicker">Preview harmony</span>
       <h3>Harmony</h3>
       <dl>
         <div>

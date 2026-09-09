@@ -7,6 +7,7 @@ import {
 } from "../../domain/harmony/pitch";
 import { validateManualVoicing } from "../../instruments/piano/voicing";
 import { PIANO_RANGE_MAX_MIDI, PIANO_RANGE_MIN_MIDI } from "../../instruments/contracts";
+import { useModalFocus } from "../common/useModalFocus";
 
 export interface PianoVoicingEditorProps {
   readonly initialPitches: readonly ExactPitch[];
@@ -47,6 +48,7 @@ export function PianoVoicingEditor({
 }: PianoVoicingEditorProps) {
   const [pitches, setPitches] = useState<readonly ExactPitch[]>(initialPitches);
   const [newMidi, setNewMidi] = useState<number>(60);
+  const dialogRef = useModalFocus<HTMLDivElement>({ isOpen, onClose });
 
   if (!isOpen) return null;
 
@@ -94,6 +96,7 @@ export function PianoVoicingEditor({
   return (
     <div
       className="piano-voicing-editor-modal"
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`Manual Piano Voicing Editor for ${stepLabel}`}

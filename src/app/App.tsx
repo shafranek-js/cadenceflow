@@ -358,6 +358,8 @@ export function App() {
   };
 
   const preview = (functionId: string) => {
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
     if (project.temporaryBranch) {
       addToBranch(functionId);
     } else {
@@ -365,8 +367,12 @@ export function App() {
     }
     auditionMatrixCard(functionId);
   };
-  const add = (functionId: string) =>
-    project.temporaryBranch ? addToBranch(functionId) : addToProgression(functionId);
+  const add = (functionId: string) => {
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
+    if (project.temporaryBranch) addToBranch(functionId);
+    else addToProgression(functionId);
+  };
 
   const patchTemplatePerformance = (overrides: StepPerformanceOverrides) => {
     if (!settingsFunctionId) return;
@@ -395,6 +401,8 @@ export function App() {
     store.dispatch(command, resetMatrixScope);
   };
   const setProgressionSelection = (stepId?: string) => {
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
     if (store.project.progression.selectedStepId === stepId) return;
     const command: SelectStepCommand = {
       type: "progression/select-step",
@@ -884,6 +892,7 @@ export function App() {
             disabled={!project.temporaryBranch}
             onChange={changeIntent}
           />
+          <HarmonyDetails chord={previewChord} />
           <CardTemplateInspector
             project={project}
             functionId={settingsFunctionId}
@@ -909,7 +918,6 @@ export function App() {
               onOpenVoicingEditor={() => setVoicingEditorOpen(true)}
             />
           )}
-          <HarmonyDetails chord={previewChord} />
         </>
       }
       onProgressionBackgroundClick={() => setProgressionSelection()}
