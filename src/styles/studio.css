@@ -746,7 +746,7 @@
   min-height: 96px;
   overflow: visible;
 }
-.progression-step-cards > div {
+.progression-step-cards > div:not(.progression-empty-state) {
   width: 170px;
   min-width: 170px;
   max-width: 170px;

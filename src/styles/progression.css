@@ -32,7 +32,7 @@
   overflow: visible;
 }
 
-.progression-step-cards > div {
+.progression-step-cards > div:not(.progression-empty-state) {
   width: 170px;
   min-width: 170px;
   max-width: 170px;
@@ -86,6 +86,7 @@
   grid-column: 1 / -1;
   min-height: 96px;
   min-width: 0;
+  width: 100%;
   padding: 16px;
   border: 1px dashed var(--border);
   border-radius: 10px;
