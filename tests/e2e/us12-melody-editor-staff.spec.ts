@@ -14,6 +14,35 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 }
 
 test.describe("US12 — melody editor and derived staff", () => {
+  test("auditions an unapplied Melody draft with the local sampled instrument", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openStudio(page);
+    await addChord(page, "I");
+
+    const step = page.locator("[data-progression-step-select]").last();
+    await step.click({ button: "right" });
+    const menu = page.getByRole("menu", { name: /Melody actions/ });
+    await menu.getByRole("menuitem", { name: "Create Melody…" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Create Melody" });
+    const play = dialog.getByRole("button", { name: "Play melody preview" });
+    await expect(play).toBeEnabled();
+
+    const sampleResponse = page.waitForResponse(
+      (response) => response.url().endsWith("/audio/melody/FluidR3_GM/flute-mp3.js"),
+      { timeout: 60_000 },
+    );
+    await play.click();
+    expect((await sampleResponse).status()).toBe(200);
+
+    const stop = dialog.getByRole("button", { name: "Stop melody preview" });
+    await expect(stop).toBeVisible({ timeout: 60_000 });
+    await stop.click();
+    await expect(play).toBeVisible();
+  });
+
   test("creates, edits, selects, controls, removes, and undoes a melody", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
@@ -25,29 +54,31 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(page.getByTestId("progression-step")).toHaveCount(3);
     await page.getByLabel("Progression Card View").selectOption("staff");
 
-    const firstStep = page.getByTestId("progression-step").first();
-    await firstStep.locator("[data-progression-step-select]").click();
+    const staffEvents = page.getByTestId("progression-measure").locator(".measure-staff-event");
+    await expect(staffEvents).toHaveCount(3);
+    const firstStep = staffEvents.first();
+    await firstStep.locator(".measure-staff-event-select").click();
     const selectedInspector = page.getByTestId("step-performance-inspector");
     await selectedInspector
       .getByRole("textbox", { name: "Duration in canonical quarter-note beats" })
       .fill("3");
     await selectedInspector.getByRole("button", { name: "Set custom duration in beats" }).click();
 
-    const secondStep = page.getByTestId("progression-step").nth(1);
-    await secondStep.locator("[data-progression-step-select]").click();
+    const secondStep = staffEvents.nth(1);
+    await secondStep.locator(".measure-staff-event-select").click();
     await selectedInspector
       .getByRole("textbox", { name: "Duration in canonical quarter-note beats" })
       .fill("3/4");
     await selectedInspector.getByRole("button", { name: "Set custom duration in beats" }).click();
 
-    const thirdStep = page.getByTestId("progression-step").nth(2);
-    const thirdSelect = thirdStep.locator("[data-progression-step-select]");
+    const thirdStep = staffEvents.nth(2);
+    const thirdSelect = thirdStep.locator(".measure-staff-event-select");
     await thirdSelect.focus();
     await page.keyboard.press("Enter");
     await selectedInspector.getByTestId("duration-preset-eighth").click();
 
     const step = thirdStep;
-    const select = step.locator("[data-progression-step-select]");
+    const select = step.locator(".measure-staff-event-select");
     await expect(select).toHaveAttribute("aria-haspopup", "menu");
 
     await select.focus();
