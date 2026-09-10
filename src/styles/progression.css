@@ -304,6 +304,295 @@
   border-radius: 0;
 }
 
+.melody-track-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  margin: 8px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+}
+
+.melody-track-title,
+.melody-track-instrument,
+.melody-track-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.melody-track-title {
+  flex: 1 1 150px;
+  flex-wrap: wrap;
+  gap: 2px 7px;
+}
+
+.melody-track-title span,
+.melody-track-instrument span,
+.melody-track-volume span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.melody-track-title span {
+  flex: 0 0 auto;
+}
+
+.melody-track-instrument select {
+  max-width: 150px;
+}
+
+.melody-track-toggle {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.72rem;
+}
+
+.melody-track-toggle[aria-pressed="true"] {
+  border-color: var(--selected);
+  background: var(--surface-selected);
+}
+
+.melody-track-volume {
+  flex: 1 1 150px;
+}
+
+.melody-track-volume input {
+  width: min(180px, 100%);
+  min-width: 80px;
+}
+
+.melody-track-volume output {
+  min-width: 26px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.melody-context-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  min-width: 174px;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 42%);
+}
+
+.melody-context-menu button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.melody-context-menu button:hover,
+.melody-context-menu button:focus-visible {
+  border-color: var(--border-subtle);
+  background: var(--surface-selected);
+  outline: none;
+}
+
+.melody-editor-dialog {
+  width: min(760px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 52%);
+}
+
+.melody-editor-dialog .dialog-header > div {
+  min-width: 0;
+}
+
+.melody-editor-dialog .dialog-header p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.melody-editor-body {
+  display: grid;
+  gap: 12px;
+}
+
+.melody-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.melody-editor-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.melody-editor-fields label > span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.melody-editor-preview {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: #fff;
+  color: #000;
+}
+
+.melody-editor-preview-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px 10px;
+  color: #161b22;
+  font-size: 0.75rem;
+}
+
+.melody-editor-preview-heading span {
+  color: #5f6874;
+  font-size: 0.68rem;
+}
+
+.melody-editor-preview-measures {
+  display: grid;
+  gap: 6px;
+  max-height: 380px;
+  margin-top: 6px;
+  overflow: auto;
+}
+
+.melody-editor-preview-measures .melody-staff-view {
+  border-color: #c4c9cf;
+}
+
+.melody-editor-error {
+  margin: 8px 0 0;
+  color: #b42318;
+  font-size: 0.78rem;
+}
+
+.melody-staff-view {
+  min-width: 0;
+  margin-bottom: 8px;
+  padding: 6px 8px 8px;
+  border: 1px solid #b9bec6;
+  border-radius: 7px;
+  background: #fff;
+  color: #000;
+  overflow: hidden;
+}
+
+.melody-staff-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-height: 20px;
+  color: #161b22;
+  font-size: 0.72rem;
+}
+
+.melody-staff-header span {
+  color: #5f6874;
+  font-size: 0.66rem;
+}
+
+.melody-staff-paper {
+  position: relative;
+  height: 174px;
+  min-width: 0;
+}
+
+.melody-staff-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 174px;
+  min-width: 0;
+}
+
+.melody-staff-canvas svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.melody-staff-annotations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.melody-staff-note {
+  position: absolute;
+  top: 4px;
+  left: var(--melody-staff-event-x);
+  min-width: 26px;
+  min-height: 25px;
+  padding: 3px 5px;
+  transform: translateX(-50%);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 86%);
+  color: #161b22;
+  font-size: 0.66rem;
+  font-weight: 700;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.melody-staff-note:hover,
+.melody-staff-note:focus-visible,
+.melody-staff-note.is-selected {
+  border-color: #80613d;
+  outline: 2px solid #80613d;
+  outline-offset: 1px;
+}
+
+.melody-staff-note.is-active {
+  border-color: var(--piano-pressed-key-border);
+  background: var(--piano-pressed-key);
+  color: #24170e;
+  box-shadow: 0 0 0 2px rgb(138 87 50 / 20%);
+}
+
+.melody-staff-note.is-continuation {
+  font-weight: 500;
+}
+
+@media (max-width: 620px) {
+  .melody-editor-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .melody-track-title {
+    flex-basis: 100%;
+  }
+}
+
 .progression-step-continuation {
   display: grid;
   place-items: center;

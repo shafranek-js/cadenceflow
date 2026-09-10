@@ -67,6 +67,12 @@ export function staffRhythmForDuration(duration: MusicalDuration): StaffRhythm {
       tuplet: { numNotes: 3, notesOccupied: 2 },
       notation: "eighth-triplet",
     },
+    "1/6": {
+      vexDuration: "16",
+      dots: 0,
+      tuplet: { numNotes: 3, notesOccupied: 2 },
+      notation: "sixteenth-triplet",
+    },
   };
   return exact[value] ?? { vexDuration: "q", dots: 0, notation: `custom-${value}` };
 }
@@ -121,6 +127,14 @@ export interface StaffSequenceChordEntry extends StaffSequenceEntryBase {
   readonly highlighted?: boolean;
 }
 
+export interface StaffSequenceNoteEntry extends StaffSequenceEntryBase {
+  readonly kind: "note";
+  readonly projection: StaffProjectionDto;
+  readonly continuesFromPrevious?: boolean;
+  readonly continuesToNext?: boolean;
+  readonly highlighted?: boolean;
+}
+
 export interface StaffSequenceRestEntry extends StaffSequenceEntryBase {
   readonly kind: "rest";
 }
@@ -130,7 +144,13 @@ export interface StaffSequenceGapEntry extends StaffSequenceEntryBase {
 }
 
 export type StaffSequenceEntry =
-  StaffSequenceChordEntry | StaffSequenceRestEntry | StaffSequenceGapEntry;
+  StaffSequenceChordEntry | StaffSequenceNoteEntry | StaffSequenceRestEntry | StaffSequenceGapEntry;
+
+export type StaffClef = "treble" | "bass";
+
+export interface StaffSequenceRenderOptions {
+  readonly clef?: StaffClef;
+}
 
 export interface StaffSequencePosition {
   readonly key: string;
@@ -190,6 +210,7 @@ function getSequenceLayout(
   container: HTMLDivElement,
   entries: readonly StaffSequenceEntry[],
   meter: Meter,
+  clef: StaffClef,
 ): StaffLayout {
   const width = Math.max(container.clientWidth, MIN_VIEWBOX_WIDTH);
   const staveX = SEQUENCE_STAVE_INSET;
@@ -199,15 +220,23 @@ function getSequenceLayout(
     rightBar: true,
     spacingBetweenLinesPx: STAFF_LINE_SPACING,
   });
-  probeStave.addClef("treble").addTimeSignature(`${meter.numerator}/${meter.denominator}`);
+  probeStave.addClef(clef).addTimeSignature(`${meter.numerator}/${meter.denominator}`);
   const staffCenter = probeStave.getYForLine(2);
   let topDistance = MIN_SEQUENCE_HEIGHT / 2;
   let bottomDistance = MIN_SEQUENCE_HEIGHT / 2;
 
   entries.forEach((entry) => {
-    if (entry.kind !== "chord") return;
+    if (entry.kind !== "chord" && entry.kind !== "note") return;
     const rhythm = staffRhythmForDuration(entry.duration);
-    const note = createStaffNote(entry.projection, probeStave, rhythm, entry.duration, false);
+    const note = createStaffNote(
+      entry.projection,
+      probeStave,
+      rhythm,
+      entry.duration,
+      false,
+      STAFF_INK,
+      clef,
+    );
     const bounds = note.getNoteHeadBounds();
     topDistance = Math.max(topDistance, staffCenter - bounds.yTop + SEQUENCE_LEDGER_SAFETY_MARGIN);
     bottomDistance = Math.max(
@@ -343,11 +372,13 @@ export function renderStaffSequence(
   entries: readonly StaffSequenceEntry[],
   meter: Meter,
   onLayout?: (positions: readonly StaffSequencePosition[]) => void,
+  options: StaffSequenceRenderOptions = {},
 ): () => void {
   container.replaceChildren();
   if (entries.length === 0) return () => container.replaceChildren();
 
-  const layout = getSequenceLayout(container, entries, meter);
+  const clef = options.clef ?? "treble";
+  const layout = getSequenceLayout(container, entries, meter, clef);
   const { width, height } = layout;
   const renderer = new Renderer(container, Renderer.Backends.SVG);
   renderer.resize(width, height);
@@ -361,7 +392,7 @@ export function renderStaffSequence(
     spacingBetweenLinesPx: STAFF_LINE_SPACING,
   };
   const stave = new Stave(layout.staveX, layout.staveY, layout.staveWidth, staveOptions);
-  stave.addClef("treble").addTimeSignature(`${meter.numerator}/${meter.denominator}`);
+  stave.addClef(clef).addTimeSignature(`${meter.numerator}/${meter.denominator}`);
   stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
   stave.setContext(context).draw();
   const bassStave = hasBassStaff
@@ -386,7 +417,7 @@ export function renderStaffSequence(
       entry.kind === "gap"
         ? createGapNote(stave, entry.duration)
         : entry.kind === "rest"
-          ? createRestNote(stave, rhythm, entry.duration)
+          ? createRestNote(stave, rhythm, entry.duration, clef)
           : createStaffNote(
               entry.projection,
               stave,
@@ -394,9 +425,10 @@ export function renderStaffSequence(
               entry.duration,
               false,
               entry.highlighted ? playingInk : STAFF_INK,
+              clef,
             );
     note.setAttribute("data-staff-entry", entry.key);
-    if (entry.kind === "chord" && entry.highlighted) {
+    if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
       note.setAttribute("data-staff-playing", "true");
     }
     return { entry, note, rhythm };
@@ -416,20 +448,26 @@ export function renderStaffSequence(
   const bassNotes = bassStave
     ? entries.map((entry) => {
         const rhythm = staffRhythmForDuration(entry.duration);
-        const note =
-          entry.kind === "gap" || (entry.kind === "chord" && !entry.bassProjection)
-            ? createGapNote(bassStave, entry.duration)
-            : entry.kind === "rest"
-              ? createRestNote(bassStave, rhythm, entry.duration, "bass")
-              : createStaffNote(
-                  entry.bassProjection!,
-                  bassStave,
-                  rhythm,
-                  entry.duration,
-                  false,
-                  entry.highlighted ? playingInk : STAFF_INK,
-                  "bass",
-                );
+        let note: StaveNote | GhostNote;
+        if (
+          entry.kind === "gap" ||
+          entry.kind === "note" ||
+          (entry.kind === "chord" && !entry.bassProjection)
+        ) {
+          note = createGapNote(bassStave, entry.duration);
+        } else if (entry.kind === "rest") {
+          note = createRestNote(bassStave, rhythm, entry.duration, "bass");
+        } else {
+          note = createStaffNote(
+            entry.bassProjection!,
+            bassStave,
+            rhythm,
+            entry.duration,
+            false,
+            entry.highlighted ? playingInk : STAFF_INK,
+            "bass",
+          );
+        }
         note.setAttribute("data-bass-staff-entry", entry.key);
         if (entry.kind === "chord" && entry.highlighted && entry.bassProjection) {
           note.setAttribute("data-staff-playing", "true");
@@ -505,13 +543,17 @@ export function renderStaffSequence(
   onLayout?.(Object.freeze(positions));
 
   notes.forEach(({ entry, note }) => {
-    if (entry.kind !== "chord") return;
+    if (entry.kind !== "chord" && entry.kind !== "note") return;
     const indexes = entry.projection.notes.map((_, index) => index);
     if (entry.continuesFromPrevious) {
-      new StaveTie({ lastNote: note, lastIndexes: indexes }).setContext(context).draw();
+      indexes.forEach((index) => {
+        new StaveTie({ lastNote: note, lastIndexes: [index] }).setContext(context).draw();
+      });
     }
     if (entry.continuesToNext) {
-      new StaveTie({ firstNote: note, firstIndexes: indexes }).setContext(context).draw();
+      indexes.forEach((index) => {
+        new StaveTie({ firstNote: note, firstIndexes: [index] }).setContext(context).draw();
+      });
     }
   });
   bassNotes.forEach(({ entry, note }) => {
@@ -537,7 +579,7 @@ export function renderStaffSequence(
   svg.setAttribute("focusable", "false");
   svg.style.backgroundColor = "#fff";
   svg.dataset.staffSequenceLength = String(entries.length);
-  svg.dataset.staffClef = "treble";
+  svg.dataset.staffClef = clef;
   svg.dataset.staffMeter = `${meter.numerator}/${meter.denominator}`;
   svg.dataset.staffSystem = bassStave ? "grand" : "treble";
   svg.dataset.staffBassEntries = entries
@@ -548,7 +590,7 @@ export function renderStaffSequence(
     .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
     .join(",");
   svg.dataset.staffPlayingEntries = entries
-    .filter((entry) => entry.kind === "chord" && entry.highlighted)
+    .filter((entry) => (entry.kind === "chord" || entry.kind === "note") && entry.highlighted)
     .map((entry) => entry.key)
     .join(",");
   svg.dataset.staffSequencePositions = positions

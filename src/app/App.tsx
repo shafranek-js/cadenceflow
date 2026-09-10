@@ -62,11 +62,7 @@ import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
 import type { AudioProviderState } from "../audio/contracts";
 import { realizeStepAudioEvents } from "../audio/eventRealizer";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
-import {
-  PlaybackSupportControls,
-  TempoControls,
-  TransportBar,
-} from "../ui/transport/TransportBar";
+import { PlaybackSupportControls, TempoControls, TransportBar } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
 import { TransportStore, type TransportState } from "../ui/transport/transportStore";
 import {
@@ -177,6 +173,19 @@ import {
   type SetStaffBassVisibilityCommand,
 } from "./commands/presentationCommands";
 import type { PresentationMode, ThemeMode } from "../domain/project/project";
+import type {
+  ChordMelodyRecipe,
+  MelodyInstrument,
+  MelodyTrackSettings,
+} from "../domain/melody/types";
+import {
+  createPatchMelodyTrackSettingsCommand,
+  createRemoveMelodyRecipeCommand,
+  createSetMelodyRecipeCommand,
+  removeMelodyRecipe as applyRemoveMelodyRecipe,
+  setMelodyRecipe as applySetMelodyRecipe,
+  setMelodyTrackSettings as applyMelodyTrackSettings,
+} from "./commands/melodyCommands";
 
 function useStore(store: AppStore) {
   const [, force] = useState(0);
@@ -663,6 +672,27 @@ export function App() {
       payload: { stepId, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, removeStep);
+  };
+  const setMelodyRecipeForStep = (
+    stepId: string,
+    recipe: ChordMelodyRecipe,
+    instrument: MelodyInstrument,
+  ) => {
+    const command = createSetMelodyRecipeCommand(
+      stepId,
+      recipe,
+      new Date().toISOString(),
+      instrument,
+    );
+    store.dispatch(command, applySetMelodyRecipe);
+  };
+  const removeMelodyRecipeForStep = (stepId: string) => {
+    const command = createRemoveMelodyRecipeCommand(stepId, new Date().toISOString());
+    store.dispatch(command, applyRemoveMelodyRecipe);
+  };
+  const changeMelodyTrackSettings = (patch: Partial<MelodyTrackSettings>) => {
+    const command = createPatchMelodyTrackSettingsCommand(patch, new Date().toISOString());
+    store.dispatch(command, applyMelodyTrackSettings);
   };
   const reorderProgressionStep = (stepId: string, targetIndex: number) => {
     const command: ReorderStepCommand = {
@@ -1388,6 +1418,9 @@ export function App() {
             onFillGapWithRest={fillProgressionGapWithRest}
             onExtendFinalChord={extendFinalChordToBar}
             onRepeatFinalChord={repeatFinalChordToBar}
+            onSetMelodyRecipe={setMelodyRecipeForStep}
+            onRemoveMelodyRecipe={removeMelodyRecipeForStep}
+            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
           />
           <BranchComparison
             project={project}

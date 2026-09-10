@@ -302,6 +302,28 @@ describe("renderStaffSequence", () => {
     }
   });
 
+  it("renders partial ties for multi-note chord fragments without mismatched indexes", () => {
+    const projection = projectionFor([
+      exactPitch(60, { step: "C", alter: 0 }),
+      exactPitch(64, { step: "E", alter: 0 }),
+      exactPitch(67, { step: "G", alter: 0 }),
+    ]);
+
+    expect(() =>
+      renderSequence([
+        {
+          key: "continued-chord",
+          kind: "chord",
+          projection,
+          startOffsetBeats: rational(0),
+          duration: musicalDuration(rational(4)),
+          continuesFromPrevious: true,
+          continuesToNext: true,
+        },
+      ]),
+    ).not.toThrow();
+  });
+
   it("accepts additive meter timing and exact custom Rational durations", () => {
     const container = document.createElement("div");
     Object.defineProperty(container, "clientWidth", { configurable: true, value: 800 });

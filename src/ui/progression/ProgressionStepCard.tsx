@@ -2,6 +2,7 @@ import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { formatMusicalDuration } from "../../domain/timing/duration";
 import { PianoCardView } from "../piano/PianoCardView";
@@ -26,6 +27,7 @@ export function ProgressionStepCard({
   onSelect,
   onPerformanceChange,
   onRemove,
+  onOpenMelodyMenu,
 }: {
   readonly step: ChordStep;
   readonly stepNumber?: number;
@@ -38,6 +40,10 @@ export function ProgressionStepCard({
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onRemove: () => void;
+  readonly onOpenMelodyMenu?: (
+    anchor: HTMLElement,
+    position?: { readonly x: number; readonly y: number },
+  ) => void;
 }) {
   const realization = realizeProgressionStepRealization(step, tonic);
   // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
@@ -56,6 +62,26 @@ export function ProgressionStepCard({
     const patch = performanceOctaveShiftPatch(step.performance, direction);
     if (patch) onPerformanceChange(patch);
   };
+  const openMelodyMenuFromPointer = (event: MouseEvent<HTMLElement>) => {
+    if (!onOpenMelodyMenu) return;
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const anchor = target?.closest<HTMLElement>("[data-progression-step-select]") ?? null;
+    if (!anchor) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onOpenMelodyMenu(anchor, { x: event.clientX, y: event.clientY });
+  };
+  const openMelodyMenuFromKeyboard = (event: KeyboardEvent<HTMLElement>) => {
+    if (!onOpenMelodyMenu) return;
+    if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const anchor = target?.closest<HTMLElement>("[data-progression-step-select]") ?? null;
+    if (!anchor) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = anchor.getBoundingClientRect();
+    onOpenMelodyMenu(anchor, { x: rect.left, y: rect.bottom });
+  };
 
   return (
     <article
@@ -65,6 +91,8 @@ export function ProgressionStepCard({
       data-playing={playing ? "true" : undefined}
       data-in-loop={inLoop ? "true" : undefined}
       onClick={onSelect}
+      onContextMenu={openMelodyMenuFromPointer}
+      onKeyDown={openMelodyMenuFromKeyboard}
     >
       <span
         className="progression-step-number"
@@ -94,6 +122,7 @@ export function ProgressionStepCard({
             event.stopPropagation();
             onSelect();
           }}
+          hasContextMenu={Boolean(onOpenMelodyMenu)}
           onOctaveChange={changeStaffOctave}
         />
       ) : (
@@ -109,6 +138,7 @@ export function ProgressionStepCard({
           aria-label={selectionAriaLabel}
           aria-pressed={selected}
           aria-current={playing ? "step" : undefined}
+          aria-haspopup={onOpenMelodyMenu ? "menu" : undefined}
         >
           {playing ? (
             <span className="step-state-indicator playing-indicator" aria-hidden="true">

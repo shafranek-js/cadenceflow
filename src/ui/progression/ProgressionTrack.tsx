@@ -1,5 +1,6 @@
 import {
   useRef,
+  useMemo,
   useState,
   type ChangeEvent,
   type CSSProperties,
@@ -28,6 +29,16 @@ import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
 import { MeasureStaffView, type MeasureStaffItem } from "../staff/MeasureStaffView";
+import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
+import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
+import { MelodyTrackControls } from "../melody/MelodyTrackControls";
+import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
+import type {
+  ChordMelodyRecipe,
+  MelodyInstrument,
+  MelodyTrackSettings,
+} from "../../domain/melody/types";
+import { MelodyStaffView } from "../melody/MelodyStaffView";
 import {
   canShiftPerformanceOctave,
   performanceOctaveShiftPatch,
@@ -57,6 +68,10 @@ export function ProgressionTrack({
   onFillGapWithRest,
   onExtendFinalChord,
   onRepeatFinalChord,
+  onSetMelodyRecipe,
+  onRemoveMelodyRecipe,
+  onMelodyTrackSettingsChange,
+  activeMelodyEventKey,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -72,11 +87,26 @@ export function ProgressionTrack({
   readonly onFillGapWithRest?: () => void;
   readonly onExtendFinalChord?: () => void;
   readonly onRepeatFinalChord?: () => void;
+  readonly onSetMelodyRecipe?: (
+    stepId: string,
+    recipe: ChordMelodyRecipe,
+    instrument: MelodyInstrument,
+  ) => void;
+  readonly onRemoveMelodyRecipe?: (stepId: string) => void;
+  readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
+  readonly activeMelodyEventKey?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [matrixGapHint, setMatrixGapHint] = useState<number | null>(null);
+  const [melodyMenu, setMelodyMenu] = useState<{
+    readonly stepId: string;
+    readonly position: MelodyMenuPosition;
+    readonly invoker: HTMLElement;
+  } | null>(null);
+  const [melodyEditorStepId, setMelodyEditorStepId] = useState<string | null>(null);
+  const melodyInvokerRef = useRef<HTMLElement | null>(null);
   const selectedStepId = project.progression.selectedStepId;
   const currentPlayingStepId =
     currentPlayingStepIndex === null || currentPlayingStepIndex === undefined
@@ -102,6 +132,47 @@ export function ProgressionTrack({
     chordViews.length && chordViews.every((view) => view === chordViews[0])
       ? chordViews[0]!
       : "mixed";
+  const hasMelodyRecipe = project.progression.steps.some(
+    (step) => step.kind === "chord" && step.melody !== undefined,
+  );
+  const melodyTimeline = useMemo(
+    () => (hasMelodyRecipe ? createMelodyTimeline(project) : null),
+    [hasMelodyRecipe, project],
+  );
+
+  const openMelodyMenu = (stepId: string, anchor: HTMLElement, position?: MelodyMenuPosition) => {
+    const step = project.progression.steps.find(
+      (candidate) => candidate.id === stepId && candidate.kind === "chord",
+    );
+    if (!step || step.kind !== "chord") return;
+    const rect = anchor.getBoundingClientRect();
+    melodyInvokerRef.current = anchor;
+    if (project.progression.selectedStepId !== stepId) onSelectStep(stepId);
+    setMelodyMenu({
+      stepId,
+      invoker: anchor,
+      position: position ?? { x: rect.left, y: rect.bottom },
+    });
+  };
+
+  const openMelodyMenuFromEvent = (
+    stepId: string,
+    event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>,
+  ) => {
+    if ("clientX" in event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMelodyMenu(stepId, event.currentTarget, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    openMelodyMenu(stepId, event.currentTarget, { x: rect.left, y: rect.bottom });
+  };
 
   const staffItemsForMeasure = (measure: (typeof layout.measures)[number]): MeasureStaffItem[] =>
     measure.items.map((item, itemIndex) => {
@@ -284,6 +355,7 @@ export function ProgressionTrack({
     compactStaff: boolean,
   ) => {
     if (!fragment.startsHere) {
+      const isChordFragment = fragment.step.kind === "chord";
       return (
         <div
           key={`${fragment.stepId}-continuation-${fragment.fragmentIndex}`}
@@ -291,13 +363,26 @@ export function ProgressionTrack({
           style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
           data-testid="progression-step-continuation"
           onClick={() => onSelectStep(fragment.stepId)}
+          onContextMenu={
+            isChordFragment && onSetMelodyRecipe
+              ? (event) => openMelodyMenuFromEvent(fragment.stepId, event)
+              : undefined
+          }
           role="button"
           tabIndex={0}
+          aria-haspopup={isChordFragment && onSetMelodyRecipe ? "menu" : undefined}
           aria-label={`Continuation of progression step ${fragment.stepIndex + 1} in measure ${measureNumber}, ${formatMusicalDuration(musicalDuration(fragment.durationBeats))}`}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               onSelectStep(fragment.stepId);
+            }
+            if (
+              isChordFragment &&
+              onSetMelodyRecipe &&
+              (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))
+            ) {
+              openMelodyMenuFromEvent(fragment.stepId, event);
             }
           }}
         >
@@ -338,6 +423,12 @@ export function ProgressionTrack({
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
           onRemove={() => onRemove(step.id)}
+          {...(onSetMelodyRecipe
+            ? {
+                onOpenMelodyMenu: (anchor: HTMLElement, position?: MelodyMenuPosition) =>
+                  openMelodyMenu(step.id, anchor, position),
+              }
+            : {})}
         />
       </div>
     );
@@ -434,6 +525,12 @@ export function ProgressionTrack({
           </button>
         ) : null}
       </div>
+      {commonView === "staff" && hasMelodyRecipe && onMelodyTrackSettingsChange ? (
+        <MelodyTrackControls
+          settings={project.melodyTrack}
+          onChange={onMelodyTrackSettingsChange}
+        />
+      ) : null}
       <div className="progression-step-cards" onClick={handleBackgroundClick}>
         {matrixGapHint !== null ? (
           <p className="progression-gap-hint" role="status" data-testid="progression-gap-hint">
@@ -472,6 +569,16 @@ export function ProgressionTrack({
                   {project.globalTiming.meter.grouping.join("+")}
                 </span>
               </header>
+              {usesSharedStaff && melodyTimeline ? (
+                <MelodyStaffView
+                  project={project}
+                  timeline={melodyTimeline}
+                  measure={melodyTimeline.measures[measure.measureIndex]!}
+                  {...(selectedStepId !== undefined ? { selectedStepId } : {})}
+                  {...(activeMelodyEventKey !== undefined ? { activeMelodyEventKey } : {})}
+                  onSelectStep={onSelectStep}
+                />
+              ) : null}
               {usesSharedStaff ? (
                 <MeasureStaffView
                   items={staffItems}
@@ -503,6 +610,57 @@ export function ProgressionTrack({
           );
         })}
       </div>
+      {melodyMenu
+        ? (() => {
+            const step = project.progression.steps.find(
+              (candidate) => candidate.id === melodyMenu.stepId && candidate.kind === "chord",
+            );
+            if (!step || step.kind !== "chord") return null;
+            return (
+              <MelodyContextMenu
+                step={step}
+                position={melodyMenu.position}
+                invoker={melodyMenu.invoker}
+                tonic={project.tonic}
+                onCreate={() => {
+                  setMelodyMenu(null);
+                  setMelodyEditorStepId(step.id);
+                }}
+                onEdit={() => {
+                  setMelodyMenu(null);
+                  setMelodyEditorStepId(step.id);
+                }}
+                onRemove={() => {
+                  onRemoveMelodyRecipe?.(step.id);
+                  setMelodyMenu(null);
+                }}
+                onClose={() => setMelodyMenu(null)}
+              />
+            );
+          })()
+        : null}
+      {melodyEditorStepId && onSetMelodyRecipe
+        ? (() => {
+            const step = project.progression.steps.find(
+              (candidate) => candidate.id === melodyEditorStepId && candidate.kind === "chord",
+            );
+            if (!step || step.kind !== "chord") return null;
+            return (
+              <MelodyEditorDialog
+                isOpen
+                mode={step.melody ? "edit" : "create"}
+                step={step}
+                project={project}
+                restoreFocusRef={melodyInvokerRef}
+                onClose={() => setMelodyEditorStepId(null)}
+                onApply={(recipe, instrument) => {
+                  onSetMelodyRecipe(step.id, recipe, instrument);
+                  setMelodyEditorStepId(null);
+                }}
+              />
+            );
+          })()
+        : null}
     </div>
   );
 }

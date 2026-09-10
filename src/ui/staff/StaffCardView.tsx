@@ -27,6 +27,7 @@ export function StaffCardView({
   canShiftDown = true,
   onSelect,
   onOctaveChange,
+  hasContextMenu = false,
 }: {
   readonly pitches: readonly ExactPitch[];
   readonly chordPitches?: readonly ExactPitch[];
@@ -43,6 +44,7 @@ export function StaffCardView({
   readonly canShiftDown?: boolean;
   readonly onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
   readonly onOctaveChange: (direction: StaffOctaveDirection) => void;
+  readonly hasContextMenu?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const projection = useMemo(() => projectPitchesToStaff(pitches), [pitches]);
@@ -93,6 +95,7 @@ export function StaffCardView({
         aria-label={selectionAriaLabel}
         aria-pressed={selected}
         aria-current={playing ? "step" : undefined}
+        aria-haspopup={hasContextMenu ? "menu" : undefined}
         aria-describedby={selectionDescribedBy}
         title={selectionTitle}
       >
