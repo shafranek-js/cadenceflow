@@ -338,7 +338,11 @@ describe("US9 MusicXML semantic projection", () => {
       divisions: 6,
       key: { fifths: -1, mode: "minor" },
       time: { numerator: 7, denominator: 8, beats: "2+2+3", grouping: [2, 2, 3] },
-      clef: { sign: "G", line: 2 },
+      staves: 2,
+      clefs: [
+        { number: 1, sign: "G", line: 2 },
+        { number: 2, sign: "F", line: 4 },
+      ],
     });
     expect(projection.tempoBpm).toBe(140);
     expect(projection.measures).toHaveLength(1);
@@ -356,6 +360,7 @@ describe("US9 MusicXML semantic projection", () => {
     expect(
       projection.measures[0]?.events
         .filter((event): event is MusicXmlMeasureEvent & { kind: "rest" } => event.kind === "rest")
+        .filter((event) => event.staff === 1)
         .map((event) => [event.stepId, event.duration]),
     ).toEqual([["rest-triplet", 2]]);
     expect(projection.measures[0]?.durationBeats).toEqual(rational(7, 2));
@@ -414,7 +419,7 @@ describe("US9 MusicXML semantic projection", () => {
       projection.measures[0]?.events
         .filter((event) => event.kind === "direction")
         .map((event) => event.dynamicLabel),
-    ).toEqual(["f", "mf", "mf"]);
+    ).toEqual(["f", "mf"]);
   });
 
   it("splits cross-barline chords into exact fragments and uses one harmony with ties", () => {
@@ -423,10 +428,16 @@ describe("US9 MusicXML semantic projection", () => {
     expect(projection.measures).toHaveLength(2);
     const chordNotes = notes(projection).filter((note) => note.stepId === "crossing-chord");
     expect([...new Set(chordNotes.map((note) => note.duration))]).toEqual([8, 2]);
-    expect(chordNotes.filter((note) => note.chord === false).map((note) => note.ties)).toEqual([
-      ["start"],
-      ["stop"],
-    ]);
+    expect(
+      chordNotes
+        .filter((note) => note.staff === 1 && note.chord === false)
+        .map((note) => note.ties),
+    ).toEqual([["start"], ["stop"]]);
+    expect(
+      chordNotes
+        .filter((note) => note.staff === 2 && note.chord === false)
+        .map((note) => note.ties),
+    ).toEqual([["start"], ["stop"]]);
     expect(
       projection.measures
         .flatMap((measure) => measure.events)
@@ -517,6 +528,13 @@ describe("US9 MusicXML writer and safety contract", () => {
     expect(xml).not.toContain("<creation-date>");
     expect(xml).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     expect(xml).toContain("<beats>2+2+3</beats>");
+    expect(xml).toContain("<staves>2</staves>");
+    expect(xml).toContain('<part-symbol top-staff="1" bottom-staff="2">brace</part-symbol>');
+    expect(xml).toContain('<clef number="1">');
+    expect(xml).toMatch(/<clef number="2">[\s\S]*?<sign>F<\/sign>[\s\S]*?<line>4<\/line>/);
+    expect(xml).toContain("<backup>");
+    expect(xml).toContain("<staff>1</staff>");
+    expect(xml).toContain("<staff>2</staff>");
     expect(xml).toContain("<per-minute>140</per-minute>");
     expect(xml).toContain('<sound tempo="140"/>');
     expect(xml).toContain("<kind>dominant</kind>");

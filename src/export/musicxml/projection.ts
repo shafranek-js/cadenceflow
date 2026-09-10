@@ -57,7 +57,11 @@ export interface MusicXmlAttributes {
     readonly beats: string;
     readonly grouping: readonly number[];
   };
-  readonly clef: { readonly sign: "G"; readonly line: 2 };
+  readonly staves: 2;
+  readonly clefs: readonly [
+    { readonly number: 1; readonly sign: "G"; readonly line: 2 },
+    { readonly number: 2; readonly sign: "F"; readonly line: 4 },
+  ];
 }
 
 export interface MusicXmlHarmonyEvent {
@@ -84,7 +88,8 @@ export interface MusicXmlNoteEvent {
   readonly stepId: string;
   readonly durationBeats: Rational;
   readonly duration: number;
-  readonly voice: "1";
+  readonly voice: "1" | "2";
+  readonly staff: 1 | 2;
   readonly chord: boolean;
   readonly sourceMidi: number;
   readonly role: "upper" | "bass";
@@ -100,7 +105,8 @@ export interface MusicXmlRestEvent {
   readonly stepId: string;
   readonly durationBeats: Rational;
   readonly duration: number;
-  readonly voice: "1";
+  readonly voice: "1" | "2";
+  readonly staff: 1 | 2;
 }
 
 export type MusicXmlMeasureEvent =
@@ -302,6 +308,7 @@ function addFragment(
   projectedChord: ProjectedChord | undefined,
   fragmentIndex: number,
   fragmentCount: number,
+  emitDynamic: boolean,
 ): void {
   const fragmentDuration = subtractRational(fragmentEnd, fragmentStart);
   const onsetBeats = subtractRational(fragmentStart, measure.startBeats);
@@ -310,16 +317,20 @@ function addFragment(
   const isLastFragment = fragmentIndex === fragmentCount - 1;
 
   if (!projectedChord) {
-    const event: MusicXmlRestEvent = Object.freeze({
-      kind: "rest",
-      onsetBeats,
-      stepIndex: entry.stepIndex,
-      stepId: entry.step.id,
-      durationBeats: fragmentDuration,
-      duration,
-      voice: "1",
-    });
-    measure.events.push(event);
+    measure.events.push(
+      ...([1, 2] as const).map((staff): MusicXmlRestEvent =>
+        Object.freeze({
+          kind: "rest",
+          onsetBeats,
+          stepIndex: entry.stepIndex,
+          stepId: entry.step.id,
+          durationBeats: fragmentDuration,
+          duration,
+          voice: staff === 1 ? "1" : "2",
+          staff,
+        }),
+      ),
+    );
     measure.durationBeats = addRational(measure.durationBeats, fragmentDuration);
     return;
   }
@@ -333,22 +344,28 @@ function addFragment(
         stepId: entry.step.id,
         harmony: projectedChord.harmony,
       }),
-      Object.freeze({
-        kind: "direction",
-        onsetBeats,
-        stepIndex: entry.stepIndex,
-        stepId: entry.step.id,
-        dynamicLabel: projectedChord.dynamicLabel,
-        sourceVelocity: projectedChord.sourceVelocity,
-      }),
     );
+    if (emitDynamic) {
+      measure.events.push(
+        Object.freeze({
+          kind: "direction",
+          onsetBeats,
+          stepIndex: entry.stepIndex,
+          stepId: entry.step.id,
+          dynamicLabel: projectedChord.dynamicLabel,
+          sourceVelocity: projectedChord.sourceVelocity,
+        }),
+      );
+    }
   }
 
   const ties: ("start" | "stop")[] = [];
   if (!isFirstFragment) ties.push("stop");
   if (!isLastFragment) ties.push("start");
 
-  projectedChord.pitches.forEach(({ pitch, role }, pitchIndex) => {
+  let upperPitchIndex = 0;
+  projectedChord.pitches.forEach(({ pitch, role }) => {
+    const staff = role === "upper" ? 1 : 2;
     const event: MusicXmlNoteEvent = Object.freeze({
       kind: "note",
       onsetBeats,
@@ -356,8 +373,9 @@ function addFragment(
       stepId: entry.step.id,
       durationBeats: fragmentDuration,
       duration,
-      voice: "1",
-      chord: pitchIndex > 0,
+      voice: staff === 1 ? "1" : "2",
+      staff,
+      chord: role === "upper" ? upperPitchIndex++ > 0 : false,
       sourceMidi: pitch.midiNumber,
       role,
       pitch: Object.freeze({
@@ -494,6 +512,7 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
 
   let previousPitches: readonly ExactPitch[] | undefined;
   let previousBassPitch: ExactPitch | undefined;
+  let previousDynamicLabel: ProjectedChord["dynamicLabel"] | undefined;
   const projectedChords = new Map<number, ProjectedChord>();
 
   for (const entry of timeline.steps) {
@@ -523,6 +542,9 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
       cursor = end;
     }
     const projectedChord = projectedChords.get(entry.stepIndex);
+    const emitDynamic = Boolean(
+      projectedChord && projectedChord.dynamicLabel !== previousDynamicLabel,
+    );
     fragments.forEach((fragment, fragmentIndex) => {
       addFragment(
         getMeasure(floorRational(divideRationalSafe(fragment.start, barLengthBeats))),
@@ -533,8 +555,10 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
         projectedChord,
         fragmentIndex,
         fragments.length,
+        emitDynamic,
       );
     });
+    if (projectedChord) previousDynamicLabel = projectedChord.dynamicLabel;
   }
 
   const measureLayout = createProgressionMeasureLayout(project.progression.steps, meter);
@@ -542,16 +566,21 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
     const finalMeasure = measures.get(measureLayout.measures.length - 1);
     if (!finalMeasure)
       throw new MusicXmlExportError("invalid-projection", "Missing final measure.");
-    const gap: MusicXmlRestEvent = Object.freeze({
-      kind: "rest",
-      onsetBeats: subtractRational(measureLayout.authoredDurationBeats, finalMeasure.startBeats),
-      stepIndex: project.progression.steps.length,
-      stepId: "__trailing-measure-gap__",
-      durationBeats: measureLayout.trailingSilenceBeats,
-      duration: durationUnits(measureLayout.trailingSilenceBeats, divisions),
-      voice: "1",
-    });
-    finalMeasure.events.push(gap);
+    const gapOnset = subtractRational(measureLayout.authoredDurationBeats, finalMeasure.startBeats);
+    finalMeasure.events.push(
+      ...([1, 2] as const).map((staff): MusicXmlRestEvent =>
+        Object.freeze({
+          kind: "rest",
+          onsetBeats: gapOnset,
+          stepIndex: project.progression.steps.length,
+          stepId: "__trailing-measure-gap__",
+          durationBeats: measureLayout.trailingSilenceBeats,
+          duration: durationUnits(measureLayout.trailingSilenceBeats, divisions),
+          voice: staff === 1 ? "1" : "2",
+          staff,
+        }),
+      ),
+    );
     finalMeasure.durationBeats = addRational(
       finalMeasure.durationBeats,
       measureLayout.trailingSilenceBeats,
@@ -576,7 +605,11 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
         beats: groupingText(meter.grouping),
         grouping: Object.freeze([...meter.grouping]),
       }),
-      clef: Object.freeze({ sign: "G", line: 2 }),
+      staves: 2,
+      clefs: Object.freeze([
+        Object.freeze({ number: 1, sign: "G", line: 2 }),
+        Object.freeze({ number: 2, sign: "F", line: 4 }),
+      ] as const),
     }),
     tempoBpm: project.globalTiming.tempoBpm,
     measures: Object.freeze(measureList),

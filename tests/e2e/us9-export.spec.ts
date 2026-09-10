@@ -99,6 +99,11 @@ function assertMusicXmlStructure(xml: string): void {
   expect(xml).toMatch(/<key>[\s\S]*<fifths>0<\/fifths>[\s\S]*<mode>major<\/mode>/);
   expect(xml).toMatch(/<time>[\s\S]*<beats>4<\/beats>[\s\S]*<beat-type>4<\/beat-type>/);
   expect(xml).toContain("<per-minute>100</per-minute>");
+  expect(xml).toContain("<staves>2</staves>");
+  expect(xml).toMatch(/<clef number="1">[\s\S]*<sign>G<\/sign>/);
+  expect(xml).toMatch(/<clef number="2">[\s\S]*<sign>F<\/sign>/);
+  expect(xml).toContain("<backup>");
+  expect(xml).toContain("<staff>2</staff>");
   expect(xml).toContain("<note>");
 }
 

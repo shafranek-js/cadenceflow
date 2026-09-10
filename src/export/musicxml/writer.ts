@@ -25,9 +25,9 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function element(name: string, value: string | number, level: number): string {
+function element(name: string, value: string | number, level: number, attributes = ""): string {
   const indent = "  ".repeat(level);
-  return `${indent}<${name}>${escapeXml(String(value))}</${name}>`;
+  return `${indent}<${name}${attributes}>${escapeXml(String(value))}</${name}>`;
 }
 
 function emptyElement(name: string, level: number, attributes = ""): string {
@@ -66,15 +66,15 @@ function validateNote(event: MusicXmlNoteEvent): void {
   if (!Number.isSafeInteger(event.pitch.alter)) {
     throw new MusicXmlWriterError(`alter for ${event.stepId} must be a safe integer.`);
   }
-  if (event.voice !== "1") {
-    throw new MusicXmlWriterError(`unsupported MusicXML voice on ${event.stepId}.`);
+  if ((event.staff === 1 && event.voice !== "1") || (event.staff === 2 && event.voice !== "2")) {
+    throw new MusicXmlWriterError(`voice and staff disagree on ${event.stepId}.`);
   }
 }
 
 function validateRest(event: MusicXmlRestEvent): void {
   assertInteger(event.duration, `duration for ${event.stepId}`, 1);
-  if (event.voice !== "1") {
-    throw new MusicXmlWriterError(`unsupported MusicXML voice on ${event.stepId}.`);
+  if ((event.staff === 1 && event.voice !== "1") || (event.staff === 2 && event.voice !== "2")) {
+    throw new MusicXmlWriterError(`voice and staff disagree on ${event.stepId}.`);
   }
 }
 
@@ -119,10 +119,21 @@ function writeAttributes(projection: MusicXmlProjection, level: number): string[
   lines.push(element("beats", attributes.time.beats, level + 2));
   lines.push(element("beat-type", attributes.time.denominator, level + 2));
   lines.push(closeElement("time", level + 1));
-  lines.push(emptyElement("clef", level + 1));
-  lines.push(element("sign", attributes.clef.sign, level + 2));
-  lines.push(element("line", attributes.clef.line, level + 2));
-  lines.push(closeElement("clef", level + 1));
+  lines.push(element("staves", attributes.staves, level + 1));
+  lines.push(
+    element(
+      "part-symbol",
+      "brace",
+      level + 1,
+      `${xmlAttribute("top-staff", 1)}${xmlAttribute("bottom-staff", 2)}`,
+    ),
+  );
+  for (const clef of attributes.clefs) {
+    lines.push(emptyElement("clef", level + 1, xmlAttribute("number", clef.number)));
+    lines.push(element("sign", clef.sign, level + 2));
+    lines.push(element("line", clef.line, level + 2));
+    lines.push(closeElement("clef", level + 1));
+  }
   lines.push(closeElement("attributes", level));
   return lines;
 }
@@ -135,6 +146,7 @@ function writeTempoDirection(projection: MusicXmlProjection, level: number): str
   lines.push(element("per-minute", projection.tempoBpm, level + 3));
   lines.push(closeElement("metronome", level + 2));
   lines.push(closeElement("direction-type", level + 1));
+  lines.push(element("staff", 1, level + 1));
   lines.push(selfClosingElement("sound", level + 1, xmlAttribute("tempo", projection.tempoBpm)));
   lines.push(closeElement("direction", level));
   return lines;
@@ -148,6 +160,7 @@ function writeDynamicDirection(event: MusicXmlDirectionEvent, level: number): st
   lines.push(selfClosingElement(event.dynamicLabel, level + 3));
   lines.push(closeElement("dynamics", level + 2));
   lines.push(closeElement("direction-type", level + 1));
+  lines.push(element("staff", 1, level + 1));
   lines.push(closeElement("direction", level));
   return lines;
 }
@@ -205,6 +218,7 @@ function writeNote(event: MusicXmlNoteEvent, level: number): string[] {
   lines.push(element("duration", event.duration, level + 1));
   lines.push(...writeTies(event, level + 1));
   lines.push(element("voice", event.voice, level + 1));
+  lines.push(element("staff", event.staff, level + 1));
   lines.push(...writeNotations(event, level + 1));
   lines.push(closeElement("note", level));
   return lines;
@@ -215,11 +229,12 @@ function writeRest(event: MusicXmlRestEvent, level: number): string[] {
   lines.push(selfClosingElement("rest", level + 1));
   lines.push(element("duration", event.duration, level + 1));
   lines.push(element("voice", event.voice, level + 1));
+  lines.push(element("staff", event.staff, level + 1));
   lines.push(closeElement("note", level));
   return lines;
 }
 
-function writeMeasureEvents(events: readonly MusicXmlMeasureEvent[], level: number): string[] {
+function writeTrebleEvents(events: readonly MusicXmlMeasureEvent[], level: number): string[] {
   const lines: string[] = [];
   for (const event of events) {
     switch (event.kind) {
@@ -230,14 +245,31 @@ function writeMeasureEvents(events: readonly MusicXmlMeasureEvent[], level: numb
         lines.push(...writeHarmony(event, level));
         break;
       case "note":
-        lines.push(...writeNote(event, level));
+        if (event.staff === 1) lines.push(...writeNote(event, level));
         break;
       case "rest":
-        lines.push(...writeRest(event, level));
+        if (event.staff === 1) lines.push(...writeRest(event, level));
         break;
     }
   }
   return lines;
+}
+
+function writeBassEvents(events: readonly MusicXmlMeasureEvent[], level: number): string[] {
+  const lines: string[] = [];
+  for (const event of events) {
+    if (event.kind === "note" && event.staff === 2) lines.push(...writeNote(event, level));
+    if (event.kind === "rest" && event.staff === 2) lines.push(...writeRest(event, level));
+  }
+  return lines;
+}
+
+function writeBackup(duration: number, level: number): string[] {
+  return [
+    emptyElement("backup", level),
+    element("duration", duration, level + 1),
+    closeElement("backup", level),
+  ];
 }
 
 /** Serializes the MusicXML semantic projection without making musical decisions. */
@@ -263,7 +295,9 @@ export function writeMusicXml(projection: MusicXmlProjection): string {
       lines.push(...writeAttributes(projection, 3));
       lines.push(...writeTempoDirection(projection, 3));
     }
-    lines.push(...writeMeasureEvents(measure.events, 3));
+    lines.push(...writeTrebleEvents(measure.events, 3));
+    lines.push(...writeBackup(measure.capacity, 3));
+    lines.push(...writeBassEvents(measure.events, 3));
     lines.push("    </measure>");
   });
   lines.push("  </part>", "</score-partwise>");

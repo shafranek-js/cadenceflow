@@ -20,9 +20,15 @@
           <beats>2+2+3</beats>
           <beat-type>8</beat-type>
         </time>
-        <clef>
+        <staves>2</staves>
+        <part-symbol top-staff="1" bottom-staff="2">brace</part-symbol>
+        <clef number="1">
           <sign>G</sign>
           <line>2</line>
+        </clef>
+        <clef number="2">
+          <sign>F</sign>
+          <line>4</line>
         </clef>
       </attributes>
       <direction placement="above">
@@ -32,6 +38,7 @@
             <per-minute>140</per-minute>
           </metronome>
         </direction-type>
+        <staff>1</staff>
         <sound tempo="140"/>
       </direction>
       <direction placement="below">
@@ -40,6 +47,7 @@
             <f/>
           </dynamics>
         </direction-type>
+        <staff>1</staff>
       </direction>
       <harmony>
         <root>
@@ -50,19 +58,11 @@
       <note>
         <pitch>
           <step>D</step>
-          <octave>2</octave>
-        </pitch>
-        <duration>9</duration>
-        <voice>1</voice>
-      </note>
-      <note>
-        <chord/>
-        <pitch>
-          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
         </notations>
@@ -75,6 +75,7 @@
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
         </notations>
@@ -87,6 +88,7 @@
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
         </notations>
@@ -97,6 +99,7 @@
             <mf/>
           </dynamics>
         </direction-type>
+        <staff>1</staff>
       </direction>
       <harmony>
         <root>
@@ -118,20 +121,11 @@
         <pitch>
           <step>C</step>
           <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-      </note>
-      <note>
-        <chord/>
-        <pitch>
-          <step>C</step>
-          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -142,6 +136,7 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -151,6 +146,7 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -160,6 +156,7 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -169,19 +166,14 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <rest/>
         <duration>2</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
-      <direction placement="below">
-        <direction-type>
-          <dynamics>
-            <mf/>
-          </dynamics>
-        </direction-type>
-      </direction>
       <harmony>
         <root>
           <root-step>B</root-step>
@@ -191,21 +183,12 @@
       </harmony>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>6</duration>
-        <voice>1</voice>
-      </note>
-      <note>
-        <chord/>
-        <pitch>
           <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -215,6 +198,7 @@
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <staff>1</staff>
       </note>
       <note>
         <chord/>
@@ -225,6 +209,45 @@
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <staff>1</staff>
+      </note>
+      <backup>
+        <duration>21</duration>
+      </backup>
+      <note>
+        <pitch>
+          <step>D</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>9</duration>
+        <voice>2</voice>
+        <staff>2</staff>
+      </note>
+      <note>
+        <pitch>
+          <step>C</step>
+          <alter>1</alter>
+          <octave>3</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <staff>2</staff>
+      </note>
+      <note>
+        <rest/>
+        <duration>2</duration>
+        <voice>2</voice>
+        <staff>2</staff>
+      </note>
+      <note>
+        <pitch>
+          <step>B</step>
+          <alter>-1</alter>
+          <octave>3</octave>
+        </pitch>
+        <duration>6</duration>
+        <voice>2</voice>
+        <staff>2</staff>
       </note>
     </measure>
   </part>

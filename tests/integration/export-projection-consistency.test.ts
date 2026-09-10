@@ -280,6 +280,7 @@ function xmlNotes(document: XmlNode): readonly {
   readonly duration: number;
   readonly rest: boolean;
   readonly chord: boolean;
+  readonly staff: number;
 }[] {
   return document
     .find("//*")
@@ -300,6 +301,7 @@ function xmlNotes(document: XmlNode): readonly {
         duration: Number(xmlText(note, "duration")),
         rest,
         chord: Boolean(note.get("chord")),
+        staff: Number(xmlText(note, "staff")),
       };
     });
 }
@@ -454,6 +456,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
       musicXmlProjection.measures
         .flatMap((measure) => measure.events)
         .filter((event) => event.kind === "rest")
+        .filter((event) => event.staff === 1)
         .map((event) => [event.stepId, event.duration]),
     ).toEqual([
       ["rest-between", 2],
@@ -474,6 +477,9 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
     expect(xmlText(document, "//attributes/key/mode")).toBe("minor");
     expect(xmlText(document, "//attributes/time/beats")).toBe("2+2+3");
     expect(xmlText(document, "//attributes/time/beat-type")).toBe("8");
+    expect(xmlText(document, "//attributes/staves")).toBe("2");
+    expect(xmlText(document, '//attributes/clef[@number="1"]/sign')).toBe("G");
+    expect(xmlText(document, '//attributes/clef[@number="2"]/sign')).toBe("F");
     expect(document.get("//direction[1]/sound")?.attr("tempo")?.value()).toBe("140");
     expect(document.find("//harmony/kind").map((node) => node.text())).toEqual([
       "minor",
@@ -482,17 +488,23 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
     ]);
     expect(document.find("//dynamics/*").map((node) => node.name())).toEqual(["f", "mf", "mp"]);
     const parsedNotes = xmlNotes(document);
-    expect(parsedNotes.filter((note) => !note.rest).map((note) => note.pitch)).toEqual(
-      expectedPitchSequence,
-    );
+    expect(
+      parsedNotes.filter((note) => !note.rest && note.staff === 1).map((note) => note.pitch),
+    ).toEqual([62, 65, 69, 61, 65, 67, 71, 81, 61, 65, 67, 71, 81]);
+    expect(
+      parsedNotes.filter((note) => !note.rest && note.staff === 2).map((note) => note.pitch),
+    ).toEqual([38, 49, 57]);
     expect(
       parsedNotes.filter((note) => note.rest).map((note) => [note.duration, note.rest]),
     ).toEqual([
       [2, true],
       [9, true],
       [1, true],
+      [2, true],
+      [9, true],
+      [1, true],
     ]);
-    expect(parsedNotes.filter((note) => !note.rest && note.chord)).toHaveLength(13);
+    expect(parsedNotes.filter((note) => !note.rest && note.chord)).toHaveLength(10);
     expect(musicXml).not.toContain("branch-only-note");
     expect(repeatedXml).toBe(musicXml);
 
