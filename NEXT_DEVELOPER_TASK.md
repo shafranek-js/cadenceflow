@@ -106,8 +106,23 @@ Commit this correction separately, preferably:
   API), not by overwriting each note's inherited velocity.
 - `stop`, cancellation, Retry, instrument change, and disposal must prevent stuck notes and stale timers.
 - Extend Melody Track UI with concise `Loading`, `Ready`, and identified `Error` state plus a keyboard-
-  accessible `Retry`. Add an audible Preview action to the editor now that the real provider exists. Preview
-  is isolated from Project/history and does not stop or mutate progression transport.
+  accessible `Retry`.
+- Add a compact standard Play-icon button to the `Notation preview` header in the Melody editor. It auditions
+  the **current local draft** Pattern/Grid/Octave/Instrument before Apply, using exactly the notes shown in
+  that preview and the real Melody provider. While sounding, the same control becomes Stop (standard square
+  icon); its accessible name and tooltip must be `Play melody preview` / `Stop melody preview`, and its state
+  must not be conveyed by icon or color alone.
+- Preview must start from its first note on every Play, replace/cancel a previous Melody preview, and stop
+  immediately when Pattern, Grid, Octave, or Instrument changes; when the dialog closes, cancels, applies,
+  unmounts, or the source Step disappears; and when the Stop control is pressed. It must leave no timers or
+  stuck notes.
+- The preview has its own playback scope: it must not start/pause/stop the main Transport, change selection,
+  mutate Project/history, trigger autosave, or cancel a running progression Melody channel. Space activates
+  it only while the focused preview button handles Space and must not bubble into the global Transport
+  shortcut.
+- During provider `idle/loading`, the control shows a non-playing loading state and deduplicates preparation;
+  on provider error it is disabled in favor of the identified Retry path. Do not silently audition with the
+  Piano provider.
 
 Recommended commit:
 `feat(us12): prepare lazy melody soundfont provider`.
@@ -182,6 +197,8 @@ Recommended commit:
 - lazy zero-fetch project-without-melody case and concurrent prepare deduplication;
 - all six GM mappings, CC7/gain Volume, shared AudioContext, state transitions, Retry recovery;
 - schedule/cancel/stop/dispose and no stuck notes/timers;
+- editor Play/Stop previews the current unapplied draft, replaces prior preview, stops on every draft/dialog
+  lifecycle boundary, does not add Undo/autosave activity, and does not affect progression Transport;
 - no runtime remote URL.
 
 ### Projection/controller
@@ -197,8 +214,8 @@ Recommended commit:
 
 ### Focused Chromium
 
-- Create a Melody, observe lazy Loading → Ready using the real local asset path, preview it, and play Piano +
-  Melody.
+- Create a Melody, observe lazy Loading → Ready using the real local asset path, play/stop the editor's
+  unapplied draft, change a draft field and verify preview cancellation, then Apply and play Piano + Melody.
 - Verify exact note highlight advances within one Chord Step.
 - Verify Mute, Solo, Volume, pause/resume, loop, Stop, instrument change, and keyboard Retry after an
   intentionally intercepted SF3 failure.
