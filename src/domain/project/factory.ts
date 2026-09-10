@@ -5,6 +5,8 @@ import { groove } from "../timing/swing";
 import { emptyProgression } from "../progression/progression";
 import type { StepPerformance } from "../progression/step";
 import type { Project } from "./project";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "./migrations";
+import { DEFAULT_MELODY_TRACK_SETTINGS } from "../melody/types";
 
 export const DEFAULT_PIANO_PERFORMANCE: StepPerformance = Object.freeze({
   articulation: "humanized",
@@ -29,7 +31,7 @@ export function createDefaultProject(
   });
   return Object.freeze({
     id,
-    schemaVersion: 1,
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     name,
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -43,6 +45,7 @@ export function createDefaultProject(
       globalMatrixCardView: "harmonic",
       showBassInStaff: false,
     }),
+    melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,
     defaults,
     moduleTemplateStates: Object.freeze({
       progressions: Object.freeze({ cards: Object.freeze({}) }),

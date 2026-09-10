@@ -1,8 +1,10 @@
 /**
- * Pure schema-version migration chain and version validation (T125).
+ * Pure schema-version migration chain and version validation (T125/T168).
  */
 
-export const CURRENT_PROJECT_SCHEMA_VERSION = 1;
+import { createDefaultMelodyTrackSettings } from "../melody/types";
+
+export const CURRENT_PROJECT_SCHEMA_VERSION = 2;
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(
@@ -47,7 +49,49 @@ export function migrateProjectData(data: unknown): Record<string, unknown> {
     throw new UnsupportedProjectVersionError(version, CURRENT_PROJECT_SCHEMA_VERSION);
   }
 
-  // Schema version 1 is current; no migrations needed yet.
-  // Sequential migration chains (v1 -> v2, v2 -> v3) will be appended here.
-  return record;
+  if (version === 1) {
+    return migrateV1ToV2(record);
+  }
+
+  // A shallow root copy keeps v2 decoding pure while preserving every supported
+  // v2 field exactly as supplied. Future migrations can be appended above.
+  return { ...record };
+}
+
+function migrateV1ToV2(record: Record<string, unknown>): Record<string, unknown> {
+  const cloneSteps = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map((step) =>
+          step && typeof step === "object" && !Array.isArray(step)
+            ? { ...(step as Record<string, unknown>) }
+            : step,
+        )
+      : value;
+
+  const progression = record["progression"];
+  const migratedProgression =
+    progression && typeof progression === "object" && !Array.isArray(progression)
+      ? {
+          ...(progression as Record<string, unknown>),
+          steps: cloneSteps((progression as Record<string, unknown>)["steps"]),
+        }
+      : progression;
+  const temporaryBranch = record["temporaryBranch"];
+  const migratedTemporaryBranch =
+    temporaryBranch && typeof temporaryBranch === "object" && !Array.isArray(temporaryBranch)
+      ? {
+          ...(temporaryBranch as Record<string, unknown>),
+          steps: cloneSteps((temporaryBranch as Record<string, unknown>)["steps"]),
+        }
+      : temporaryBranch;
+
+  return {
+    ...record,
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    melodyTrack: createDefaultMelodyTrackSettings(),
+    ...(migratedProgression !== undefined ? { progression: migratedProgression } : {}),
+    ...(migratedTemporaryBranch !== undefined
+      ? { temporaryBranch: migratedTemporaryBranch }
+      : {}),
+  };
 }

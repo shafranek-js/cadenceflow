@@ -68,7 +68,7 @@ describe("T120 — Dexie Autosave and Project Repository Recovery Contract", () 
       // Identity & harmonic context
       expect(recovered.id).toBe(richProject.id);
       expect(recovered.name).toBe(richProject.name);
-      expect(recovered.schemaVersion).toBe(1);
+      expect(recovered.schemaVersion).toBe(2);
       expect(recovered.tonic).toBe(richProject.tonic);
       expect(recovered.activeModule).toBe(richProject.activeModule);
 
@@ -253,7 +253,7 @@ describe("T120 — Dexie Autosave and Project Repository Recovery Contract", () 
       // Original valid project remains intact and uncorrupted
       const loaded = await repo.loadProject(validProject.id);
       expect(loaded).not.toBeNull();
-      expect(loaded?.schemaVersion).toBe(1);
+      expect(loaded?.schemaVersion).toBe(2);
       expect(loaded?.name).toBe(validProject.name);
     });
   });

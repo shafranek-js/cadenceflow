@@ -108,10 +108,14 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
   });
 
   describe("Schema Migration Chain (T125)", () => {
-    it("passes through valid schemaVersion 1 data", () => {
+    it("migrates valid schemaVersion 1 data to the current version", () => {
       const data = { schemaVersion: 1, name: "Test" };
       const migrated = migrateProjectData(data);
-      expect(migrated).toEqual(data);
+      expect(migrated).not.toBe(data);
+      expect(migrated).toMatchObject({
+        name: "Test",
+        melodyTrack: { instrument: "flute", muted: false, solo: false, volume: 100 },
+      });
       expect(migrated.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     });
 
@@ -132,7 +136,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
     });
 
     it("rejects future schemaVersion with UnsupportedProjectVersionError", () => {
-      expect(() => migrateProjectData({ schemaVersion: 2 })).toThrow(
+      expect(() => migrateProjectData({ schemaVersion: 3 })).toThrow(
         UnsupportedProjectVersionError,
       );
       expect(() => migrateProjectData({ schemaVersion: 100 })).toThrow(
@@ -284,7 +288,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       // Loading returns exact previous valid project
       const loaded = await repo.loadProject(validProject.id);
-      expect(loaded?.schemaVersion).toBe(1);
+      expect(loaded?.schemaVersion).toBe(2);
       expect(loaded?.name).toBe(validProject.name);
 
       await db.delete();

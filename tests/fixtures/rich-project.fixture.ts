@@ -8,10 +8,11 @@ import { EMPTY_HARMONIC_VARIANT } from "../../src/domain/harmony/chord";
 import type { ChordStep, RestStep } from "../../src/domain/progression/step";
 import type { TemporaryBranch } from "../../src/domain/progression/branch";
 import type { FunctionalPreset } from "../../src/domain/progression/presets";
+import { snapshotChordMelodyRecipe } from "../../src/domain/melody/types";
 
 /**
- * Rich, canonical Project fixture covering all accepted semantic domains (US1–US7).
- * Used by T119 portable project tests and T120 autosave recovery tests.
+ * Rich, canonical Project fixture covering all accepted semantic domains (US1–US12).
+ * Used by portable project, autosave recovery, and melody persistence tests.
  */
 export function createRichProjectFixture(): Project {
   const step1: ChordStep = Object.freeze({
@@ -26,6 +27,11 @@ export function createRichProjectFixture(): Project {
     duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
     performance: DEFAULT_PIANO_PERFORMANCE,
     cardView: "harmonic",
+    melody: snapshotChordMelodyRecipe({
+      pattern: "outside-in",
+      grid: "eighth-triplet",
+      octaveOffset: 1,
+    }),
   });
 
   const step2: ChordStep = Object.freeze({
@@ -174,7 +180,7 @@ export function createRichProjectFixture(): Project {
 
   return Object.freeze({
     id: "project-us8-rich-fixture-001",
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: "Rich US8 Acceptance Project",
     createdAt: "2026-09-05T20:00:00.000Z",
     updatedAt: "2026-09-05T20:30:00.000Z",
@@ -187,6 +193,12 @@ export function createRichProjectFixture(): Project {
       theme: "dark",
       globalMatrixCardView: "harmonic",
       showBassInStaff: false,
+    }),
+    melodyTrack: Object.freeze({
+      instrument: "violin",
+      muted: false,
+      solo: false,
+      volume: 96,
     }),
     defaults: Object.freeze({
       piano: Object.freeze({

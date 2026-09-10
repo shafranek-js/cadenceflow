@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadenceflow.local/schema/project-v1.json",
-  "title": "CadenceFlow Project v1",
+  "$id": "https://cadenceflow.local/schema/project-v2.json",
+  "title": "CadenceFlow Project v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,13 +14,14 @@
     "tonic",
     "globalTiming",
     "groove",
+    "melodyTrack",
     "defaults",
     "moduleTemplateStates",
     "progression",
     "customPresets"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -29,6 +30,7 @@
     "tonic": { "$ref": "#/$defs/pitchClass" },
     "globalTiming": { "$ref": "#/$defs/globalTiming" },
     "groove": { "$ref": "#/$defs/groove" },
+    "melodyTrack": { "$ref": "#/$defs/melodyTrack" },
     "presentation": { "type": "object" },
     "defaults": { "type": "object" },
     "moduleTemplateStates": {
@@ -97,6 +99,26 @@
         "swingAmount": { "type": "number" }
       }
     },
+    "melodyTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrument", "muted", "solo", "volume"],
+      "properties": {
+        "instrument": {
+          "enum": ["flute", "violin", "clarinet", "oboe", "cello", "synth-lead"]
+        },
+        "muted": { "type": "boolean" },
+        "solo": { "type": "boolean" },
+        "volume": { "type": "integer", "minimum": 0, "maximum": 127 }
+      },
+      "not": {
+        "required": ["muted", "solo"],
+        "properties": {
+          "muted": { "const": true },
+          "solo": { "const": true }
+        }
+      }
+    },
     "progression": {
       "type": "object",
       "additionalProperties": false,
@@ -118,7 +140,7 @@
     },
     "chordStep": {
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["id", "kind", "harmonicFunction", "harmonicVariant", "duration", "performance"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
@@ -127,7 +149,9 @@
         "harmonicVariant": { "type": "object" },
         "duration": { "$ref": "#/$defs/duration" },
         "performance": { "type": "object" },
-        "cardView": { "enum": ["harmonic", "piano", "staff"] }
+        "cardView": { "enum": ["harmonic", "piano", "staff"] },
+        "explicitSpellingOverrides": { "type": "object" },
+        "melody": { "$ref": "#/$defs/melodyRecipe" }
       }
     },
     "restStep": {
@@ -138,6 +162,20 @@
         "id": { "type": "string", "minLength": 1 },
         "kind": { "const": "rest" },
         "duration": { "$ref": "#/$defs/duration" }
+      }
+    },
+    "melodyRecipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "grid", "octaveOffset"],
+      "properties": {
+        "pattern": {
+          "enum": ["up", "down", "up-down", "down-up", "outside-in", "inside-out"]
+        },
+        "grid": {
+          "enum": ["quarter", "eighth", "sixteenth", "eighth-triplet", "sixteenth-triplet"]
+        },
+        "octaveOffset": { "type": "integer", "minimum": -2, "maximum": 2 }
       }
     }
   }

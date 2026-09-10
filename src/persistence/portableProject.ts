@@ -22,6 +22,14 @@ import type { HarmonicVariant } from "../domain/harmony/chord";
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
 import type { CompositionIntent, TemporaryBranch } from "../domain/progression/branch";
 import {
+  snapshotChordMelodyRecipe,
+  snapshotMelodyTrackSettings,
+  validateChordMelodyRecipe,
+  validateMelodyTrackSettings,
+  type ChordMelodyRecipe,
+  type MelodyTrackSettings,
+} from "../domain/melody/types";
+import {
   CURRENT_PROJECT_SCHEMA_VERSION,
   InvalidProjectDataError,
   migrateProjectData,
@@ -184,6 +192,33 @@ function decodeDuration(wire: WireDuration): MusicalDuration {
   return musicalDuration(rational(wire.beats.numerator, wire.beats.denominator), hint);
 }
 
+function encodeMelodyRecipe(recipe: ChordMelodyRecipe): Record<string, unknown> {
+  const snapshot = snapshotChordMelodyRecipe(recipe);
+  return {
+    pattern: snapshot.pattern,
+    grid: snapshot.grid,
+    octaveOffset: snapshot.octaveOffset,
+  };
+}
+
+function decodeMelodyRecipe(raw: unknown): ChordMelodyRecipe {
+  return validateChordMelodyRecipe(raw);
+}
+
+function encodeMelodyTrackSettings(settings: MelodyTrackSettings): Record<string, unknown> {
+  const snapshot = snapshotMelodyTrackSettings(settings);
+  return {
+    instrument: snapshot.instrument,
+    muted: snapshot.muted,
+    solo: snapshot.solo,
+    volume: snapshot.volume,
+  };
+}
+
+function decodeMelodyTrackSettings(raw: unknown): MelodyTrackSettings {
+  return validateMelodyTrackSettings(raw);
+}
+
 // Wire step representations
 function encodeStep(step: ProgressionStep): Record<string, unknown> {
   if (step.kind === "rest") {
@@ -201,6 +236,7 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
     duration: encodeDuration(step.duration),
     performance: step.performance,
     cardView: step.cardView,
+    ...(step.melody !== undefined ? { melody: encodeMelodyRecipe(step.melody) } : {}),
   };
 }
 
@@ -222,6 +258,7 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
     duration,
     performance: raw["performance"] as StepPerformance,
     cardView: (raw["cardView"] as CardViewId | undefined) ?? "harmonic",
+    ...(raw["melody"] !== undefined ? { melody: decodeMelodyRecipe(raw["melody"]) } : {}),
   });
   return chord;
 }
@@ -338,6 +375,7 @@ export function encodePortableProject(project: Project): string {
       globalMatrixCardView: project.presentation.globalMatrixCardView,
       showBassInStaff: project.presentation.showBassInStaff,
     },
+    melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
     defaults,
     moduleTemplateStates,
     progression,
@@ -550,6 +588,8 @@ export function decodePortableProject(jsonString: string): Project {
     "dark-harmony": { cards: darkHarmonyCards },
   };
 
+  const melodyTrack = decodeMelodyTrackSettings(migrated["melodyTrack"]);
+
   const project: Project = Object.freeze({
     id: String(migrated["id"]),
     schemaVersion: Number(migrated["schemaVersion"]),
@@ -572,6 +612,7 @@ export function decodePortableProject(jsonString: string): Project {
         showBassInStaff: presentation["showBassInStaff"] === true,
       });
     })(),
+    melodyTrack,
     defaults,
     moduleTemplateStates,
     progression: Object.freeze({

@@ -7,6 +7,7 @@ import type { FunctionalPreset } from "../progression/presets";
 import type { CardViewId } from "../progression/step";
 import type { GlobalTiming } from "../timing/meter";
 import type { GrooveSettings } from "../timing/swing";
+import type { MelodyTrackSettings } from "../melody/types";
 import {
   countStepCreationOverrides,
   type ProjectDefaults,
@@ -52,6 +53,7 @@ export interface Project {
   readonly globalTiming: GlobalTiming;
   readonly groove: GrooveSettings;
   readonly presentation: PresentationState;
+  readonly melodyTrack: MelodyTrackSettings;
   readonly defaults: ProjectDefaults;
   readonly moduleTemplateStates: Readonly<Record<HarmonicModuleId, ModuleTemplateState>>;
   readonly progression: Progression;
