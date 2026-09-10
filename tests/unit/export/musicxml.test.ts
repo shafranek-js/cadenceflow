@@ -18,6 +18,7 @@ import { musicalDuration } from "../../../src/domain/timing/duration";
 import { globalTiming, meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import { groove } from "../../../src/domain/timing/swing";
+import type { ChordMelodyRecipe } from "../../../src/domain/melody/types";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 import type { Project } from "../../../src/domain/project/project";
 import type { MusicXmlDiagnosticCode } from "../../../src/export/musicxml/mapping";
@@ -31,11 +32,17 @@ import {
 import {
   MusicXmlExportError,
   projectProjectToMusicXml,
+  type MusicXmlMelodyNoteEvent,
+  type MusicXmlMelodyRestEvent,
   type MusicXmlMeasureEvent,
   type MusicXmlNoteEvent,
   type MusicXmlProjection,
 } from "../../../src/export/musicxml/projection";
-import { writeMusicXml, writeMusicXmlFile } from "../../../src/export/musicxml/writer";
+import {
+  MusicXmlWriterError,
+  writeMusicXml,
+  writeMusicXmlFile,
+} from "../../../src/export/musicxml/writer";
 
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
   return Object.freeze({
@@ -172,10 +179,111 @@ function eventCodes(projection: MusicXmlProjection): MusicXmlDiagnosticCode[] {
   return projection.diagnostics.map((diagnostic) => diagnostic.code);
 }
 
-function pitchMidi(note: MusicXmlNoteEvent): number {
+function pitchMidi(note: {
+  readonly pitch: { readonly step: string; readonly alter: number; readonly octave: number };
+}): number {
   const natural: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   return (note.pitch.octave + 1) * 12 + natural[note.pitch.step]! + note.pitch.alter;
 }
+
+function melodyChordStep(
+  project: Project,
+  functionId: string,
+  id: string,
+  duration: RationalParts,
+  melody: ChordMelodyRecipe,
+): ChordStep {
+  return Object.freeze({
+    ...chordStep(project, functionId, id, duration),
+    melody: Object.freeze({ ...melody }),
+  });
+}
+
+function melodyProject(): Project {
+  const base = createDefaultProject("musicxml-melody", "Melody MusicXML");
+  const first = melodyChordStep(
+    base,
+    "I",
+    "melody-triplet",
+    { numerator: 7, denominator: 2 },
+    {
+      pattern: "up",
+      grid: "eighth-triplet",
+      octaveOffset: 1,
+    },
+  );
+  const second = melodyChordStep(
+    base,
+    "V",
+    "melody-quarter",
+    { numerator: 1, denominator: 1 },
+    {
+      pattern: "down",
+      grid: "quarter",
+      octaveOffset: 0,
+    },
+  );
+  const noRecipe = chordStep(base, "vi", "melody-no-recipe", { numerator: 1, denominator: 2 });
+  return Object.freeze({
+    ...base,
+    melodyTrack: Object.freeze({ ...base.melodyTrack, instrument: "violin" }),
+    progression: Object.freeze({
+      steps: Object.freeze([
+        first,
+        second,
+        restStep("melody-rest", { numerator: 1, denominator: 2 }),
+        noRecipe,
+      ]),
+    }),
+    temporaryBranch: Object.freeze({
+      id: "melody-temporary-branch",
+      originStepId: "melody-triplet",
+      originAtEnd: false,
+      rejoinStepId: "melody-no-recipe",
+      compositionIntent: "temporary melody branch",
+      steps: Object.freeze([
+        melodyChordStep(
+          base,
+          "iv",
+          "melody-branch-only",
+          { numerator: 1, denominator: 1 },
+          {
+            pattern: "inside-out",
+            grid: "sixteenth-triplet",
+            octaveOffset: 0,
+          },
+        ),
+      ]),
+    }),
+  });
+}
+
+function melodyNotes(projection: MusicXmlProjection): MusicXmlMelodyNoteEvent[] {
+  return (
+    projection.melody?.measures.flatMap((measure) =>
+      measure.events.filter((event): event is MusicXmlMelodyNoteEvent => event.kind === "note"),
+    ) ?? []
+  );
+}
+
+function melodyRests(projection: MusicXmlProjection): MusicXmlMelodyRestEvent[] {
+  return (
+    projection.melody?.measures.flatMap((measure) =>
+      measure.events.filter((event): event is MusicXmlMelodyRestEvent => event.kind === "rest"),
+    ) ?? []
+  );
+}
+
+function extractPartIds(xml: string): { readonly partList: string[]; readonly score: string[] } {
+  const partList = xml.slice(xml.indexOf("<part-list>"), xml.indexOf("</part-list>"));
+  return {
+    partList: [...partList.matchAll(/<score-part id="([^"]+)">/g)].map((match) => match[1]!),
+    score: [...xml.matchAll(/<part id="([^"]+)">/g)].map((match) => match[1]!),
+  };
+}
+
+const PRE_T175_NO_MELODY_GOLDEN_BASE64 =
+  "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHNjb3JlLXBhcnR3aXNlIHZlcnNpb249IjQuMCI+CiAgPHdvcms+CiAgICA8d29yay10aXRsZT5UMTc1IEdvbGRlbjwvd29yay10aXRsZT4KICA8L3dvcms+CiAgPHBhcnQtbGlzdD4KICAgIDxzY29yZS1wYXJ0IGlkPSJQMSI+CiAgICAgIDxwYXJ0LW5hbWU+UGlhbm88L3BhcnQtbmFtZT4KICAgIDwvc2NvcmUtcGFydD4KICA8L3BhcnQtbGlzdD4KICA8cGFydCBpZD0iUDEiPgogICAgPG1lYXN1cmUgbnVtYmVyPSIxIj4KICAgICAgPGF0dHJpYnV0ZXM+CiAgICAgICAgPGRpdmlzaW9ucz4xPC9kaXZpc2lvbnM+CiAgICAgICAgPGtleT4KICAgICAgICAgIDxmaWZ0aHM+MDwvZmlmdGhzPgogICAgICAgICAgPG1vZGU+bWFqb3I8L21vZGU+CiAgICAgICAgPC9rZXk+CiAgICAgICAgPHRpbWU+CiAgICAgICAgICA8YmVhdHM+NDwvYmVhdHM+CiAgICAgICAgICA8YmVhdC10eXBlPjQ8L2JlYXQtdHlwZT4KICAgICAgICA8L3RpbWU+CiAgICAgICAgPHN0YXZlcz4yPC9zdGF2ZXM+CiAgICAgICAgPHBhcnQtc3ltYm9sIHRvcC1zdGFmZj0iMSIgYm90dG9tLXN0YWZmPSIyIj5icmFjZTwvcGFydC1zeW1ib2w+CiAgICAgICAgPGNsZWYgbnVtYmVyPSIxIj4KICAgICAgICAgIDxzaWduPkc8L3NpZ24+CiAgICAgICAgICA8bGluZT4yPC9saW5lPgogICAgICAgIDwvY2xlZj4KICAgICAgICA8Y2xlZiBudW1iZXI9IjIiPgogICAgICAgICAgPHNpZ24+Rjwvc2lnbj4KICAgICAgICAgIDxsaW5lPjQ8L2xpbmU+CiAgICAgICAgPC9jbGVmPgogICAgICA8L2F0dHJpYnV0ZXM+CiAgICAgIDxkaXJlY3Rpb24gcGxhY2VtZW50PSJhYm92ZSI+CiAgICAgICAgPGRpcmVjdGlvbi10eXBlPgogICAgICAgICAgPG1ldHJvbm9tZT4KICAgICAgICAgICAgPGJlYXQtdW5pdD5xdWFydGVyPC9iZWF0LXVuaXQ+CiAgICAgICAgICAgIDxwZXItbWludXRlPjEwMDwvcGVyLW1pbnV0ZT4KICAgICAgICAgIDwvbWV0cm9ub21lPgogICAgICAgIDwvZGlyZWN0aW9uLXR5cGU+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICAgIDxzb3VuZCB0ZW1wbz0iMTAwIi8+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8ZGlyZWN0aW9uIHBsYWNlbWVudD0iYmVsb3ciPgogICAgICAgIDxkaXJlY3Rpb24tdHlwZT4KICAgICAgICAgIDxkeW5hbWljcz4KICAgICAgICAgICAgPG1mLz4KICAgICAgICAgIDwvZHluYW1pY3M+CiAgICAgICAgPC9kaXJlY3Rpb24tdHlwZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8aGFybW9ueT4KICAgICAgICA8cm9vdD4KICAgICAgICAgIDxyb290LXN0ZXA+Qzwvcm9vdC1zdGVwPgogICAgICAgIDwvcm9vdD4KICAgICAgICA8a2luZD5tYWpvcjwva2luZD4KICAgICAgPC9oYXJtb255PgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT40PC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjE8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4xPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgICA8bm90ZT4KICAgICAgICA8Y2hvcmQvPgogICAgICAgIDxwaXRjaD4KICAgICAgICAgIDxzdGVwPkU8L3N0ZXA+CiAgICAgICAgICA8b2N0YXZlPjQ8L29jdGF2ZT4KICAgICAgICA8L3BpdGNoPgogICAgICAgIDxkdXJhdGlvbj40PC9kdXJhdGlvbj4KICAgICAgICA8dm9pY2U+MTwvdm9pY2U+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICA8L25vdGU+CiAgICAgIDxub3RlPgogICAgICAgIDxjaG9yZC8+CiAgICAgICAgPHBpdGNoPgogICAgICAgICAgPHN0ZXA+Rzwvc3RlcD4KICAgICAgICAgIDxvY3RhdmU+NDwvb2N0YXZlPgogICAgICAgIDwvcGl0Y2g+CiAgICAgICAgPGR1cmF0aW9uPjQ8L2R1cmF0aW9uPgogICAgICAgIDx2b2ljZT4xPC92b2ljZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvbm90ZT4KICAgICAgPGJhY2t1cD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgIDwvYmFja3VwPgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT4zPC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjI8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4yPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgPC9tZWFzdXJlPgogIDwvcGFydD4KPC9zY29yZS1wYXJ0d2lzZT4K";
 
 describe("US9 MusicXML mapping policy", () => {
   it("preserves the canonical key spelling for every tonic in both modes", () => {
@@ -596,4 +704,280 @@ describe("US9 MusicXML writer and safety contract", () => {
     expect(Object.isFrozen(first.measures[0])).toBe(true);
     expect(Object.isFrozen(first.measures[0]?.events)).toBe(true);
   });
+});
+
+describe("T175 Melody MusicXML part", () => {
+  it("keeps the pre-T175 no-Melody bytes unchanged", () => {
+    const base = createDefaultProject("golden-t175", "T175 Golden", "2026-09-10T00:00:00.000Z");
+    const step = chordStep(base, "I", "golden-step", { numerator: 4, denominator: 1 });
+    const project = Object.freeze({
+      ...base,
+      progression: Object.freeze({ steps: Object.freeze([step]) }),
+    });
+    const bytes = writeMusicXmlFile(projectProjectToMusicXml(project));
+    expect(Buffer.from(bytes).toString("base64")).toBe(PRE_T175_NO_MELODY_GOLDEN_BASE64);
+    expect(projectProjectToMusicXml(project).melody).toBeUndefined();
+  });
+
+  it("writes Melody as P2 before the stable Piano P1 with instrument metadata", () => {
+    const projection = projectProjectToMusicXml(melodyProject());
+    const xml = writeMusicXml(projection);
+    expect(extractPartIds(xml)).toEqual({ partList: ["P2", "P1"], score: ["P2", "P1"] });
+    expect(xml).toContain("<part-name>Violin</part-name>");
+    expect(xml).toContain("<instrument-name>Violin</instrument-name>");
+    expect(xml).toContain("<midi-channel>3</midi-channel>");
+    expect(xml).toContain("<midi-program>41</midi-program>");
+    expect(xml).toMatch(
+      /<part id="P2">[\s\S]*?<clef>[\s\S]*?<sign>G<\/sign>[\s\S]*?<line>2<\/line>/,
+    );
+    expect(xml).toContain('<part id="P1">');
+    expect(xml.indexOf('<part id="P2">')).toBeLessThan(xml.indexOf('<part id="P1">'));
+  });
+
+  it("projects contextual exact pitches, written types, rests, tuplets, ties, and complete bars", () => {
+    const projection = projectProjectToMusicXml(melodyProject());
+    const melody = projection.melody!;
+    expect(projection.attributes.divisions).toBe(6);
+    expect(melody.measures.map((measure) => measure.capacity)).toEqual([24, 24]);
+    expect(melodyNotes(projection).every((note) => pitchMidi(note) === note.sourceMidi)).toBe(true);
+    expect(
+      melodyNotes(projection).filter((note) => note.stepId === "melody-triplet")[0],
+    ).toMatchObject({
+      pitch: { step: "C", alter: 0, octave: 5 },
+      type: "eighth",
+      timeModification: { actualNotes: 3, normalNotes: 2, normalType: "eighth" },
+      voice: "1",
+      staff: 1,
+      chord: false,
+    });
+    expect(melodyRests(projection).map((event) => event.stepId)).toEqual([
+      "melody-rest",
+      "melody-no-recipe",
+      "__trailing-measure-gap__",
+    ]);
+    expect(
+      melodyNotes(projection)
+        .filter((note) => note.stepId === "melody-quarter")
+        .map((note) => note.ties),
+    ).toEqual([["start"], ["stop"]]);
+    expect(
+      melody.measures.every(
+        (measure) =>
+          measure.events.reduce((sum, event) => sum + event.duration, 0) === measure.capacity,
+      ),
+    ).toBe(true);
+    expect(writeMusicXml(projection)).not.toContain("melody-branch-only");
+  });
+
+  it("carries authored Melody pitch spelling through the contextual projection", () => {
+    const source = melodyProject();
+    const first = source.progression.steps[0] as ChordStep;
+    const spelledFirst = Object.freeze({
+      ...first,
+      explicitSpellingOverrides: Object.freeze({ "upper:60": { step: "B" as const, alter: 1 } }),
+    });
+    const project = Object.freeze({
+      ...source,
+      progression: Object.freeze({
+        steps: Object.freeze([spelledFirst, ...source.progression.steps.slice(1)]),
+      }),
+    });
+    const firstNote = melodyNotes(projectProjectToMusicXml(project)).find(
+      (note) => note.stepId === "melody-triplet",
+    );
+    expect(firstNote?.pitch).toEqual({ step: "B", alter: 1, octave: 4 });
+    expect(firstNote && pitchMidi(firstNote)).toBe(firstNote?.sourceMidi);
+  });
+
+  it.each([
+    ["flute", "Flute", 74, "G", 2],
+    ["violin", "Violin", 41, "G", 2],
+    ["clarinet", "Clarinet", 72, "G", 2],
+    ["oboe", "Oboe", 69, "G", 2],
+    ["cello", "Cello", 43, "F", 4],
+    ["synth-lead", "Synth Lead", 81, "G", 2],
+  ] as const)(
+    "maps %s to its deterministic MusicXML identity",
+    (instrument, name, program, sign, line) => {
+      const project = Object.freeze({
+        ...melodyProject(),
+        melodyTrack: Object.freeze({ ...melodyProject().melodyTrack, instrument }),
+      });
+      const projection = projectProjectToMusicXml(project);
+      expect(projection.melody).toMatchObject({
+        id: "P2",
+        name,
+        instrumentName: name,
+        instrument,
+        midiChannel: 3,
+        midiProgram: program,
+        clef: { sign, line },
+      });
+    },
+  );
+
+  it("writes both supported triplet grids with time-modification and deterministic tuplet boundaries", () => {
+    for (const [grid, type, normalType] of [
+      ["eighth-triplet", "eighth", "eighth"],
+      ["sixteenth-triplet", "16th", "16th"],
+    ] as const) {
+      const base = createDefaultProject(`triplet-${grid}`, `Triplet ${grid}`);
+      const step = melodyChordStep(
+        base,
+        "I",
+        "triplet-step",
+        { numerator: 1, denominator: 1 },
+        {
+          pattern: "up",
+          grid,
+          octaveOffset: 0,
+        },
+      );
+      const project = Object.freeze({
+        ...base,
+        progression: Object.freeze({ steps: Object.freeze([step]) }),
+      });
+      const projection = projectProjectToMusicXml(project);
+      const events = melodyNotes(projection);
+      expect(events.every((event) => event.type === type)).toBe(true);
+      expect(events.every((event) => event.timeModification?.normalType === normalType)).toBe(true);
+      expect(events[0]?.tupletMarks).toEqual(["start"]);
+      expect(events.at(-1)?.tupletMarks).toEqual(["stop"]);
+      expect(writeMusicXml(projection)).toContain(`<normal-type>${normalType}</normal-type>`);
+    }
+  });
+
+  it.each([
+    [3, 4, [3], 3],
+    [7, 8, [2, 2, 3], 3.5],
+  ] as const)(
+    "keeps %s/%s measure capacity exact with grouping %s",
+    (numerator, denominator, grouping, barLength) => {
+      const base = createDefaultProject(`meter-${numerator}-${denominator}`, "Meter Melody");
+      const step = melodyChordStep(
+        base,
+        "I",
+        "meter-melody",
+        { numerator: 5, denominator: 2 },
+        {
+          pattern: "up-down",
+          grid: "eighth",
+          octaveOffset: 0,
+        },
+      );
+      const project = Object.freeze({
+        ...base,
+        globalTiming: globalTiming(100, meter(numerator, denominator, grouping)),
+        progression: Object.freeze({ steps: Object.freeze([step]) }),
+      });
+      const projection = projectProjectToMusicXml(project);
+      expect(projection.attributes.time).toMatchObject({ numerator, denominator, grouping });
+      expect(projection.melody!.measures.length).toBeGreaterThan(0);
+      expect(
+        projection.melody!.measures.every(
+          (measure) =>
+            measure.capacityBeats.numerator / measure.capacityBeats.denominator === barLength &&
+            measure.events.reduce((sum, event) => sum + event.duration, 0) === measure.capacity,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("does not let notation depend on Melody mute/solo/volume or swing", () => {
+    const source = melodyProject();
+    const straightXml = writeMusicXml(projectProjectToMusicXml(source));
+    const variants = [
+      { muted: true, solo: false, volume: 100 },
+      { muted: false, solo: true, volume: 100 },
+      { muted: false, solo: false, volume: 7 },
+    ];
+    for (const track of variants) {
+      const variant = Object.freeze({
+        ...source,
+        melodyTrack: Object.freeze({ ...source.melodyTrack, ...track }),
+      });
+      expect(writeMusicXml(projectProjectToMusicXml(variant))).toBe(straightXml);
+    }
+    const swing = Object.freeze({ ...source, groove: groove("swing", 0.75) });
+    expect(writeMusicXml(projectProjectToMusicXml(swing))).toBe(straightXml);
+  });
+
+  it("is deterministic and deeply immutable without mutating the source Project", () => {
+    const project = melodyProject();
+    const before = structuredClone(project);
+    const first = projectProjectToMusicXml(project);
+    const second = projectProjectToMusicXml(project);
+    expect(second).toEqual(first);
+    expect(writeMusicXml(second)).toBe(writeMusicXml(first));
+    expect(structuredClone(project)).toEqual(before);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.melody)).toBe(true);
+    expect(Object.isFrozen(first.melody?.measures)).toBe(true);
+    expect(Object.isFrozen(first.melody?.measures[0])).toBe(true);
+    expect(Object.isFrozen(first.melody?.measures[0]?.events)).toBe(true);
+    expect(Object.isFrozen(first.melody?.measures[0]?.events[0])).toBe(true);
+  });
+
+  it("rejects malformed Melody projection data with a stable typed writer error", () => {
+    const projection = projectProjectToMusicXml(melodyProject());
+    const invalid = {
+      ...projection,
+      melody: {
+        ...projection.melody!,
+        measures: [
+          {
+            ...projection.melody!.measures[0]!,
+            capacity: projection.melody!.measures[0]!.capacity + 1,
+          },
+          ...projection.melody!.measures.slice(1),
+        ],
+      },
+    } as unknown as MusicXmlProjection;
+    expect(() => writeMusicXml(invalid)).toThrowError(MusicXmlWriterError);
+    expect(() => writeMusicXml(invalid)).toThrowError(/duration .* does not equal capacity/);
+
+    const malformed = melodyProject();
+    const malformedStep = malformed.progression.steps[0] as ChordStep;
+    const malformedProject = Object.freeze({
+      ...malformed,
+      progression: Object.freeze({
+        steps: Object.freeze([
+          Object.freeze({
+            ...malformedStep,
+            melody: { ...malformedStep.melody!, grid: "invalid" },
+          }),
+        ]),
+      }),
+    }) as unknown as Project;
+    expect(() => projectProjectToMusicXml(malformedProject)).toThrowError(MusicXmlExportError);
+  });
+
+  it("validates a fresh valid Melody fixture and rejects a deliberate invalid fixture offline", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "cadenceflow-t175-musicxml-"));
+    const validPath = join(directory, "fresh-melody.musicxml");
+    const invalidPath = join(directory, "invalid-melody.musicxml");
+    const validate = (path: string) =>
+      spawnSync(
+        process.execPath,
+        [resolve("node_modules/tsx/dist/cli.mjs"), resolve("scripts/validate-musicxml.ts"), path],
+        { encoding: "utf8", timeout: 20000 },
+      );
+    try {
+      const xml = writeMusicXml(projectProjectToMusicXml(melodyProject()));
+      await writeFile(validPath, xml, "utf8");
+      const valid = validate(validPath);
+      expect(valid.error).toBeUndefined();
+      expect(valid.status, valid.stderr).toBe(0);
+      await writeFile(
+        invalidPath,
+        xml.replace("<midi-channel>3</midi-channel>", "<midi-channel>17</midi-channel>"),
+        "utf8",
+      );
+      const invalid = validate(invalidPath);
+      expect(invalid.status).toBe(1);
+      expect(invalid.stderr).toContain("XSD validation failed");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30000);
 });

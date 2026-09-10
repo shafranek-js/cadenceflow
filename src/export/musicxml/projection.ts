@@ -16,6 +16,13 @@ import {
 import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import { modeForModule } from "../../domain/harmony/functions";
 import { exactPitch, type ExactPitch } from "../../domain/harmony/pitch";
+import { melodyGridDuration } from "../../domain/melody/patterns";
+import { realizeChordMelody } from "../../domain/melody/projection";
+import {
+  validateMelodyTrackSettings,
+  type MelodyGrid,
+  type MelodyInstrument,
+} from "../../domain/melody/types";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import type { ChordStep, ProgressionStep, RestStep } from "../../domain/progression/step";
 import type { Project } from "../../domain/project/project";
@@ -35,6 +42,7 @@ import { pianoProfile } from "../../instruments/piano/profile";
 export const MUSICXML_VERSION = "4.0";
 export const MUSICXML_PART_ID = "P1";
 export const MUSICXML_PART_NAME = "Piano";
+export const MUSICXML_MELODY_PART_ID = "P2";
 export const MUSICXML_MAX_DIVISIONS = 1_000_000;
 
 export class MusicXmlExportError extends Error {
@@ -112,6 +120,44 @@ export interface MusicXmlRestEvent {
 export type MusicXmlMeasureEvent =
   MusicXmlHarmonyEvent | MusicXmlDirectionEvent | MusicXmlNoteEvent | MusicXmlRestEvent;
 
+export interface MusicXmlMelodyTimeModification {
+  readonly actualNotes: 3;
+  readonly normalNotes: 2;
+  readonly normalType: "eighth" | "16th";
+}
+
+export interface MusicXmlMelodyNoteEvent {
+  readonly kind: "note";
+  readonly onsetBeats: Rational;
+  readonly stepIndex: number;
+  readonly stepId: string;
+  readonly durationBeats: Rational;
+  readonly duration: number;
+  readonly voice: "1";
+  readonly staff: 1;
+  readonly chord: false;
+  readonly sourceMidi: number;
+  readonly sourcePitchMidi: number;
+  readonly pitch: MusicXmlPitchSpelling & { readonly octave: number };
+  readonly type: "quarter" | "eighth" | "16th";
+  readonly ties: readonly ("start" | "stop")[];
+  readonly timeModification?: MusicXmlMelodyTimeModification;
+  readonly tupletMarks: readonly ("start" | "stop")[];
+}
+
+export interface MusicXmlMelodyRestEvent {
+  readonly kind: "rest";
+  readonly onsetBeats: Rational;
+  readonly stepIndex: number;
+  readonly stepId: string;
+  readonly durationBeats: Rational;
+  readonly duration: number;
+  readonly voice: "1";
+  readonly staff: 1;
+}
+
+export type MusicXmlMelodyMeasureEvent = MusicXmlMelodyNoteEvent | MusicXmlMelodyRestEvent;
+
 export interface MusicXmlMeasure {
   readonly number: number;
   readonly startBeats: Rational;
@@ -121,6 +167,28 @@ export interface MusicXmlMeasure {
   readonly events: readonly MusicXmlMeasureEvent[];
 }
 
+export interface MusicXmlMelodyMeasure {
+  readonly number: number;
+  readonly startBeats: Rational;
+  readonly capacityBeats: Rational;
+  readonly durationBeats: Rational;
+  readonly capacity: number;
+  readonly events: readonly MusicXmlMelodyMeasureEvent[];
+}
+
+export interface MusicXmlMelodyPart {
+  readonly id: typeof MUSICXML_MELODY_PART_ID;
+  readonly name: string;
+  readonly instrumentName: string;
+  readonly instrument: MelodyInstrument;
+  /** MusicXML uses one-based channels; channel 3 is the app's melody channel 2. */
+  readonly midiChannel: 3;
+  /** MusicXML uses one-based programs; this is the General MIDI program + 1. */
+  readonly midiProgram: number;
+  readonly clef: { readonly sign: "G" | "F"; readonly line: 2 | 4 };
+  readonly measures: readonly MusicXmlMelodyMeasure[];
+}
+
 export interface MusicXmlProjection {
   readonly version: typeof MUSICXML_VERSION;
   readonly title: string;
@@ -128,6 +196,7 @@ export interface MusicXmlProjection {
   readonly attributes: MusicXmlAttributes;
   readonly tempoBpm: number;
   readonly measures: readonly MusicXmlMeasure[];
+  readonly melody?: MusicXmlMelodyPart;
   readonly diagnostics: readonly MusicXmlDiagnostic[];
 }
 
@@ -139,6 +208,37 @@ interface MutableMeasure {
   readonly events: MusicXmlMeasureEvent[];
 }
 
+interface MutableMelodyMeasure {
+  readonly number: number;
+  readonly startBeats: Rational;
+  readonly capacityBeats: Rational;
+  durationBeats: Rational;
+  readonly events: MusicXmlMelodyMeasureEvent[];
+}
+
+interface MelodyRawEventBase {
+  readonly startBeats: Rational;
+  readonly endBeats: Rational;
+  readonly stepIndex: number;
+  readonly stepId: string;
+}
+
+interface MelodyRawNoteEvent extends MelodyRawEventBase {
+  readonly kind: "note";
+  readonly sourceMidi: number;
+  readonly sourcePitchMidi: number;
+  readonly pitch: MusicXmlPitchSpelling & { readonly octave: number };
+  readonly type: MusicXmlMelodyNoteEvent["type"];
+  readonly timeModification?: MusicXmlMelodyTimeModification;
+  readonly tupletMarks: readonly ("start" | "stop")[];
+}
+
+interface MelodyRawRestEvent extends MelodyRawEventBase {
+  readonly kind: "rest";
+}
+
+type MelodyRawEvent = MelodyRawNoteEvent | MelodyRawRestEvent;
+
 interface ProjectedChord {
   readonly chord: ReturnType<typeof realizeHarmonyChord>;
   readonly pitches: readonly { readonly pitch: ExactPitch; readonly role: "upper" | "bass" }[];
@@ -146,6 +246,60 @@ interface ProjectedChord {
   readonly dynamicLabel: "pp" | "p" | "mp" | "mf" | "f" | "ff";
   readonly sourceVelocity: number;
   readonly arpeggiate?: MusicXmlArticulation;
+}
+
+const MELODY_MUSICXML_METADATA: Readonly<
+  Record<MelodyInstrument, { readonly name: string; readonly program: number }>
+> = Object.freeze({
+  flute: Object.freeze({ name: "Flute", program: 73 }),
+  violin: Object.freeze({ name: "Violin", program: 40 }),
+  clarinet: Object.freeze({ name: "Clarinet", program: 71 }),
+  oboe: Object.freeze({ name: "Oboe", program: 68 }),
+  cello: Object.freeze({ name: "Cello", program: 42 }),
+  "synth-lead": Object.freeze({ name: "Synth Lead", program: 80 }),
+});
+
+function melodyNoteType(grid: MelodyGrid): MusicXmlMelodyNoteEvent["type"] {
+  switch (grid) {
+    case "quarter":
+      return "quarter";
+    case "eighth":
+    case "eighth-triplet":
+      return "eighth";
+    case "sixteenth":
+    case "sixteenth-triplet":
+      return "16th";
+    default:
+      throw new MusicXmlExportError(
+        "invalid-projection",
+        `Unsupported Melody grid: ${String(grid)}.`,
+      );
+  }
+}
+
+function melodyTimeModification(grid: MelodyGrid): MusicXmlMelodyTimeModification | undefined {
+  switch (grid) {
+    case "eighth-triplet":
+      return Object.freeze({ actualNotes: 3, normalNotes: 2, normalType: "eighth" });
+    case "sixteenth-triplet":
+      return Object.freeze({ actualNotes: 3, normalNotes: 2, normalType: "16th" });
+    default:
+      return undefined;
+  }
+}
+
+function melodyTupletMarks(
+  grid: MelodyGrid,
+  eventIndex: number,
+  eventCount: number,
+): readonly ("start" | "stop")[] {
+  if (!grid.endsWith("-triplet")) return Object.freeze([]);
+  const groupStart = Math.floor(eventIndex / 3) * 3;
+  const groupEnd = Math.min(groupStart + 2, eventCount - 1);
+  const marks: ("start" | "stop")[] = [];
+  if (eventIndex === groupStart) marks.push("start");
+  if (eventIndex === groupEnd) marks.push("stop");
+  return Object.freeze(marks);
 }
 
 function gcd(a: number, b: number): number {
@@ -215,6 +369,29 @@ function pitchWithSavedSpelling(
   const override =
     overrides?.[`${role}:${pitch.midiNumber}`] ?? overrides?.[String(pitch.midiNumber)];
   return override ? exactPitch(pitch.midiNumber, override) : pitch;
+}
+
+function musicXmlPitchForExactPitch(
+  pitch: ExactPitch,
+): MusicXmlPitchSpelling & { readonly octave: number } {
+  const spelling = mapPitchSpellingToMusicXml(pitch.spelling);
+  const naturalPitchClass: Record<MusicXmlPitchSpelling["step"], number> = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
+  };
+  const octaveNumerator = pitch.midiNumber - naturalPitchClass[spelling.step] - spelling.alter;
+  if (octaveNumerator % 12 !== 0) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      `Pitch spelling ${spelling.step}${spelling.alter} cannot represent MIDI ${pitch.midiNumber} exactly.`,
+    );
+  }
+  return Object.freeze({ ...spelling, octave: octaveNumerator / 12 - 1 });
 }
 
 function freezeProjectedPitches(
@@ -378,10 +555,7 @@ function addFragment(
       chord: role === "upper" ? upperPitchIndex++ > 0 : false,
       sourceMidi: pitch.midiNumber,
       role,
-      pitch: Object.freeze({
-        ...mapPitchSpellingToMusicXml(pitch.spelling),
-        octave: pitch.octave,
-      }),
+      pitch: musicXmlPitchForExactPitch(pitch),
       ties: Object.freeze([...ties]),
       // Piano arpeggiation affects upper voices; the independent bass stays on beat.
       ...(isFirstFragment && role === "upper" && projectedChord.arpeggiate
@@ -430,10 +604,243 @@ function freezeMeasure(measure: MutableMeasure, divisions: number): MusicXmlMeas
   });
 }
 
+function freezeMelodyMeasure(
+  measure: MutableMelodyMeasure,
+  divisions: number,
+): MusicXmlMelodyMeasure {
+  return Object.freeze({
+    number: measure.number,
+    startBeats: measure.startBeats,
+    capacityBeats: measure.capacityBeats,
+    durationBeats: measure.durationBeats,
+    capacity: durationUnits(measure.capacityBeats, divisions),
+    events: Object.freeze([...measure.events]),
+  });
+}
+
+function addMelodyRawEvent(
+  measures: readonly MutableMelodyMeasure[],
+  rawEvent: MelodyRawEvent,
+  divisions: number,
+  barLengthBeats: Rational,
+): void {
+  if (compareRational(rawEvent.endBeats, rawEvent.startBeats) <= 0) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      `Melody event ${rawEvent.stepId} must have a positive duration.`,
+    );
+  }
+
+  let cursor = rawEvent.startBeats;
+  while (compareRational(cursor, rawEvent.endBeats) < 0) {
+    const barIndex = floorRational(divideRationalSafe(cursor, barLengthBeats));
+    const measure = measures[barIndex];
+    if (!measure) {
+      throw new MusicXmlExportError(
+        "invalid-projection",
+        `Melody event ${rawEvent.stepId} falls outside the MusicXML measure layout.`,
+      );
+    }
+    const boundary = addRational(measure.startBeats, measure.capacityBeats);
+    const fragmentEnd =
+      compareRational(rawEvent.endBeats, boundary) <= 0 ? rawEvent.endBeats : boundary;
+    const durationBeats = subtractRational(fragmentEnd, cursor);
+    const isFirstFragment = compareRational(cursor, rawEvent.startBeats) === 0;
+    const isLastFragment = compareRational(fragmentEnd, rawEvent.endBeats) === 0;
+    const ties: ("start" | "stop")[] = [];
+    if (!isFirstFragment) ties.push("stop");
+    if (!isLastFragment) ties.push("start");
+    const onsetBeats = subtractRational(cursor, measure.startBeats);
+    const duration = durationUnits(durationBeats, divisions);
+
+    if (rawEvent.kind === "note") {
+      const tupletMarks: ("start" | "stop")[] = [];
+      if (isFirstFragment && rawEvent.tupletMarks.includes("start")) tupletMarks.push("start");
+      if (isLastFragment && rawEvent.tupletMarks.includes("stop")) tupletMarks.push("stop");
+      measure.events.push(
+        Object.freeze({
+          kind: "note",
+          onsetBeats,
+          stepIndex: rawEvent.stepIndex,
+          stepId: rawEvent.stepId,
+          durationBeats,
+          duration,
+          voice: "1",
+          staff: 1,
+          chord: false,
+          sourceMidi: rawEvent.sourceMidi,
+          sourcePitchMidi: rawEvent.sourcePitchMidi,
+          pitch: rawEvent.pitch,
+          type: rawEvent.type,
+          ties: Object.freeze(ties),
+          ...(rawEvent.timeModification ? { timeModification: rawEvent.timeModification } : {}),
+          tupletMarks: Object.freeze(tupletMarks),
+        } satisfies MusicXmlMelodyNoteEvent),
+      );
+    } else {
+      measure.events.push(
+        Object.freeze({
+          kind: "rest",
+          onsetBeats,
+          stepIndex: rawEvent.stepIndex,
+          stepId: rawEvent.stepId,
+          durationBeats,
+          duration,
+          voice: "1",
+          staff: 1,
+        } satisfies MusicXmlMelodyRestEvent),
+      );
+    }
+    measure.durationBeats = addRational(measure.durationBeats, durationBeats);
+    cursor = fragmentEnd;
+  }
+}
+
+function buildMelodyPart(
+  project: Project,
+  timeline: ReturnType<typeof createProgressionTimeline>,
+  projectedChords: ReadonlyMap<number, ProjectedChord>,
+  measureLayout: ReturnType<typeof createProgressionMeasureLayout>,
+  divisions: number,
+  barLengthBeats: Rational,
+): MusicXmlMelodyPart | undefined {
+  const hasAuthoredMelody = project.progression.steps.some(
+    (step) => step.kind === "chord" && step.melody !== undefined,
+  );
+  if (!hasAuthoredMelody) return undefined;
+
+  let melodyTrack;
+  try {
+    melodyTrack = validateMelodyTrackSettings(project.melodyTrack);
+  } catch (error) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      `Invalid Melody track settings: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  }
+
+  const rawEvents: MelodyRawEvent[] = [];
+  for (const entry of timeline.steps) {
+    if (entry.step.kind !== "chord" || !entry.step.melody) {
+      rawEvents.push(
+        Object.freeze({
+          kind: "rest",
+          startBeats: entry.startBeats,
+          endBeats: entry.endBeats,
+          stepIndex: entry.stepIndex,
+          stepId: entry.step.id,
+        }),
+      );
+      continue;
+    }
+
+    const projectedChord = projectedChords.get(entry.stepIndex);
+    if (!projectedChord) {
+      throw new MusicXmlExportError(
+        "invalid-projection",
+        `Missing contextual Piano realization for Melody step ${entry.step.id}.`,
+      );
+    }
+
+    try {
+      const phrase = realizeChordMelody({
+        sourceStepId: entry.step.id,
+        upperPitches: projectedChord.pitches
+          .filter((item) => item.role === "upper")
+          .map((item) => item.pitch),
+        durationBeats: entry.durationBeats,
+        recipe: entry.step.melody,
+      });
+      const type = melodyNoteType(entry.step.melody.grid);
+      const timeModification = melodyTimeModification(entry.step.melody.grid);
+      phrase.events.forEach((event) => {
+        const startBeats = addRational(entry.startBeats, event.startOffsetBeats);
+        rawEvents.push(
+          Object.freeze({
+            kind: "note",
+            startBeats,
+            endBeats: addRational(startBeats, event.durationBeats),
+            stepIndex: entry.stepIndex,
+            stepId: entry.step.id,
+            sourceMidi: event.pitch.midiNumber,
+            sourcePitchMidi: event.sourcePitchMidi,
+            pitch: musicXmlPitchForExactPitch(event.pitch),
+            type,
+            ...(timeModification ? { timeModification } : {}),
+            tupletMarks: melodyTupletMarks(
+              entry.step.melody.grid,
+              event.index,
+              phrase.events.length,
+            ),
+          }),
+        );
+      });
+    } catch (error) {
+      if (error instanceof MusicXmlExportError) throw error;
+      throw new MusicXmlExportError(
+        "invalid-projection",
+        `Invalid Melody recipe on step ${entry.step.id}: ${error instanceof Error ? error.message : String(error)}.`,
+      );
+    }
+  }
+
+  if (compareRational(measureLayout.trailingSilenceBeats, ZERO) > 0) {
+    rawEvents.push(
+      Object.freeze({
+        kind: "rest",
+        startBeats: measureLayout.authoredDurationBeats,
+        endBeats: measureLayout.playbackDurationBeats,
+        stepIndex: project.progression.steps.length,
+        stepId: "__trailing-measure-gap__",
+      }),
+    );
+  }
+
+  const measures: MutableMelodyMeasure[] = measureLayout.measures.map((measure) => ({
+    number: measure.number,
+    startBeats: measure.startBeats,
+    capacityBeats: measure.capacityBeats,
+    durationBeats: ZERO,
+    events: [],
+  }));
+  for (const rawEvent of rawEvents) {
+    addMelodyRawEvent(measures, rawEvent, divisions, barLengthBeats);
+  }
+
+  const metadata = MELODY_MUSICXML_METADATA[melodyTrack.instrument];
+  if (!metadata) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      `Unsupported Melody instrument: ${String(melodyTrack.instrument)}.`,
+    );
+  }
+  return Object.freeze({
+    id: MUSICXML_MELODY_PART_ID,
+    name: metadata.name,
+    instrumentName: metadata.name,
+    instrument: melodyTrack.instrument,
+    midiChannel: 3,
+    midiProgram: metadata.program + 1,
+    clef: melodyTrack.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 },
+    measures: Object.freeze(measures.map((measure) => freezeMelodyMeasure(measure, divisions))),
+  });
+}
+
 function calculateDivisions(project: Project, barLengthBeats: Rational): number {
   let divisions = 1;
   for (const step of project.progression.steps) {
     divisions = lcmOrThrow(divisions, step.duration.beats.denominator);
+    if (step.kind === "chord" && step.melody) {
+      try {
+        divisions = lcmOrThrow(divisions, melodyGridDuration(step.melody.grid).denominator);
+      } catch (error) {
+        if (error instanceof MusicXmlExportError) throw error;
+        throw new MusicXmlExportError(
+          "invalid-projection",
+          `Invalid Melody recipe on step ${step.id}: ${error instanceof Error ? error.message : String(error)}.`,
+        );
+      }
+    }
   }
   divisions = lcmOrThrow(divisions, barLengthBeats.denominator);
   return divisions;
@@ -592,6 +999,14 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
     .map(([, measure]) => freezeMeasure(measure, divisions));
 
   const key = mapTonicToMusicXmlKey(project.tonic, modeForModule(project.activeModule));
+  const melodyPart = buildMelodyPart(
+    project,
+    timeline,
+    projectedChords,
+    measureLayout,
+    divisions,
+    barLengthBeats,
+  );
   const projection: MusicXmlProjection = Object.freeze({
     version: MUSICXML_VERSION,
     title: project.name,
@@ -613,6 +1028,7 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
     }),
     tempoBpm: project.globalTiming.tempoBpm,
     measures: Object.freeze(measureList),
+    ...(melodyPart ? { melody: melodyPart } : {}),
     diagnostics: Object.freeze(diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
   });
   return projection;

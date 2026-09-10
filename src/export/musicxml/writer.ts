@@ -1,11 +1,15 @@
 import type {
   MusicXmlDirectionEvent,
   MusicXmlHarmonyEvent,
+  MusicXmlMelodyMeasureEvent,
+  MusicXmlMelodyNoteEvent,
+  MusicXmlMelodyPart,
   MusicXmlMeasureEvent,
   MusicXmlNoteEvent,
   MusicXmlProjection,
   MusicXmlRestEvent,
 } from "./projection";
+import type { MelodyInstrument } from "../../domain/melody/types";
 
 export class MusicXmlWriterError extends Error {
   readonly code = "invalid-projection" as const;
@@ -78,6 +82,125 @@ function validateRest(event: MusicXmlRestEvent): void {
   }
 }
 
+function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
+  assertInteger(event.duration, `duration for ${event.stepId}`, 1);
+  assertInteger(event.sourceMidi, `source MIDI for ${event.stepId}`, 0);
+  assertInteger(event.sourcePitchMidi, `source pitch MIDI for ${event.stepId}`, 0);
+  if (event.sourceMidi > 127 || event.sourcePitchMidi > 127) {
+    throw new MusicXmlWriterError(`source MIDI for ${event.stepId} must be <= 127.`);
+  }
+  if (!Number.isSafeInteger(event.pitch.octave) || !Number.isSafeInteger(event.pitch.alter)) {
+    throw new MusicXmlWriterError(`pitch for ${event.stepId} must contain safe integer values.`);
+  }
+  if (event.voice !== "1" || event.staff !== 1 || event.chord !== false) {
+    throw new MusicXmlWriterError(
+      `Melody note ${event.stepId} must use voice 1, staff 1, and no chord.`,
+    );
+  }
+  if (!["quarter", "eighth", "16th"].includes(event.type)) {
+    throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid written type.`);
+  }
+  for (const tie of event.ties) {
+    if (tie !== "start" && tie !== "stop") {
+      throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid tie.`);
+    }
+  }
+  for (const mark of event.tupletMarks) {
+    if (mark !== "start" && mark !== "stop") {
+      throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid tuplet mark.`);
+    }
+  }
+  if (event.timeModification) {
+    if (
+      event.timeModification.actualNotes !== 3 ||
+      event.timeModification.normalNotes !== 2 ||
+      !["eighth", "16th"].includes(event.timeModification.normalType)
+    ) {
+      throw new MusicXmlWriterError(
+        `Melody note ${event.stepId} has an invalid time modification.`,
+      );
+    }
+  }
+}
+
+function validateMelodyRest(event: MusicXmlMelodyMeasureEvent & { readonly kind: "rest" }): void {
+  assertInteger(event.duration, `duration for ${event.stepId}`, 1);
+  if (event.voice !== "1" || event.staff !== 1) {
+    throw new MusicXmlWriterError(`Melody rest ${event.stepId} must use voice 1 and staff 1.`);
+  }
+}
+
+function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelodyPart): void {
+  if (
+    !melody ||
+    typeof melody !== "object" ||
+    melody.id !== "P2" ||
+    !melody.name ||
+    melody.instrumentName !== melody.name
+  ) {
+    throw new MusicXmlWriterError(
+      "MusicXML Melody part must be the deterministic P2 instrument part.",
+    );
+  }
+  const metadata: Readonly<
+    Record<MelodyInstrument, { readonly name: string; readonly program: number }>
+  > = {
+    flute: { name: "Flute", program: 73 },
+    violin: { name: "Violin", program: 40 },
+    clarinet: { name: "Clarinet", program: 71 },
+    oboe: { name: "Oboe", program: 68 },
+    cello: { name: "Cello", program: 42 },
+    "synth-lead": { name: "Synth Lead", program: 80 },
+  };
+  const instrument = metadata[melody.instrument];
+  if (
+    !instrument ||
+    melody.name !== instrument.name ||
+    melody.instrumentName !== instrument.name ||
+    melody.midiProgram !== instrument.program + 1
+  ) {
+    throw new MusicXmlWriterError("MusicXML Melody instrument metadata is not deterministic.");
+  }
+  if (melody.midiChannel !== 3) {
+    throw new MusicXmlWriterError("MusicXML Melody must use one-based MIDI channel 3.");
+  }
+  assertInteger(melody.midiProgram, "Melody MIDI program", 1);
+  if (melody.midiProgram > 128) {
+    throw new MusicXmlWriterError("Melody MIDI program must be <= 128.");
+  }
+  const expectedClef =
+    melody.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
+  if (melody.clef.sign !== expectedClef.sign || melody.clef.line !== expectedClef.line) {
+    throw new MusicXmlWriterError("Melody clef does not match its instrument.");
+  }
+  if (
+    !Array.isArray(melody.measures) ||
+    melody.measures.length !== projection.measures.length ||
+    melody.measures.length === 0
+  ) {
+    throw new MusicXmlWriterError("MusicXML Melody must have one measure for every Piano measure.");
+  }
+  melody.measures.forEach((measure, index) => {
+    if (measure.number !== index + 1) {
+      throw new MusicXmlWriterError(
+        "MusicXML Melody measures must be numbered consecutively from 1.",
+      );
+    }
+    assertInteger(measure.capacity, `Melody capacity for measure ${measure.number}`, 1);
+    let duration = 0;
+    measure.events.forEach((event) => {
+      if (event.kind === "note") validateMelodyNote(event);
+      if (event.kind === "rest") validateMelodyRest(event);
+      duration += event.duration;
+    });
+    if (duration !== measure.capacity) {
+      throw new MusicXmlWriterError(
+        `Melody measure ${measure.number} duration ${duration} does not equal capacity ${measure.capacity}.`,
+      );
+    }
+  });
+}
+
 function validateProjection(projection: MusicXmlProjection): void {
   if (projection.version !== "4.0") {
     throw new MusicXmlWriterError("MusicXML projection version must be 4.0.");
@@ -105,6 +228,7 @@ function validateProjection(projection: MusicXmlProjection): void {
       if (event.kind === "rest") validateRest(event);
     });
   });
+  if (projection.melody) validateMelodyPart(projection, projection.melody);
 }
 
 function writeAttributes(projection: MusicXmlProjection, level: number): string[] {
@@ -224,6 +348,127 @@ function writeNote(event: MusicXmlNoteEvent, level: number): string[] {
   return lines;
 }
 
+function writeMelodyTies(event: MusicXmlMelodyNoteEvent, level: number): string[] {
+  return event.ties.map((tie) => selfClosingElement("tie", level, xmlAttribute("type", tie)));
+}
+
+function writeMelodyNotations(event: MusicXmlMelodyNoteEvent, level: number): string[] {
+  if (event.ties.length === 0 && event.tupletMarks.length === 0) return [];
+  const lines = [emptyElement("notations", level)];
+  for (const tie of event.ties) {
+    lines.push(selfClosingElement("tied", level + 1, xmlAttribute("type", tie)));
+  }
+  for (const mark of event.tupletMarks) {
+    lines.push(
+      selfClosingElement(
+        "tuplet",
+        level + 1,
+        `${xmlAttribute("type", mark)}${xmlAttribute("number", 1)}`,
+      ),
+    );
+  }
+  lines.push(closeElement("notations", level));
+  return lines;
+}
+
+function writeMelodyNote(event: MusicXmlMelodyNoteEvent, level: number): string[] {
+  const lines = [emptyElement("note", level)];
+  lines.push(emptyElement("pitch", level + 1));
+  lines.push(element("step", event.pitch.step, level + 2));
+  if (event.pitch.alter !== 0) lines.push(element("alter", event.pitch.alter, level + 2));
+  lines.push(element("octave", event.pitch.octave, level + 2));
+  lines.push(closeElement("pitch", level + 1));
+  lines.push(element("duration", event.duration, level + 1));
+  lines.push(...writeMelodyTies(event, level + 1));
+  lines.push(element("voice", event.voice, level + 1));
+  lines.push(element("type", event.type, level + 1));
+  if (event.timeModification) {
+    lines.push(emptyElement("time-modification", level + 1));
+    lines.push(element("actual-notes", event.timeModification.actualNotes, level + 2));
+    lines.push(element("normal-notes", event.timeModification.normalNotes, level + 2));
+    lines.push(element("normal-type", event.timeModification.normalType, level + 2));
+    lines.push(closeElement("time-modification", level + 1));
+  }
+  lines.push(element("staff", event.staff, level + 1));
+  lines.push(...writeMelodyNotations(event, level + 1));
+  lines.push(closeElement("note", level));
+  return lines;
+}
+
+function writeMelodyRest(
+  event: MusicXmlMelodyMeasureEvent & { readonly kind: "rest" },
+  level: number,
+): string[] {
+  const lines = [emptyElement("note", level)];
+  lines.push(selfClosingElement("rest", level + 1));
+  lines.push(element("duration", event.duration, level + 1));
+  lines.push(element("voice", event.voice, level + 1));
+  lines.push(element("staff", event.staff, level + 1));
+  lines.push(closeElement("note", level));
+  return lines;
+}
+
+function writeMelodyAttributes(
+  projection: MusicXmlProjection,
+  melody: MusicXmlMelodyPart,
+  level: number,
+): string[] {
+  const attributes = projection.attributes;
+  const lines = [emptyElement("attributes", level)];
+  lines.push(element("divisions", attributes.divisions, level + 1));
+  lines.push(emptyElement("key", level + 1));
+  lines.push(element("fifths", attributes.key.fifths, level + 2));
+  lines.push(element("mode", attributes.key.mode, level + 2));
+  lines.push(closeElement("key", level + 1));
+  lines.push(emptyElement("time", level + 1));
+  lines.push(element("beats", attributes.time.beats, level + 2));
+  lines.push(element("beat-type", attributes.time.denominator, level + 2));
+  lines.push(closeElement("time", level + 1));
+  lines.push(emptyElement("clef", level + 1));
+  lines.push(element("sign", melody.clef.sign, level + 2));
+  lines.push(element("line", melody.clef.line, level + 2));
+  lines.push(closeElement("clef", level + 1));
+  lines.push(closeElement("attributes", level));
+  return lines;
+}
+
+function writeMelodyPart(
+  projection: MusicXmlProjection,
+  melody: MusicXmlMelodyPart,
+  level: number,
+): string[] {
+  const lines = [emptyElement("part", level, xmlAttribute("id", melody.id))];
+  melody.measures.forEach((measure, index) => {
+    lines.push(`${"  ".repeat(level + 1)}<measure${xmlAttribute("number", measure.number)}>`);
+    if (index === 0) lines.push(...writeMelodyAttributes(projection, melody, level + 2));
+    for (const event of measure.events) {
+      lines.push(
+        ...(event.kind === "note"
+          ? writeMelodyNote(event, level + 2)
+          : writeMelodyRest(event, level + 2)),
+      );
+    }
+    lines.push(`${"  ".repeat(level + 1)}</measure>`);
+  });
+  lines.push(closeElement("part", level));
+  return lines;
+}
+
+function writeMelodyScorePart(melody: MusicXmlMelodyPart, level: number): string[] {
+  const instrumentId = `${melody.id}-I1`;
+  const lines = [emptyElement("score-part", level, xmlAttribute("id", melody.id))];
+  lines.push(element("part-name", melody.name, level + 1));
+  lines.push(emptyElement("score-instrument", level + 1, xmlAttribute("id", instrumentId)));
+  lines.push(element("instrument-name", melody.instrumentName, level + 2));
+  lines.push(closeElement("score-instrument", level + 1));
+  lines.push(emptyElement("midi-instrument", level + 1, xmlAttribute("id", instrumentId)));
+  lines.push(element("midi-channel", melody.midiChannel, level + 2));
+  lines.push(element("midi-program", melody.midiProgram, level + 2));
+  lines.push(closeElement("midi-instrument", level + 1));
+  lines.push(closeElement("score-part", level));
+  return lines;
+}
+
 function writeRest(event: MusicXmlRestEvent, level: number): string[] {
   const lines = [emptyElement("note", level)];
   lines.push(selfClosingElement("rest", level + 1));
@@ -282,10 +527,12 @@ export function writeMusicXml(projection: MusicXmlProjection): string {
     element("work-title", projection.title, 2),
     "  </work>",
     "  <part-list>",
+    ...(projection.melody ? writeMelodyScorePart(projection.melody, 2) : []),
     '    <score-part id="P1">',
     element("part-name", projection.part.name, 3),
     "    </score-part>",
     "  </part-list>",
+    ...(projection.melody ? writeMelodyPart(projection, projection.melody, 1) : []),
     '  <part id="P1">',
   ];
 
