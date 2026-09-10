@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-08
-**Current implementation stage:** Phase 15 / User Story 11 measure-card composition layout implemented and verified; Phase 13 Batch B and Phase 14 tasks remain separately tracked; the external interoperability gate remains open
-**Task progress:** 150 accepted tasks, 150 / 165 total tasks
+**Handoff date:** 2026-09-10
+**Current implementation stage:** Phase 16 / User Story 12 Batch A contracts and deterministic melody projection accepted; T168–T169 are the next controlled batch
+**Task progress:** 152 accepted tasks, 152 / 176 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** has contracts and its pure deterministic generator accepted through **T166–T167**; Project schema/persistence and commands begin in T168–T169. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -24,9 +24,9 @@ Use the following precedence when requirements appear ambiguous:
 
 Current spec verification:
 
-- 1077 lines.
-- FR-001 through FR-182: 182 unique functional requirements.
-- SC-001 through SC-017: 17 unique success criteria.
+- 1217 physical lines / 1084 non-empty lines.
+- FR-001 through FR-207: 207 unique functional requirements.
+- SC-001 through SC-018: 18 unique success criteria.
 - No `TODO`, `TBD`, or `NEEDS CLARIFICATION` placeholders.
 
 ## 3. Completed work
@@ -579,33 +579,16 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 13 / US10 — Batch B T142, T145–T148
+## 8. Next development sequence: Phase 16 / US12 — Batch B T168–T169
 
-Active milestone is **Phase 13: User Story 10 — Work in one focused wide desktop studio (Priority: P2)**. Batch A responsive shell is accepted through T141/T143/T144. The next controlled scope is Batch B T142 and T145–T148; T149 remains explicitly deferred, and SC-013/SC-014 external interoperability remains open:
+T166–T167 are accepted after independent review and correction. The next controlled scope adds the
+recipe/settings to Project schema v2 and introduces the undoable commands that own all subsequent UI
+changes. UI, Staff, SoundFont, playback, MIDI, and MusicXML remain deferred to T170+.
 
-- **T119**: [x] Write project schema round-trip and unsupported-future-version tests in `tests/unit/persistence/portable-project.test.ts`.
-- **T120**: [x] Write Dexie autosave/recovery tests including active temporary branch in `tests/integration/autosave-recovery.test.ts`.
-- **T121**: [x] Implement Dexie database schema and project records in `src/persistence/db.ts`.
-- **T122**: [x] Implement named-project repository list/load/save/delete in `src/persistence/projectRepository.ts`.
-- **T123**: [x] Implement debounced/transactional autosave excluding Undo/Redo and audio runtime state in `src/persistence/autosave.ts`.
-- **T124**: [x] Implement `.cadenceflow` JSON codec with JSON Schema validation in `src/persistence/portableProject.ts`.
-- **T125**: [x] Implement pure schema-version migration chain and explicit future-version rejection in `src/domain/project/migrations.ts`.
-- **T126**: [x] Implement new/open/rename/delete project UX and last-session recovery in `src/ui/projects/ProjectManager.tsx`.
-- **T127**: [x] Implement Save Project As / Export Project / Open Project file interactions in `src/ui/projects/PortableProjectActions.tsx`.
-- **T128**: [x] Ensure project load/import clears session Undo/Redo history in `src/app/history/history.ts` and `src/app/commands/projectCommands.ts`.
-- **T129**: [x] Write Playwright acceptance for autosave restart recovery and portable project round-trip in `tests/e2e/us8-project-actions.spec.ts`.
-- **T130**: [x] Write MIDI event-projection golden tests for order, exact pitches, rests, timing, velocity, and per-note overrides in `tests/unit/export/midi.test.ts`.
-- **T131**: [x] Write MusicXML semantic golden tests for spelling, harmony, durations, key/mode, meter, tempo, dynamics, rests, and unsupported-semantic mapping behavior in `tests/unit/export/musicxml.test.ts`.
-- **T132**: [x] Implement direct semantic/performance-to-MIDI event projection in `src/export/midi/eventProjection.ts`.
-- **T133**: [x] Implement deterministic Standard MIDI File writer in `src/export/midi/writer.ts`.
-- **T134–T137**: [x] Implement MusicXML semantic projection, explicit mapping policy, MusicXML 4.0 writer, and offline XSD validation.
-- **T138–T140**: [x] Implement export UI, cross-projection integration acceptance, and browser export acceptance.
-- **T141**: [x] Write Playwright viewport tests for 1280×720 and 1920×1080 with no page-level horizontal scroll.
-- **T142**: [ ] Write keyboard/accessibility tests for chord cards, `+`, settings/reset, Card Views, reorder, module controls, and transport.
-- **T143**: [x] Implement the full-width Studio shell composing Matrix, Inspector, My Progression, and Transport.
-- **T144**: [x] Implement desktop layout/responsive CSS for the supported viewport range.
-- **T145–T148**: [ ] Implement themes, expertise mode, keyboard/focus management, and non-color semantic state signals.
-- **T149**: [ ] Write the final end-to-end Studio journey; deferred from this batch.
+- **T168**: [ ] Add Project schema v2 melody recipe/track-settings types, pure v1 migration, JSON Schema,
+  autosave/repository compatibility, and portable round-trip coverage without serializing generated notes.
+- **T169**: [ ] Add undoable create/edit/remove recipe and Melody Track setting commands, including the
+  accepted Repeat/Extend/delete/reorder behavior and selection restoration.
 
 ## 9. Handoff operating model
 

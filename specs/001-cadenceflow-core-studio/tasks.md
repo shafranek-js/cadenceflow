@@ -404,11 +404,11 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
 
 ### Contracts and pure generator
 
-- [ ] T166 [US12] Add the User Story 12, FR-191–FR-207, SC-018, acceptance scenarios, entities, Scope
+- [x] T166 [US12] Add the User Story 12, FR-191–FR-207, SC-018, acceptance scenarios, entities, Scope
   Boundaries, Slice 11, dependencies, and Phase 16 contracts to
   `specs/001-cadenceflow-core-studio/spec.md`, `plan.md`, and `tasks.md` without changing existing task
   checkboxes or implemented Project/schema code.
-- [ ] T167 [US12] Add immutable pure melody types, six pattern orderings, five exact Rational grids,
+- [x] T167 [US12] Add immutable pure melody types, six pattern orderings, five exact Rational grids,
   octave-offset/MIDI validation, and deterministic Chord Step projection in
   `src/domain/melody/types.ts`, `src/domain/melody/patterns.ts`, `src/domain/melody/projection.ts`, with
   focused coverage in `tests/unit/melody/projection.test.ts`.
