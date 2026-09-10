@@ -392,6 +392,49 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 ---
 
+## Phase 16: User Story 12 - Create a linked melody from chord context (Priority: P2)
+
+**Goal**: A Chord Step can own one recipe-derived Melody Track phrase whose pitches come only from its
+contextual upper voicing, with deterministic exact-time generation and later persistence/UI/audio/export
+integration.
+
+**Independent Test**: Generate a linked phrase from a canonical upper voicing, verify all six pattern orders,
+all five Rational grids, octave/error/immutability behavior, then hand off the reviewed generator to the
+schema, UI, audio, playback, and export tasks without changing existing Project semantics.
+
+### Contracts and pure generator
+
+- [ ] T166 [US12] Add the User Story 12, FR-191–FR-207, acceptance scenarios, Scope Boundaries, Slice 11,
+  and Phase 16 contracts to `specs/001-cadenceflow-core-studio/spec.md`, `plan.md`, and `tasks.md` without
+  changing existing task checkboxes or Project/schema contracts.
+- [ ] T167 [US12] Add immutable pure melody types, six pattern orderings, five exact Rational grids,
+  octave-offset/MIDI validation, and deterministic Chord Step projection in
+  `src/domain/melody/types.ts`, `src/domain/melody/patterns.ts`, `src/domain/melody/projection.ts`, with
+  focused coverage in `tests/unit/melody/projection.test.ts`.
+
+### Integration after generator review
+
+- [ ] T168 [US12] Add Project schema v2 melody recipe/track-settings types, v1 migration, JSON Schema, and
+  portable persistence round-trip coverage without serializing generated notes.
+- [ ] T169 [US12] Add undoable melody create/edit/remove and track-setting commands, including
+  Repeat/Extend/delete/reorder linkage behavior.
+- [ ] T170 [US12] Add accessible Chord Step context menu, compact melody editor/preview, and Melody Track
+  Instrument/Mute/Solo/Volume controls with keyboard/focus lifecycle coverage.
+- [ ] T171 [US12] Add Melody Staff projection/rendering, clef/instrument mapping, rests/tuplets,
+  cross-bar ties, and active-note highlighting without changing Piano staff semantics.
+- [ ] T172 [US12] Add the licensed FluidR3Mono preparation/provenance path and lazy SoundFont provider
+  integration with offline loading and explicit failure/Retry fallback.
+- [ ] T173 [US12] Route Melody playback through a separate provider/channel role with exact velocity,
+  Mute/Solo/Volume behavior, current-note highlighting, and piano-continuation fallback.
+- [ ] T174 [US12] Add the deterministic Melody track to MIDI format-1 export while preserving byte-for-byte
+  output for projects without melody.
+- [ ] T175 [US12] Add the deterministic Melody MusicXML part with instrument, clef, rests, tuplets, and
+  cross-bar ties while preserving no-melody output compatibility and XSD validation.
+- [ ] T176 [US12] Run final US12 integration and Chromium acceptance at supported desktop sizes, then after
+  independent review update project status and accept the reviewed Phase 16 tasks.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

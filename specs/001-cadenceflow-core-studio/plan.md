@@ -132,6 +132,10 @@ src/
 │   │   ├── duration.ts
 │   │   ├── swing.ts
 │   │   └── timeline.ts
+│   ├── melody/
+│   │   ├── types.ts
+│   │   ├── patterns.ts
+│   │   └── projection.ts
 │   └── project/
 │       ├── project.ts
 │       ├── defaults.ts
@@ -357,6 +361,26 @@ Deliver:
 Exit gate:
 - four-beat and additive-meter measure fixtures, gap actions, playback boundary behavior, and both
   export projections pass deterministic unit/integration tests and desktop Chromium acceptance.
+
+### Slice 11 — User Story 12: recipe-derived melody from Chord Steps
+
+Deliver:
+- US12 product contracts for one linked Melody Track without expanding scope to a piano roll, multiple
+  Melody Tracks, arbitrary external SoundFonts, or rendered-audio export;
+- pure framework-independent melody types, six deterministic pitch-order patterns, five exact Rational
+  grids, octave-offset validation, and immutable source-step-linked projection;
+- Project schema v2, v1 migration, portable persistence, and recipe-only storage;
+- undoable create/edit/remove and Repeat/Extend/delete/reorder semantics for linked melody recipes;
+- accessible Chord Step context menu, compact editor, preview, Melody Track controls, Melody Staff, and
+  active-note highlighting;
+- a licensed lazy FluidR3Mono provider path with graceful failure fallback;
+- independent playback, MIDI, and MusicXML melody projections while preserving no-melody output
+  compatibility.
+
+Exit gate:
+- deterministic unit coverage proves every pattern/grid/timing/offset/error/immutability contract before
+  schema, UI, audio, playback, or export integration proceeds; the complete US12 acceptance follows in
+  Phase 16 after review of the generator.
 
 ## Performance and Audio Strategy
 

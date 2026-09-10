@@ -399,6 +399,50 @@ unrelated screens.
 user can access progression, Inspector, piano visualization, playback, project controls, and theme/
 expertise controls without page-level horizontal scrolling.
 
+---
+
+### User Story 12 - Create a linked melody from chord context (Priority: P2)
+
+As a composer, I want to generate a concise melodic phrase from a selected Chord Step so that I can
+quickly add a connected melodic idea without manually entering a piano-roll sequence or losing the
+harmonic relationship.
+
+**Independent Test**: Given a progression containing a Chord Step with a contextual upper voicing, the
+user can create a recipe-derived Melody Track phrase, edit or remove its recipe, and verify deterministic
+pitch order, exact timing, source-step linkage, staff presentation, and playback/export projections.
+
+**Acceptance Scenarios**:
+
+1. **Given** a Chord Step or any of its measure-card fragments is selected, **When** the user opens its
+   context menu, **Then** CadenceFlow offers `Create Melody…` when no recipe exists and `Edit Melody…`
+   plus `Remove Melody` when one does.
+2. **Given** the melody editor, **When** the user applies a Pattern, Grid, Octave, and Instrument,
+   **Then** the recipe is attached to that independent Chord Step and the operation is undoable as one
+   semantic edit.
+3. **Given** an attached recipe, **When** CadenceFlow realizes the phrase, **Then** it uses only the
+   canonical contextual upper voicing of the source Chord Step, never its independent bass voice, and
+   stores the recipe rather than a list of generated notes.
+4. **Given** any supported Pattern and Grid, **When** the phrase is projected, **Then** the pattern
+   order is deterministic, repeats from the beginning for that Chord Step, uses exact Rational offsets,
+   and truncates the final event exactly to the remaining step duration.
+5. **Given** a source Chord Step whose harmony, voicing, register, or duration changes, **When** the
+   linked phrase is read or projected, **Then** its pitches and timing are rebuilt from the current
+   source realization without stale generated-note state; Repeat copies the recipe independently,
+   Extend preserves it, and delete/reorder preserve source-step identity semantics.
+6. **Given** duplicate MIDI pitches, octave doublings, a single upper pitch, an empty pitch list, or an
+   octave offset outside MIDI range, **When** the pure generator is called, **Then** valid inputs retain
+   duplicates/single-pitch cycles and invalid inputs return typed domain validation errors without
+   clamping or mutating inputs.
+7. **Given** at least one Melody recipe in the project, **When** Staff View renders, **Then** a separate
+   Melody staff uses the selected instrument's supported clef, concert pitch, exact rests/tuplets, and
+   cross-bar ties while the existing Piano staff and bass visibility semantics remain unchanged.
+8. **Given** Melody Track settings, **When** the user changes Mute, Solo, or Volume, **Then** the
+   settings apply to playback as specified, Mute and Solo are mutually exclusive, and exports retain
+   melody data regardless of playback-only mute/solo/volume settings.
+9. **Given** Melody playback or export, **When** the preferred SoundFont is unavailable or a supported
+   projection is requested, **Then** piano playback continues with an explicit melody fallback state,
+   while MIDI and MusicXML remain available and contain the deterministic melody projection.
+
 ## Edge Cases
 
 - A requested harmonic recommendation has fewer than three strong Alternatives.
@@ -418,6 +462,10 @@ expertise controls without page-level horizontal scrolling.
 - Autosave occurs while a temporary branch is active.
 - Undo is requested immediately after a branch commit, key/mode change, preset insertion, or meter
   transformation.
+- A melody recipe is projected from contextual upper voicing containing duplicate MIDI pitches or octave
+  doublings, including a one-pitch source.
+- A melody grid does not divide the source Chord Step duration exactly, or the source duration is shorter
+  than one grid interval.
 
 ## Requirements *(mandatory)*
 
@@ -906,6 +954,62 @@ expertise controls without page-level horizontal scrolling.
 - **FR-190**: The derived measure layout, gap actions, and all measure-level controls MUST preserve exact
   Rational timing, Step independence, Undo/Redo behavior, keyboard access, and source-project immutability.
 
+### Melody generation from Chord Steps
+
+- **FR-191**: CadenceFlow MUST allow a user to attach one linked melody recipe to an individual Chord
+  Step and MUST expose Create, Edit, and Remove Melody actions without changing the Chord Step's
+  harmonic identity.
+- **FR-192**: A Chord Melody Recipe MUST contain exactly the supported Pattern (`up`, `down`, `up-down`,
+  `down-up`, `outside-in`, or `inside-out`), Grid (`quarter`, `eighth`, `sixteenth`,
+  `eighth-triplet`, or `sixteenth-triplet`), and Octave Offset from -2 through +2; instrument and
+  Melody Track settings are separate concerns.
+- **FR-193**: Melody generation MUST consume the canonical contextual upper voicing already realized for
+  the source Chord Step. It MUST NOT consume or infer from the independent bass voice, reimplement
+  harmony, or import a piano profile into the pure melody domain.
+- **FR-194**: The persisted Chord Step MUST store the melody recipe and MUST NOT store a generated list of
+  melody notes. Melody pitches and timing MUST be recomputed from the current source voicing and exact
+  Chord Step duration.
+- **FR-195**: The pure melody projection MUST sort source upper pitches by MIDI number without mutating
+  the input, preserve exact duplicate MIDI pitches and octave doublings, and produce deterministic
+  source-step-linked events with sequential indexes and exact Rational offsets/durations.
+- **FR-196**: Pattern traversal MUST implement full ascending/descending passes, endpoint-nonrepeating
+  Up-Down/Down-Up passes, alternating Outside-In traversal, and center-outward Inside-Out traversal;
+  each Chord Step MUST restart its pattern cycle from the first event.
+- **FR-197**: Grid durations MUST be exactly 1, 1/2, 1/4, 1/3, and 1/6 quarter-note beats for the
+  supported grids. The final event MUST be truncated exactly to the remaining duration, including when
+  the source duration is shorter than one grid interval; musical time MUST NOT use floating point.
+- **FR-198**: Octave Offset MUST shift MIDI number and ExactPitch octave by twelve semitones per offset
+  while retaining note letter and accidental spelling. Any result outside MIDI 0..127 MUST fail with a
+  typed domain validation error and MUST NOT clamp.
+- **FR-199**: Empty upper-pitch input and non-positive source duration MUST fail with a typed domain
+  validation error. The source Step ID, recipe, pitch input, and duration input MUST remain unchanged.
+- **FR-200**: Repeat MUST copy a melody recipe into an independent new Step, Extend MUST preserve the
+  recipe, and delete/reorder/replace operations MUST maintain the source-step linkage and recompute the
+  projection. Custom chord presets MUST NOT persist melody recipes or Melody Track settings.
+- **FR-201**: Melody context-menu and editor interactions MUST be keyboard accessible, expose semantic
+  menu/menuitem roles, support Escape/outside-click dismissal and focus return, and apply a recipe edit as
+  one undoable operation.
+- **FR-202**: When a project contains at least one melody recipe, Staff View MUST render a separate
+  Melody staff above Piano in concert pitch, select treble clef for Flute, Violin, Clarinet, Oboe, and
+  Synth Lead, bass clef for Cello, encode rests/tuplets, and split cross-bar events with ties without
+  creating repeated attacks.
+- **FR-203**: Melody Track settings MUST support Instrument, Mute, Solo, and integer Volume 0..127;
+  enabling Mute MUST disable Solo and enabling Solo MUST disable Mute. Solo MUST suppress chord upper
+  and bass playback but MUST NOT suppress the metronome.
+- **FR-204**: Melody playback MUST use a separate provider/channel role and preserve exact source-note
+  velocity semantics with global Volume applied independently. Active-note highlighting MUST identify
+  the currently sounding melody event while preserving chord highlighting.
+- **FR-205**: The bundled FluidR3Mono SoundFont preparation/provider path MUST be licensed, provenance
+  checked, offline-capable, and lazy-loaded. Failure to load it MUST expose an identified melody error
+  and Retry state while leaving piano playback, project data, MIDI, and MusicXML available.
+- **FR-206**: When melody exists, MIDI export MUST add a deterministic Melody track before the Piano
+  tracks with the selected instrument program, channel, track name, and volume controls; playback-only
+  Mute/Solo/Volume settings MUST NOT remove melody data from export. Projects without melody MUST retain
+  the existing MIDI output.
+- **FR-207**: When melody exists, MusicXML export MUST add a deterministic single-staff Melody part before
+  Piano with instrument name, supported clef, concert-pitch notes, rests, tuplets, and cross-bar ties.
+  Projects without melody MUST retain the existing MusicXML output.
+
 ### Scope Boundaries
 
 #### Explicitly in v1
@@ -934,6 +1038,8 @@ expertise controls without page-level horizontal scrolling.
 - Multi-step what-if branch from any progression point, Original vs Alternative comparison, rejoin,
   selective or whole-branch commit.
 - Independent Progression Step objects and drag/drop reordering.
+- One recipe-derived Melody Track linked to Chord Steps, using contextual upper voicing only, with
+  deterministic exact-time pattern/grid projection and supported instrument settings.
 - Structured chord extensions/tensions and harmonic validation.
 - Global Tempo and global Time Signature with custom meter and beat grouping.
 - Bars/beats/subdivisions, dotted values, triplets, Rest Steps.
@@ -961,7 +1067,8 @@ expertise controls without page-level horizontal scrolling.
 - Live MIDI capture/controller workflow.
 - Full saved-progression catalog/library beyond project and Custom Preset persistence.
 - Large genre/harmony-mode selector system.
-- `Scales` module (future melodic/scale navigation, including instrument-specific visualizations).
+- `Scales` module (future scale navigation and scale-based melodic material, including instrument-specific
+  visualizations; this does not defer the accepted Chord-Step-linked melody capability).
 - `Blues` module (future genre-focused harmony, blues scales/notes, riffs, and solo vocabulary).
 - Additional tonal/modal systems beyond Major and Tonal Minor.
 - Dark Harmony expansion with additional layers such as Dominant Tension and Borrowed / Minor Colors,
@@ -972,6 +1079,8 @@ expertise controls without page-level horizontal scrolling.
 - Tempo maps/tempo automation inside progression.
 - Meter maps/time-signature changes inside progression.
 - Persistent cross-session Undo history / full project version history.
+- Manual piano-roll editing of individual generated melody notes.
+- Multiple independent Melody Tracks or arbitrary per-step melody layering beyond the single v1 track.
 - Mobile-first UI.
 - Cloud sync, accounts, collaboration, and sharing services.
 - Rendered-audio export to WAV/MP3 (architecture prepared in v1; implementation deferred).
