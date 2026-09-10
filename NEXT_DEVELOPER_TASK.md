@@ -1,123 +1,117 @@
-# Next Developer Assignment — CadenceFlow US12, Batch E
+# Next Developer Assignment — CadenceFlow US12, Batch F
 
-**Assignment:** T174 only — deterministic Melody track in Standard MIDI File format 1.
+**Assignment:** T175 only — deterministic Melody part in MusicXML 4.0.
 
-**Do not implement T175 or T176.** Do not change MusicXML, UI, Project schema, playback behavior, or the
-accepted Melody generator/provider.
+**Do not implement T176.** Do not change MIDI, UI, Project schema, live playback, or accepted Staff
+presentation behavior.
 
 ## Accepted baseline
 
-Work on the current `master` baseline containing:
+Work on current `master` containing:
 
-- `18bd946 fix(us12): share contextual melody realization`;
-- `28e9863 feat(us12): add safe sampled melody playback`;
-- `a5287f2 test(us12): complete melody playback acceptance`;
-- `866810a fix(us12): complete safe melody playback acceptance`;
-- `acd1210 docs(status): accept us12 sampled melody playback`.
+- `6b2defb feat(us12): export melody as a separate midi track`;
+- `0ffee9f docs(status): accept us12 melody midi export`.
 
-Before editing, report `git status --short` and `git log -6 --oneline`. Preserve all untracked
-visual-polish/QA/source-information files and do not stage them. Do not push.
+Before editing, report `git status --short` and `git log -6 --oneline`. Preserve every untracked QA,
+visual-polish, screenshot, and source-information item; do not stage it. Do not push.
 
-## Required behavior
+## Required semantic projection
 
-### Projection
+- Extend the existing semantic MusicXML projection directly from the accepted contextual Melody timeline;
+  do not reconstruct Melody from MIDI, WebAudio events, rendered SVG, or Piano bass.
+- Add an optional immutable Melody part only when an authored Progression ChordStep owns a Melody recipe.
+- Temporary Branch recipes and runtime/highlight state must not enter MusicXML.
+- `Mute`, `Solo`, and Melody Volume are playback settings and must not suppress or alter notation.
+- Preserve exact Rational timing until MusicXML `divisions` conversion. Divisions must account for Melody
+  grids, measure boundaries, tuplets, rests, and cross-bar fragments, and must retain the accepted overflow
+  error behavior.
+- The source Project and projection DTOs must remain immutable and deterministic.
 
-- Extend the semantic MIDI projection without reconstructing Melody from live WebAudio or Staff SVG.
-- Generate Melody from the accepted contextual upper-voicing and exact Rational recipe timeline.
-- Straight subdivisions follow the same Swing onset projection as live Melody; triplet grids remain
-  unswung. Quantize only at the existing MIDI PPQ boundary using the established deterministic half-up
-  policy.
-- Melody events inherit the velocity of their corresponding pre-octave-offset upper source note.
-  Melody Track Volume must not overwrite note velocity; it is exported separately as CC7.
-- `Mute` and `Solo` are playback controls only and must not remove or alter exported Piano or Melody data.
-- Temporary Branch recipes and runtime/highlight state must not enter MIDI.
-- Preserve aligned final-measure silence through End-of-Track; do not create phantom notes.
-- Keep the source `Project` and all projection DTOs immutable and deterministic.
+## Score and part structure
 
-### Format-1 writer
+For projects containing Melody, output the Melody part before the existing Piano part in both `<part-list>`
+and score order. Keep the accepted Piano part semantics unchanged.
 
-When at least one authored Progression ChordStep has a Melody recipe, write exactly four tracks in this
-order:
+- Keep Piano as stable part `P1` so its internal identifiers and no-Melody output remain compatible.
+- Use a stable separate Melody part ID such as `P2`, with matching `score-instrument` and
+  `midi-instrument` IDs.
+- Melody is a single staff and voice, written at concert pitch.
+- Clef mapping:
+  - Cello → bass clef, F on line 4;
+  - Violin, Oboe, Clarinet, Flute, Synth Lead → treble clef, G on line 2.
+- Write the selected human-readable instrument name in `<part-name>` and `<instrument-name>`.
+- MusicXML MIDI fields are one-based: zero-based app/MIDI channel `2` becomes `<midi-channel>3`, and the
+  stored zero-based GM program becomes `<midi-program>program + 1`.
+- Program mapping before one-based conversion: Violin 40, Cello 42, Oboe 68, Clarinet 71, Flute 73,
+  Synth Lead 80.
 
-1. `CadenceFlow Conductor` — tempo and meter;
-2. `CadenceFlow Melody` — Melody notes;
-3. `CadenceFlow Chords` — Piano upper notes;
-4. `CadenceFlow Bass` — independent Piano bass notes.
+## Melody notation
 
-Melody track requirements:
+- Every generated Melody note must use its exact spelling/pitch and written duration from the accepted
+  Melody projection.
+- Chords without recipes, explicit RestSteps, and the aligned trailing virtual gap must be represented by
+  real rests so every Melody measure is rhythmically complete.
+- Notes crossing a barline must be split into fragments with `<tie>` and matching `<notations><tied>`
+  stop/start semantics. Continuations must not create a second attack.
+- Encode eighth- and sixteenth-triplet grids with correct `<time-modification>` values and deterministic
+  tuplet start/stop notation. Do not approximate tuplets as ordinary notes.
+- Straight/Swing changes live and MIDI timing only; written MusicXML durations/onsets remain straight.
+- Keep harmony symbols, Piano dynamics, Piano grand staff, bass staff, tempo, key, meter/grouping, and
+  existing Piano rests exactly as accepted.
 
-- zero-based MIDI channel `2` for channel prefix, program change, CC7, note-on, and note-off;
-- track name `CadenceFlow Melody`;
-- instrument-name meta event from the selected human-readable instrument label;
-- program mapping: Violin `40`, Cello `42`, Oboe `68`, Clarinet `71`, Flute `73`, Synth Lead `80`;
-- CC7 value equals the stored integer Melody Track Volume `0..127`;
-- at a shared tick, note-off precedes note-on, including consecutive notes of the same pitch;
-- End-of-Track is emitted at the same aligned `totalTicks` as every other track.
+## Strict backward compatibility
 
-Do not emit a nonstandard clef event: MIDI has no portable clef semantic.
-
-### Strict backward compatibility
-
-- A project with no authored Melody recipe must produce byte-for-byte identical output from
-  `projectProjectToMidi` + `writeMidiFile` to the accepted pre-T174 baseline.
-- Such a file remains format 1 with the existing three tracks in the existing order.
-- `writeStandardMidiFile` keeps its accepted format-0 behavior and bytes.
-- The presence of only a Temporary Branch Melody recipe does not enable the Melody track.
-
-## Suggested interfaces
-
-Keep the existing public APIs working:
-
-- `projectProjectToMidi(project)`;
-- `projectProgressionToMidi(project)`;
-- `projectMidiEvents(project)`;
-- `writeMidiFile(projection)`;
-- `writeStandardMidiFile(projection)`.
-
-An optional immutable Melody section may be added to `MidiProjection`, but omit it entirely for
-no-Melody projects so backward-compatible callers and byte output remain stable. Reuse or extract the
-existing tick quantizer instead of duplicating a different rounding algorithm.
+- If the authored progression contains no Melody recipe, `projectProjectToMusicXml` and `writeMusicXml`
+  must return byte-for-byte identical DTO/XML output to the pre-T175 implementation.
+- A Melody recipe present only in Temporary Branch must not add a part or change a byte.
+- Existing public aliases and file writer APIs must remain compatible.
+- Existing MusicXML diagnostics must remain stable; add new typed diagnostics only when a Melody semantic
+  cannot be represented exactly.
 
 ## Required tests
 
-Extend the focused MIDI tests with an independent SMF parser that verifies actual emitted bytes, not only
-internal DTOs:
+Extend focused MusicXML tests and validate freshly generated output against the repository's offline
+MusicXML 4.0 XSD:
 
-- four-track format-1 order and declared track count;
-- Melody channel prefix/channel `2`, instrument name, exact GM program, and CC7 volume;
-- exact Melody pitches, velocities, start/end ticks, and aligned EOT;
-- Swing changes straight-grid onsets but not triplet-grid onsets;
-- repeated same pitch has note-off before the following note-on;
-- Mute/Solo do not change exported data;
+- Melody appears before Piano with stable unique IDs;
+- all six instrument names, clefs, MIDI channels, and one-based MIDI programs;
+- exact pitches/spellings, note types, durations, voices, and staff numbers;
+- explicit rests for no-recipe chords, RestSteps, and trailing virtual gap;
+- eighth- and sixteenth-triplet `<time-modification>` plus tuplet boundaries;
+- cross-bar start/stop ties and no duplicate attacks;
+- 3/4 and grouped 7/8 measure completeness;
+- Mute/Solo/Volume and Swing do not change written notation;
 - Temporary Branch is excluded;
-- output is deterministic and Project is not mutated;
-- a no-Melody fixture is byte-for-byte identical to a pinned pre-T174 golden byte sequence;
-- legacy `writeStandardMidiFile` format-0 bytes remain unchanged.
+- deterministic XML and Project immutability;
+- a pinned no-Melody fixture remains byte-for-byte identical to its pre-T175 XML;
+- invalid Melody projection data fails with a typed stable error rather than producing invalid XML.
 
-Use a fixture containing at least two contextual chords, one Rest, a trailing virtual gap, a velocity
-override, and a Melody octave offset. Cover all six instrument program mappings with a table-driven test.
+Use an independently parsed XML assertion for part order and IDs in addition to string checks. At least
+one fresh Melody fixture must pass the real offline XSD validator; a deliberately invalid fixture must
+still be rejected.
 
 ## Verification and reporting
 
 Run only:
 
-1. focused MIDI Vitest files with `--maxWorkers=1`;
-2. the existing export projection consistency test if its MIDI contract is touched;
-3. TypeScript;
-4. ESLint and Prettier for changed files only;
-5. `git diff --check`.
+1. focused MusicXML Vitest files with `--maxWorkers=1`;
+2. `pnpm validate:musicxml` (or the repository's exact offline validation command) on fresh valid and
+   deliberately invalid fixtures;
+3. the export projection consistency test if the shared contract changes;
+4. TypeScript;
+5. ESLint and Prettier for changed files only;
+6. `git diff --check`.
 
-Do not run full Vitest, full Chromium, MusicXML validation, or unrelated E2E. No Chromium test is required
-because this batch changes the existing export projection/writer behind an already accepted UI action.
-Keep the dev server responding at `http://127.0.0.1:5174/` after verification.
+Do not run full Vitest, full Chromium, unrelated E2E, or the production build. No Chromium test is required
+for this projection/writer-only batch. Restore/keep the dev server at `http://127.0.0.1:5174/`.
 
-Commit implementation and tests together as:
+Commit implementation and tests as:
 
-`feat(us12): export melody as a separate midi track`
+`feat(us12): export melody as a separate musicxml part`
 
-Leave T174 unchecked and do not change `PROJECT_STATUS.md`, `spec.md`, `plan.md`, or `tasks.md`; acceptance
-status is updated only after independent review.
+Leave T175 unchecked and do not modify `PROJECT_STATUS.md`, `spec.md`, `plan.md`, or `tasks.md`; acceptance
+is recorded only after independent review.
 
-Report the commit hash, exact changed files, parser evidence for every track/channel/program/CC7/EOT,
-no-Melody golden compatibility evidence, focused command results, final Git status/ahead count, HTTP status,
-and `Spec deviations: none` or the complete deviation list.
+Report commit hash and exact files; parsed part order/IDs; instrument/clef/program evidence; rest, tuplet,
+tie, divisions, and measure-capacity evidence; no-Melody byte compatibility; real XSD results; focused
+commands; final Git status/ahead count; HTTP status; and `Spec deviations: none` or every deviation.
