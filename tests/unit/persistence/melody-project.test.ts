@@ -189,6 +189,25 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
           octaveOffset: 0,
         }),
     ],
+    [
+      "recipe on a Temporary Branch RestStep",
+      (raw: Record<string, any>) =>
+        raw.temporaryBranch.steps.push({
+          id: "branch-rest-with-melody",
+          kind: "rest",
+          duration: { beats: { numerator: 1, denominator: 1 } },
+          melody: { pattern: "up", grid: "quarter", octaveOffset: 0 },
+        }),
+    ],
+    [
+      "invalid recipe in a Temporary Branch ChordStep",
+      (raw: Record<string, any>) =>
+        (raw.temporaryBranch.steps[0].melody = {
+          pattern: "random",
+          grid: "quarter",
+          octaveOffset: 0,
+        }),
+    ],
   ])("rejects %s at the portable schema boundary", (_name, mutate) => {
     const raw = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
       string,

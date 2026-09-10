@@ -38,7 +38,9 @@
       "additionalProperties": { "type": "object" }
     },
     "progression": { "$ref": "#/$defs/progression" },
-    "temporaryBranch": { "type": ["object", "null"] },
+    "temporaryBranch": {
+      "anyOf": [{ "$ref": "#/$defs/temporaryBranch" }, { "type": "null" }]
+    },
     "customPresets": { "type": "array", "items": { "type": "object" } }
   },
   "$defs": {
@@ -130,6 +132,31 @@
         },
         "selectedStepId": { "type": ["string", "null"] },
         "loopRegion": { "type": ["object", "null"] }
+      }
+    },
+    "temporaryBranch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "originAtEnd", "steps", "compositionIntent"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "originStepId": { "type": "string", "minLength": 1 },
+        "originAtEnd": { "type": "boolean" },
+        "rejoinStepId": { "type": "string", "minLength": 1 },
+        "compositionIntent": {
+          "enum": [
+            "neutral",
+            "resolve",
+            "build-tension",
+            "darken-emotional",
+            "surprise",
+            "smooth-voice-leading"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        }
       }
     },
     "step": {

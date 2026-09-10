@@ -3,6 +3,7 @@ import { AppStore } from "../../../src/app/appStore";
 import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
 import { addMatrixPreview } from "../../../src/app/commands/matrixCommands";
 import {
+  MelodyCommandError,
   removeMelodyRecipe,
   setMelodyRecipe,
   setMelodyTrackSettings,
@@ -143,6 +144,64 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     expect(store.project.melodyTrack.solo).toBe(true);
   });
 
+  it("applies mutually exclusive Mute/Solo patches and rejects invalid track patches", () => {
+    const initial = createChordProject();
+    const muted = setMelodyTrackSettings(initial, {
+      type: "melody/set-track-settings",
+      payload: { patch: { muted: true }, nowIso: T1 },
+    }).project;
+    const soloed = setMelodyTrackSettings(muted, {
+      type: "melody/set-track-settings",
+      payload: { patch: { solo: true }, nowIso: T1 },
+    }).project;
+    expect(soloed.melodyTrack).toEqual({
+      instrument: "flute",
+      muted: false,
+      solo: true,
+      volume: 100,
+    });
+
+    const mutedAgain = setMelodyTrackSettings(soloed, {
+      type: "melody/set-track-settings",
+      payload: { patch: { muted: true }, nowIso: T1 },
+    }).project;
+    expect(mutedAgain.melodyTrack).toEqual({
+      instrument: "flute",
+      muted: true,
+      solo: false,
+      volume: 100,
+    });
+
+    for (const patch of [
+      { muted: true, solo: true },
+      { volume: -1 },
+      { volume: 128 },
+      { volume: 63.5 },
+      { instrument: "piano" },
+    ]) {
+      expect(() =>
+        setMelodyTrackSettings(initial, {
+          type: "melody/set-track-settings",
+          payload: {
+            patch: patch as SetMelodyTrackSettingsCommand["payload"]["patch"],
+            nowIso: T1,
+          },
+        }),
+      ).toThrow();
+    }
+
+    expect(() =>
+      setMelodyTrackSettings(initial, {
+        type: "melody/set-track-settings",
+        payload: {
+          settings: initial.melodyTrack,
+          patch: { volume: 90 },
+          nowIso: T1,
+        },
+      }),
+    ).toThrow(MelodyCommandError);
+  });
+
   it("rejects unknown/rest steps and malformed settings without mutating the source", () => {
     const initial = createChordProject();
     const before = JSON.stringify(initial);
@@ -173,6 +232,12 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
       payload: { stepId: "rest-1", nowIso: T1 },
     }).project;
     expect(() => setMelodyRecipe(withRest, setRecipeCommand("rest-1"))).toThrow(RangeError);
+    expect(() =>
+      removeMelodyRecipe(initial, {
+        type: "melody/remove-recipe",
+        payload: { stepId: "step-1", nowIso: T1 },
+      }),
+    ).toThrow(MelodyCommandError);
     expect(JSON.stringify(initial)).toBe(before);
   });
 
