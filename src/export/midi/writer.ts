@@ -5,10 +5,21 @@ const MIDI_MAX_CHUNK_LENGTH = 0xffffffff;
 
 interface MidiTrackEvent {
   readonly tick: number;
-  readonly kind: "tempo" | "meter" | "note-off" | "note-on" | "eot";
+  readonly kind:
+    | "track-name"
+    | "instrument-name"
+    | "channel-prefix"
+    | "tempo"
+    | "meter"
+    | "program-change"
+    | "note-off"
+    | "note-on"
+    | "eot";
   readonly channel?: number;
   readonly pitch?: number;
   readonly velocity?: number;
+  readonly program?: number;
+  readonly text?: string;
   readonly roleOrder?: number;
   readonly order: number;
 }
@@ -48,15 +59,23 @@ function encodeVlq(value: number): readonly number[] {
 
 function eventKindOrder(kind: MidiTrackEvent["kind"]): number {
   switch (kind) {
+    case "track-name":
+      return 0;
+    case "instrument-name":
+      return 1;
+    case "channel-prefix":
+      return 2;
     case "tempo":
     case "meter":
-      return 0;
-    case "note-off":
-      return 1;
-    case "note-on":
-      return 2;
-    case "eot":
       return 3;
+    case "program-change":
+      return 4;
+    case "note-off":
+      return 5;
+    case "note-on":
+      return 6;
+    case "eot":
+      return 7;
   }
 }
 
@@ -98,17 +117,58 @@ function validateProjection(projection: MidiProjection): void {
   }
 }
 
-function buildTrackEvents(projection: MidiProjection): readonly MidiTrackEvent[] {
-  const events: MidiTrackEvent[] = [
-    { tick: 0, kind: "tempo", order: 0 },
-    { tick: 0, kind: "meter", order: 1 },
-  ];
-  let order = 2;
-  for (const note of projection.notes) {
+interface TrackOptions {
+  readonly notes: readonly MidiProjectionNote[];
+  readonly includeTiming?: boolean;
+  readonly trackName?: string;
+  readonly instrumentName?: string;
+  readonly channel?: number;
+  readonly program?: number;
+}
+
+function buildTrackEvents(
+  projection: MidiProjection,
+  options: TrackOptions,
+): readonly MidiTrackEvent[] {
+  const events: MidiTrackEvent[] = [];
+  let order = 0;
+  if (options.trackName) {
+    events.push({ tick: 0, kind: "track-name", text: options.trackName, order: order++ });
+  }
+  if (options.instrumentName) {
+    events.push({
+      tick: 0,
+      kind: "instrument-name",
+      text: options.instrumentName,
+      order: order++,
+    });
+  }
+  if (options.channel !== undefined) {
+    events.push({
+      tick: 0,
+      kind: "channel-prefix",
+      channel: options.channel,
+      order: order++,
+    });
+  }
+  if (options.includeTiming) {
+    events.push({ tick: 0, kind: "tempo", order: order++ });
+    events.push({ tick: 0, kind: "meter", order: order++ });
+  }
+  if (options.program !== undefined && options.channel !== undefined) {
+    events.push({
+      tick: 0,
+      kind: "program-change",
+      channel: options.channel,
+      program: options.program,
+      order: order++,
+    });
+  }
+  for (const note of options.notes) {
     events.push({
       tick: note.startTick,
       kind: "note-on",
-      channel: note.channel,
+      channel: options.channel ?? note.channel,
       pitch: note.pitch,
       velocity: note.velocity,
       roleOrder: roleOrder(note),
@@ -117,7 +177,7 @@ function buildTrackEvents(projection: MidiProjection): readonly MidiTrackEvent[]
     events.push({
       tick: note.endTick,
       kind: "note-off",
-      channel: note.channel,
+      channel: options.channel ?? note.channel,
       pitch: note.pitch,
       velocity: 0,
       roleOrder: roleOrder(note),
@@ -128,8 +188,13 @@ function buildTrackEvents(projection: MidiProjection): readonly MidiTrackEvent[]
   return Object.freeze(events.sort(compareEvents));
 }
 
-function encodeTrack(projection: MidiProjection): Uint8Array {
-  const events = buildTrackEvents(projection);
+function encodeTextMeta(track: number[], metaType: number, value: string): void {
+  const bytes = [...value].map((character) => character.charCodeAt(0));
+  track.push(0xff, metaType, ...encodeVlq(bytes.length), ...bytes);
+}
+
+function encodeTrack(projection: MidiProjection, options: TrackOptions): Uint8Array {
+  const events = buildTrackEvents(projection, options);
   const track: number[] = [];
   let previousTick = 0;
   const microsecondsPerQuarter = Math.min(
@@ -143,12 +208,24 @@ function encodeTrack(projection: MidiProjection): Uint8Array {
     if (delta < 0) throw new RangeError("MIDI events must be sorted by absolute tick");
     track.push(...encodeVlq(delta));
     switch (event.kind) {
+      case "track-name":
+        encodeTextMeta(track, 0x03, event.text!);
+        break;
+      case "instrument-name":
+        encodeTextMeta(track, 0x04, event.text!);
+        break;
+      case "channel-prefix":
+        track.push(0xff, 0x20, 0x01, event.channel!);
+        break;
       case "tempo":
         track.push(0xff, 0x51, 0x03);
         pushU24(track, microsecondsPerQuarter);
         break;
       case "meter":
         track.push(0xff, 0x58, 0x04, projection.meter.numerator, denominatorPower, 24, 8);
+        break;
+      case "program-change":
+        track.push(0xc0 | event.channel!, event.program!);
         break;
       case "note-on":
         track.push(0x90 | event.channel!, event.pitch!, event.velocity!);
@@ -174,7 +251,10 @@ function encodeTrack(projection: MidiProjection): Uint8Array {
 /** Writes a deterministic SMF format-0 file with one piano track. */
 export function writeStandardMidiFile(projection: MidiProjection): Uint8Array {
   validateProjection(projection);
-  const track = encodeTrack(projection);
+  const track = encodeTrack(projection, {
+    notes: projection.notes,
+    includeTiming: true,
+  });
   const header: number[] = [];
   pushAscii(header, "MThd");
   pushU32(header, 6);
@@ -184,4 +264,39 @@ export function writeStandardMidiFile(projection: MidiProjection): Uint8Array {
   return Uint8Array.from([...header, ...track]);
 }
 
-export const writeMidiFile = writeStandardMidiFile;
+/**
+ * Writes a notation-friendly SMF format-1 file.
+ *
+ * MIDI has no portable clef event. Separate, named upper and bass tracks give
+ * notation importers the pitch range and semantic role needed to choose treble
+ * and bass clefs correctly instead of guessing from one mixed format-0 track.
+ */
+export function writeMidiFile(projection: MidiProjection): Uint8Array {
+  validateProjection(projection);
+  const conductorTrack = encodeTrack(projection, {
+    notes: [],
+    includeTiming: true,
+    trackName: "CadenceFlow Conductor",
+  });
+  const upperTrack = encodeTrack(projection, {
+    notes: projection.notes.filter((note) => note.role === "upper"),
+    trackName: "CadenceFlow Chords",
+    instrumentName: "Acoustic Grand Piano",
+    channel: 0,
+    program: 0,
+  });
+  const bassTrack = encodeTrack(projection, {
+    notes: projection.notes.filter((note) => note.role === "bass"),
+    trackName: "CadenceFlow Bass",
+    instrumentName: "Acoustic Grand Piano",
+    channel: 1,
+    program: 0,
+  });
+  const header: number[] = [];
+  pushAscii(header, "MThd");
+  pushU32(header, 6);
+  pushU16(header, 1);
+  pushU16(header, 3);
+  pushU16(header, projection.ppq);
+  return Uint8Array.from([...header, ...conductorTrack, ...upperTrack, ...bassTrack]);
+}

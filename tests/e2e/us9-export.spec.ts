@@ -45,42 +45,52 @@ test.beforeEach(async ({ page }) => {
 });
 
 function midiNoteOnCount(bytes: Uint8Array): number {
-  let offset = 14;
-  expect(String.fromCharCode(...bytes.slice(offset, offset + 4))).toBe("MTrk");
-  const trackLength =
-    bytes[offset + 4]! * 0x1000000 +
-    (bytes[offset + 5]! << 16) +
-    (bytes[offset + 6]! << 8) +
-    bytes[offset + 7]!;
-  const end = offset + 8 + trackLength;
-  offset += 8;
+  const trackCount = bytes[10]! * 256 + bytes[11]!;
+  let trackOffset = 14;
   let count = 0;
-  while (offset < end) {
-    let deltaComplete = false;
-    while (!deltaComplete) {
-      const byte = bytes[offset++];
-      if (byte === undefined) throw new Error("truncated MIDI delta");
-      deltaComplete = (byte & 0x80) === 0;
-    }
-    const status = bytes[offset++];
-    if (status === undefined) throw new Error("truncated MIDI status");
-    if (status === 0xff) {
-      offset++;
-      let length = 0;
-      let lengthComplete = false;
-      while (!lengthComplete) {
+  for (let trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
+    expect(String.fromCharCode(...bytes.slice(trackOffset, trackOffset + 4))).toBe("MTrk");
+    const trackLength =
+      bytes[trackOffset + 4]! * 0x1000000 +
+      (bytes[trackOffset + 5]! << 16) +
+      (bytes[trackOffset + 6]! << 8) +
+      bytes[trackOffset + 7]!;
+    const end = trackOffset + 8 + trackLength;
+    let offset = trackOffset + 8;
+    while (offset < end) {
+      let deltaComplete = false;
+      while (!deltaComplete) {
         const byte = bytes[offset++];
-        if (byte === undefined) throw new Error("truncated MIDI meta length");
-        length = (length << 7) | (byte & 0x7f);
-        lengthComplete = (byte & 0x80) === 0;
+        if (byte === undefined) throw new Error("truncated MIDI delta");
+        deltaComplete = (byte & 0x80) === 0;
       }
-      offset += length;
-      continue;
+      const status = bytes[offset++];
+      if (status === undefined) throw new Error("truncated MIDI status");
+      if (status === 0xff) {
+        offset++;
+        let length = 0;
+        let lengthComplete = false;
+        while (!lengthComplete) {
+          const byte = bytes[offset++];
+          if (byte === undefined) throw new Error("truncated MIDI meta length");
+          length = (length << 7) | (byte & 0x7f);
+          lengthComplete = (byte & 0x80) === 0;
+        }
+        offset += length;
+        continue;
+      }
+      const command = status & 0xf0;
+      if (command === 0xc0 || command === 0xd0) {
+        offset += 1;
+        continue;
+      }
+      offset += 2;
+      if (command === 0x90 && bytes[offset - 1]! > 0) count++;
     }
-    const command = status & 0xf0;
-    offset += 2;
-    if (command === 0x90 && bytes[offset - 1]! > 0) count++;
+    expect(offset).toBe(end);
+    trackOffset = end;
   }
+  expect(trackOffset).toBe(bytes.length);
   return count;
 }
 
@@ -120,6 +130,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     const firstMidi = await clickExport(page, "export-midi-btn");
     expect(firstMidi.download.suggestedFilename()).toBe("Session- - take--.mid");
     expect(firstMidi.bytes.subarray(0, 4).toString("ascii")).toBe("MThd");
+    expect([...firstMidi.bytes.subarray(8, 12)]).toEqual([0, 1, 0, 3]);
     const noteCountBeforeBranch = midiNoteOnCount(firstMidi.bytes);
     expect(noteCountBeforeBranch).toBe(4);
     await page.getByTestId("export-menu-toggle").click();

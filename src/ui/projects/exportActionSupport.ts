@@ -1,6 +1,6 @@
 import type { Project } from "../../domain/project/project";
 import { projectProgressionToMidi } from "../../export/midi/eventProjection";
-import { writeStandardMidiFile } from "../../export/midi/writer";
+import { writeMidiFile } from "../../export/midi/writer";
 import {
   MusicXmlExportError,
   projectProjectToMusicXml,
@@ -78,7 +78,7 @@ export function createMidiExportFile(project: Project): BrowserExportFile {
   return Object.freeze({
     filename: filenameForProject(project.name, "mid"),
     mimeType: MIDI_MIME_TYPE,
-    data: writeStandardMidiFile(projectProgressionToMidi(project)),
+    data: writeMidiFile(projectProgressionToMidi(project)),
   });
 }
 

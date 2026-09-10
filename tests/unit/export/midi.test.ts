@@ -17,7 +17,7 @@ import {
   quantizeRationalToMidiTicks,
   type MidiProjection,
 } from "../../../src/export/midi/eventProjection";
-import { writeStandardMidiFile } from "../../../src/export/midi/writer";
+import { writeMidiFile, writeStandardMidiFile } from "../../../src/export/midi/writer";
 
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
   return Object.freeze({
@@ -300,6 +300,29 @@ interface ParsedSmf {
   readonly events: readonly ParsedEvent[];
 }
 
+interface ParsedFormatOneEvent {
+  readonly tick: number;
+  readonly kind:
+    | "track-name"
+    | "instrument-name"
+    | "channel-prefix"
+    | "tempo"
+    | "meter"
+    | "program-change"
+    | "note-on"
+    | "note-off"
+    | "eot"
+    | "other";
+  readonly channel?: number;
+  readonly pitch?: number;
+  readonly velocity?: number;
+  readonly text?: string;
+}
+
+interface ParsedFormatOneTrack {
+  readonly events: readonly ParsedFormatOneEvent[];
+}
+
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   return String.fromCharCode(...bytes.slice(start, start + length));
 }
@@ -378,6 +401,86 @@ function parseSmf(bytes: Uint8Array): ParsedSmf {
     division: u16(bytes, 12),
     trackLength,
     events,
+  };
+}
+
+function parseFormatOneSmf(bytes: Uint8Array): {
+  readonly format: number;
+  readonly division: number;
+  readonly tracks: readonly ParsedFormatOneTrack[];
+} {
+  expect(ascii(bytes, 0, 4)).toBe("MThd");
+  expect(u32(bytes, 4)).toBe(6);
+  const trackCount = u16(bytes, 10);
+  const tracks: ParsedFormatOneTrack[] = [];
+  let trackOffset = 14;
+
+  for (let trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
+    expect(ascii(bytes, trackOffset, 4)).toBe("MTrk");
+    const trackLength = u32(bytes, trackOffset + 4);
+    const trackEnd = trackOffset + 8 + trackLength;
+    const cursor = { value: trackOffset + 8 };
+    let tick = 0;
+    const events: ParsedFormatOneEvent[] = [];
+
+    while (cursor.value < trackEnd) {
+      tick += parseVlq(bytes, cursor).value;
+      const status = bytes[cursor.value++]!;
+      if (status === 0xff) {
+        const metaType = bytes[cursor.value++]!;
+        const length = parseVlq(bytes, cursor).value;
+        const data = [...bytes.slice(cursor.value, cursor.value + length)];
+        cursor.value += length;
+        const kind =
+          metaType === 0x03
+            ? "track-name"
+            : metaType === 0x04
+              ? "instrument-name"
+              : metaType === 0x20
+                ? "channel-prefix"
+                : metaType === 0x51
+                  ? "tempo"
+                  : metaType === 0x58
+                    ? "meter"
+                    : metaType === 0x2f
+                      ? "eot"
+                      : "other";
+        events.push({
+          tick,
+          kind,
+          ...(kind === "track-name" || kind === "instrument-name"
+            ? { text: String.fromCharCode(...data) }
+            : {}),
+          ...(kind === "channel-prefix" ? { channel: data[0] } : {}),
+        });
+        continue;
+      }
+
+      const command = status & 0xf0;
+      const channel = status & 0x0f;
+      if (command === 0xc0) {
+        cursor.value += 1;
+        events.push({ tick, kind: "program-change", channel });
+        continue;
+      }
+      const pitch = bytes[cursor.value++]!;
+      const velocity = bytes[cursor.value++]!;
+      if (command === 0x90 && velocity > 0) {
+        events.push({ tick, kind: "note-on", channel, pitch, velocity });
+      } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+        events.push({ tick, kind: "note-off", channel, pitch, velocity });
+      }
+    }
+    expect(cursor.value).toBe(trackEnd);
+    tracks.push({ events });
+    trackOffset = trackEnd;
+  }
+
+  expect(trackOffset).toBe(bytes.length);
+  return {
+    format: u16(bytes, 8),
+    division: u16(bytes, 12),
+    tracks,
   };
 }
 
@@ -511,5 +614,51 @@ describe("T133 — independent SMF parsing evidence", () => {
     expect(Array.from(writeStandardMidiFile(projection))).toEqual(
       Array.from(writeStandardMidiFile(projection)),
     );
+  });
+});
+
+describe("notation-friendly MIDI export", () => {
+  it("writes separate named chord and bass tracks with stable channels and barline EOT", () => {
+    const projection = projectProjectToMidi(makeManualProject());
+    const bytes = writeMidiFile(projection);
+    const parsed = parseFormatOneSmf(bytes);
+
+    expect(parsed.format).toBe(1);
+    expect(parsed.division).toBe(MIDI_PPQ);
+    expect(parsed.tracks).toHaveLength(3);
+    expect(parsed.tracks.map((track) => track.events[0]?.text)).toEqual([
+      "CadenceFlow Conductor",
+      "CadenceFlow Chords",
+      "CadenceFlow Bass",
+    ]);
+
+    const conductor = parsed.tracks[0]!.events;
+    expect(conductor.map((event) => event.kind)).toContain("tempo");
+    expect(conductor.map((event) => event.kind)).toContain("meter");
+
+    const upperNotes = parsed.tracks[1]!.events.filter((event) => event.kind === "note-on");
+    expect(upperNotes.map((event) => [event.channel, event.pitch, event.velocity])).toEqual([
+      [0, 60, 111],
+      [0, 64, 92],
+      [0, 67, 92],
+    ]);
+    const bassNotes = parsed.tracks[2]!.events.filter((event) => event.kind === "note-on");
+    expect(bassNotes.map((event) => [event.channel, event.pitch, event.velocity])).toEqual([
+      [1, 36, 92],
+    ]);
+    expect(parsed.tracks[1]!.events[1]).toMatchObject({
+      kind: "instrument-name",
+      text: "Acoustic Grand Piano",
+    });
+    expect(parsed.tracks[2]!.events[2]).toMatchObject({
+      kind: "channel-prefix",
+      channel: 1,
+    });
+    expect(parsed.tracks.map((track) => track.events.at(-1))).toEqual([
+      expect.objectContaining({ kind: "eot", tick: projection.totalTicks }),
+      expect.objectContaining({ kind: "eot", tick: projection.totalTicks }),
+      expect.objectContaining({ kind: "eot", tick: projection.totalTicks }),
+    ]);
+    expect(Array.from(writeMidiFile(projection))).toEqual(Array.from(bytes));
   });
 });

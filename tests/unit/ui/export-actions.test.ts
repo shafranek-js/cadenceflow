@@ -40,10 +40,12 @@ describe("T138 — export actions", () => {
 
   it("keeps Rest-only progression exportable while blocking an empty progression", () => {
     const restOnly = restOnlyProject();
-    expect(createMidiExportFile(restOnly)).toMatchObject({
+    const midi = createMidiExportFile(restOnly);
+    expect(midi).toMatchObject({
       filename: "Rest Only.mid",
       mimeType: "audio/midi",
     });
+    expect([...midi.data.slice(8, 12)]).toEqual([0, 1, 0, 3]);
     expect(createMusicXmlExportFile(restOnly)).toMatchObject({
       filename: "Rest Only.musicxml",
       mimeType: "application/vnd.recordare.musicxml+xml",
