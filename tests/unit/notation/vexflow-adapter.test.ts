@@ -3,11 +3,15 @@
 import { describe, expect, it } from "vitest";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { musicalDuration, type MusicalDuration } from "../../../src/domain/timing/duration";
+import { meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import { projectPitchesToStaff } from "../../../src/notation/staffProjection";
 import {
   renderStaffProjection,
+  renderStaffSequence,
   staffRhythmForDuration,
+  type StaffSequenceEntry,
+  type StaffSequencePosition,
 } from "../../../src/notation/vexflowAdapter";
 
 function projectionFor(
@@ -161,5 +165,158 @@ describe("renderStaffProjection", () => {
         staffRhythmForDuration(musicalDuration(rational(numerator, denominator))).notation,
       ).toBe(notation);
     }
+  });
+});
+
+describe("renderStaffSequence", () => {
+  const cMajor = projectionFor([
+    exactPitch(60, { step: "C", alter: 0 }),
+    exactPitch(64, { step: "E", alter: 0 }),
+    exactPitch(67, { step: "G", alter: 0 }),
+  ]);
+
+  function chord(
+    key: string,
+    startNumerator: number,
+    startDenominator: number,
+    durationNumerator: number,
+    durationDenominator: number,
+    continuation: Partial<
+      Pick<StaffSequenceEntry, "continuesFromPrevious" | "continuesToNext">
+    > = {},
+  ): StaffSequenceEntry {
+    return {
+      key,
+      kind: "chord",
+      projection: cMajor,
+      startOffsetBeats: rational(startNumerator, startDenominator),
+      duration: musicalDuration(rational(durationNumerator, durationDenominator)),
+      ...continuation,
+    };
+  }
+
+  function renderSequence(entries: readonly StaffSequenceEntry[]): {
+    readonly svg: SVGSVGElement;
+    readonly positions: readonly StaffSequencePosition[];
+  } {
+    const container = document.createElement("div");
+    Object.defineProperty(container, "clientWidth", { configurable: true, value: 800 });
+    let positions: readonly StaffSequencePosition[] = [];
+    renderStaffSequence(container, entries, meter(4, 4), (next) => {
+      positions = next;
+    });
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Measure staff SVG was not rendered");
+    return { svg, positions };
+  }
+
+  it("places six attacks on the exact Rational measure timeline", () => {
+    const entries = [
+      chord("c-1", 0, 1, 1, 2),
+      chord("c-2", 1, 2, 1, 2),
+      chord("c-3", 1, 1, 1, 2),
+      chord("c-4", 3, 2, 1, 2),
+      chord("em-1", 2, 1, 1, 1),
+      chord("em-2", 3, 1, 1, 1),
+    ];
+    const { positions, svg } = renderSequence(entries);
+    const x = positions.map((position) => position.x);
+
+    expect(x).toHaveLength(6);
+    expect(x.every((value, index) => index === 0 || value > x[index - 1]!)).toBe(true);
+    const halfBeatGap = x[1]! - x[0]!;
+    expect(x[5]! - x[4]!).toBeCloseTo(halfBeatGap * 2, 5);
+    expect(svg.querySelectorAll(".vf-stavenote")).toHaveLength(6);
+    expect(svg.dataset.staffSequencePositions).toContain("c-1:");
+    expect(svg.dataset.staffClef).toBe("treble");
+    expect(svg.dataset.staffMeter).toBe("4/4");
+    expect(svg.dataset.staffSystem).toBe("treble");
+    expect(svg.querySelectorAll(".vf-clef")).toHaveLength(1);
+    expect(svg.querySelectorAll(".vf-timesignature")).toHaveLength(1);
+  });
+
+  it("renders a time-aligned bass staff and highlights only the playing chord", () => {
+    const bassProjection = projectionFor([exactPitch(36, { step: "C", alter: 0 })]);
+    const entries: readonly StaffSequenceEntry[] = [
+      {
+        ...chord("playing", 0, 1, 2, 1),
+        bassProjection,
+        highlighted: true,
+      },
+      {
+        ...chord("idle", 2, 1, 2, 1),
+        bassProjection,
+      },
+    ];
+    const { positions, svg } = renderSequence(entries);
+
+    expect(svg.dataset.staffSystem).toBe("grand");
+    expect(svg.dataset.staffPlayingEntries).toBe("playing");
+    expect(svg.querySelectorAll(".vf-clef")).toHaveLength(2);
+    expect(svg.querySelectorAll(".vf-timesignature")).toHaveLength(2);
+    expect(svg.dataset.staffBassEntries).toBe("playing,idle");
+    expect(svg.dataset.staffBassSequencePositions).toBe(svg.dataset.staffSequencePositions);
+    expect(svg.innerHTML).toContain("#8a5732");
+    expect(positions[1]!.x).toBeGreaterThan(positions[0]!.x);
+  });
+
+  it("keeps a trailing virtual gap silent while reserving the rest of the bar", () => {
+    const entries: readonly StaffSequenceEntry[] = [
+      chord("half", 0, 1, 2, 1),
+      {
+        key: "gap",
+        kind: "gap",
+        startOffsetBeats: rational(2),
+        duration: musicalDuration(rational(2)),
+      },
+    ];
+    const { positions, svg } = renderSequence(entries);
+
+    expect(positions.map((position) => position.key)).toEqual(["half"]);
+    expect(svg.querySelectorAll(".vf-stavenote")).toHaveLength(1);
+    expect(svg.dataset.staffSequenceLength).toBe("2");
+  });
+
+  it("renders continuation ties and keeps ledger-line ink inside the viewBox", () => {
+    const lowProjection = projectionFor([exactPitch(24, { step: "C", alter: 0 })]);
+    const entries: readonly StaffSequenceEntry[] = [
+      {
+        key: "continued",
+        kind: "chord",
+        projection: lowProjection,
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(4)),
+        continuesFromPrevious: true,
+        continuesToNext: true,
+      },
+    ];
+    const { svg } = renderSequence(entries);
+    const [, , width, height] = viewBox(svg);
+
+    expect(svg.querySelectorAll(".vf-stavetie").length).toBeGreaterThan(0);
+    for (const [x, y] of pathPoints(svg)) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(width);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(height);
+    }
+  });
+
+  it("accepts additive meter timing and exact custom Rational durations", () => {
+    const container = document.createElement("div");
+    Object.defineProperty(container, "clientWidth", { configurable: true, value: 800 });
+    const entries: readonly StaffSequenceEntry[] = [
+      chord("custom-a", 0, 1, 5, 6),
+      chord("custom-b", 5, 6, 8, 3),
+    ];
+    let positions: readonly StaffSequencePosition[] = [];
+
+    expect(() =>
+      renderStaffSequence(container, entries, meter(7, 8, [2, 2, 3]), (next) => {
+        positions = next;
+      }),
+    ).not.toThrow();
+    expect(positions).toHaveLength(2);
+    expect(positions[1]!.x).toBeGreaterThan(positions[0]!.x);
   });
 });

@@ -22,12 +22,17 @@ import {
   type ProgressionMeasureFragment,
   type ProgressionMeasureItem,
 } from "../../domain/timing/measureLayout";
-import { rationalToNumber } from "../../domain/timing/rational";
+import { rationalToNumber, subtractRational } from "../../domain/timing/rational";
 import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
-import { MeasureStaffView, type MeasureStaffEvent } from "../staff/MeasureStaffView";
+import { MeasureStaffView, type MeasureStaffItem } from "../staff/MeasureStaffView";
+import {
+  canShiftPerformanceOctave,
+  performanceOctaveShiftPatch,
+  type StaffOctaveDirection,
+} from "../staff/staffOctave";
 
 function segmentStyle(
   durationBeats: MusicalDuration["beats"],
@@ -73,6 +78,10 @@ export function ProgressionTrack({
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [matrixGapHint, setMatrixGapHint] = useState<number | null>(null);
   const selectedStepId = project.progression.selectedStepId;
+  const currentPlayingStepId =
+    currentPlayingStepIndex === null || currentPlayingStepIndex === undefined
+      ? undefined
+      : project.progression.steps[currentPlayingStepIndex]?.id;
   const layout = createProgressionMeasureLayout(
     project.progression.steps,
     project.globalTiming.meter,
@@ -94,38 +103,60 @@ export function ProgressionTrack({
       ? chordViews[0]!
       : "mixed";
 
-  const staffEventsForMeasure = (measure: (typeof layout.measures)[number]): MeasureStaffEvent[] =>
-    measure.items.flatMap((item) => {
-      if (item.kind === "gap" || !item.startsHere) return [];
-      if (item.step.kind === "rest") {
-        return [
-          {
-            stepId: item.step.id,
-            label: "Rest",
-            pitches: [],
-            duration: musicalDuration(item.durationBeats),
-            rest: true,
-          },
-        ];
+  const staffItemsForMeasure = (measure: (typeof layout.measures)[number]): MeasureStaffItem[] =>
+    measure.items.map((item, itemIndex) => {
+      const duration = musicalDuration(item.durationBeats);
+      const startOffsetBeats = subtractRational(item.startBeats, measure.startBeats);
+      if (item.kind === "gap") {
+        return {
+          key: `gap-${measure.measureIndex}-${itemIndex}`,
+          kind: "gap",
+          duration,
+          startOffsetBeats,
+        };
       }
-      if (item.step.cardView !== "staff") return [];
-      const realization = realizeProgressionStepRealization(item.step, project.tonic);
-      const pitches =
-        project.presentation.showBassInStaff && realization.bassPitch
-          ? Object.freeze([realization.bassPitch, ...realization.pitches])
-          : realization.pitches;
-      return [
-        {
+      if (item.step.kind === "rest") {
+        return {
+          key: `${item.step.id}-${item.fragmentIndex}`,
+          kind: "rest",
           stepId: item.step.id,
-          label: formatChordSymbol({
-            ...realizeChord(item.step.harmonicFunction, project.tonic),
-            variant: item.step.harmonicVariant,
-          }),
-          pitches,
-          duration: musicalDuration(item.durationBeats),
-        },
-      ];
+          label: "Rest",
+          duration,
+          startOffsetBeats,
+        };
+      }
+      const realization = realizeProgressionStepRealization(item.step, project.tonic);
+      return {
+        key: `${item.step.id}-${item.fragmentIndex}`,
+        kind: "chord",
+        stepId: item.step.id,
+        label: formatChordSymbol({
+          ...realizeChord(item.step.harmonicFunction, project.tonic),
+          variant: item.step.harmonicVariant,
+        }),
+        pitches: realization.pitches,
+        ...(project.presentation.showBassInStaff && realization.bassPitch
+          ? { bassPitch: realization.bassPitch }
+          : {}),
+        chordPitches: realization.pitches,
+        duration,
+        startOffsetBeats,
+        startsHere: item.startsHere,
+        continuesFromPrevious: item.continuesFromPrevious,
+        continuesToNext: item.continuesToNext,
+        canShiftUp: canShiftPerformanceOctave(item.step.performance, 1),
+        canShiftDown: canShiftPerformanceOctave(item.step.performance, -1),
+      };
     });
+
+  const shiftStaffOctave = (stepId: string, direction: StaffOctaveDirection) => {
+    const step = project.progression.steps.find(
+      (candidate) => candidate.id === stepId && candidate.kind === "chord",
+    );
+    if (!step || step.kind !== "chord") return;
+    const patch = performanceOctaveShiftPatch(step.performance, direction);
+    if (patch) onEditPerformance(step.id, patch);
+  };
 
   const dragStart = (event: DragEvent<HTMLElement>, stepId: string) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
@@ -423,12 +454,12 @@ export function ProgressionTrack({
           </div>
         ) : null}
         {layout.measures.map((measure) => {
-          const staffEvents = staffEventsForMeasure(measure);
-          const usesSharedStaff = staffEvents.length > 1;
+          const usesSharedStaff = commonView === "staff";
+          const staffItems = usesSharedStaff ? staffItemsForMeasure(measure) : [];
           return (
             <section
               key={measure.measureIndex}
-              className="progression-measure-card"
+              className={`progression-measure-card ${usesSharedStaff ? "has-shared-staff" : ""}`}
               data-testid="progression-measure"
               aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
             >
@@ -442,7 +473,15 @@ export function ProgressionTrack({
                 </span>
               </header>
               {usesSharedStaff ? (
-                <MeasureStaffView events={staffEvents} onSelect={onSelectStep} />
+                <MeasureStaffView
+                  items={staffItems}
+                  meter={project.globalTiming.meter}
+                  barLengthBeats={layout.barLengthBeats}
+                  selectedStepId={selectedStepId}
+                  playingStepId={currentPlayingStepId}
+                  onSelect={onSelectStep}
+                  onOctaveChange={shiftStaffOctave}
+                />
               ) : null}
               <div className="progression-measure-grid" data-testid="progression-measure-grid">
                 {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (

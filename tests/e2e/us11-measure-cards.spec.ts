@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function openStudio(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    (
+      window as unknown as { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
+    ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
+  });
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
@@ -46,7 +51,66 @@ test.describe("US11 measure-card progression layout", () => {
     await page.getByLabel("Progression Card View").selectOption("staff");
     await expect(page.getByTestId("measure-staff-view")).toHaveCount(1);
     await expect(page.locator(".progression-measure-grid .mini-staff")).toHaveCount(0);
-    await expect(page.getByTestId("measure-staff-view").locator("svg")).toHaveCount(1);
+    const staff = page.getByTestId("measure-staff-view");
+    const svg = staff.locator(".measure-staff > svg");
+    await expect(svg).toHaveCount(1);
+    await expect(svg).toHaveAttribute("data-staff-clef", "treble");
+    await expect(svg).toHaveAttribute("data-staff-meter", "4/4");
+    await expect(svg.locator(".vf-clef")).toHaveCount(1);
+    await expect(svg.locator(".vf-timesignature")).toHaveCount(1);
+
+    const attackRatios = await svg.evaluate((element) =>
+      (element.getAttribute("data-staff-sequence-positions") ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((entry) => Number(entry.split(":").at(-1))),
+    );
+    expect(attackRatios).toHaveLength(2);
+    expect(attackRatios[1]).toBeGreaterThan(attackRatios[0]!);
+    const compactStripHeight = await page
+      .getByTestId("progression-measure-grid")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    expect(compactStripHeight).toBeLessThanOrEqual(74);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBe(0);
+
+    const controls = page
+      .getByRole("region", { name: "My Progression" })
+      .getByRole("group", { name: "Progression playback controls" });
+    await controls.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(svg).not.toHaveAttribute("data-staff-playing-entries", "");
+    await expect
+      .poll(() =>
+        svg
+          .locator(".vf-stavenote")
+          .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill)),
+      )
+      .toContain("rgb(138, 87, 50)");
+    await controls.getByRole("button", { name: "Stop", exact: true }).click();
+    await expect(svg).toHaveAttribute("data-staff-playing-entries", "");
+  });
+
+  test("shows an aligned bass stave only when the View setting is enabled and space permits", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openStudio(page);
+    await addChord(page, "I");
+    await page.getByLabel("Progression Card View").selectOption("staff");
+
+    const svg = page.getByTestId("measure-staff-view").locator(".measure-staff > svg");
+    await expect(svg).toHaveAttribute("data-staff-system", "treble");
+    await page.getByTestId("view-menu-toggle").click();
+    await page.getByTestId("show-bass-in-staff").click();
+
+    await expect(page.getByTestId("measure-staff-view")).toHaveClass(/has-bass-staff/);
+    await expect(svg).toHaveAttribute("data-staff-system", "grand");
+    await expect(svg.locator(".vf-clef")).toHaveCount(2);
+    await expect(svg.locator(".vf-timesignature")).toHaveCount(2);
+    await expect(svg).not.toHaveAttribute("data-staff-bass-entries", "");
   });
 
   test("provides Rest, Extend, and Repeat actions without hidden duplication", async ({ page }) => {
@@ -94,7 +158,8 @@ test.describe("US11 measure-card progression layout", () => {
     );
 
     await page.getByLabel("Progression Card View").selectOption("staff");
-    await expect(page.locator('[data-testid="progression-step"] .mini-staff')).toHaveCount(1);
+    await expect(page.getByTestId("measure-staff-view")).toHaveCount(1);
+    await expect(page.locator('[data-testid="progression-step"] .mini-staff')).toHaveCount(0);
     await expect(page.getByTestId("progression-measure")).toHaveAttribute(
       "aria-label",
       "Measure 1, 4/4",

@@ -36,3 +36,20 @@ export function canShiftPerformanceOctave(
   }
   return nextRegisterOffset(performance.register, direction) !== null;
 }
+
+/**
+ * Builds the same immutable octave-shift patch for standalone and measure Staff views.
+ * Manual voicings move their authored chord pitches; automatic voicings move the
+ * register selector and are re-realized by the normal progression update path.
+ */
+export function performanceOctaveShiftPatch(
+  performance: StepPerformance,
+  direction: StaffOctaveDirection,
+): Readonly<Partial<StepPerformance>> | null {
+  if (performance.voicingMode === "manual" && performance.manualVoicing?.length) {
+    const manualVoicing = shiftPitchesByOctave(performance.manualVoicing, direction);
+    return manualVoicing ? Object.freeze({ manualVoicing }) : null;
+  }
+  const register = nextRegisterOffset(performance.register, direction);
+  return register === null ? null : Object.freeze({ register });
+}

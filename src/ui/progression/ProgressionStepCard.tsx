@@ -10,8 +10,7 @@ import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
 import {
   canShiftPerformanceOctave,
-  nextRegisterOffset,
-  shiftPitchesByOctave,
+  performanceOctaveShiftPatch,
   type StaffOctaveDirection,
 } from "../staff/staffOctave";
 
@@ -54,13 +53,8 @@ export function ProgressionStepCard({
   const durationLabel = formatMusicalDuration(step.duration);
   const selectionAriaLabel = `Select progression step ${stepNumber}: ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`;
   const changeStaffOctave = (direction: StaffOctaveDirection) => {
-    if (step.performance.voicingMode === "manual" && step.performance.manualVoicing?.length) {
-      const manualVoicing = shiftPitchesByOctave(step.performance.manualVoicing, direction);
-      if (manualVoicing) onPerformanceChange({ manualVoicing });
-      return;
-    }
-    const register = nextRegisterOffset(step.performance.register, direction);
-    if (register !== null) onPerformanceChange({ register });
+    const patch = performanceOctaveShiftPatch(step.performance, direction);
+    if (patch) onPerformanceChange(patch);
   };
 
   return (

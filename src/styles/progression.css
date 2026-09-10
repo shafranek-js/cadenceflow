@@ -70,50 +70,152 @@
 }
 
 .measure-staff-view {
-  display: grid;
-  gap: 6px;
   margin-bottom: 8px;
-  padding: 8px 10px 6px;
+  padding: 0 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: #fff;
   color: #000;
+  overflow: hidden;
+}
+
+.measure-staff-paper {
+  position: relative;
+  height: 226px;
 }
 
 .measure-staff {
+  position: absolute;
+  inset: 34px 0 32px;
   width: 100%;
-  min-height: 150px;
+  height: 160px;
 }
 
-.measure-staff-event-labels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  gap: 4px;
+.measure-staff-view.has-bass-staff .measure-staff-paper {
+  height: 338px;
 }
 
-.measure-staff-event-button {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 3px 5px;
-  border: 1px solid #c4cbd4;
+.measure-staff-view.has-bass-staff .measure-staff {
+  height: 272px;
+}
+
+.measure-staff-annotations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.measure-staff-event {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: var(--measure-staff-event-x);
+  width: clamp(62px, var(--measure-staff-event-span), 156px);
+  transform: translateX(-50%);
+  color: #161b22;
+  text-align: center;
+  pointer-events: none;
+}
+
+.measure-staff-event-top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.measure-staff-event-select,
+.measure-staff-octave-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  min-height: 25px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: #fff;
+  background: rgb(255 255 255 / 88%);
   color: #161b22;
   font-size: 0.7rem;
-  text-align: center;
+  line-height: 1;
+  pointer-events: auto;
 }
 
-.measure-staff-event-button span {
-  color: #586273;
-  font-size: 0.62rem;
+.measure-staff-event-select {
+  font-weight: 700;
 }
 
-.measure-staff-event-button:hover,
-.measure-staff-event-button:focus-visible {
+.measure-staff-event-select:hover,
+.measure-staff-event-select:focus-visible,
+.measure-staff-octave-button:hover:not(:disabled),
+.measure-staff-octave-button:focus-visible {
   border-color: #80613d;
   outline: 2px solid #80613d;
   outline-offset: 1px;
+}
+
+.measure-staff-event-select[aria-pressed="true"] {
+  border-color: #80613d;
+  background: #f1e4d5;
+}
+
+.measure-staff-event.is-playing .measure-staff-event-select {
+  border-color: var(--piano-pressed-key-border);
+  background: var(--piano-pressed-key);
+  color: #24170e;
+  box-shadow: 0 0 0 2px rgb(138 87 50 / 20%);
+}
+
+.measure-staff-octave-button {
+  width: 26px;
+  padding: 0;
+}
+
+.measure-staff-octave-button:disabled {
+  opacity: 0.38;
+}
+
+.measure-staff-octave-down {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.measure-staff-event-details {
+  position: absolute;
+  right: 50%;
+  bottom: 28px;
+  display: grid;
+  gap: 1px;
+  max-width: 156px;
+  padding: 2px 4px;
+  transform: translateX(50%);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 88%);
+  color: #303742;
+  font-size: 0.6rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.measure-staff-event-details span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.measure-staff-event-details span:last-child {
+  color: #606a78;
+  font-size: 0.56rem;
+  text-transform: uppercase;
+}
+
+.measure-staff-event.is-continuation .measure-staff-event-select,
+.measure-staff-event.is-rest .measure-staff-event-select {
+  font-weight: 500;
 }
 
 .compact-staff-label {
@@ -146,6 +248,35 @@
     color-mix(in srgb, var(--border-subtle) 70%, transparent) calc(25% - 1px),
     color-mix(in srgb, var(--border-subtle) 70%, transparent) 25%
   );
+}
+
+.progression-measure-card.has-shared-staff .progression-measure-grid {
+  min-height: 72px;
+}
+
+.progression-measure-card.has-shared-staff .progression-step-card,
+.progression-measure-card.has-shared-staff .progression-rest-card,
+.progression-measure-card.has-shared-staff .progression-step-continuation,
+.progression-measure-card.has-shared-staff .progression-measure-gap {
+  height: 70px;
+  min-height: 70px;
+  max-height: 70px;
+}
+
+.progression-measure-card.has-shared-staff .progression-step-card,
+.progression-measure-card.has-shared-staff .progression-rest-card {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 4px 6px;
+}
+
+.progression-measure-card.has-shared-staff .progression-step-select-button {
+  height: 100%;
+  min-height: 0;
+}
+
+.progression-measure-card.has-shared-staff .compact-staff-label {
+  min-height: 38px;
 }
 
 .measure-item-wrapper {

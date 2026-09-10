@@ -4,6 +4,7 @@ import type { StepPerformance } from "../../../src/domain/progression/step";
 import {
   canShiftPerformanceOctave,
   nextRegisterOffset,
+  performanceOctaveShiftPatch,
   shiftPitchesByOctave,
 } from "../../../src/ui/staff/staffOctave";
 
@@ -37,5 +38,23 @@ describe("Staff octave controls", () => {
 
     expect(canShiftPerformanceOctave(performance, 1)).toBe(false);
     expect(canShiftPerformanceOctave(performance, -1)).toBe(true);
+  });
+
+  it("builds the same immutable octave patch for automatic and manual voicing", () => {
+    const automatic = {
+      voicingMode: "automatic",
+      register: 1,
+    } as StepPerformance;
+    expect(performanceOctaveShiftPatch(automatic, 1)).toEqual({ register: 2 });
+    expect(performanceOctaveShiftPatch(automatic, 1)).not.toBe(automatic);
+
+    const manual = {
+      voicingMode: "manual",
+      manualVoicing: [exactPitch(60, { step: "C", alter: 0 })],
+    } as StepPerformance;
+    expect(
+      performanceOctaveShiftPatch(manual, -1)?.manualVoicing?.map((pitch) => pitch.midiNumber),
+    ).toEqual([48]);
+    expect(manual.manualVoicing?.[0]?.midiNumber).toBe(60);
   });
 });
