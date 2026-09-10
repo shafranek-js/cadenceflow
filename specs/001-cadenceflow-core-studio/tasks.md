@@ -427,7 +427,7 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
   provider with offline integrity checking and explicit failure/Retry behavior.
 - [x] T173 [US12] Route Melody playback through a separate provider/channel role with exact velocity,
   Mute/Solo/Volume behavior, current-note highlighting, and piano-continuation fallback.
-- [ ] T174 [US12] Add the deterministic Melody track to MIDI format-1 export while preserving byte-for-byte
+- [x] T174 [US12] Add the deterministic Melody track to MIDI format-1 export while preserving byte-for-byte
   output for projects without melody.
 - [ ] T175 [US12] Add the deterministic Melody MusicXML part with instrument, clef, rests, tuplets, and
   cross-bar ties while preserving no-melody output compatibility and XSD validation.

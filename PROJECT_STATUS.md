@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-10
-**Current implementation stage:** Phase 16 / User Story 12 sampled playback accepted through T173; T174 MIDI export is the next controlled batch
-**Task progress:** 158 accepted tasks, 158 / 176 total tasks
+**Current implementation stage:** Phase 16 / User Story 12 MIDI export accepted through T174; T175 MusicXML export is the next controlled batch
+**Task progress:** 159 accepted tasks, 159 / 176 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -579,21 +579,28 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 16 / US12 — Batch E T174
+## 8. Next development sequence: Phase 16 / US12 — Batch F T175
 
-T166–T173 are accepted after independent review and correction. Melody playback uses verified local
-FluidR3_GM MP3 sample maps through `soundfont-player`; the quarantined `stb-vorbis`/SF3 path is not used,
-and no antivirus exclusion is required. The next controlled scope adds Melody to MIDI export only;
-MusicXML remains deferred to T175.
+T166–T174 are accepted after independent review. Melody playback uses verified local FluidR3_GM MP3
+sample maps through `soundfont-player`; the quarantined `stb-vorbis`/SF3 path is not used, and no antivirus
+exclusion is required. Format-1 MIDI now adds a deterministic Melody track while preserving the exact
+three-track bytes for projects without Melody. The next controlled scope adds Melody to MusicXML only.
 
-- **T174**: [ ] Add deterministic Melody output as a separate track in Standard MIDI File format 1 while
-  preserving byte-for-byte output compatibility for projects without Melody.
+- **T175**: [ ] Add a deterministic Melody MusicXML part with instrument metadata, clef, rests, tuplets,
+  cross-bar ties, and byte-for-byte no-Melody compatibility.
 
 T172–T173 focused acceptance: offline asset verification PASS; 5 focused Vitest files / 17 tests PASS;
 US12 Chromium 2 / 2 PASS with `--workers=1 --retries=0`; TypeScript, scoped ESLint, Prettier, and
 `git diff --check` PASS. Review corrections preserve contextual preview realization, rebase audition to
 an immediate start, fix the octave label, and ensure a clean checkout no longer imports removed
 `spessasynth_lib`/`stb-vorbis` dependencies.
+
+T174 focused acceptance: MIDI Vitest 22 / 22 PASS; independent format-1 parsing confirms Conductor,
+Melody, Chords, and Bass track order, Melody channel 2, all six GM program mappings, CC7 volume, exact
+notes/velocities/ticks, note-off ordering, and aligned EOT. T139 export consistency 1 / 1 PASS after
+rebuilding its local `libxmljs2` native binding. TypeScript, scoped ESLint, Prettier, and `git diff --check`
+PASS. Mute/Solo and Temporary Branch are excluded from export policy, while no-Melody format-1 and legacy
+format-0 bytes remain pinned and unchanged.
 
 ## 9. Handoff operating model
 
