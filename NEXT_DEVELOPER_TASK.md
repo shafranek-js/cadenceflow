@@ -1,87 +1,168 @@
-# Next Developer Assignment — CadenceFlow US5, Batch A
+# Next Developer Assignment — CadenceFlow US12, Batch A
 
-**Assignment:** T077–T080 only  
-**Do not implement T081+ in this batch.**  
-**Goal:** establish executable test contracts for Piano realization and Audio Provider behavior before implementation.
+**Assignment:** T166–T167 only
 
-## Preflight requirement
+**Do not implement T168+ in this batch.**
 
-Before changing test/product code:
+**Goal:** закрепить требования US12 и реализовать чистое детерминированное ядро генерации мелодии без
+изменения сохраняемой Project schema, UI, audio, playback или export.
 
-1. Restore/attach Git and create a baseline commit from the handoff state.
-2. Restore dependencies with Node >=22 and a reproducible lockfile/package-manager version.
-3. Run the existing baseline build/tests/lint. Report real failures separately from environment failures.
-4. Do not alter approved product semantics merely to make old scaffolds pass.
+Полный утверждённый план:
+`specs/001-cadenceflow-core-studio/us12-melody-from-chords-plan.md`.
 
-## T077 — contextual voice-leading tests
+## Preflight и границы рабочего дерева
 
-Create `tests/unit/instruments/piano/voice-leading.test.ts`.
+1. Использовать Node `24.14.0` и текущий package manager проекта.
+2. Перед изменениями показать `git status --short` и `git log -3 --oneline`.
+3. Не изменять и не добавлять в коммит существующие untracked-файлы:
+   - `cadenceflow_visual_polish_batches/`;
+   - `design-qa.md`;
+   - `progression-controls.png`;
+   - `progression-strip.png`;
+   - `qa-current.png`;
+   - `qa-wide.png`.
+4. Не делать push.
+5. Не отмечать T166/T167 выполненными и не обновлять `PROJECT_STATUS.md` до review оркестратора.
 
-Required cases:
+## T166 — требования и технический срез US12
 
-- Common tones are retained where musically reasonable.
-- Consecutive voicings prefer bounded/minimal movement over independent root-position jumps.
-- Repeated chord can retain/adjust voicing contextually without sharing mutable step state.
-- Register preference constrains but does not redefine harmonic identity.
-- Deterministic input produces deterministic auto-voicing.
+Обновить только `spec.md`, `plan.md` и `tasks.md`:
 
-## T078 — manual voicing, bass, register and range tests
+- добавить User Story 12: создание связанной мелодической партии из выбранного ChordStep;
+- добавить новые FR после FR-190 и acceptance-сценарии, соответствующие утверждённому плану;
+- добавить в `plan.md` отдельный slice для melody generation;
+- добавить Phase 16 и задачи T166–T176;
+- сохранить все существующие task checkbox без изменений;
+- явно удалить из Future Scope противоречия новой принятой функции, но не расширять scope на ручной
+  piano-roll, произвольные SoundFont, несколько Melody Tracks или аудиоэкспорт;
+- зафиксировать, что melody использует только contextual upper voicing, не bass, и вычисляется из
+  recipe, а не хранится как список нот.
 
-Create `tests/unit/instruments/piano/realization.test.ts`.
+Нумерация Phase 16:
 
-Required cases:
+- T166 — docs/spec/plan/task contracts;
+- T167 — pure melody types, patterns, grids and deterministic projection;
+- T168 — Project schema v2, migration and portable persistence;
+- T169 — undoable melody and track-setting commands;
+- T170 — accessible context menu, editor dialog and track controls;
+- T171 — Melody Staff rendering and active-note highlighting;
+- T172 — licensed FluidR3Mono asset preparation and provider;
+- T173 — playback routing, Mute/Solo/Volume and failure fallback;
+- T174 — MIDI melody track;
+- T175 — MusicXML melody part;
+- T176 — final integration and Chromium acceptance.
 
-- Manual exact pitches/octaves round-trip unchanged.
-- Manual pitches remain step-local.
-- Bass is independent from the upper voicing.
-- `Auto / Root / 3rd / 5th / Custom` bass semantics are testable.
-- Bass octave `Auto / -1 / -2` is independent from upper register.
-- Register `Auto / -2 / -1 / 0 / +1 / +2` moves realization without changing harmony.
-- Out-of-range/invalid manual pitches return validation errors rather than silent mutation.
+## T167 — чистый генератор мелодии
 
-## T079 — articulation and dynamics tests
+Добавить framework-independent domain-модуль, рекомендуемое расположение:
 
-Create `tests/unit/instruments/piano/performance.test.ts`.
+- `src/domain/melody/types.ts`;
+- `src/domain/melody/patterns.ts`;
+- `src/domain/melody/projection.ts`;
+- `tests/unit/melody/projection.test.ts`.
 
-Required cases:
+Публичные типы этого batch:
 
-- Piano articulations: `Block`, `Arp Up`, `Arp Down`, `Broken Chord`, `Humanized`.
-- `Strum` must not appear in the Piano profile.
-- Master Velocity source of truth is numeric 1–127.
-- Musical labels map to defaults without destroying a previously entered exact MIDI velocity.
-- Per-note velocity overrides inherit Master Velocity for non-overridden notes.
-- Presets: `Balanced`, `Top Voice Emphasis`, `Bass Emphasis`, `Inner Voices Soft`, `Humanized Dynamics`.
-- Humanization is bounded and testable; avoid flaky randomness by using an injected deterministic source/seed in tests.
+```ts
+type MelodyPattern =
+  | "up"
+  | "down"
+  | "up-down"
+  | "down-up"
+  | "outside-in"
+  | "inside-out";
 
-## T080 — Audio Provider contract tests
+type MelodyGrid =
+  | "quarter"
+  | "eighth"
+  | "sixteenth"
+  | "eighth-triplet"
+  | "sixteenth-triplet";
 
-Create `tests/integration/audio-provider-contract.test.ts` using a mock clock/provider.
+type MelodyOctaveOffset = -2 | -1 | 0 | 1 | 2;
 
-Required contract checks:
+interface ChordMelodyRecipe {
+  readonly pattern: MelodyPattern;
+  readonly grid: MelodyGrid;
+  readonly octaveOffset: MelodyOctaveOffset;
+}
+```
 
-- `prepare()` transitions provider state predictably.
-- `schedule()` consumes canonical `AudioNoteEvent[]`, not UI chord objects.
-- Schedule start times use the injected `AudioClock`, not React/render-frame timing.
-- `stop(scope)` and `dispose()` are idempotent or safely repeatable.
-- Provider errors/fallback state are observable and do not mutate Project/Progression state.
-- Contract permits both future `HqSamplePianoProvider` and `SoundFontProvider` without changing callers.
+Проекция этого batch принимает уже канонически реализованные upper pitches и точную duration. Она не
+должна самостоятельно реализовывать гармонию или импортировать piano profile. Предусмотреть API уровня:
 
-## Architecture constraints
+```ts
+realizeChordMelody(input: {
+  readonly sourceStepId: string;
+  readonly upperPitches: readonly ExactPitch[];
+  readonly durationBeats: Rational;
+  readonly recipe: ChordMelodyRecipe;
+}): MelodyPhrase
+```
 
-- Tests may drive new type/interface refinements only when compatible with `spec.md` and existing contracts.
-- Do not import React/VexFlow/Dexie into `src/domain/**`.
-- Do not implement a second pitch representation for audio.
-- Do not add or download piano sample assets in this batch.
-- Do not start timing transport (US6).
+Каждый event должен содержать source Step ID, последовательный index, `ExactPitch`, точные Rational
+`startOffsetBeats` и `durationBeats`. Результат и вложенные массивы должны быть immutable.
 
-## Required submission to orchestrator
+Обязательная семантика:
 
-Return:
+- входные upper pitches сортируются по `midiNumber`; исходный массив не мутируется;
+- octave offset сдвигает `midiNumber` и spelling octave на `12 * offset`, сохраняя note letter и
+  accidental;
+- bass в API отсутствует;
+- Up/Down — полный проход по возрастанию/убыванию;
+- Up-Down/Down-Up — разворот без повторения крайних нот;
+- Outside-In — lowest, highest, next-lowest, next-highest;
+- Inside-Out — от центра наружу; для чётного количества lower-middle, upper-middle, затем попеременно
+  наружу; для нечётного — middle, lower, upper и далее наружу;
+- sequence циклически повторяется и начинается заново для каждого вызова;
+- grid durations: `1`, `1/2`, `1/4`, `1/3`, `1/6` beats;
+- последняя нота сокращается ровно до остатка ChordStep;
+- duration короче grid всё равно создаёт одну ноту на всю duration;
+- пустой pitch list или неположительная duration завершаются typed domain validation error;
+- octave overflow за MIDI range 0–127 завершается typed error, без clamp;
+- exact duplicate MIDI pitches и octave doublings сохраняются;
+- один pitch повторяется до конца duration;
+- генерация deterministic и не использует float для музыкального времени.
 
-- Git diff/commit for T077–T080.
-- Exact commands and full summary of build/unit/integration/e2e results.
-- Any interface changes required to make these tests express the approved model.
-- List of unresolved questions/blockers, if any.
-- Explicit statement: `Spec deviations: none` or enumerate them.
+В этом batch не добавлять `melody` в `ChordStep`/Project, не менять schema version и codecs. T168 выполнит
+интеграцию типов в сохраняемую модель после review генератора.
 
-**Acceptance condition:** the tests are specific enough that T081–T094 can be implemented against them without reinterpreting the product model.
+## Обязательные тесты
+
+- шесть patterns на трёх, четырёх и пяти входных pitches с literal expected MIDI order;
+- octave doublings, exact duplicates и single-pitch cycle;
+- все пять grids;
+- exact fit и truncated tail (`5/6`, `7/8`, custom Rational);
+- duration меньше одного grid interval;
+- octave offsets `-2..+2` и MIDI range failure;
+- empty pitches и zero/negative duration failure;
+- source input, recipe и pitches не мутируются;
+- повторные вызовы глубоко равны и возвращают frozen/readonly projection.
+
+## Проверки для сдачи
+
+Запустить только focused-проверки этого batch:
+
+1. Новый melody unit test с `--maxWorkers=1`.
+2. Существующие focused Rational и piano realization tests, затронутые импортами.
+3. TypeScript.
+4. Prettier check только для изменённых файлов.
+5. `git diff --check`.
+
+Полный Vitest, build, lint и Chromium в этом batch не запускать. Dev server после работы должен снова
+отвечать на `http://127.0.0.1:5174/`.
+
+## Формат отчёта разработчика
+
+Вернуть:
+
+1. commit hash и точный список изменённых файлов;
+2. literal expected sequences для всех шести patterns;
+3. команды и результаты focused checks;
+4. подтверждение отсутствия Project/schema/UI/audio/export изменений;
+5. финальный `git status --short` и ahead/behind;
+6. `Spec deviations: none` либо точный перечень отклонений.
+
+**Acceptance condition:** требования US12 согласованы с основными артефактами, а чистый generator
+однозначно определяет pitch order и Rational timing для последующей persistence/UI/audio/export
+интеграции.
