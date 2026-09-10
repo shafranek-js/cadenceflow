@@ -4,9 +4,16 @@
 
 **Do not implement T174+ in this batch.** MIDI and MusicXML output must remain unchanged.
 
-**Goal:** prepare and verify the licensed offline FluidR3Mono asset, add one lazy Melody SoundFont
+**Goal:** bundle and verify licensed offline FluidR3_GM instrument samples, add one lazy Melody SoundFont
 provider, and route derived Melody events through a separate playback role/channel. Piano and metronome
 must continue when Melody is unavailable. Staff must highlight the exact sounding Melody event.
+
+> **Security correction (2026-09-10):** the earlier FluidR3Mono SF3/SpessaSynth route is superseded.
+> Microsoft Defender detected `Trojan:Script/ObfusScript.A!ml` in the transitive
+> `stb-vorbis/dist/index.js` decoder. Although `DidThreatExecute=False` and this is consistent with a
+> heuristic false positive, do not restore `spessasynth_lib`, `stb-vorbis`, the SF3 asset, or an antivirus
+> exclusion. The approved implementation uses local FluidR3_GM MP3 sample maps through
+> `soundfont-player@0.12.0` and keeps their hashes, provenance, and CC BY 3.0 attribution in the repository.
 
 Authoritative sources:
 
@@ -48,40 +55,25 @@ Before adding sound, remove the current Step-local ambiguity in Melody projectio
 Commit this correction separately, preferably:
 `fix(us12): share contextual melody realization`.
 
-## T172 — licensed offline asset and lazy provider
+## T172 — licensed offline samples and lazy provider
 
-### Reproducible preparation
+### Reproducible local assets
 
-- Add an idempotent Node/TypeScript preparation script and package command for exactly
-  `fluidr3mono-gm-soundfont_2.315-7_all.deb`.
-- Download only from the authoritative Debian archive/package path and verify the package SHA-256 before
-  extraction:
-  `4098301bf29f4253c2f5799a844f42dd4aa733d91a210071ad16d7757dea51d6`.
-- Use a safe temporary directory outside tracked output; remove it on success/failure. Never write an
-  unverified package into `public/` and never commit the `.deb`.
-- Extract only:
-  - `FluidR3Mono_GM.sf3`;
-  - the Debian copyright/license source.
-- Commit the verified runtime asset under `public/audio/melody/`, the license under `public/licenses/`, and
-  a deterministic provenance manifest containing package/version, canonical source URL, package SHA-256,
-  extracted filenames, byte sizes, extracted SHA-256 values, license identity, and preparation-script
-  version.
-- Add an offline `--verify` path that performs no network calls and fails on a missing, renamed, empty, or
-  hash-mismatched asset/license/manifest. A second prepare run must be deterministic and must not rewrite
-  identical files.
-- Update `.gitignore` narrowly so temporary/package artifacts cannot be staged while the intended extracted
-  runtime files remain trackable.
-- Do not add a new extraction npm dependency unless Node/platform facilities truly cannot handle the Debian
-  archive. If an external executable is required, invoke it via `execFile` with fixed arguments and produce
-  a clear prerequisite error; never construct a shell command from paths.
+- Bundle only the six required FluidR3_GM MP3 instrument maps under `public/audio/melody/FluidR3_GM/`:
+  Violin, Cello, Oboe, Clarinet, Flute, and Lead 1 Square.
+- Keep `public/audio/melody/manifest.json` deterministic and complete: canonical source repository, license,
+  relative filenames, byte sizes, and SHA-256 values for every runtime asset.
+- Keep the CC BY 3.0 legal text and attribution under `public/licenses/`.
+- Runtime playback must use only these local files and must not make CDN/network requests.
+- Verification must fail on a missing, renamed, empty, or hash-mismatched sample, manifest, or license.
+- Do not restore an SF2/SF3 decoder, WASM decoder, `spessasynth_lib`, or `stb-vorbis`.
 
 ### Melody provider
 
-- Keep `SpessaSoundFontProvider` generic/backward compatible. Add a small Melody-specific provider or
-  adapter rather than embedding Melody policy throughout the generic class.
-- Inspect the installed `spessasynth_lib@4.3.14` exports/types before choosing program-change/controller
-  calls; do not guess its API and do not add another synthesizer library.
-- Load only local `/audio/melody/FluidR3Mono_GM.sf3`; runtime must make no CDN/network request.
+- Keep `SpessaSoundFontProvider` generic/backward compatible, but do not use or import SpessaSynth for
+  Melody. Use the dedicated `MelodySoundFontProvider` backed by `soundfont-player@0.12.0`.
+- Map each supported Melody instrument to its exact local FluidR3_GM sample-map URL; no silent Piano or
+  oscillator fallback is allowed.
 - Use the same AudioContext/clock as the HQ Piano provider. Do not create an extra AudioContext when the
   shared context exists.
 - Load lazily only when:
@@ -241,13 +233,13 @@ focused preview-based Chromium configuration. Restore dev server HTTP 200 at
 
 ## Report
 
-Return commit hashes and exact file lists; downloaded package URL/hash and extracted asset/license hashes;
-offline verify result; inspected Spessa API/program/volume method; lazy-load request evidence; routing table;
+Return commit hashes and exact file lists; sample source URLs, asset/license hashes, and attribution evidence;
+offline verify result; inspected soundfont-player scheduling/gain behavior; lazy-load request evidence; routing table;
 velocity and Swing evidence; pause/resume/loop/highlight evidence; failure/Retry evidence; exact focused
 commands/results with Chromium retries `0`; final Git/ahead state; dev-server HTTP status; and
 `Spec deviations: none` or the complete list.
 
-**Acceptance condition:** CadenceFlow reproducibly bundles a verified open-source FluidR3Mono asset, loads
-it only when Melody needs it, plays derived Melody through an isolated instrument channel with correct
+**Acceptance condition:** CadenceFlow reproducibly bundles verified open-source FluidR3_GM samples, loads
+only the selected instrument when Melody needs it, plays derived Melody through an isolated instrument channel with correct
 settings and graceful failure, and highlights the exact sounding Melody note without changing Project or
 export semantics.

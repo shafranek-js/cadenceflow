@@ -32,7 +32,7 @@ export interface MelodyStateSnapshot {
   readonly updatedAt: string;
 }
 
-export interface RestoreMelodyStatePayload extends MelodyStateSnapshot {}
+export type RestoreMelodyStatePayload = MelodyStateSnapshot;
 export type RestoreMelodyStateCommand = ProjectCommand<RestoreMelodyStatePayload> & {
   readonly type: "melody/restore-state";
 };

@@ -22,10 +22,6 @@ function ascendingIndexes(count: number): number[] {
   return Array.from({ length: count }, (_, index) => index);
 }
 
-function descendingIndexes(count: number): number[] {
-  return ascendingIndexes(count).reverse();
-}
-
 function patternIndexes(count: number, pattern: MelodyPattern): readonly number[] {
   const ascending = ascendingIndexes(count);
   const descending = [...ascending].reverse();

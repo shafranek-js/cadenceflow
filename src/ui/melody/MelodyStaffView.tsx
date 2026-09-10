@@ -3,7 +3,6 @@ import type { Project } from "../../domain/project/project";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
-import { formatMusicalDuration } from "../../domain/timing/duration";
 import { rational, rationalToNumber } from "../../domain/timing/rational";
 import { projectPitchesToStaff } from "../../notation/staffProjection";
 import type {

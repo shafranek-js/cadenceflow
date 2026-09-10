@@ -103,7 +103,7 @@ async function verify(): Promise<void> {
   try {
     manifest = JSON.parse(manifestText);
   } catch (error) {
-    throw new Error(`Melody manifest is not valid JSON: ${String(error)}`);
+    throw new Error(`Melody manifest is not valid JSON: ${String(error)}`, { cause: error });
   }
   assertManifest(manifest);
 

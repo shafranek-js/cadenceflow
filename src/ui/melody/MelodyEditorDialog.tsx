@@ -50,11 +50,18 @@ function previewProject(
     melodyTrack: Object.freeze({ ...project.melodyTrack, instrument }),
     progression: Object.freeze({
       ...project.progression,
-      // The dialog previews the edited phrase, not the complete composition.
-      // The canonical realization is Step-local; keeping only this Step avoids
-      // unrelated recipes and empty measures turning a compact preview into a
-      // second full score.
-      steps: Object.freeze([previewStep]),
+      // Preserve the complete progression so automatic voicing receives the
+      // same preceding harmonic context as live playback. Remove recipes from
+      // every other Step so the audition contains only this draft phrase.
+      steps: Object.freeze(
+        project.progression.steps.map((current) => {
+          if (current.kind !== "chord") return current;
+          if (current.id === step.id) return previewStep;
+          if (!current.melody) return current;
+          const { melody: _melody, ...withoutMelody } = current;
+          return Object.freeze(withoutMelody);
+        }),
+      ),
       selectedStepId: step.id,
     }),
   });
@@ -231,7 +238,7 @@ export function MelodyEditorDialog({
                 >
                   {OCTAVE_OFFSETS.map((offset) => (
                     <option key={offset} value={offset}>
-                      {offset > 0 ? `+${offset}` : offset} octave$
+                      {offset > 0 ? `+${offset}` : offset} octave
                       {Math.abs(offset) === 1 ? "" : "s"}
                     </option>
                   ))}

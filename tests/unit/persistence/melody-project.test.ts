@@ -21,11 +21,29 @@ import { createCadenceFlowDb } from "../../../src/persistence/db";
 import { createAutosaveEngine } from "../../../src/persistence/autosave";
 import { createProjectRepository } from "../../../src/persistence/projectRepository";
 
-function createV1Payload(): Record<string, any> {
-  const payload = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
-    string,
-    any
-  >;
+type MutableMelodyTrackPayload = {
+  instrument?: unknown;
+  muted?: unknown;
+  solo?: unknown;
+  volume?: unknown;
+};
+
+type MutableProjectPayload = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  schemaVersion: number;
+  melodyTrack?: MutableMelodyTrackPayload;
+  progression: { steps: Array<Record<string, unknown>> };
+  temporaryBranch: { steps: Array<Record<string, unknown>> };
+  [key: string]: unknown;
+};
+
+function createV1Payload(): MutableProjectPayload {
+  const payload = JSON.parse(
+    encodePortableProject(createRichProjectFixture()),
+  ) as MutableProjectPayload;
   payload.schemaVersion = 1;
   delete payload.melodyTrack;
   for (const step of payload.progression.steps) delete step.melody;
@@ -116,7 +134,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     const original = createRichProjectFixture();
     const first = encodePortableProject(original);
     const second = encodePortableProject(original);
-    const raw = JSON.parse(first) as Record<string, any>;
+    const raw = JSON.parse(first) as MutableProjectPayload;
 
     expect(first).toBe(second);
     expect(raw.schemaVersion).toBe(2);
@@ -143,10 +161,9 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
   });
 
   it("preserves recipe data in an active Temporary Branch", () => {
-    const raw = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
-      string,
-      any
-    >;
+    const raw = JSON.parse(
+      encodePortableProject(createRichProjectFixture()),
+    ) as MutableProjectPayload;
     raw.temporaryBranch.steps[0].melody = {
       pattern: "up",
       grid: "quarter",
@@ -162,27 +179,29 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
   });
 
   it.each([
-    ["missing melodyTrack", (raw: Record<string, any>) => delete raw.melodyTrack],
-    ["invalid instrument", (raw: Record<string, any>) => (raw.melodyTrack.instrument = "piano")],
-    ["invalid volume", (raw: Record<string, any>) => (raw.melodyTrack.volume = 128)],
+    ["missing melodyTrack", (raw: MutableProjectPayload) => delete raw.melodyTrack],
+    ["invalid instrument", (raw: MutableProjectPayload) => (raw.melodyTrack!.instrument = "piano")],
+    ["invalid volume", (raw: MutableProjectPayload) => (raw.melodyTrack!.volume = 128)],
     [
       "mute and solo together",
-      (raw: Record<string, any>) => {
-        raw.melodyTrack.muted = true;
-        raw.melodyTrack.solo = true;
+      (raw: MutableProjectPayload) => {
+        raw.melodyTrack!.muted = true;
+        raw.melodyTrack!.solo = true;
       },
     ],
     [
       "invalid recipe pattern",
-      (raw: Record<string, any>) => (raw.progression.steps[0].melody.pattern = "random"),
+      (raw: MutableProjectPayload) =>
+        ((raw.progression.steps[0]!.melody as Record<string, unknown>).pattern = "random"),
     ],
     [
       "invalid recipe octave",
-      (raw: Record<string, any>) => (raw.progression.steps[0].melody.octaveOffset = 3),
+      (raw: MutableProjectPayload) =>
+        ((raw.progression.steps[0]!.melody as Record<string, unknown>).octaveOffset = 3),
     ],
     [
       "recipe on RestStep",
-      (raw: Record<string, any>) =>
+      (raw: MutableProjectPayload) =>
         (raw.progression.steps[2].melody = {
           pattern: "up",
           grid: "quarter",
@@ -191,7 +210,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     ],
     [
       "recipe on a Temporary Branch RestStep",
-      (raw: Record<string, any>) =>
+      (raw: MutableProjectPayload) =>
         raw.temporaryBranch.steps.push({
           id: "branch-rest-with-melody",
           kind: "rest",
@@ -201,7 +220,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     ],
     [
       "invalid recipe in a Temporary Branch ChordStep",
-      (raw: Record<string, any>) =>
+      (raw: MutableProjectPayload) =>
         (raw.temporaryBranch.steps[0].melody = {
           pattern: "random",
           grid: "quarter",
@@ -209,10 +228,9 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
         }),
     ],
   ])("rejects %s at the portable schema boundary", (_name, mutate) => {
-    const raw = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
-      string,
-      any
-    >;
+    const raw = JSON.parse(
+      encodePortableProject(createRichProjectFixture()),
+    ) as MutableProjectPayload;
     mutate(raw);
     expect(() => decodePortableProject(JSON.stringify(raw))).toThrow(InvalidPortableProjectError);
   });

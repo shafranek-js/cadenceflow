@@ -263,7 +263,7 @@ export function App() {
     }
     melodyProviderRef.current.setTrackSettings(project.melodyTrack);
     return melodyProviderRef.current;
-  }, [project.melodyTrack.instrument, project.melodyTrack.volume]);
+  }, [project.melodyTrack]);
 
   useEffect(() => {
     try {
@@ -1023,13 +1023,20 @@ export function App() {
         groove: { feel: "straight", swingAmount: 0 },
         melodyTrack: previewProject.melodyTrack,
       });
-      const playback = getMelodyPreviewAuditionController()?.audition(projection.events);
+      const firstStartSeconds = projection.events[0]?.startSeconds ?? 0;
+      const previewEvents = projection.events.map((event) =>
+        Object.freeze({
+          ...event,
+          startSeconds: event.startSeconds - firstStartSeconds,
+        }),
+      );
+      const playback = getMelodyPreviewAuditionController()?.audition(previewEvents);
       if (!playback) return;
       setIsMelodyPreviewPlaying(true);
       if (melodyPreviewStopTimerRef.current !== null) {
         clearTimeout(melodyPreviewStopTimerRef.current);
       }
-      const durationSeconds = projection.events.reduce(
+      const durationSeconds = previewEvents.reduce(
         (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
         0,
       );

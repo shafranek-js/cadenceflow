@@ -15,6 +15,8 @@ export interface ISpessaSynth {
   noteOn(channel: number, midiNote: number, velocity: number): void;
   noteOff(channel: number, midiNote: number): void;
   stopAll(force?: boolean): void;
+  controllerChange?(channel: number, controller: number, value: number): void;
+  programChange?(channel: number, programNumber: number): void;
   destroy?(): void;
   connect?(node: AudioNode): AudioNode;
 }
@@ -28,11 +30,27 @@ export interface SpessaSoundFontProviderOptions {
   readonly synthFactory?:
     ((ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth) | undefined;
   readonly fetchFn?: typeof fetch | undefined;
+  readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
 }
 
 interface ScheduledNoteTimer {
   readonly onTimerId: ReturnType<typeof setTimeout>;
   readonly offTimerId: ReturnType<typeof setTimeout>;
+  readonly channel: number;
+  readonly pitch: number;
+  started: boolean;
+}
+
+export const SPESSA_CHANNELS = Object.freeze({
+  upper: 0,
+  bass: 1,
+  melody: 2,
+  preview: 3,
+  metronome: 9,
+} as const);
+
+function midiChannelForRole(role: AudioNoteEvent["channelRole"]): number {
+  return SPESSA_CHANNELS[role];
 }
 
 export class SpessaSoundFontProvider implements InstrumentAudioProvider {
@@ -46,9 +64,12 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
   private readonly synthFactory?:
     ((ctx: BaseAudioContext) => Promise<ISpessaSynth> | ISpessaSynth) | undefined;
   private readonly fetchImpl: typeof fetch;
+  private readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
 
   private activeTimers: ScheduledNoteTimer[] = [];
   private playbackCount = 0;
+  private preparationPromise: Promise<void> | null = null;
+  private preparationError: Error | null = null;
 
   constructor(options: SpessaSoundFontProviderOptions = {}) {
     this.id = options.id ?? "soundfont-piano";
@@ -57,6 +78,7 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
     this.audioContext = options.audioContext ?? null;
     this.destinationNode = options.destination;
     this.synthFactory = options.synthFactory;
+    this.onStateChange = options.onStateChange;
     this.fetchImpl =
       options.fetchFn ??
       (typeof fetch !== "undefined"
@@ -72,157 +94,209 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
     return this.synth;
   }
 
+  get audioCtx(): BaseAudioContext | null {
+    return this.audioContext;
+  }
+
+  get clock(): AudioClock {
+    return {
+      now: () =>
+        this.audioContext?.currentTime ??
+        (typeof performance !== "undefined" ? performance.now() / 1000 : 0),
+    };
+  }
+
+  get lastError(): Error | null {
+    return this.preparationError;
+  }
+
+  private setProviderState(nextState: AudioProviderState): void {
+    if (this.providerState !== nextState) {
+      this.providerState = nextState;
+      this.onStateChange?.(nextState);
+    }
+  }
+
   async prepare(): Promise<void> {
-    this.providerState = "loading";
-    // Yield to allow observation of loading state
+    if (this.providerState === "ready" && this.synth) return;
+    if (this.preparationPromise) return this.preparationPromise;
+
+    this.preparationPromise = this.prepareInternal();
+    try {
+      await this.preparationPromise;
+    } finally {
+      this.preparationPromise = null;
+    }
+  }
+
+  private async prepareInternal(): Promise<void> {
+    this.setProviderState("loading");
+    this.preparationError = null;
     await Promise.resolve();
 
     try {
       if (!this.audioContext && typeof AudioContext !== "undefined") {
         this.audioContext = new AudioContext();
       }
+      if (!this.audioContext) {
+        throw new Error("AudioContext is required to initialize synthesizer");
+      }
 
       if (this.synthFactory) {
-        if (!this.audioContext) {
-          throw new Error("AudioContext is required to initialize synthesizer");
-        }
         this.synth = await this.synthFactory(this.audioContext);
       } else {
-        // Dynamic import from spessasynth_lib to keep worklet/browser initialization isolated
-        const { WorkletSynthesizer } = await import("spessasynth_lib");
-        if (!this.audioContext) {
-          throw new Error("AudioContext is required to initialize WorkletSynthesizer");
-        }
-        this.synth = new WorkletSynthesizer(this.audioContext);
+        throw new Error("SpessaSynth backend requires an explicit synthesizer factory");
       }
 
       if (this.destinationNode && this.synth && typeof this.synth.connect === "function") {
         this.synth.connect(this.destinationNode);
       }
 
-      // Load soundbank buffer if provided or url specified
       let buffer = this.soundFontBuffer;
       if (!buffer && this.soundFontUrl) {
-        if (!this.fetchImpl) {
-          throw new Error("Fetch is required to load soundfont URL");
+        if (!this.fetchImpl) throw new Error("Fetch is required to load SoundFont URL");
+        const response = await this.fetchImpl(this.soundFontUrl);
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load SoundFont from ${this.soundFontUrl}: HTTP ${response.status}`,
+          );
         }
-        const res = await this.fetchImpl(this.soundFontUrl);
-        if (!res.ok) {
-          throw new Error(`Failed to load SoundFont from ${this.soundFontUrl}: HTTP ${res.status}`);
-        }
-        buffer = await res.arrayBuffer();
+        buffer = await response.arrayBuffer();
       }
-
-      if (buffer && this.synth.soundBankManager) {
+      if (buffer) {
+        if (!this.synth?.soundBankManager) {
+          throw new Error("SpessaSynth sound bank manager is unavailable");
+        }
         await this.synth.soundBankManager.addSoundBank(buffer, "default-soundfont");
       }
-
-      if (this.synth.isReady) {
-        await this.synth.isReady;
-      }
-
-      this.providerState = "ready";
-    } catch (err) {
-      this.providerState = "error";
-      throw err;
+      if (this.synth.isReady) await this.synth.isReady;
+      this.setProviderState("ready");
+    } catch (error) {
+      this.synth?.stopAll(true);
+      this.synth?.destroy?.();
+      this.synth = null;
+      this.preparationError = error instanceof Error ? error : new Error(String(error));
+      this.setProviderState("error");
+      throw error;
     }
   }
 
+  configureChannel(channel: number, programNumber?: number, volume = 127): void {
+    if (!this.synth) return;
+    if (programNumber !== undefined) this.synth.programChange?.(channel, programNumber);
+    this.synth.controllerChange?.(channel, 7, Math.max(0, Math.min(127, Math.round(volume))));
+  }
+
   schedule(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback {
+    return this.scheduleOnChannel(events, clock);
+  }
+
+  scheduleOnChannel(
+    events: readonly AudioNoteEvent[],
+    clock: AudioClock,
+    channelOverride?: number,
+  ): ScheduledPlayback {
     if (this.providerState !== "ready" && this.providerState !== "fallback") {
       throw new Error(`Cannot schedule audio while provider is in state '${this.providerState}'`);
     }
+    if (!this.synth) throw new Error("Synthesizer not initialized");
 
-    if (!this.synth) {
-      throw new Error("Synthesizer not initialized");
-    }
-
-    // Validate canonical events
-    for (const evt of events) {
-      if (typeof evt.pitch !== "number" || evt.pitch < 0 || evt.pitch > 127) {
-        throw new TypeError("AudioNoteEvent must contain a valid MIDI pitch in 0..127");
-      }
-      if (typeof evt.startSeconds !== "number" || evt.startSeconds < 0) {
-        throw new TypeError("AudioNoteEvent must contain non-negative startSeconds");
-      }
-      if (typeof evt.durationSeconds !== "number" || evt.durationSeconds <= 0) {
-        throw new TypeError("AudioNoteEvent must contain positive durationSeconds");
-      }
-      if (typeof evt.velocity !== "number" || evt.velocity < 1 || evt.velocity > 127) {
-        throw new TypeError("AudioNoteEvent must contain numeric velocity in 1..127");
-      }
-      if (!["upper", "bass", "metronome"].includes(evt.channelRole)) {
-        throw new TypeError("AudioNoteEvent channelRole must be upper, bass, or metronome");
+    for (const event of events) {
+      if (
+        !Number.isInteger(event.pitch) ||
+        event.pitch < 0 ||
+        event.pitch > 127 ||
+        !Number.isFinite(event.startSeconds) ||
+        event.startSeconds < 0 ||
+        !Number.isFinite(event.durationSeconds) ||
+        event.durationSeconds <= 0 ||
+        !Number.isFinite(event.velocity) ||
+        event.velocity < 1 ||
+        event.velocity > 127
+      ) {
+        throw new TypeError("AudioNoteEvent contains invalid pitch, timing, or velocity");
       }
     }
 
-    this.playbackCount++;
+    this.playbackCount += 1;
     const playbackId = `sf-playback-${this.playbackCount}`;
     const batchTimers: ScheduledNoteTimer[] = [];
     let isCancelled = false;
-
-    const _baseClockTime = clock.now();
     const synthRef = this.synth;
+    void clock.now();
 
-    for (const evt of events) {
-      const channel = evt.channelRole === "bass" ? 1 : 0;
-      const onDelayMs = Math.max(0, evt.startSeconds * 1000);
-      const offDelayMs = Math.max(0, (evt.startSeconds + evt.durationSeconds) * 1000);
-
-      const onTimerId = setTimeout(() => {
-        if (!isCancelled && synthRef) {
-          synthRef.noteOn(channel, evt.pitch, evt.velocity);
-        }
-      }, onDelayMs);
-
-      const offTimerId = setTimeout(() => {
-        if (!isCancelled && synthRef) {
-          synthRef.noteOff(channel, evt.pitch);
-        }
-      }, offDelayMs);
-
-      const timerEntry: ScheduledNoteTimer = { onTimerId, offTimerId };
-      batchTimers.push(timerEntry);
-      this.activeTimers.push(timerEntry);
+    for (const event of events) {
+      const channel = channelOverride ?? midiChannelForRole(event.channelRole);
+      const timer: ScheduledNoteTimer = {
+        onTimerId: setTimeout(
+          () => {
+            if (!isCancelled) {
+              timer.started = true;
+              synthRef.noteOn(channel, event.pitch, event.velocity);
+            }
+          },
+          Math.max(0, event.startSeconds * 1000),
+        ),
+        offTimerId: setTimeout(
+          () => {
+            if (!isCancelled && timer.started) synthRef.noteOff(channel, event.pitch);
+            this.removeTimer(timer);
+          },
+          Math.max(0, (event.startSeconds + event.durationSeconds) * 1000),
+        ),
+        channel,
+        pitch: event.pitch,
+        started: false,
+      };
+      batchTimers.push(timer);
+      this.activeTimers.push(timer);
     }
 
     return {
       id: playbackId,
       cancel: () => {
+        if (isCancelled) return;
         isCancelled = true;
-        for (const t of batchTimers) {
-          clearTimeout(t.onTimerId);
-          clearTimeout(t.offTimerId);
-          const idx = this.activeTimers.indexOf(t);
-          if (idx !== -1) {
-            this.activeTimers.splice(idx, 1);
-          }
+        for (const timer of batchTimers) {
+          clearTimeout(timer.onTimerId);
+          clearTimeout(timer.offTimerId);
+          if (timer.started) synthRef.noteOff(timer.channel, timer.pitch);
+          this.removeTimer(timer);
         }
-        synthRef?.stopAll(true);
       },
     };
   }
 
+  stopChannel(channel: number): void {
+    for (const timer of [...this.activeTimers]) {
+      if (timer.channel !== channel) continue;
+      clearTimeout(timer.onTimerId);
+      clearTimeout(timer.offTimerId);
+      if (timer.started) this.synth?.noteOff(timer.channel, timer.pitch);
+      this.removeTimer(timer);
+    }
+  }
+
   stop(_scope?: PlaybackScope): void {
-    for (const t of this.activeTimers) {
-      clearTimeout(t.onTimerId);
-      clearTimeout(t.offTimerId);
+    for (const timer of this.activeTimers) {
+      clearTimeout(timer.onTimerId);
+      clearTimeout(timer.offTimerId);
+      if (timer.started) this.synth?.noteOff(timer.channel, timer.pitch);
     }
     this.activeTimers = [];
-
-    if (this.synth) {
-      this.synth.stopAll(true);
-    }
+    this.synth?.stopAll(true);
   }
 
   async dispose(): Promise<void> {
     this.stop();
-    if (this.synth) {
-      if (typeof this.synth.destroy === "function") {
-        this.synth.destroy();
-      }
-      this.synth = null;
-    }
-    this.providerState = "idle";
+    this.synth?.destroy?.();
+    this.synth = null;
+    this.preparationError = null;
+    this.setProviderState("idle");
+  }
+
+  private removeTimer(timer: ScheduledNoteTimer): void {
+    const index = this.activeTimers.indexOf(timer);
+    if (index >= 0) this.activeTimers.splice(index, 1);
   }
 }
