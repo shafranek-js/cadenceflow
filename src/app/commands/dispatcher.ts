@@ -40,6 +40,7 @@ import {
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
 } from "./presentationCommands";
+import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -77,6 +78,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setExpertiseMode(project, command as SetExpertiseModeCommand).project;
     case "presentation/set-staff-bass-visibility":
       return setStaffBassVisibility(project, command as SetStaffBassVisibilityCommand).project;
+    case "melody/restore-state":
+      return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
     default:
       return project;
   }

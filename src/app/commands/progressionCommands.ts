@@ -11,6 +11,7 @@ import { musicalDuration, type MusicalDuration } from "../../domain/timing/durat
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
+import { snapshotChordMelodyRecipe } from "../../domain/melody/types";
 import type { AppliedCommand, ProjectCommand } from ".";
 
 function updateProgression(project: Project, progression: Progression, nowIso: string): Project {
@@ -313,6 +314,7 @@ export function repeatChordStep(project: Project, command: RepeatChordStepComman
     id: command.payload.stepId,
     duration: command.payload.duration,
     performance: snapshotStepPerformance(source.performance),
+    ...(source.melody !== undefined ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
   });
   const steps = Object.freeze([...project.progression.steps, repeated]);
   return withInverse(

@@ -90,8 +90,6 @@ function migrateV1ToV2(record: Record<string, unknown>): Record<string, unknown>
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     melodyTrack: createDefaultMelodyTrackSettings(),
     ...(migratedProgression !== undefined ? { progression: migratedProgression } : {}),
-    ...(migratedTemporaryBranch !== undefined
-      ? { temporaryBranch: migratedTemporaryBranch }
-      : {}),
+    ...(migratedTemporaryBranch !== undefined ? { temporaryBranch: migratedTemporaryBranch } : {}),
   };
 }
