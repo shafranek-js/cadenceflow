@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano is the only production instrument profile in v1.
+Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles.
 
 Audio is sample-based rather than oscillator-based: the launch piano uses a high-quality multisampled acoustic grand through an `InstrumentAudioProvider`, with web-optimized lazy loading/caching; an SF2/SF3 provider can be integrated independently. MIDI and MusicXML are separate projections of the same semantic model.
 
@@ -20,7 +20,7 @@ Audio is sample-based rather than oscillator-based: the launch piano uses a high
 **Project Type**: Single-page desktop-first web application; no backend in v1  
 **Performance Goals**: Matrix interaction response <100 ms for ordinary local actions; preview note scheduling audible without UI-frame-dependent jitter; recommendation refresh <100 ms for v1 vocabulary; 60 fps target for ordinary UI motion; no page-level horizontal scroll in supported desktop range  
 **Constraints**: Harmonic/domain core must be browser/UI/audio-library independent; large piano assets must not block UI; autosave must not persist Undo history; no silent harmonic conversion; no ML requirement  
-**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, one production instrument profile, three v1 Card Views
+**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, one full production instrument profile, six curated Melody Track timbres, three v1 Card Views
 
 ## Constitution Check
 
@@ -66,7 +66,7 @@ Responsibilities:
 - piano articulation event expansion
 - Piano Card View data
 
-Future Guitar/Ukulele/Melodica profiles implement the same profile contract without changing stored harmonic identity.
+Future Guitar/Ukulele/Melodica profiles implement the same profile contract without changing stored harmonic identity. The US12 Melody Track instrument catalog is deliberately narrower: it assigns clef, General MIDI program, label, and SoundFont timbre to already-derived monophonic notes and does not implement chord voicing, Card Views, or an Instrument Profile.
 
 ### 3. Audio Providers
 
@@ -74,7 +74,7 @@ Future Guitar/Ukulele/Melodica profiles implement the same profile contract with
 
 v1 providers:
 - `HqSamplePianoProvider` — default production provider; high-quality multisampled acoustic piano, lazy loaded/cached.
-- `SoundFontProvider` — adapter/proof path using `spessasynth_lib` for SF2/SF3 compatibility; not a user-facing sound-bank manager in v1.
+- `SoundFontProvider` — `spessasynth_lib` SF2/SF3 adapter used by the curated US12 Melody Track catalog; not a user-facing sound-bank manager in v1.
 
 Audio providers do **not** decide chord spelling, voicing semantics, harmonic function, or progression timing.
 

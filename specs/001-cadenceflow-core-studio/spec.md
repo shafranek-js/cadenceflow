@@ -1117,6 +1117,12 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
 - **Progression**: Ordered sequence of Progression Steps and Rest Steps.
 - **Progression Step**: One independent chord occurrence with its own harmonic variant, duration,
   instrument realization, voicing, bass, articulation, dynamics, and notation overrides where relevant.
+- **Chord Melody Recipe**: Step-local Pattern, Grid, and Octave Offset settings from which CadenceFlow
+  deterministically derives a monophonic phrase using the Chord Step's current contextual upper voicing.
+- **Melody Track**: The single project-level presentation, playback, and export lane for all derived
+  Chord Melody phrases, with one curated instrument assignment and saved Mute, Solo, and Volume settings.
+- **Melody Instrument**: A curated clef, General MIDI program, label, and SoundFont timbre assignment for
+  already-derived monophonic melody notes; it is not a full chord-realization Instrument Profile.
 - **Rest Step**: Timed non-harmonic progression event that preserves prior harmonic context.
 - **Temporary Branch**: One active non-destructive sequence of preview steps with origin, optional
   rejoin point, and commit state.
@@ -1181,6 +1187,10 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
   MIDI-exported pitches for 100% of tested manual and automatic voicings; at least three distinct
   velocity regions produce audibly and measurably different sample/timbre responses without changing
   stored note identity.
+- **SC-018**: For every supported Melody Pattern and Grid in the US12 acceptance fixture, 100% of
+  generated events use only the source Chord Step's contextual upper pitches, retain exact Rational
+  ordering and duration through Staff, playback, MIDI, MusicXML, save/reopen, and Undo/Redo, and never
+  serialize a generated-note list.
 
 ## Assumptions
 

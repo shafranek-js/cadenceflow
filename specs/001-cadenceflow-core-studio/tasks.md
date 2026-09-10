@@ -404,9 +404,10 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
 
 ### Contracts and pure generator
 
-- [ ] T166 [US12] Add the User Story 12, FR-191–FR-207, acceptance scenarios, Scope Boundaries, Slice 11,
-  and Phase 16 contracts to `specs/001-cadenceflow-core-studio/spec.md`, `plan.md`, and `tasks.md` without
-  changing existing task checkboxes or Project/schema contracts.
+- [ ] T166 [US12] Add the User Story 12, FR-191–FR-207, SC-018, acceptance scenarios, entities, Scope
+  Boundaries, Slice 11, dependencies, and Phase 16 contracts to
+  `specs/001-cadenceflow-core-studio/spec.md`, `plan.md`, and `tasks.md` without changing existing task
+  checkboxes or implemented Project/schema code.
 - [ ] T167 [US12] Add immutable pure melody types, six pattern orderings, five exact Rational grids,
   octave-offset/MIDI validation, and deterministic Chord Step projection in
   `src/domain/melody/types.ts`, `src/domain/melody/patterns.ts`, `src/domain/melody/projection.ts`, with
@@ -452,7 +453,12 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
 - **US8** → repository/codec work can start after Foundation, but final round-trip acceptance depends on state introduced by US2/US3/US5/US6.
 - **US9** → depends on canonical realized performance (US5) and exact timeline (US6).
 - **US10** → shell work may start earlier, but final acceptance integrates all preceding stories.
-- **Phase 14 Polish** → runs after all selected P1/P2 stories.
+- **US11** → depends on progression Step timing (US3/US6), the desktop shell (US10), and independent
+  playback/export projections (US9).
+- **US12** → depends on canonical contextual upper voicing (US5), exact Step/measure timing (US6/US11),
+  persistence (US8), Staff rendering (US10/US11), and independent export projections (US9).
+- **Phase 14 Polish** → its final full-suite gate runs after US11 and US12; earlier completed polish tasks
+  remain valid but T150–T158 must cover the final accumulated product.
 
 ### User Story Dependency Graph
 
@@ -465,7 +471,7 @@ Setup → Foundation → US1
 Foundation ─────────────────→ US6 ──┘
 US3 + US4/US4A ─────────────→ US7
 Foundation + accumulated state ────→ US8
-All product stories ───────────────→ US10 → Polish
+All earlier product stories ───────→ US10 → US11 → US12 → Polish
 ```
 
 ### Parallel Opportunities
@@ -494,8 +500,14 @@ Complete Phase 9. Exit when custom meter/grouping, rests, swing, metronome/count
 ### Milestone 5 — Reuse, Persistence, Interchange
 Complete Phases 10–12. Exit when presets, autosave/portable projects, MIDI, and MusicXML round-trip/validation are stable.
 
-### Milestone 6 — Studio UX + Release Candidate
-Complete Phases 13–14. Exit when desktop/a11y/performance/full regression pass SC-001..SC-017.
+### Milestone 6 — Studio UX + Measure Composition
+Complete Phases 13 and 15. Exit when the wide desktop studio and exact measure-card composition flow
+pass their focused desktop, timing, playback, and export acceptance.
+
+### Milestone 7 — Linked Melody + Release Candidate
+Complete Phase 16, then finish the remaining Phase 14 gates. Exit when linked Melody generation,
+persistence, Staff, playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC-018
+regression suite pass.
 
 ## MVP First
 
@@ -508,7 +520,9 @@ Complete Phases 13–14. Exit when desktop/a11y/performance/full regression pass
 ## Notes
 
 - `Progressions` and `Dark Harmony` are v1 harmonic modules; `Scales` and `Blues` remain future modules.
-- Piano is the only production Instrument Profile in v1; Guitar Card View/profile remains future capability.
+- Piano is the only full production Instrument Profile in v1. US12's curated Melody Track timbres assign
+  sound, clef, and export metadata to derived monophonic notes but do not add full chord Instrument Profiles;
+  Guitar Card View/profile remains future capability.
 - HQ piano quality is mandatory, but the harmonic/project model must not depend on a specific SoundFont or sample-bank format.
 - No task may serialize Undo/Redo history into project/autosave/`.cadenceflow` data.
 - No task may silently map ambiguous harmonic content during module/mode changes.

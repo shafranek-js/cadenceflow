@@ -49,6 +49,19 @@ function midiOrder(
   return phrase.events.map((event) => event.pitch.midiNumber);
 }
 
+function expectValidationReason(
+  action: () => unknown,
+  reason: MelodyValidationError["reason"],
+): void {
+  try {
+    action();
+    throw new Error("expected melody validation to fail");
+  } catch (error) {
+    expect(error).toBeInstanceOf(MelodyValidationError);
+    expect((error as MelodyValidationError).reason).toBe(reason);
+  }
+}
+
 describe("T167 — deterministic Chord Step melody projection", () => {
   it("uses literal expected MIDI order for every pattern and source pitch count", () => {
     const cases: readonly {
@@ -274,25 +287,71 @@ describe("T167 — deterministic Chord Step melody projection", () => {
   });
 
   it("rejects empty pitches and non-positive durations with typed errors", () => {
-    expect(() =>
-      realizeChordMelody({
-        sourceStepId: "step-empty",
-        upperPitches: [],
-        durationBeats: rational(1),
-        recipe: recipe("up"),
-      }),
-    ).toThrow(MelodyValidationError);
-
-    for (const durationBeats of [rational(0), rational(-1), rational(-1, 2)]) {
-      expect(() =>
+    expectValidationReason(
+      () =>
         realizeChordMelody({
-          sourceStepId: "step-invalid-duration",
-          upperPitches: SOURCE_PITCHES.slice(0, 2),
-          durationBeats,
+          sourceStepId: "step-empty",
+          upperPitches: [],
+          durationBeats: rational(1),
           recipe: recipe("up"),
         }),
-      ).toThrow(MelodyValidationError);
+      "empty-pitches",
+    );
+
+    for (const durationBeats of [rational(0), rational(-1), rational(-1, 2)]) {
+      expectValidationReason(
+        () =>
+          realizeChordMelody({
+            sourceStepId: "step-invalid-duration",
+            upperPitches: SOURCE_PITCHES.slice(0, 2),
+            durationBeats,
+            recipe: recipe("up"),
+          }),
+        "invalid-duration",
+      );
     }
+  });
+
+  it("reports stable typed reasons for invalid pitches and runtime-invalid recipes", () => {
+    expectValidationReason(
+      () =>
+        realizeChordMelody({
+          sourceStepId: "step-invalid-pitch",
+          upperPitches: [
+            {
+              midiNumber: 128,
+              pitchClassIdentity: 8,
+              octave: 9,
+              spelling: { step: "G", alter: 1 },
+            },
+          ],
+          durationBeats: rational(1),
+          recipe: recipe("up"),
+        }),
+      "invalid-pitch",
+    );
+
+    expectValidationReason(
+      () =>
+        realizeChordMelody({
+          sourceStepId: "step-invalid-pattern",
+          upperPitches: SOURCE_PITCHES.slice(0, 2),
+          durationBeats: rational(1),
+          recipe: { ...recipe("up"), pattern: "random" as MelodyPattern },
+        }),
+      "invalid-recipe",
+    );
+
+    expectValidationReason(
+      () =>
+        realizeChordMelody({
+          sourceStepId: "step-invalid-grid",
+          upperPitches: SOURCE_PITCHES.slice(0, 2),
+          durationBeats: rational(1),
+          recipe: { ...recipe("up"), grid: "thirty-second" as MelodyGrid },
+        }),
+      "invalid-recipe",
+    );
   });
 
   it("does not mutate inputs and returns a deeply frozen deterministic projection", () => {
