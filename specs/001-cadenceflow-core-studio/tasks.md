@@ -415,9 +415,9 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
 
 ### Integration after generator review
 
-- [ ] T168 [US12] Add Project schema v2 melody recipe/track-settings types, v1 migration, JSON Schema, and
+- [x] T168 [US12] Add Project schema v2 melody recipe/track-settings types, v1 migration, JSON Schema, and
   portable persistence round-trip coverage without serializing generated notes.
-- [ ] T169 [US12] Add undoable melody create/edit/remove and track-setting commands, including
+- [x] T169 [US12] Add undoable melody create/edit/remove and track-setting commands, including
   Repeat/Extend/delete/reorder linkage behavior.
 - [ ] T170 [US12] Add accessible Chord Step context menu, compact melody editor/preview, and Melody Track
   Instrument/Mute/Solo/Volume controls with keyboard/focus lifecycle coverage.

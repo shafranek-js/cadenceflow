@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-10
-**Current implementation stage:** Phase 16 / User Story 12 Batch A contracts and deterministic melody projection accepted; T168–T169 are the next controlled batch
-**Task progress:** 152 accepted tasks, 152 / 176 total tasks
+**Current implementation stage:** Phase 16 / User Story 12 persistence and command foundation accepted through T169; T170–T171 are the next controlled batch
+**Task progress:** 154 accepted tasks, 154 / 176 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** has contracts and its pure deterministic generator accepted through **T166–T167**; Project schema/persistence and commands begin in T168–T169. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is accepted through **T169**: contracts, deterministic generator, Project schema v2 migration/persistence, and undoable melody commands are complete. Context menu/editor and Melody Staff begin in T170–T171. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -579,16 +579,16 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 16 / US12 — Batch B T168–T169
+## 8. Next development sequence: Phase 16 / US12 — Batch C T170–T171
 
-T166–T167 are accepted after independent review and correction. The next controlled scope adds the
-recipe/settings to Project schema v2 and introduces the undoable commands that own all subsequent UI
-changes. UI, Staff, SoundFont, playback, MIDI, and MusicXML remain deferred to T170+.
+T166–T169 are accepted after independent review and correction. The next controlled scope adds the
+accessible creation/editing UI and projects derived melody events onto a separate Staff. SoundFont,
+live playback routing, MIDI, and MusicXML remain deferred to T172+.
 
-- **T168**: [ ] Add Project schema v2 melody recipe/track-settings types, pure v1 migration, JSON Schema,
-  autosave/repository compatibility, and portable round-trip coverage without serializing generated notes.
-- **T169**: [ ] Add undoable create/edit/remove recipe and Melody Track setting commands, including the
-  accepted Repeat/Extend/delete/reorder behavior and selection restoration.
+- **T170**: [ ] Add accessible Chord Step context menu, compact melody editor/preview, and Melody Track
+  Instrument/Mute/Solo/Volume controls with keyboard/focus lifecycle coverage.
+- **T171**: [ ] Add Melody Staff projection/rendering, clef/instrument mapping, rests/tuplets,
+  cross-bar ties, and active-note highlighting without changing Piano staff semantics.
 
 ## 9. Handoff operating model
 
