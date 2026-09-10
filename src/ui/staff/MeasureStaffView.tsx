@@ -66,6 +66,7 @@ export function MeasureStaffView({
   playingStepId,
   onSelect,
   onOctaveChange,
+  onOpenMelodyMenu,
 }: {
   readonly items: readonly MeasureStaffItem[];
   readonly meter: Meter;
@@ -74,6 +75,11 @@ export function MeasureStaffView({
   readonly playingStepId: string | undefined;
   readonly onSelect: (stepId: string) => void;
   readonly onOctaveChange: (stepId: string, direction: StaffOctaveDirection) => void;
+  readonly onOpenMelodyMenu?: (
+    stepId: string,
+    anchor: HTMLElement,
+    position: { readonly x: number; readonly y: number },
+  ) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [renderedPositions, setRenderedPositions] = useState<Readonly<Record<string, number>>>({});
@@ -229,9 +235,35 @@ export function MeasureStaffView({
                     aria-label={`Select ${title}`}
                     aria-pressed={selected}
                     aria-current={playing ? "step" : undefined}
+                    aria-haspopup={chord && onOpenMelodyMenu ? "menu" : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSelect(item.stepId);
+                    }}
+                    onContextMenu={(event) => {
+                      if (!chord || !onOpenMelodyMenu) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        !chord ||
+                        !onOpenMelodyMenu ||
+                        (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey))
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                        x: rect.left,
+                        y: rect.bottom,
+                      });
                     }}
                   >
                     {visibleLabel}

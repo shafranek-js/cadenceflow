@@ -588,6 +588,7 @@ export function ProgressionTrack({
                   playingStepId={currentPlayingStepId}
                   onSelect={onSelectStep}
                   onOctaveChange={shiftStaffOctave}
+                  {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
                 />
               ) : null}
               <div className="progression-measure-grid" data-testid="progression-measure-grid">

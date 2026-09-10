@@ -341,4 +341,26 @@ describe("renderStaffSequence", () => {
     expect(positions).toHaveLength(2);
     expect(positions[1]!.x).toBeGreaterThan(positions[0]!.x);
   });
+
+  it("groups consecutive triplet notes under one tuplet bracket", () => {
+    const triplets: readonly StaffSequenceEntry[] = [
+      chord("triplet-1", 0, 1, 1, 3),
+      chord("triplet-2", 1, 3, 1, 3),
+      chord("triplet-3", 2, 3, 1, 3),
+      chord("triplet-4", 1, 1, 1, 3),
+      chord("triplet-5", 4, 3, 1, 3),
+      chord("triplet-6", 5, 3, 1, 3),
+      {
+        key: "remaining-half",
+        kind: "rest",
+        startOffsetBeats: rational(2),
+        duration: musicalDuration(rational(2)),
+      },
+    ];
+
+    const { svg } = renderSequence(triplets);
+
+    expect(svg.dataset.staffTupletGroups).toBe("2");
+    expect(svg.querySelectorAll(".vf-tuplet")).toHaveLength(2);
+  });
 });

@@ -11,18 +11,21 @@ export function MelodyTrackControls({
   readonly onChange: (patch: Partial<MelodyTrackSettings>) => void;
 }) {
   const [volumeDraft, setVolumeDraft] = useState(settings.volume);
+  const volumeDraftRef = useRef(settings.volume);
   const pointerEditingRef = useRef(false);
   const lastCommittedVolumeRef = useRef(settings.volume);
 
   useEffect(() => {
     if (pointerEditingRef.current) return;
     setVolumeDraft(settings.volume);
+    volumeDraftRef.current = settings.volume;
     lastCommittedVolumeRef.current = settings.volume;
   }, [settings.volume]);
 
   const commitVolume = (value: number) => {
     const next = Math.max(0, Math.min(127, Math.round(value)));
     setVolumeDraft(next);
+    volumeDraftRef.current = next;
     if (next === lastCommittedVolumeRef.current) return;
     lastCommittedVolumeRef.current = next;
     onChange({ volume: next });
@@ -31,6 +34,7 @@ export function MelodyTrackControls({
   const handleVolumeChange = (event: ChangeEvent<HTMLInputElement>) => {
     const next = Number(event.target.value);
     setVolumeDraft(next);
+    volumeDraftRef.current = next;
     if (!pointerEditingRef.current) commitVolume(next);
   };
 
@@ -88,11 +92,15 @@ export function MelodyTrackControls({
           onChange={handleVolumeChange}
           onPointerUp={() => {
             pointerEditingRef.current = false;
-            commitVolume(volumeDraft);
+            commitVolume(volumeDraftRef.current);
+          }}
+          onPointerCancel={() => {
+            pointerEditingRef.current = false;
+            commitVolume(volumeDraftRef.current);
           }}
           onBlur={() => {
             pointerEditingRef.current = false;
-            commitVolume(volumeDraft);
+            commitVolume(volumeDraftRef.current);
           }}
         />
         <output>{volumeDraft}</output>

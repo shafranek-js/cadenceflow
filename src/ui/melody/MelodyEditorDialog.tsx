@@ -48,11 +48,12 @@ function previewProject(
     melodyTrack: Object.freeze({ ...project.melodyTrack, instrument }),
     progression: Object.freeze({
       ...project.progression,
-      steps: Object.freeze(
-        project.progression.steps.map((candidate) =>
-          candidate.id === step.id ? previewStep : candidate,
-        ),
-      ),
+      // The dialog previews the edited phrase, not the complete composition.
+      // The canonical realization is Step-local; keeping only this Step avoids
+      // unrelated recipes and empty measures turning a compact preview into a
+      // second full score.
+      steps: Object.freeze([previewStep]),
+      selectedStepId: step.id,
     }),
   });
 }
@@ -97,9 +98,15 @@ export function MelodyEditorDialog({
   const preview = useMemo(() => {
     if (!isOpen) return { kind: "closed" as const };
     try {
+      const projectWithDraft = previewProject(project, step, recipe, instrument);
+      const timeline = createMelodyTimeline(projectWithDraft);
       return {
         kind: "ready" as const,
-        timeline: createMelodyTimeline(previewProject(project, step, recipe, instrument)),
+        project: projectWithDraft,
+        timeline,
+        measures: timeline.measures.filter((measure) =>
+          measure.entries.some((entry) => entry.kind === "note" && entry.sourceStepId === step.id),
+        ),
       };
     } catch (error) {
       return {
@@ -235,12 +242,12 @@ export function MelodyEditorDialog({
                 <p className="melody-editor-error" role="alert" data-testid="melody-editor-error">
                   {preview.message}
                 </p>
-              ) : preview.kind === "ready" && preview.timeline.measures.length > 0 ? (
+              ) : preview.kind === "ready" && preview.measures.length > 0 ? (
                 <div className="melody-editor-preview-measures">
-                  {preview.timeline.measures.map((measure) => (
+                  {preview.measures.map((measure) => (
                     <MelodyStaffView
                       key={measure.measureIndex}
-                      project={previewProject(project, step, recipe, instrument)}
+                      project={preview.project}
                       timeline={preview.timeline}
                       measure={measure}
                       onSelectStep={() => undefined}

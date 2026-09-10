@@ -65,7 +65,9 @@ export function ProgressionStepCard({
   const openMelodyMenuFromPointer = (event: MouseEvent<HTMLElement>) => {
     if (!onOpenMelodyMenu) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const anchor = target?.closest<HTMLElement>("[data-progression-step-select]") ?? null;
+    const anchor =
+      target?.closest<HTMLElement>("[data-progression-step-select]") ??
+      event.currentTarget.querySelector<HTMLElement>("[data-progression-step-select]");
     if (!anchor) return;
     event.preventDefault();
     event.stopPropagation();
@@ -75,7 +77,9 @@ export function ProgressionStepCard({
     if (!onOpenMelodyMenu) return;
     if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const anchor = target?.closest<HTMLElement>("[data-progression-step-select]") ?? null;
+    const anchor =
+      target?.closest<HTMLElement>("[data-progression-step-select]") ??
+      event.currentTarget.querySelector<HTMLElement>("[data-progression-step-select]");
     if (!anchor) return;
     event.preventDefault();
     event.stopPropagation();

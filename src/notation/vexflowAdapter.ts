@@ -158,6 +158,60 @@ export interface StaffSequencePosition {
   readonly ratio: number;
 }
 
+interface RenderedSequenceTickable {
+  readonly entry: StaffSequenceEntry;
+  readonly note: StaveNote | GhostNote;
+  readonly rhythm: StaffRhythm;
+}
+
+/**
+ * A tuplet describes a rhythmic group, not an individual note. Group adjacent
+ * compatible tickables in threes so an eighth/sixteenth-triplet run receives
+ * one bracket and one numeral per beat. A truncated final group remains a
+ * single partial tuplet, preserving its exact Rational duration.
+ */
+function createSequenceTuplets(
+  rendered: readonly RenderedSequenceTickable[],
+  eligible: (entry: StaffSequenceEntry) => boolean,
+): readonly Tuplet[] {
+  const tuplets: Tuplet[] = [];
+  let pending: RenderedSequenceTickable[] = [];
+  let signature: string | null = null;
+
+  const flush = () => {
+    if (pending.length === 0) return;
+    const specification = pending[0]!.rhythm.tuplet!;
+    tuplets.push(
+      new Tuplet(
+        pending.map(({ note }) => note),
+        {
+          numNotes: specification.numNotes,
+          notesOccupied: specification.notesOccupied,
+          bracketed: true,
+          ratioed: false,
+        },
+      ),
+    );
+    pending = [];
+    signature = null;
+  };
+
+  for (const item of rendered) {
+    const specification = item.rhythm.tuplet;
+    if (!specification || !eligible(item.entry)) {
+      flush();
+      continue;
+    }
+    const nextSignature = `${specification.numNotes}:${specification.notesOccupied}:${item.rhythm.vexDuration}`;
+    if (signature !== null && signature !== nextSignature) flush();
+    signature = nextSignature;
+    pending.push(item);
+    if (pending.length === specification.numNotes) flush();
+  }
+  flush();
+  return Object.freeze(tuplets);
+}
+
 function exactDurationFraction(duration: MusicalDuration): Fraction {
   return new Fraction(duration.beats.numerator, duration.beats.denominator * 4);
 }
@@ -433,18 +487,7 @@ export function renderStaffSequence(
     }
     return { entry, note, rhythm };
   });
-  const tuplets = notes.flatMap(({ entry, note, rhythm }) =>
-    entry.kind !== "gap" && rhythm.tuplet
-      ? [
-          new Tuplet([note], {
-            numNotes: rhythm.tuplet.numNotes,
-            notesOccupied: rhythm.tuplet.notesOccupied,
-            bracketed: true,
-            ratioed: false,
-          }),
-        ]
-      : [],
-  );
+  const tuplets = createSequenceTuplets(notes, (entry) => entry.kind !== "gap");
   const bassNotes = bassStave
     ? entries.map((entry) => {
         const rhythm = staffRhythmForDuration(entry.duration);
@@ -475,17 +518,9 @@ export function renderStaffSequence(
         return { entry, note, rhythm };
       })
     : [];
-  const bassTuplets = bassNotes.flatMap(({ entry, note, rhythm }) =>
-    (entry.kind === "rest" || (entry.kind === "chord" && entry.bassProjection)) && rhythm.tuplet
-      ? [
-          new Tuplet([note], {
-            numNotes: rhythm.tuplet.numNotes,
-            notesOccupied: rhythm.tuplet.notesOccupied,
-            bracketed: true,
-            ratioed: false,
-          }),
-        ]
-      : [],
+  const bassTuplets = createSequenceTuplets(
+    bassNotes,
+    (entry) => entry.kind === "rest" || (entry.kind === "chord" && Boolean(entry.bassProjection)),
   );
   const voice = new Voice({ numBeats: meter.numerator, beatValue: meter.denominator }).setMode(
     Voice.Mode.FULL,
@@ -593,6 +628,7 @@ export function renderStaffSequence(
     .filter((entry) => (entry.kind === "chord" || entry.kind === "note") && entry.highlighted)
     .map((entry) => entry.key)
     .join(",");
+  svg.dataset.staffTupletGroups = String(tuplets.length);
   svg.dataset.staffSequencePositions = positions
     .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
     .join(",");
