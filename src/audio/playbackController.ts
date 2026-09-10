@@ -10,6 +10,14 @@ import type { ProgressionStep } from "../domain/progression/step";
 import type { TransportStore } from "../ui/transport/transportStore";
 import type { LoopState } from "../ui/transport/loopState";
 import { resolveLoopRegion } from "../ui/transport/loopState";
+import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
+import {
+  addRational,
+  rationalToNumber,
+  subtractRational,
+  ZERO,
+  type Rational,
+} from "../domain/timing/rational";
 
 export interface PlaybackControllerOptions {
   readonly clock: AudioClock;
@@ -240,6 +248,27 @@ export class PlaybackController {
 
     const secondsPerBeat = 60 / tempoBpm;
 
+    const authoredStartBeats = steps
+      .slice(0, sliceStart)
+      .reduce<Rational>((sum, step) => addRational(sum, step.duration.beats), ZERO);
+    const activeAuthoredDurationBeats = activeSteps.reduce<Rational>(
+      (sum, step) => addRational(sum, step.duration.beats),
+      ZERO,
+    );
+    const measureLayout = createProgressionMeasureLayout(steps, meter);
+    const includesProjectEnd = sliceEnd === steps.length;
+    const shouldIncludeTrailingGap =
+      includesProjectEnd && (!resolvedLoop || resolvedLoop.endStepIndex === steps.length - 1);
+    const playbackDurationBeats = shouldIncludeTrailingGap
+      ? subtractRational(measureLayout.playbackDurationBeats, authoredStartBeats)
+      : activeAuthoredDurationBeats;
+    const playbackDurationSeconds = rationalToNumber(playbackDurationBeats) * secondsPerBeat;
+    if (resolvedLoop) {
+      this.loopDurationBeatsNumerator = playbackDurationBeats.numerator;
+      this.loopDurationBeatsDenominator = playbackDurationBeats.denominator;
+      this.loopDurationSeconds = playbackDurationSeconds;
+    }
+
     // 1. Calculate Count-in (only for session start, never for resume or loop repetitions)
     const isFirstRun = !isLoopIteration && this.loopIteration === 0;
     const applyCountIn = isFirstRun && Boolean(countInEnabled);
@@ -293,7 +322,7 @@ export class PlaybackController {
 
     // 3. Add metronome clicks during playback if enabled
     if (metronomeEnabled) {
-      const totalPlaybackSeconds = currentSecondsAccumulator - countInDurationSeconds;
+      const totalPlaybackSeconds = playbackDurationSeconds;
       const barDurationSec = ((meter.numerator * 4) / meter.denominator) * secondsPerBeat;
       const totalBars = Math.ceil(totalPlaybackSeconds / barDurationSec);
 
@@ -347,7 +376,12 @@ export class PlaybackController {
             (this.loopDurationBeatsDenominator * tempoBpm)
         : this.loopBaseAudioTime - countInDurationSeconds;
 
-      this.scheduler.start(allSessionEvents, sessionStartAudioTime);
+      this.scheduler.start(
+        allSessionEvents,
+        sessionStartAudioTime,
+        0,
+        countInDurationSeconds + playbackDurationSeconds,
+      );
       this.startStepTracking();
       return true;
     } catch (err) {
@@ -423,9 +457,7 @@ export class PlaybackController {
         }
       }
 
-      if (matchingStepIndex !== null) {
-        this.transportStore.setCurrentStepIndex(matchingStepIndex, sessionId);
-      }
+      this.transportStore.setCurrentStepIndex(matchingStepIndex, sessionId);
     }, 30);
   }
 

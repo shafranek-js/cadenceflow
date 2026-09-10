@@ -19,6 +19,7 @@
 }
 
 .matrix-toolbar {
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 
@@ -34,9 +35,36 @@
   flex-wrap: wrap;
 }
 
+.matrix-toolbar .tonic-selector {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+.matrix-toolbar .tonic-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.matrix-toolbar-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .matrix-layer-cards {
   overflow: visible;
   overscroll-behavior-x: contain;
+}
+
+@media (max-width: 760px) {
+  .matrix-toolbar .tonic-buttons {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
 }
 
 /* Batch 2 state priority: focus-visible > playing > selected/previewed > recommendation > customized > hover > passive. */
@@ -103,10 +131,15 @@
 
 .chord-card-status-row {
   display: flex;
+  grid-row: 1;
+  grid-column: 1;
+  position: relative;
+  z-index: 1;
   align-items: flex-start;
   justify-content: flex-start;
   min-width: 0;
   min-height: 20px;
+  pointer-events: none;
 }
 
 .chord-card-identity {
@@ -121,30 +154,52 @@
   font-size: 0.76rem;
 }
 
+.chord-card-identity .chord-card-notes-label {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.chord-card-identity .chord-card-notes {
+  max-width: 100%;
+  color: var(--text);
+  font-size: 0.7rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
 .chord-main {
+  grid-row: 1 / -1;
+  grid-column: 1;
+  position: relative;
+  z-index: 0;
   min-width: 0;
   min-height: 58px;
-  padding: 2px 0;
+  padding: 28px 0 26px;
+  box-sizing: border-box;
 }
 
 .chord-card-actions {
+  grid-row: 3;
+  grid-column: 1;
+  position: relative;
+  z-index: 1;
   justify-content: space-between;
   min-width: 0;
   gap: 6px;
+  pointer-events: none;
 }
 
-.add-chord {
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  border-color: var(--accent);
-  color: var(--accent);
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.add-chord:hover {
-  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+.chord-card-customized-indicator {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
 }
 
 .card-view-switcher {
@@ -229,9 +284,46 @@
 }
 
 .matrix-layer-cards {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
 .chord-card {
   border-radius: var(--radius-card);
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+/* Card view is a compact choice control, so it shares the Studio pill language. */
+.card-view-switcher {
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-badge);
+  background: var(--surface-2);
+}
+
+.card-view-switcher button {
+  width: 24px;
+  height: var(--control-height);
+  min-width: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.card-view-switcher button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.card-view-switcher button[aria-pressed="true"] {
+  border-color: var(--selected);
+  background: var(--surface-selected);
+  color: var(--text);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }

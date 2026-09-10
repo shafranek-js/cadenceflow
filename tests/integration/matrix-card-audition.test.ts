@@ -245,7 +245,7 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     controller.dispose();
   });
 
-  it("Item 9: Explicit Add does not trigger duplicate audition; Card Body does not Add to Progression", () => {
+  it("Item 9: Ctrl-click combines one card audition with one progression add", () => {
     const project = createDefaultProject("proj-audition-6", "Add vs Audition Isolation");
     const store = new AppStore(project);
 
@@ -257,7 +257,7 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(store.matrixSession.previewFunctionId).toBe("I");
     expect(store.project.progression.steps.length).toBe(0);
 
-    // Simulate explicit Add button click -> adds step to progression
+    // The production add command still creates exactly one progression step.
     store.dispatch(
       {
         type: "matrix/add-preview",
@@ -304,10 +304,11 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     controllerError.dispose();
   });
 
-  it("Item 11: Exact test proving one physical activation (Enter, Space, Mouse click) = exactly one onSelect audition request without duplicate scheduling", () => {
+  it("Item 11: Enter, Space, click and Ctrl-click use single-fire card activation paths", () => {
     const project = createDefaultProject("proj-audition-ui", "UI Activation Exact Single-Fire");
     const onSelectSpy = vi.fn();
     const onAddSpy = vi.fn();
+    const onResetSpy = vi.fn();
     const preview = realizeMatrixCardPreview(project, "I");
 
     const container = document.createElement("div");
@@ -319,25 +320,33 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
           model: {
             chord: preview.chord,
             realizedPitches: preview.pitches,
+            pianoPitches: preview.upperPitches,
+            duration: preview.step.duration,
+            canRaiseStaffOctave: true,
+            canLowerStaffOctave: true,
             recommendationStatus: "none",
           },
           view: "harmonic",
           selected: false,
           customizedCount: 0,
           onSelect: onSelectSpy,
-          onAdd: onAddSpy,
-          onViewChange: () => {},
-          onSettingsOpen: () => {},
-          onReset: () => {},
+          onCtrlClickAdd: () => {
+            onSelectSpy();
+            onAddSpy();
+          },
+          onAltClickReset: onResetSpy,
+          onStaffOctaveChange: vi.fn(),
         }),
       );
     });
 
     const cardBodyButton = container.querySelector(".chord-main") as HTMLButtonElement;
-    const addButton = container.querySelector(".add-chord") as HTMLButtonElement;
 
     expect(cardBodyButton).not.toBeNull();
-    expect(addButton).not.toBeNull();
+    expect(container.querySelector(".add-chord")).toBeNull();
+    expect(cardBodyButton.title).toBe(
+      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+    );
 
     // Baseline: 0 invocations
     expect(onSelectSpy).toHaveBeenCalledTimes(0);
@@ -370,20 +379,21 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(onSelectSpy).toHaveBeenCalledTimes(5);
     expect(onAddSpy).not.toHaveBeenCalled();
 
-    // 6. Keyboard activation of the '+' button (Enter): Adds once, does NOT audition card body, no duplicates
-    simulateBrowserButtonKeyboardActivation(addButton, "Enter");
+    // 6. Ctrl-click: previews and adds exactly once
+    cardBodyButton.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
     expect(onAddSpy).toHaveBeenCalledTimes(1);
-    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
+    expect(onSelectSpy).toHaveBeenCalledTimes(6);
 
-    // 7. Keyboard activation of the '+' button (Space): Adds once, does NOT audition card body
-    simulateBrowserButtonKeyboardActivation(addButton, " ");
+    // 7. Repeated Ctrl-click remains single-fire per physical activation
+    cardBodyButton.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
     expect(onAddSpy).toHaveBeenCalledTimes(2);
-    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
+    expect(onSelectSpy).toHaveBeenCalledTimes(7);
 
-    // 8. Mouse click on '+' button: Adds once, does NOT audition card body
-    addButton.click();
-    expect(onAddSpy).toHaveBeenCalledTimes(3);
-    expect(onSelectSpy).toHaveBeenCalledTimes(5); // unchanged!
+    // 8. Alt-click resets the card template without previewing or adding a step
+    cardBodyButton.dispatchEvent(new MouseEvent("click", { bubbles: true, altKey: true }));
+    expect(onResetSpy).toHaveBeenCalledTimes(1);
+    expect(onSelectSpy).toHaveBeenCalledTimes(7);
+    expect(onAddSpy).toHaveBeenCalledTimes(2);
 
     act(() => {
       root.unmount();

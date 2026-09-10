@@ -91,9 +91,8 @@ describe("T095 — Canonical projection consistency integration test", () => {
       ? [canonicalBassPitch, ...canonicalUpperPitches]
       : canonicalUpperPitches;
 
-    // 2. Piano View Projection
-    // PianoCardView maps pitches by pitch.midiNumber
-    const pianoViewMidi = allPitches.map((p) => p.midiNumber);
+    // 2. Piano View Projection: chord tones only; independent bass is audio-only.
+    const pianoViewMidi = canonicalUpperPitches.map((p) => p.midiNumber);
 
     // 3. Staff View Projection
     const staffProjection = projectPitchesToStaff(allPitches);
@@ -137,10 +136,10 @@ describe("T095 — Canonical projection consistency integration test", () => {
       expect(mapping.velocityLayer).toBe(expectedLayer);
     }
 
-    // Exact Pitch Identity Assertions across all 5 projection layers:
-    // canonical MIDI numbers == Piano projection MIDI == Staff projection MIDI == eventRealizer pitches == HQ requested pitches
+    // Exact Pitch Identity Assertions across the projection layers. Piano is intentionally
+    // upper-only, while Staff/audio/HQ retain the complete realization including bass.
     const canonicalMidiNumbers = allPitches.map((p) => p.midiNumber);
-    expect(pianoViewMidi).toEqual(canonicalMidiNumbers);
+    expect(pianoViewMidi).toEqual(canonicalUpperPitches.map((p) => p.midiNumber));
     expect(staffViewMidi).toEqual(canonicalMidiNumbers);
     expect(audioEventPitches).toEqual(canonicalMidiNumbers);
     expect(hqRequestedPitches).toEqual(canonicalMidiNumbers);

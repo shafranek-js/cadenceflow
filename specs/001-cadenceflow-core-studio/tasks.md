@@ -369,6 +369,27 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [ ] T157 Run `pnpm test`, `pnpm verify:fixtures`, `pnpm exec playwright test`, `pnpm build`, and offline MusicXML validation; record final acceptance notes in `specs/001-cadenceflow-core-studio/checklists/implementation-readiness.md`
 - [ ] T158 Update `specs/001-cadenceflow-core-studio/quickstart.md` with verified bootstrap/run/test/audio-bank commands from the implemented project
 
+## Phase 15: Measure-card composition layout
+
+- [x] T159 [US11] Add exact Rational `createProgressionMeasureLayout` projection with bar fragments,
+  continuation flags, final virtual gap, and Full bar duration helper in `src/domain/timing/measureLayout.ts`
+  with unit coverage for 4/4, 3/4, 7/8, dotted, triplet, rests, and cross-barline Steps.
+- [x] T160 [US11] Add undoable final-gap commands for Rest, Extend, and independent Repeat behavior in
+  `src/app/commands/progressionCommands.ts` and register them in the dispatcher with command tests.
+- [x] T161 [US11] Render My Progression as one measure card per bar with proportional segments,
+  continuation items, explicit trailing-gap actions, accessible names, and responsive styling in
+  `src/ui/progression/ProgressionTrack.tsx` and `src/styles/progression.css`.
+- [x] T162 [US11] Add context-aware `Full bar` duration control to the Progression step editor and
+  verify absolute note-value durations remain unchanged in `src/ui/timing/StepDurationControl.tsx`.
+- [x] T163 [US11] Extend playback scheduling to honor aligned silent trailing duration, clear the active
+  Step during the gap, and preserve the documented loop policy in `src/audio/playbackController.ts` and
+  `src/audio/scheduler.ts`.
+- [x] T164 [US11] Align final partial measures in MIDI and MusicXML projections, encoding MusicXML rests
+  and MIDI End-of-Track at the barline without mutating the source Project.
+- [x] T165 [US11] Add measure-card integration and Chromium acceptance for Half/Whole, multiple events,
+  Rest/Extend/Repeat, view switching, reorder/duration reflow, keyboard access, playback silence, and
+  deterministic export output.
+
 ---
 
 ## Dependencies & Execution Order

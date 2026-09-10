@@ -338,6 +338,30 @@ describe("T090 — LookAheadScheduler", () => {
     expect(scheduler.currentState).toBe("idle");
   });
 
+  it("keeps an explicit silent tail alive when there are no events in it", () => {
+    const clock = new FakeAudioClock(0);
+    const provider = new MockProvider();
+    const onEnded = vi.fn();
+    const scheduler = new LookAheadScheduler({
+      clock,
+      provider,
+      onPlaybackEnded: onEnded,
+      tickIntervalMs: 1000,
+    });
+
+    scheduler.start([], 0, 0, 2);
+    expect(scheduler.currentState).toBe("running");
+    expect(onEnded).not.toHaveBeenCalled();
+    clock.advance(1.99);
+    scheduler.tick();
+    expect(scheduler.currentState).toBe("running");
+    expect(onEnded).not.toHaveBeenCalled();
+    clock.advance(0.01);
+    scheduler.tick();
+    expect(scheduler.currentState).toBe("idle");
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
   it("ticks automatically using timer without manual tick calls", () => {
     vi.useFakeTimers();
     try {

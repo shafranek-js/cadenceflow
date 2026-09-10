@@ -10,7 +10,12 @@ import {
   type SetStepDurationCommand,
   type RestoreMeterAndStepsCommand,
 } from "./timingCommands";
-import { restoreProgression, type RestoreProgressionCommand } from "./progressionCommands";
+import {
+  restoreProgression,
+  type RestoreProgressionCommand,
+  repeatChordStep,
+  type RepeatChordStepCommand,
+} from "./progressionCommands";
 import { restoreBranchState, type RestoreBranchStateCommand } from "./branchCommands";
 import {
   restoreModuleTemplate,
@@ -30,8 +35,10 @@ import { renameProject, type RenameProjectCommand } from "./projectCommands";
 import {
   setTheme,
   setExpertiseMode,
+  setStaffBassVisibility,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
+  type SetStaffBassVisibilityCommand,
 } from "./presentationCommands";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
@@ -46,6 +53,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setStepDuration(project, command as SetStepDurationCommand).project;
     case "progression/restore":
       return restoreProgression(project, command as RestoreProgressionCommand).project;
+    case "progression/repeat-chord":
+      return repeatChordStep(project, command as RepeatChordStepCommand).project;
     case "presets/restore-custom":
       return restoreCustomPresets(project, command as RestoreCustomPresetsCommand).project;
     case "branch/restore-state":
@@ -66,6 +75,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setTheme(project, command as SetThemeCommand).project;
     case "presentation/set-expertise-mode":
       return setExpertiseMode(project, command as SetExpertiseModeCommand).project;
+    case "presentation/set-staff-bass-visibility":
+      return setStaffBassVisibility(project, command as SetStaffBassVisibilityCommand).project;
     default:
       return project;
   }

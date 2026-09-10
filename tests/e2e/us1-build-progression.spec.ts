@@ -1,12 +1,17 @@
 import { test, expect } from "@playwright/test";
 
-test("US1 builds a four-step progression only through explicit Add", async ({ page }) => {
+test("US1 builds a four-step progression through Ctrl-click", async ({ page }) => {
   await page.goto("/");
 
   // Verify piano audio status indicator is visible
   await expect(page.getByTestId("piano-audio-status")).toBeVisible();
 
   const first = page.getByTestId("chord-card-I");
+  await expect(first.getByRole("button", { name: /Add I to progression/i })).toHaveCount(0);
+  await expect(first.locator(".chord-main")).toHaveAttribute(
+    "title",
+    "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+  );
 
   // Ordinary chord-card activation via mouse -> Preview/Audition -> progression count unchanged
   await first.locator(".chord-main").click();
@@ -30,8 +35,8 @@ test("US1 builds a four-step progression only through explicit Add", async ({ pa
   await expect(first).toHaveClass(/is-selected/);
   await expect(page.getByTestId("progression-step")).toHaveCount(0);
 
-  // Explicit Add button adds to progression
-  await first.getByRole("button", { name: /Add I to progression/i }).click();
+  // Ctrl-click previews the card and adds it to progression
+  await first.locator(".chord-main").click({ modifiers: ["Control"] });
   await expect(page.getByTestId("progression-step")).toHaveCount(1);
 
   // Ordinary activation of vi -> Preview/Audition -> progression count remains 1
@@ -40,10 +45,8 @@ test("US1 builds a four-step progression only through explicit Add", async ({ pa
   await expect(cardVi).toHaveClass(/is-selected/);
   await expect(page.getByTestId("progression-step")).toHaveCount(1);
 
-  // Keyboard activation of '+' button on card vi using Enter -> adds once to progression without card body audition
-  const addViBtn = cardVi.getByRole("button", { name: /Add vi to progression/i });
-  await addViBtn.focus();
-  await page.keyboard.press("Enter");
+  // Ctrl-click adds vi once while retaining the card preview path
+  await cardVi.locator(".chord-main").click({ modifiers: ["Control"] });
   await expect(page.getByTestId("progression-step")).toHaveCount(2);
 
   // Keyboard activation of IV with Enter -> Preview/Audition -> progression count remains 2
@@ -53,14 +56,14 @@ test("US1 builds a four-step progression only through explicit Add", async ({ pa
   await expect(cardIv).toHaveClass(/is-selected/);
   await expect(page.getByTestId("progression-step")).toHaveCount(2);
 
-  // Explicitly add IV
-  await cardIv.getByRole("button", { name: /Add IV to progression/i }).click();
+  // Ctrl-click adds IV
+  await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
   await expect(page.getByTestId("progression-step")).toHaveCount(3);
 
-  // Explicitly add V
+  // Ctrl-click adds V
   await page
     .getByTestId("chord-card-V")
-    .getByRole("button", { name: /Add V to progression/i })
-    .click();
+    .locator(".chord-main")
+    .click({ modifiers: ["Control"] });
   await expect(page.getByTestId("progression-step")).toHaveCount(4);
 });

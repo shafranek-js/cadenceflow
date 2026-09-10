@@ -42,12 +42,11 @@ function renderHarness(): Harness {
     const [, force] = useState(0);
     useEffect(() => store.subscribe(() => force((value) => value + 1)), []);
     const select = (stepId: string) => {
-      const nextStepId = store.project.progression.selectedStepId === stepId ? undefined : stepId;
       store.dispatch(
         {
           type: "progression/select-step",
           payload: {
-            ...(nextStepId ? { stepId: nextStepId } : {}),
+            stepId,
             nowIso: "2026-09-08T00:00:00.000Z",
           },
         },
@@ -68,7 +67,6 @@ function renderHarness(): Harness {
       },
       onEditPerformance: () => undefined,
       onDurationChange: () => undefined,
-      onSetStepView: () => undefined,
       onSetAllViews: () => undefined,
       onReplace: () => undefined,
       onReset: () => undefined,
@@ -99,17 +97,17 @@ afterEach(() => {
 });
 
 describe("Progression step selection dismissal", () => {
-  it("toggles the selected card, switches cards, and dismisses from the empty background", () => {
+  it("selects cards without inline editors and dismisses from the empty background", () => {
     const { container, store, root } = renderHarness();
     const first = stepButton(container, 0);
     const second = stepButton(container, 1);
 
     act(() => first.click());
     expect(store.project.progression.selectedStepId).toBe("step-a");
-    expect(container.querySelectorAll(".step-editor")).toHaveLength(1);
+    expect(container.querySelectorAll(".step-editor")).toHaveLength(0);
 
     act(() => first.click());
-    expect(store.project.progression.selectedStepId).toBeUndefined();
+    expect(store.project.progression.selectedStepId).toBe("step-a");
     expect(container.querySelectorAll(".step-editor")).toHaveLength(0);
 
     act(() => first.click());
@@ -167,44 +165,33 @@ describe("Progression step selection dismissal", () => {
     act(() => root.unmount());
   });
 
-  it("dismisses with Escape from editor and view controls", () => {
+  it("dismisses with Escape and omits per-card view controls", () => {
     const { container, store, root } = renderHarness();
     const first = stepButton(container, 0);
     act(() => first.click());
 
-    const editor = container.querySelector<HTMLDivElement>(".step-editor")!;
-    const articulation = editor.querySelector<HTMLSelectElement>("select")!;
-    act(() => {
-      articulation.dispatchEvent(new Event("change", { bubbles: true }));
-    });
     expect(store.project.progression.selectedStepId).toBe("step-a");
+    expect(container.querySelector(".step-editor")).toBeNull();
 
     act(() => {
-      articulation.dispatchEvent(
+      first.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
       );
     });
     expect(store.project.progression.selectedStepId).toBeUndefined();
-    expect(container.querySelector(".step-editor")).toBeNull();
 
     act(() => first.click());
-    const viewControls = container.querySelector<HTMLDivElement>(".card-view-switcher")!;
-    act(() => {
-      viewControls.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
-      );
-    });
-    expect(store.project.progression.selectedStepId).toBeUndefined();
-    expect(container.querySelector(".step-editor")).toBeNull();
+    expect(container.querySelector(".card-view-switcher")).toBeNull();
+    expect(container.querySelector('[aria-label="Progression Card View"]')).not.toBeNull();
     act(() => root.unmount());
   });
 
-  it("restores focus to a Rest step after Escape dismisses its editor", () => {
-    const { container, root } = renderHarness();
+  it("restores focus to a Rest step after Escape dismisses selection", () => {
+    const { container, root, store } = renderHarness();
     const rest = stepButton(container, 2);
 
     act(() => rest.click());
-    expect(container.querySelectorAll(".step-editor")).toHaveLength(1);
+    expect(container.querySelectorAll(".step-editor")).toHaveLength(0);
     act(() => rest.focus());
     act(() => {
       rest.dispatchEvent(
@@ -212,7 +199,7 @@ describe("Progression step selection dismissal", () => {
       );
     });
 
-    expect(container.querySelector(".step-editor")).toBeNull();
+    expect(store.project.progression.selectedStepId).toBeUndefined();
     expect(document.activeElement).toBe(rest);
     act(() => root.unmount());
   });

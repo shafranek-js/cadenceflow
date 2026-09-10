@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111)", () => {
   test.beforeEach(async ({ page }) => {
@@ -9,13 +10,14 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     });
     await page.goto("/");
     await expect(page.locator(".app-shell")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
   });
 
   test("Scenario 1 — Step duration presets, custom duration validation, dot/trip and isolation", async ({
     page,
   }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(1);
@@ -73,7 +75,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
     // Step isolation: Add Chord IV as Step 2
     const cardIV = page.getByTestId("chord-card-IV");
-    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
     await expect(steps).toHaveCount(2);
 
     await steps.nth(1).click();
@@ -87,9 +89,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 2 — Tempo, 7/8 pulse grouping, Reflow vs Preserve & Undo", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
@@ -164,7 +166,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 3 — Groove toggle Straight/Swing and amount persistence", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await steps.first().click();
@@ -208,9 +210,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     page,
   }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const playBtn = page.getByRole("button", { name: "Play", exact: true });
     const pauseBtn = page.getByRole("button", { name: "Pause", exact: true });
@@ -274,11 +276,11 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     page,
   }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIV = page.getByTestId("chord-card-IV");
-    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(3);
@@ -319,7 +321,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     page,
   }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     // Add Rest step via + Rest button
     const addRestBtn = page.getByRole("button", { name: "Add Rest to progression" });
@@ -327,7 +329,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await addRestBtn.click();
 
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(3);
@@ -348,12 +350,12 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 7 — Loop Range & playhead reset", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIV = page.getByTestId("chord-card-IV");
-    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(4);
@@ -394,7 +396,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 8 — Metronome & Count-in with 7/8 pulse grouping", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     await page.getByLabel("Meter numerator").fill("7");
     await page.getByLabel("Meter denominator").selectOption("8");
@@ -425,9 +427,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 9 — Audio failure recovery without state corruption", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
@@ -447,12 +449,12 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
   test("Scenario 10 — Editing Selection vs Playback Independence", async ({ page }) => {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIV = page.getByTestId("chord-card-IV");
-    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(4);
@@ -483,9 +485,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
   }) => {
     // 1. Create/add multiple steps
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIV = page.getByTestId("chord-card-IV");
-    await cardIV.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
@@ -498,13 +500,16 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(steps.first().locator(".step-view span")).toContainText("4");
     await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
 
-    // 4. Expanded Step editor exposes Duration select
-    const durationSelect = steps.first().getByTestId("step-duration-select");
-    await expect(durationSelect).toBeVisible();
-    await expect(durationSelect).toHaveValue("4/1");
+    // 4. Selected step inspector exposes compact note-value duration buttons
+    const selectedInspector = page.getByTestId("step-performance-inspector");
+    const durationControl = selectedInspector.locator(".duration-buttons-control");
+    const fullBarButton = selectedInspector.getByTestId("duration-preset-full-bar");
+    const halfButton = selectedInspector.getByTestId("duration-preset-half");
+    await expect(durationControl).toBeVisible();
+    await expect(fullBarButton).toHaveAttribute("aria-pressed", "true");
 
     // 5. Change Duration to Half — 2 beats
-    await durationSelect.selectOption("2/1");
+    await halfButton.click();
 
     // 6. Assert summary now shows 2
     await expect(steps.first().locator(".step-view span")).toContainText("2");
@@ -519,7 +524,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await undoBtn.click();
     await expect(steps.first().locator(".step-view span")).toContainText("4");
     await expect(steps.first()).toHaveClass(/is-selected/);
-    await expect(durationSelect).toHaveValue("4/1");
+    await expect(fullBarButton).toHaveAttribute("aria-pressed", "true");
     await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
 
     // 9. Redo -> 2
@@ -527,18 +532,19 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await redoBtn.click();
     await expect(steps.first().locator(".step-view span")).toContainText("2");
     await expect(steps.first()).toHaveClass(/is-selected/);
-    await expect(durationSelect).toHaveValue("2/1");
+    await expect(halfButton).toHaveAttribute("aria-pressed", "true");
     await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
 
     // 10. Reset Performance preserves edited Duration
-    const resetPerfBtn = steps.first().getByRole("button", { name: "Reset Performance" });
+    const resetPerfBtn = selectedInspector.getByRole("button", { name: "Reset Performance" });
     await resetPerfBtn.click();
     await expect(steps.first().locator(".step-view span")).toContainText("2");
 
     // 11. Custom exact duration: 3/2 beats
-    await durationSelect.selectOption("custom");
-    const customInput = steps.first().getByTestId("step-duration-custom-input");
-    const setBtn = steps.first().getByTestId("step-duration-custom-set-btn");
+    const customInput = selectedInspector.getByLabel("Duration in canonical quarter-note beats");
+    const setBtn = selectedInspector.getByRole("button", {
+      name: "Set custom duration in beats",
+    });
     await expect(customInput).toBeVisible();
     await customInput.fill("3/2");
     await setBtn.click();
@@ -561,13 +567,15 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
       });
       expect(noHorizontalOverflow).toBe(true);
 
-      // Verify all card-local controls and actions are visible, non-overlapping, and accessible
-      await expect(durationSelect).toBeVisible();
+      // Verify all selected-step controls are visible, non-overlapping, and accessible
+      await expect(durationControl).toBeVisible();
       await expect(resetPerfBtn).toBeVisible();
       await expect(
-        steps.first().getByRole("button", { name: "Remove", exact: true }),
+        selectedInspector.getByRole("button", { name: "Remove", exact: true }),
       ).toBeVisible();
-      await expect(steps.first().getByRole("button", { name: "Move step right" })).toBeVisible();
+      await expect(
+        selectedInspector.getByRole("button", { name: "Move step right" }),
+      ).toBeVisible();
 
       // US10 layout follow-up: .piano-performance-inspector uses overflow-x:auto because the
       // inspector panel content (articulation/velocity/register controls) genuinely overflows

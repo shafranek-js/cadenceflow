@@ -68,7 +68,12 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     test.slow();
     await waitForStudio(page);
 
-    await page.getByRole("button", { name: "Add bIII to progression" }).click();
+    await page
+      .getByTestId("chord-card-bIII")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
     await page
       .locator('[data-testid="progression-step"]')
       .last()
@@ -86,13 +91,13 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     const stableBestCard = page.getByTestId(bestCardId);
     const stableAlternativeCard = page.getByTestId(alternativeCardId);
 
-    await stableAlternativeCard.getByRole("button", { name: "Settings for" }).click();
-    const template = page.getByRole("region", { name: /Template settings for/ });
-    await template.getByRole("combobox").first().selectOption("arp-up");
-    await expect(page.getByRole("img", { name: /Customized · 1 overrides/ })).toBeVisible();
     await expect(stableAlternativeCard.locator(".recommendation-alternative-badge")).toContainText(
       "Alternative",
     );
+    await stableAlternativeCard.locator(".chord-main").click();
+    const template = page.getByRole("region", { name: /Template settings for/ });
+    await template.getByRole("button", { name: "Articulation: Arp Up" }).click();
+    await expect(page.getByRole("img", { name: /Customized · 1 overrides/ })).toBeVisible();
 
     await stableBestCard.locator(".chord-main").click();
     await expect(stableBestCard).toHaveClass(/is-selected/);
@@ -109,7 +114,12 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     expect(bestCollision.border).not.toBe("transparent");
     expect(bestCollision.mainBackground).not.toBe("rgba(0, 0, 0, 0)");
 
-    await page.getByRole("button", { name: "Add I to progression" }).click();
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
     const progressionStep = page.locator('[data-testid="progression-step"]').last();
     await progressionStep.getByRole("button", { name: /Select progression step 2: I/ }).click();
     const progressionBeforePlayback = await readProgression(page);
@@ -214,10 +224,7 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     await expect(projectToggle).toBeFocused();
 
     await projectToggle.click();
-    await page
-      .getByRole("region", { name: "Harmonic Matrix" })
-      .locator(".matrix-toolbar")
-      .click({ position: { x: 8, y: 8 } });
+    await page.getByRole("region", { name: "Inspector" }).click({ position: { x: 8, y: 8 } });
     await expect(page.getByRole("menu", { name: "Project actions" })).not.toBeVisible();
 
     const resetSummary = page.locator(".matrix-reset-menu summary");

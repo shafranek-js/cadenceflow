@@ -15,6 +15,7 @@ import { FunctionalLayer } from "./FunctionalLayer";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
 import { MatrixResetMenu } from "../settings/MatrixResetMenu";
+import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 
 function cardKey(identity: HarmonicFunctionIdentity): string {
   return identity.functionId;
@@ -27,14 +28,14 @@ export function HarmonicMatrix({
   contextualFunctionIds,
   onPreview,
   onAdd,
-  onCardView,
   onGlobalView,
   onModuleChange,
   onTonicChange,
-  onSettingsOpen,
-  onResetCard,
+  onTemplateOpen,
+  onTemplateReset,
   onResetCurrentModule,
   onResetAllModules,
+  onStaffOctaveChange,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -42,14 +43,14 @@ export function HarmonicMatrix({
   readonly contextualFunctionIds: readonly HarmonicFunctionIdentity[];
   readonly onPreview: (functionId: string) => void;
   readonly onAdd: (functionId: string) => void;
-  readonly onCardView: (functionId: string, view: CardViewId) => void;
   readonly onGlobalView: (view: CardViewId) => void;
   readonly onModuleChange: (moduleId: HarmonicModuleId) => void;
   readonly onTonicChange: (tonic: number) => void;
-  readonly onSettingsOpen: (functionId: string) => void;
-  readonly onResetCard: (functionId: string) => void;
+  readonly onTemplateOpen: (functionId: string) => void;
+  readonly onTemplateReset: (functionId: string) => void;
   readonly onResetCurrentModule: () => void;
   readonly onResetAllModules: () => void;
+  readonly onStaffOctaveChange: (functionId: string, direction: StaffOctaveDirection) => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -65,8 +66,7 @@ export function HarmonicMatrix({
   const renderCard = (identity: HarmonicFunctionIdentity) => {
     const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
     const template = project.moduleTemplateStates[project.activeModule].cards[identity.functionId];
-    const override = template?.cardViewOverride;
-    const view = override ?? project.presentation.globalMatrixCardView;
+    const view = project.presentation.globalMatrixCardView;
     const candidate =
       recommendations?.bestMatch?.functionId === identity.functionId
         ? recommendations.bestMatch
@@ -77,6 +77,10 @@ export function HarmonicMatrix({
         model={{
           chord: preview.chord,
           realizedPitches: preview.pitches,
+          pianoPitches: preview.upperPitches,
+          duration: preview.step.duration,
+          canRaiseStaffOctave: canShiftPerformanceOctave(preview.step.performance, 1),
+          canLowerStaffOctave: canShiftPerformanceOctave(preview.step.performance, -1),
           recommendationStatus:
             best === identity.functionId
               ? "best"
@@ -86,13 +90,23 @@ export function HarmonicMatrix({
           ...(candidate ? { recommendation: candidate } : {}),
         }}
         view={view}
+        showBassInStaff={project.presentation.showBassInStaff}
         selected={previewFunctionId === identity.functionId}
         customizedCount={matrixCardOverrideCount(template)}
-        onSelect={() => onPreview(identity.functionId)}
-        onAdd={() => onAdd(identity.functionId)}
-        onViewChange={(next) => onCardView(identity.functionId, next)}
-        onSettingsOpen={() => onSettingsOpen(identity.functionId)}
-        onReset={() => onResetCard(identity.functionId)}
+        onSelect={() => {
+          onPreview(identity.functionId);
+          onTemplateOpen(identity.functionId);
+        }}
+        onCtrlClickAdd={() => {
+          onPreview(identity.functionId);
+          if (!project.temporaryBranch) onAdd(identity.functionId);
+          onTemplateOpen(identity.functionId);
+        }}
+        onAltClickReset={() => {
+          onTemplateReset(identity.functionId);
+          onTemplateOpen(identity.functionId);
+        }}
+        onStaffOctaveChange={(direction) => onStaffOctaveChange(identity.functionId, direction)}
       />
     );
   };
@@ -101,6 +115,11 @@ export function HarmonicMatrix({
     <section className="matrix-panel" aria-label="Harmonic Matrix">
       <header className="matrix-toolbar">
         <ModuleSelector value={project.activeModule} onChange={onModuleChange} />
+        <TonicSelector
+          tonic={project.tonic}
+          mode={modeForModule(project.activeModule)}
+          onChange={onTonicChange}
+        />
         <div className="matrix-toolbar-actions">
           <select
             value={project.presentation.globalMatrixCardView}
@@ -129,11 +148,6 @@ export function HarmonicMatrix({
         </p>
       ) : null}
       <div className="matrix-workbench">
-        <TonicSelector
-          tonic={project.tonic}
-          mode={modeForModule(project.activeModule)}
-          onChange={onTonicChange}
-        />
         <div className="matrix-grid">
           {module.layers.map((layer) => {
             const baselineEntries = module.topology.cards.filter(

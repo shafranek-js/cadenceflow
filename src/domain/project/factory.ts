@@ -7,7 +7,7 @@ import type { StepPerformance } from "../progression/step";
 import type { Project } from "./project";
 
 export const DEFAULT_PIANO_PERFORMANCE: StepPerformance = Object.freeze({
-  articulation: "block",
+  articulation: "humanized",
   register: "auto",
   voicingMode: "auto",
   bass: Object.freeze({ choice: "auto", octaveOffset: "auto" }),
@@ -41,6 +41,7 @@ export function createDefaultProject(
       expertiseMode: "composer",
       theme: "dark",
       globalMatrixCardView: "harmonic",
+      showBassInStaff: false,
     }),
     defaults,
     moduleTemplateStates: Object.freeze({

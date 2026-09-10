@@ -35,13 +35,12 @@ export function ExpertiseModeControl({
       role="group"
       aria-label="Expertise mode"
     >
-      <span className="presentation-control-label">Expertise</span>
-      <div className="presentation-control-options">
+      <div className="expertise-toggle">
         {MODES.map((mode) => (
           <button
             key={mode.value}
             type="button"
-            className={value === mode.value ? "is-active" : ""}
+            className={`expertise-toggle-option${value === mode.value ? " is-active" : ""}`}
             aria-pressed={value === mode.value}
             aria-label={`${mode.label} expertise mode`}
             title={`${mode.label}: ${mode.description}`}

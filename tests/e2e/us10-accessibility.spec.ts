@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -88,7 +89,7 @@ async function contrastRatio(page: Page, locator: Locator): Promise<number> {
 }
 
 test.describe("US10 Batch B — accessible studio interaction", () => {
-  test("supports Tab, Enter, Space, settings/reset, and keyboard progression reorder", async ({
+  test("supports Tab, Enter, Space, template reset, and keyboard progression reorder", async ({
     page,
   }) => {
     test.slow();
@@ -105,14 +106,14 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
 
     const steps = page.locator('[data-testid="progression-step"]');
     const beforeAdd = await steps.count();
-    const addButton = matrixCard.getByRole("button", { name: "Add I to progression" });
-    await addButton.focus();
+    const chordMain = matrixCard.locator(".chord-main");
+    await chordMain.focus();
     await page.keyboard.press("Enter");
+    await expect(steps).toHaveCount(beforeAdd);
+    await chordMain.click({ modifiers: ["Control"] });
     await expect(steps).toHaveCount(beforeAdd + 1);
 
-    const settingsButton = matrixCard.getByRole("button", { name: "Settings for I" });
-    await settingsButton.focus();
-    await page.keyboard.press("Enter");
+    await chordMain.click();
     const template = page.getByRole("region", { name: "Template settings for I" });
     await expect(template).toBeVisible();
     await template.getByRole("combobox").first().selectOption("arp-up");
@@ -125,8 +126,8 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     for (const functionId of ["IV", "V"]) {
       await page
         .getByTestId(`chord-card-${functionId}`)
-        .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`) })
-        .click();
+        .locator(".chord-main")
+        .click({ modifiers: ["Control"] });
     }
     await expect(steps).toHaveCount(beforeAdd + 3);
     const identityBeforeReorder = await readProgressionIdentity(page);
@@ -179,7 +180,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     expect(await restStep.getAttribute("tabindex")).toBeNull();
   });
 
-  test("keeps global and per-card views keyboard-accessible with focus preservation", async ({
+  test("keeps global Matrix and Progression views keyboard-accessible without per-card controls", async ({
     page,
   }) => {
     await waitForStudio(page);
@@ -189,39 +190,39 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await globalView.selectOption("piano");
     await expect(globalView).toHaveValue("piano");
     await expect(globalView).toBeFocused();
+    await expect(card.locator(".mini-piano")).toBeVisible();
 
-    const switcher = card.getByRole("group", { name: "View for I" });
-    const staffButton = switcher.getByRole("button", { name: "staff", exact: true });
-    await staffButton.focus();
-    await page.keyboard.press("Enter");
-    await expect(staffButton).toHaveAttribute("aria-pressed", "true");
-    await expect(staffButton).toBeFocused();
+    await globalView.selectOption("staff");
+    await expect(globalView).toHaveValue("staff");
+    await expect(globalView).toBeFocused();
+    await expect(card.locator(".mini-staff")).toBeVisible();
+    await expect(card.getByRole("group", { name: "View for I" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Add I to progression" }).click();
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
     const progressionView = page.getByLabel("Progression Card View");
     await progressionView.focus();
     await progressionView.selectOption("staff");
     await expect(progressionView).toHaveValue("staff");
     await expect(progressionView).toBeFocused();
-
-    const progressionStepView = page
-      .locator('[data-testid="progression-step"]')
-      .first()
-      .getByRole("group", { name: /View for progression step/ });
-    const progressionPianoButton = progressionStepView.getByRole("button", {
-      name: "piano",
-      exact: true,
-    });
-    await progressionPianoButton.focus();
-    await page.keyboard.press("Enter");
-    await expect(progressionPianoButton).toHaveAttribute("aria-pressed", "true");
-    await expect(progressionPianoButton).toBeFocused();
+    await expect(
+      page.locator('[data-testid="progression-step"]').first().locator(".mini-staff"),
+    ).toBeVisible();
+    await expect(page.locator('[data-testid="progression-step"] .card-view-switcher')).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole("group", { name: /View for progression step/ })).toHaveCount(0);
   });
 
   test("persists theme and expertise choices while preserving progression and Matrix identity", async ({
     page,
   }) => {
     await waitForStudio(page);
+    await ensureHistoryControlsVisible(page);
     const undo = page.getByRole("button", { name: "Undo", exact: true });
     await expect(undo).toBeDisabled();
 
@@ -233,8 +234,18 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await page.keyboard.press("Space");
     await expect(undo).toBeDisabled();
 
-    await page.getByRole("button", { name: "Add I to progression" }).click();
-    await page.getByRole("button", { name: "Add V to progression" }).click();
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
+    await page
+      .getByTestId("chord-card-V")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
     const progressionBefore = await readProgressionIdentity(page);
     const matrixIdsBefore = await page
       .locator('[data-testid^="chord-card-"]')
@@ -286,7 +297,12 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
   }) => {
     test.slow();
     await waitForStudio(page);
-    await page.getByRole("button", { name: "Add bIII to progression" }).click();
+    await page
+      .getByTestId("chord-card-bIII")
+      .locator(".chord-main")
+      .click({
+        modifiers: ["Control"],
+      });
     await page
       .locator('[data-testid="progression-step"]')
       .last()
@@ -300,10 +316,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await expect(page.locator(".recommendation-alternative-badge").first()).toContainText(
       "Alternative",
     );
-    await page
-      .getByTestId("chord-card-bIII")
-      .getByRole("button", { name: "Settings for bIII" })
-      .click();
+    await page.getByTestId("chord-card-bIII").locator(".chord-main").click();
     const template = page.getByRole("region", { name: "Template settings for bIII" });
     await template.getByRole("combobox").first().selectOption("arp-up");
     await expect(page.getByRole("img", { name: /Customized · 1 overrides/ })).toBeVisible();
@@ -328,10 +341,10 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     const pause = page.getByRole("button", { name: "Pause", exact: true });
     const resume = page.getByRole("button", { name: "Resume", exact: true });
     const stop = page.getByRole("button", { name: "Stop", exact: true });
-    const loopAll = page.getByRole("button", { name: "All", exact: true });
-    await loopAll.focus();
+    const loopToggle = page.getByRole("button", { name: "Toggle Loop", exact: true });
+    await loopToggle.focus();
     await page.keyboard.press("Enter");
-    await expect(loopAll).toHaveAttribute("aria-pressed", "true");
+    await expect(loopToggle).toHaveAttribute("aria-pressed", "true");
     await play.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("transport-status")).toContainText("Playing");
@@ -378,7 +391,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
       );
       const activeLoopContrast = await contrastRatio(
         page,
-        page.locator(".loop-mode-btn.is-active"),
+        page.locator(".loop-toggle-btn.is-active"),
       );
       const activeGrooveContrast = await contrastRatio(
         page,

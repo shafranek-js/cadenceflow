@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 const ACCEPTANCE_PROJECT_NAME = "US8 Acceptance";
 
@@ -85,12 +86,11 @@ async function countProjectsThroughUi(page: Page): Promise<number> {
 
 async function addChord(page: Page, functionId: string): Promise<void> {
   const card = page.getByTestId(`chord-card-${functionId}`);
-  await card
-    .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`, "i") })
-    .click();
+  await card.locator(".chord-main").click({ modifiers: ["Control"] });
 }
 
 async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnapshot> {
+  await ensureHistoryControlsVisible(page);
   const progression = await page.locator('[data-testid="progression-step"]').evaluateAll((nodes) =>
     nodes.map((node) => {
       const isRest = node.classList.contains("progression-rest-card");
@@ -130,8 +130,18 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
   await voicingModal.getByRole("button", { name: "Cancel" }).click();
   await expect(voicingModal).not.toBeVisible();
   const templateCard = page.getByTestId("chord-card-i");
-  await templateCard.getByRole("button", { name: "Settings for i" }).click();
+  const progressionCountBeforeTemplatePreview = await page
+    .locator('[data-testid="progression-step"]')
+    .count();
+  await templateCard.locator(".chord-main").click();
   const templateInspector = page.getByRole("region", { name: "Template settings for i" });
+  await expect(templateInspector).toBeVisible();
+  // In an active branch, the production card preview path appends to the branch.
+  // Undo that transient preview so this read-only snapshot keeps the original branch intact.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(
+    progressionCountBeforeTemplatePreview,
+  );
   await expect(templateInspector).toBeVisible();
   const branchRegion = page.getByRole("region", { name: "Original versus Alternative" });
 
@@ -154,13 +164,16 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
     progression,
     performance: {
       articulation: await performanceInspector
-        .getByLabel("Piano Articulation", { exact: true })
-        .inputValue(),
+        .locator('[data-articulation-value][aria-pressed="true"]')
+        .getAttribute("data-articulation-value")
+        .then((value) => value ?? ""),
       voicingMode: await performanceInspector
         .getByLabel("Voicing Mode", { exact: true })
         .inputValue(),
       manualVoicingMidi,
-      register: await performanceInspector.getByLabel("Register offset").inputValue(),
+      register: await performanceInspector
+        .locator('[data-testid="register-option"][aria-pressed="true"]')
+        .getAttribute("data-register-value"),
       bassNote: await performanceInspector.getByLabel("Bass Note", { exact: true }).inputValue(),
       bassOctave: await performanceInspector
         .getByLabel("Bass Octave", { exact: true })
@@ -187,8 +200,14 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
       swingAmount: await page.getByLabel("Swing Amount").inputValue(),
     },
     matrixTemplate: {
-      articulation: await templateInspector.locator("select").nth(0).inputValue(),
-      register: await templateInspector.locator("select").nth(1).inputValue(),
+      articulation: await templateInspector
+        .locator('[data-articulation-value][aria-pressed="true"]')
+        .getAttribute("data-articulation-value")
+        .then((value) => value ?? ""),
+      register: await templateInspector
+        .locator('[data-testid="register-option"][aria-pressed="true"]')
+        .getAttribute("data-register-value")
+        .then((value) => value ?? ""),
       masterVelocity: await templateInspector.getByRole("spinbutton").inputValue(),
       overrideSummary: (await templateInspector.innerText()).replace(/\s+/g, " ").trim(),
     },
@@ -202,6 +221,7 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
 }
 
 async function assertFreshHistory(page: Page): Promise<void> {
+  await ensureHistoryControlsVisible(page);
   await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Redo" })).toBeDisabled();
 }
@@ -260,12 +280,16 @@ test.describe("US8 Batch C — project actions", () => {
   test("recovers the active named project after reload with a fresh history", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
 
     await openProjectMenu(page);
     await page.getByTestId("new-project-btn").click();
     await page.getByTestId("project-name-input").fill("Recovered Session");
     await page.getByRole("button", { name: "Create Project" }).click();
-    await page.getByTestId("chord-card-I").getByRole("button", { name: /Add I/ }).click();
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
     await page.reload();
@@ -278,13 +302,18 @@ test.describe("US8 Batch C — project actions", () => {
   }) => {
     await page.goto("/");
     await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
 
     // Add a real progression step so the exported payload is non-trivial and
     // creates an Undo entry that must disappear after import.
-    await page.getByTestId("chord-card-I").getByRole("button", { name: /Add I/ }).click();
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
-    await openProjectMenu(page);
+    await page.getByTestId("export-menu-toggle").click();
+    await expect(page.getByRole("menu", { name: "Export menu" })).toBeVisible();
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("project-export-btn").click();
     const download = await downloadPromise;
@@ -292,6 +321,7 @@ test.describe("US8 Batch C — project actions", () => {
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
 
+    await openProjectMenu(page);
     await page.getByTestId("project-open-file-btn").click();
     await page.getByTestId("project-file-input").setInputFiles(downloadPath!);
     await expect(page.getByTestId("project-menu-toggle")).toContainText("Imported Copy");
@@ -312,6 +342,7 @@ test.describe("US8 Batch C — project actions", () => {
     });
     await page.goto("/");
     await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
 
     await openProjectMenu(page);
     await page.getByTestId("new-project-btn").click();
@@ -328,7 +359,7 @@ test.describe("US8 Batch C — project actions", () => {
       "aria-pressed",
       "true",
     );
-    await expect(page.getByText("Dark Harmony · Tonal Minor", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Dark Harmony/ })).toBeVisible();
 
     // Four persisted progression steps: three sounding chords and one Rest.
     await addChord(page, "i");
@@ -340,7 +371,7 @@ test.describe("US8 Batch C — project actions", () => {
 
     // Step-local performance and timing fixture.
     await steps.nth(0).click();
-    await page.getByLabel("Register offset").selectOption("1");
+    await page.getByRole("button", { name: "Register offset: +1 Octave" }).click();
     await page.getByRole("button", { name: "Open Piano Voicing Editor" }).click();
     const voicingModal = page.locator(".piano-voicing-editor-modal");
     await expect(voicingModal).toBeVisible();
@@ -358,7 +389,7 @@ test.describe("US8 Batch C — project actions", () => {
     await expect(voicingModal).not.toBeVisible();
     await page.getByRole("button", { name: "MIDI velocity view" }).click();
     await page.getByLabel("Master Velocity", { exact: true }).fill("95");
-    await page.getByLabel("Piano Articulation", { exact: true }).selectOption("arp-up");
+    await page.getByRole("button", { name: "Articulation: Arp Up" }).click();
     await page.getByLabel("Bass Note", { exact: true }).selectOption("root");
     await page.getByLabel("Bass Octave", { exact: true }).selectOption("-1");
     const upperVelocityRow = page.locator(".per-note-velocity-row:has(.role-upper)").first();
@@ -371,11 +402,11 @@ test.describe("US8 Batch C — project actions", () => {
     await page.getByTestId("duration-preset-half").click();
 
     // Project-owned Matrix template and presentation state.
-    await page.getByTestId("chord-card-i").getByRole("button", { name: "Settings for i" }).click();
+    await page.getByTestId("chord-card-i").locator(".chord-main").click();
     const templateInspector = page.getByRole("region", { name: "Template settings for i" });
     await expect(templateInspector).toBeVisible();
-    await templateInspector.locator("select").nth(0).selectOption("humanized");
-    await templateInspector.locator("select").nth(1).selectOption("1");
+    await templateInspector.getByRole("button", { name: "Articulation: Humanized" }).click();
+    await templateInspector.getByRole("button", { name: "Register offset: +1 Octave" }).click();
     await templateInspector.getByRole("spinbutton").fill("90");
     await expect(templateInspector).toContainText(/Customized/);
     await page.getByLabel("Global Card View").selectOption("piano");
@@ -455,8 +486,9 @@ test.describe("US8 Batch C — project actions", () => {
     await expect(recoveredVelocity).toHaveValue("95");
     await assertTemporaryBranch(page, fixtureSnapshot.progression.length);
 
-    // Export must come from the production Project menu path.
-    await openProjectMenu(page);
+    // Export must come from the production Export menu path.
+    await page.getByTestId("export-menu-toggle").click();
+    await expect(page.getByRole("menu", { name: "Export menu" })).toBeVisible();
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("project-export-btn").click();
     const download = await downloadPromise;

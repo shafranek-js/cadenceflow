@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-08
-**Current implementation stage:** Phase 13 / User Story 10 (Studio) Batch A accepted; T141, T143, and T144 implemented and accepted; Batch B theme, expertise, and accessibility work is in progress; US10 remains open and the external interoperability gate remains open
-**Task progress:** 143 accepted tasks, 143 / 158 total tasks
+**Current implementation stage:** Phase 15 / User Story 11 measure-card composition layout implemented and verified; Phase 13 Batch B and Phase 14 tasks remain separately tracked; the external interoperability gate remains open
+**Task progress:** 150 accepted tasks, 150 / 165 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED** (overall 140 / 158). **Phase 13: User Story 10** — Work in one focused wide desktop studio — has its responsive desktop shell Batch A (**T141, T143, T144**) **ACCEPTED** (overall 143 / 158); theme, expertise, and accessibility Batch B remains pending. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -618,3 +618,9 @@ From this point, development continues in controlled batches:
 5. Accepted review updates `tasks.md`, `PROJECT_STATUS.md`, and the handoff package.
 
 See `DEVELOPMENT_WORKFLOW.md` and `NEXT_DEVELOPER_TASK.md` for the exact next assignment and review protocol.
+
+## 10. Phase 15 / User Story 11 — measure-card composition layout
+
+T159–T165 are implemented and verified. `My Progression` remains a flat authored `ChordStep`/`RestStep` sequence; measure cards, fragments, continuation markers, and the final virtual gap are derived from the current meter with exact Rational arithmetic. Gap actions are undoable (`Rest`, `Extend`, `Repeat`), `Full bar` is meter-aware, playback runs through the aligned final silence, and MIDI/MusicXML preserve the barline-aligned duration without phantom notes. Staff view uses one shared staff for multiple onsets in a measure.
+
+Verification: full Vitest **69 files / 571 tests**, full Chromium **98 / 98** with `--workers=1 --retries=0`, TypeScript, build, ESLint, Prettier, and `git diff --check` all pass. Build retains the known large-chunk warning only. No schema migration, commit, or push was performed; existing visual-polish worktree changes were preserved.

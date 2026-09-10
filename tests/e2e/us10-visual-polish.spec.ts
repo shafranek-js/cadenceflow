@@ -9,9 +9,7 @@ async function waitForStudio(page: Page): Promise<void> {
 
 async function addChord(page: Page, functionId: string): Promise<void> {
   const card = page.getByTestId(`chord-card-${functionId}`);
-  await card
-    .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`, "i") })
-    .click();
+  await card.locator(".chord-main").click({ modifiers: ["Control"] });
 }
 
 async function addProgression(page: Page, count: number): Promise<void> {
@@ -46,12 +44,14 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await addChord(page, "I");
     const card = page.getByTestId("chord-card-I");
     await expect(card.locator(".chord-card-status-row")).toBeVisible();
-    await expect(card.getByRole("button", { name: "Add I to progression" })).toHaveAttribute(
+    await expect(card.getByTestId("chord-card-notes")).toContainText("C");
+    await expect(card.locator(".chord-main")).toHaveAttribute(
       "title",
-      "Add to My Progression",
+      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
     );
-    await expect(card.getByRole("group", { name: "View for I" })).toBeVisible();
-    await expect(card.locator(".card-view-glyph")).toHaveCount(3);
+    await expect(page.getByLabel("Global Card View")).toBeVisible();
+    await expect(card.getByRole("group", { name: "View for I" })).toHaveCount(0);
+    await expect(card.locator(".card-view-glyph")).toHaveCount(0);
 
     const recommendationCards = page.locator(
       '.chord-card[data-recommendation="best"], .chord-card[data-recommendation="alternative"]',
@@ -99,7 +99,8 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     });
     expect(flow.rows).toBeGreaterThan(1);
     expect(flow.rowMajor).toBe(true);
-    expect(flow.widths).toEqual([170]);
+    expect(flow.widths.every((width) => width > 0 && width <= flow.clientWidth)).toBe(true);
+    expect(flow.widths.some((width) => width > 170)).toBe(true);
     expect(flow.scrollWidth).toBeLessThanOrEqual(flow.clientWidth);
 
     await page.getByLabel("Progression Card View").selectOption("piano");
@@ -148,21 +149,18 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     );
   });
 
-  test("keeps Matrix card views compact and readable in Piano and Staff modes", async ({
-    page,
-  }) => {
+  test("keeps the global Matrix card view readable in Piano and Staff modes", async ({ page }) => {
     await waitForStudio(page);
     const card = page.getByTestId("chord-card-I");
-    await card.getByRole("button", { name: "piano" }).click();
+    const globalView = page.getByLabel("Global Card View");
+    await globalView.selectOption("piano");
     await expect(card.locator(".mini-piano")).toBeVisible();
     await expect(card.locator(".mini-key.is-active")).not.toHaveCount(0);
 
-    await card.getByRole("button", { name: "staff" }).click();
+    await globalView.selectOption("staff");
     await expect(card.locator(".mini-staff")).toBeVisible();
-    await expect(card.locator(".mini-staff")).toHaveAttribute("aria-label", /Staff realization:/);
-    await expect(card.locator(".card-view-switcher button[data-view=staff]")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(card.locator(".mini-staff")).toHaveAttribute("aria-label", /staff realization:/);
+    await expect(globalView).toHaveValue("staff");
+    await expect(card.locator(".card-view-switcher")).toHaveCount(0);
   });
 });

@@ -22,6 +22,7 @@ import { writeStandardMidiFile } from "../../../src/export/midi/writer";
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
   return Object.freeze({
     ...DEFAULT_PIANO_PERFORMANCE,
+    articulation: "block",
     ...overrides,
     ...(overrides.bass
       ? { bass: Object.freeze({ ...DEFAULT_PIANO_PERFORMANCE.bass, ...overrides.bass }) }
@@ -109,7 +110,7 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     expect(projection.ppq).toBe(120);
     expect(projection.tempoBpm).toBe(100);
     expect(projection.meter).toEqual({ numerator: 4, denominator: 4, grouping: [4] });
-    expect(projection.totalTicks).toBe(120);
+    expect(projection.totalTicks).toBe(480);
     expect(projection.notes).toEqual([
       {
         stepIndex: 0,
@@ -177,9 +178,9 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     expect([
       ...new Set(projection.notes.map((note) => `${note.stepIndex}:${note.startTick}`)),
     ]).toEqual(["0:0", "1:60", "3:210"]);
-    expect(projection.totalTicks).toBe(280);
+    expect(projection.totalTicks).toBe(480);
     expect(Math.max(...projection.notes.map((note) => note.endTick))).toBe(248);
-    expect(projection.totalTicks - 248).toBe(32);
+    expect(projection.totalTicks - 248).toBe(232);
   });
 
   it("keeps deterministic arpeggio ordering and explicit simultaneous tie ordering", () => {
@@ -232,7 +233,7 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     expect([
       ...new Set(swung.notes.filter((n) => n.stepIndex === 1).map((n) => n.startTick)),
     ]).toEqual([71]);
-    expect(swung.totalTicks).toBe(120);
+    expect(swung.totalTicks).toBe(480);
     expect(structuredClone(project.progression.steps.map((step) => step.duration))).toEqual(
       beforeDurations,
     );
@@ -273,7 +274,7 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     ]);
     const projection = projectProjectToMidi(project);
 
-    expect(projection.totalTicks).toBe(3);
+    expect(projection.totalTicks).toBe(480);
     expect([
       ...new Set(projection.notes.map((note) => `${note.stepIndex}:${note.startTick}`)),
     ]).toEqual(["0:0", "2:2"]);

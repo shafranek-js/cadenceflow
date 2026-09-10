@@ -3,8 +3,10 @@ import { AppStore } from "../../../src/app/appStore";
 import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
 import {
   setExpertiseMode,
+  setStaffBassVisibility,
   setTheme,
   type SetExpertiseModeCommand,
+  type SetStaffBassVisibilityCommand,
   type SetThemeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
@@ -55,6 +57,26 @@ describe("US10 presentation commands", () => {
     expect(store.project.presentation.expertiseMode).toBe("composer");
     expect(store.redo()).toBe(true);
     expect(store.project.presentation.expertiseMode).toBe("expert");
+  });
+
+  it("keeps Staff bass hidden by default and toggles only its visual preference", () => {
+    const initial = createDefaultProject("presentation-staff-bass", "Staff Bass");
+    const store = new AppStore(initial);
+    const command: SetStaffBassVisibilityCommand = {
+      type: "presentation/set-staff-bass-visibility",
+      payload: { visible: true, nowIso },
+    };
+
+    expect(initial.presentation.showBassInStaff).toBe(false);
+    store.dispatch(command, setStaffBassVisibility);
+    expect(store.project.presentation.showBassInStaff).toBe(true);
+    expect(store.project.progression).toBe(initial.progression);
+    expect(store.project.defaults).toBe(initial.defaults);
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.showBassInStaff).toBe(false);
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.showBassInStaff).toBe(true);
   });
 
   it("provides three distinct explanation representations without changing recommendation data", () => {

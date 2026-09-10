@@ -16,6 +16,7 @@ import type {
   RestStep,
   StepPerformance,
 } from "../domain/progression/step";
+import { snapshotStepPerformance } from "../domain/progression/step";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicVariant } from "../domain/harmony/chord";
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
@@ -335,6 +336,7 @@ export function encodePortableProject(project: Project): string {
       expertiseMode: project.presentation.expertiseMode,
       theme: project.presentation.theme,
       globalMatrixCardView: project.presentation.globalMatrixCardView,
+      showBassInStaff: project.presentation.showBassInStaff,
     },
     defaults,
     moduleTemplateStates,
@@ -471,15 +473,28 @@ export function decodePortableProject(jsonString: string): Project {
   const defaultsRaw = (migrated["defaults"] as Record<string, unknown>) || {};
   const rawPiano = defaultsRaw["piano"] as
     { duration: WireDuration; performance: StepPerformance } | undefined;
+  const decodedDefaultPerformance = rawPiano
+    ? snapshotStepPerformance(rawPiano.performance)
+    : DEFAULT_PIANO_PERFORMANCE;
+  // Projects saved before Humanized became the product default stored Block
+  // in this inherited-default slot. Keep explicit per-step/card overrides
+  // untouched while upgrading the inherited default on load.
+  const defaultPerformance =
+    decodedDefaultPerformance.articulation === "block"
+      ? Object.freeze({
+          ...decodedDefaultPerformance,
+          articulation: DEFAULT_PIANO_PERFORMANCE.articulation,
+        })
+      : decodedDefaultPerformance;
   const defaults: ProjectDefaults = {
     piano: rawPiano
       ? {
           duration: decodeDuration(rawPiano.duration),
-          performance: rawPiano.performance,
+          performance: defaultPerformance,
         }
       : {
           duration: musicalDuration(rational(4, 1)),
-          performance: DEFAULT_PIANO_PERFORMANCE,
+          performance: defaultPerformance,
         },
   };
 
@@ -545,7 +560,18 @@ export function decodePortableProject(jsonString: string): Project {
     tonic,
     globalTiming: migrated["globalTiming"] as Project["globalTiming"],
     groove: migrated["groove"] as Project["groove"],
-    presentation: migrated["presentation"] as PresentationState,
+    presentation: (() => {
+      const presentation = migrated["presentation"] as Record<string, unknown>;
+      return Object.freeze({
+        expertiseMode: presentation["expertiseMode"] as PresentationState["expertiseMode"],
+        theme: presentation["theme"] as PresentationState["theme"],
+        globalMatrixCardView: presentation[
+          "globalMatrixCardView"
+        ] as PresentationState["globalMatrixCardView"],
+        // Portable projects created before this preference default to chord notes only.
+        showBassInStaff: presentation["showBassInStaff"] === true,
+      });
+    })(),
     defaults,
     moduleTemplateStates,
     progression: Object.freeze({

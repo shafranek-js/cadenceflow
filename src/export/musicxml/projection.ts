@@ -29,6 +29,7 @@ import {
   type Rational,
 } from "../../domain/timing/rational";
 import { createProgressionTimeline, type TimelineStepEntry } from "../../domain/timing/timeline";
+import { createProgressionMeasureLayout } from "../../domain/timing/measureLayout";
 import { pianoProfile } from "../../instruments/piano/profile";
 
 export const MUSICXML_VERSION = "4.0";
@@ -534,6 +535,27 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
         fragments.length,
       );
     });
+  }
+
+  const measureLayout = createProgressionMeasureLayout(project.progression.steps, meter);
+  if (compareRational(measureLayout.trailingSilenceBeats, ZERO) > 0) {
+    const finalMeasure = measures.get(measureLayout.measures.length - 1);
+    if (!finalMeasure)
+      throw new MusicXmlExportError("invalid-projection", "Missing final measure.");
+    const gap: MusicXmlRestEvent = Object.freeze({
+      kind: "rest",
+      onsetBeats: subtractRational(measureLayout.authoredDurationBeats, finalMeasure.startBeats),
+      stepIndex: project.progression.steps.length,
+      stepId: "__trailing-measure-gap__",
+      durationBeats: measureLayout.trailingSilenceBeats,
+      duration: durationUnits(measureLayout.trailingSilenceBeats, divisions),
+      voice: "1",
+    });
+    finalMeasure.events.push(gap);
+    finalMeasure.durationBeats = addRational(
+      finalMeasure.durationBeats,
+      measureLayout.trailingSilenceBeats,
+    );
   }
 
   const measureList = [...measures.entries()]

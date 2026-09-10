@@ -128,6 +128,7 @@ function parseSmf(bytes: Uint8Array): ParsedMidi {
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
   return Object.freeze({
     ...DEFAULT_PIANO_PERFORMANCE,
+    articulation: "block",
     ...overrides,
     ...(overrides.bass
       ? { bass: Object.freeze({ ...DEFAULT_PIANO_PERFORMANCE.bass, ...overrides.bass }) }
@@ -384,7 +385,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
       61,
     ]);
     expect(midiProjection.ppq).toBe(120);
-    expect(midiProjection.totalTicks).toBe(400);
+    expect(midiProjection.totalTicks).toBe(420);
     expect(
       midiProjection.notes.map((note) => [note.startTick, note.pitch, note.velocity, note.endTick]),
     ).toEqual(expectedMidiNotes);
@@ -410,7 +411,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
         .sort((a, b) => a.endTick - b.endTick || a.pitch - b.pitch)
         .map((note) => [note.endTick, note.pitch]),
     );
-    expect(parsedMidi.events.at(-1)).toMatchObject({ kind: "eot", tick: 400 });
+    expect(parsedMidi.events.at(-1)).toMatchObject({ kind: "eot", tick: 420 });
 
     // Swing changes supported performance/MIDI timing, while written notation
     // remains semantic straight durations. The first pair is the literal swing evidence.
@@ -430,7 +431,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
     });
     expect(musicXmlProjection.tempoBpm).toBe(140);
     expect(musicXmlProjection.measures[0]?.capacity).toBe(21);
-    expect(musicXmlProjection.measures[0]?.durationBeats).toEqual(expectedTotalBeats);
+    expect(musicXmlProjection.measures[0]?.durationBeats).toEqual(rational(7, 2));
     expect(noteEvents(musicXmlProjection).map((event) => event.sourceMidi)).toEqual(
       expectedPitchSequence,
     );
@@ -457,6 +458,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
     ).toEqual([
       ["rest-between", 2],
       ["trailing-rest", 9],
+      ["__trailing-measure-gap__", 1],
     ]);
     expect(musicXmlProjection.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "presentation-state-omitted",
@@ -488,6 +490,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
     ).toEqual([
       [2, true],
       [9, true],
+      [1, true],
     ]);
     expect(parsedNotes.filter((note) => !note.rest && note.chord)).toHaveLength(13);
     expect(musicXml).not.toContain("branch-only-note");

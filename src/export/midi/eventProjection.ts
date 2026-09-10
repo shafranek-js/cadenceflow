@@ -3,6 +3,7 @@ import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { modeForModule } from "../../domain/harmony/functions";
 import type { Project } from "../../domain/project/project";
 import { addRational, subtractRational, ZERO, type Rational } from "../../domain/timing/rational";
+import { createProgressionMeasureLayout } from "../../domain/timing/measureLayout";
 
 /**
  * CadenceFlow's MIDI grid uses 120 ticks per quarter-note beat.
@@ -134,6 +135,11 @@ function rawNoteComparator(a: RawProjectionNote, b: RawProjectionNote): number {
  */
 export function projectProjectToMidi(project: Project): MidiProjection {
   const quantizedSteps = quantizeStepTimings(project);
+  const measureLayout = createProgressionMeasureLayout(
+    project.progression.steps,
+    project.globalTiming.meter,
+  );
+  const totalTicks = quantizeRationalToMidiTicks(measureLayout.playbackDurationBeats);
   const performance = realizeProgressionPerformanceEvents({
     steps: project.progression.steps,
     tonic: project.tonic,
@@ -150,10 +156,10 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     const projectedStart = stepTiming.startTick + quantizeRationalToMidiTicks(offsetBeats);
     const startTick = Math.min(
       Math.max(stepTiming.startTick, projectedStart),
-      Math.max(0, quantizedSteps.totalTicks - 1),
+      Math.max(0, totalTicks - 1),
     );
     const durationTicks = Math.max(1, quantizeRationalToMidiTicks(event.durationBeats));
-    const endTick = Math.min(quantizedSteps.totalTicks, startTick + durationTicks);
+    const endTick = Math.min(totalTicks, startTick + durationTicks);
 
     return {
       stepIndex: event.stepIndex,
@@ -186,7 +192,7 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     ppq: MIDI_PPQ,
     tempoBpm: project.globalTiming.tempoBpm,
     meter: freezeMeter(project),
-    totalTicks: quantizedSteps.totalTicks,
+    totalTicks,
     notes: Object.freeze(notes),
   });
 }

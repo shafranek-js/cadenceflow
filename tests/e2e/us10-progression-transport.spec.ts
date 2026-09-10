@@ -50,12 +50,12 @@ test.describe("US10 — progression-owned playback transport", () => {
 
     await page
       .getByTestId("chord-card-I")
-      .getByRole("button", { name: /Add I to progression/i })
-      .click();
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
     await page
       .getByTestId("chord-card-IV")
-      .getByRole("button", { name: /Add IV to progression/i })
-      .click();
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
     await expect(steps).toHaveCount(2);
 
     await steps.nth(0).click();
@@ -97,5 +97,38 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
 
     await stop.click();
+  });
+
+  test("starts and toggles playback with Space when focus is outside controls", async ({
+    page,
+  }) => {
+    test.slow();
+
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
+
+    const status = page.getByTestId("transport-status");
+    const stop = page.getByRole("button", { name: "Stop", exact: true });
+
+    await expect(page.getByTestId("piano-audio-status")).toContainText("HQ Piano Ready", {
+      timeout: 30_000,
+    });
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    await page.keyboard.press("Space");
+    await expect(status).toContainText("Playing");
+
+    await page.keyboard.press("Space");
+    await expect(status).toContainText("Paused");
+
+    await page.keyboard.press("Space");
+    await expect(status).toContainText("Playing");
+
+    await stop.click();
+    await expect(status).toContainText("Stopped");
   });
 });

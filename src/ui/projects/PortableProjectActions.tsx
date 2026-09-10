@@ -3,14 +3,12 @@ import type { Project } from "../../domain/project/project";
 import { normalizeProjectName } from "../../domain/project/name";
 import type { PortableProjectExport } from "../../app/projectController";
 import { useModalFocus } from "../common/useModalFocus";
-import { ExportActions } from "./ExportActions";
 import { Icon } from "../common/Icon";
 
 export interface PortableProjectActionsProps {
   readonly project: Project;
   readonly busy?: boolean;
   readonly onSaveProjectAs: (name: string) => void | Promise<void>;
-  readonly onExport: () => PortableProjectExport;
   readonly onOpenProjectFile: (text: string) => void | Promise<void>;
 }
 
@@ -32,7 +30,6 @@ export function PortableProjectActions({
   project,
   busy = false,
   onSaveProjectAs,
-  onExport,
   onOpenProjectFile,
 }: PortableProjectActionsProps) {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
@@ -58,15 +55,6 @@ export function PortableProjectActions({
         );
     } catch (error) {
       setNameError(error instanceof Error ? error.message : "Enter a valid project name.");
-    }
-  };
-
-  const handleExport = () => {
-    try {
-      downloadPortableProject(onExport());
-      setActionError(null);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Could not export the project.");
     }
   };
 
@@ -102,15 +90,6 @@ export function PortableProjectActions({
           type="button"
           className="secondary-btn"
           disabled={busy}
-          data-testid="project-export-btn"
-          onClick={handleExport}
-        >
-          Export Project…
-        </button>
-        <button
-          type="button"
-          className="secondary-btn"
-          disabled={busy}
           data-testid="project-open-file-btn"
           onClick={() => fileInputRef.current?.click()}
         >
@@ -125,7 +104,6 @@ export function PortableProjectActions({
           data-testid="project-file-input"
           onChange={(event) => void handleFileChange(event)}
         />
-        <ExportActions project={project} busy={busy} />
       </div>
       {actionError ? (
         <p className="project-error" role="alert" data-testid="portable-project-error">
@@ -203,6 +181,49 @@ export function PortableProjectActions({
           </section>
         </div>
       )}
+    </>
+  );
+}
+
+export interface PortableProjectExportActionProps {
+  readonly busy?: boolean;
+  readonly onExport: () => PortableProjectExport;
+}
+
+export function PortableProjectExportAction({
+  busy = false,
+  onExport,
+}: PortableProjectExportActionProps) {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleExport = () => {
+    try {
+      downloadPortableProject(onExport());
+      setError(null);
+    } catch (exportError) {
+      setError(
+        exportError instanceof Error ? exportError.message : "Could not export the project.",
+      );
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="secondary-btn"
+        role="menuitem"
+        disabled={busy}
+        data-testid="project-export-btn"
+        onClick={handleExport}
+      >
+        Export Project…
+      </button>
+      {error ? (
+        <p className="project-error" role="alert" data-testid="portable-project-export-error">
+          {error}
+        </p>
+      ) : null}
     </>
   );
 }

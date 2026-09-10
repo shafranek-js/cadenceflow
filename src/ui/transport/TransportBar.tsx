@@ -13,42 +13,118 @@ import { Icon } from "../common/Icon";
 
 export interface TransportBarProps {
   readonly project: Project;
-  readonly loopState: LoopState;
-  readonly metronomeEnabled: boolean;
-  readonly countInEnabled: boolean;
-  readonly onSetTempo: (tempoBpm: number) => void;
   readonly onSetMeter: (newMeter: Meter, policy: MeterChangePolicy) => void;
   readonly onSetGroove: (groove: GrooveSettings) => void;
   readonly onSetStepDuration: (stepId: string, duration: MusicalDuration) => void;
+}
+
+export interface TempoControlsProps {
+  readonly tempoBpm: number;
+  readonly onSetTempo: (tempoBpm: number) => void;
+  readonly className?: string;
+}
+
+/** Compact tempo editor shared by the progression heading and transport rail. */
+export function TempoControls({ tempoBpm, onSetTempo, className = "" }: TempoControlsProps) {
+  const tempoInputId = useId();
+  const sectionClassName = `transport-section transport-tempo ${className}`.trim();
+
+  return (
+    <div className={sectionClassName} role="group" aria-label="Tempo Controls">
+      <label htmlFor={tempoInputId} className="transport-label">
+        Tempo
+      </label>
+      <div className="tempo-input-group">
+        <button
+          type="button"
+          className="tempo-stepper-btn"
+          onClick={() => onSetTempo(Math.max(30, tempoBpm - 5))}
+          aria-label="Decrease tempo by 5 BPM"
+          title="-5 BPM"
+        >
+          -
+        </button>
+        <input
+          id={tempoInputId}
+          type="number"
+          min={30}
+          max={300}
+          value={tempoBpm}
+          onChange={(e) => {
+            const val = parseInt(e.target.value, 10);
+            if (Number.isFinite(val) && val >= 30 && val <= 300) {
+              onSetTempo(val);
+            }
+          }}
+          className="tempo-number-input"
+          aria-label="Tempo in BPM"
+        />
+        <button
+          type="button"
+          className="tempo-stepper-btn"
+          onClick={() => onSetTempo(Math.min(300, tempoBpm + 5))}
+          aria-label="Increase tempo by 5 BPM"
+          title="+5 BPM"
+        >
+          +
+        </button>
+        <span className="tempo-unit">BPM</span>
+      </div>
+    </div>
+  );
+}
+
+export interface PlaybackSupportControlsProps {
+  readonly loopState: LoopState;
+  readonly metronomeEnabled: boolean;
+  readonly countInEnabled: boolean;
   readonly onSetLoopMode: (mode: LoopMode) => void;
-  readonly onSetLoopRange: (startStepId: string, endStepId: string) => void;
   readonly onToggleMetronome: () => void;
   readonly onToggleCountIn: () => void;
-  readonly onUndo?: () => void;
-  readonly canUndo?: boolean;
-  readonly onRedo?: () => void;
-  readonly canRedo?: boolean;
+}
+
+/** Compact loop, metronome, and count-in toggles shown beside tempo. */
+export function PlaybackSupportControls({
+  loopState,
+  metronomeEnabled,
+  countInEnabled,
+  onSetLoopMode,
+  onToggleMetronome,
+  onToggleCountIn,
+}: PlaybackSupportControlsProps) {
+  return (
+    <div
+      className="progression-heading-support-controls"
+      role="group"
+      aria-label="Playback Support"
+    >
+      <button
+        type="button"
+        className={`transport-toggle-button loop-toggle-btn ${loopState.enabled ? "is-active" : ""}`}
+        onClick={() => onSetLoopMode(loopState.enabled ? "disabled" : "all")}
+        aria-pressed={loopState.enabled}
+        aria-label="Toggle Loop"
+        title={loopState.enabled ? "Disable loop" : "Enable loop for the progression"}
+      >
+        <Icon name="loop" />
+        <span className="loop-toggle-label">Loop</span>
+      </button>
+      <MetronomeControls
+        metronomeEnabled={metronomeEnabled}
+        countInEnabled={countInEnabled}
+        onToggleMetronome={onToggleMetronome}
+        onToggleCountIn={onToggleCountIn}
+      />
+    </div>
+  );
 }
 
 export function TransportBar({
   project,
-  loopState,
-  metronomeEnabled,
-  countInEnabled,
-  onSetTempo,
   onSetMeter,
   onSetGroove,
   onSetStepDuration,
-  onSetLoopMode,
-  onSetLoopRange,
-  onToggleMetronome,
-  onToggleCountIn,
-  onUndo,
-  canUndo,
-  onRedo,
-  canRedo,
 }: TransportBarProps) {
-  const tempoInputId = useId();
   const meterNumId = useId();
   const meterDenId = useId();
   const meterGroupingId = useId();
@@ -171,112 +247,10 @@ export function TransportBar({
     }
   };
 
-  // Loop handlers
-  const steps = project.progression.steps;
-  const loopRegion = loopState.region;
-
-  const handleLoopRangeStartChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const startId = e.target.value;
-    const endId = loopRegion?.endStepId ?? steps[steps.length - 1]?.id;
-    if (startId && endId) {
-      onSetLoopRange(startId, endId);
-    }
-  };
-
-  const handleLoopRangeEndChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const endId = e.target.value;
-    const startId = loopRegion?.startStepId ?? steps[0]?.id;
-    if (startId && endId) {
-      onSetLoopRange(startId, endId);
-    }
-  };
-
   return (
-    <nav className="transport-bar" aria-label="Playback Transport">
-      {/* History remains global; playback transport is owned by My Progression. */}
-      <div
-        className="transport-section transport-history"
-        role="group"
-        aria-label="History Controls"
-      >
-        {onUndo && (
-          <button
-            type="button"
-            className="transport-button transport-undo"
-            onClick={onUndo}
-            disabled={!canUndo}
-            aria-label="Undo"
-            title="Undo last action (Ctrl+Z)"
-          >
-            <span className="transport-btn-icon" aria-hidden="true">
-              <Icon name="undo" />
-            </span>
-            <span className="transport-btn-label">Undo</span>
-          </button>
-        )}
-
-        {onRedo && (
-          <button
-            type="button"
-            className="transport-button transport-redo"
-            onClick={onRedo}
-            disabled={!canRedo}
-            aria-label="Redo"
-            title="Redo last undone action (Ctrl+Shift+Z or Ctrl+Y)"
-          >
-            <span className="transport-btn-icon" aria-hidden="true">
-              <Icon name="redo" />
-            </span>
-            <span className="transport-btn-label">Redo</span>
-          </button>
-        )}
-      </div>
-
+    <nav className="transport-bar progression-playback-settings" aria-label="Playback Transport">
       <div className="transport-group transport-timing" role="group" aria-label="Timing Controls">
-        {/* 2. Tempo Controls */}
-        <div className="transport-section transport-tempo" role="group" aria-label="Tempo Controls">
-          <label htmlFor={tempoInputId} className="transport-label">
-            Tempo
-          </label>
-          <div className="tempo-input-group">
-            <button
-              type="button"
-              className="tempo-stepper-btn"
-              onClick={() => onSetTempo(Math.max(30, project.globalTiming.tempoBpm - 5))}
-              aria-label="Decrease tempo by 5 BPM"
-              title="-5 BPM"
-            >
-              -
-            </button>
-            <input
-              id={tempoInputId}
-              type="number"
-              min={30}
-              max={300}
-              value={project.globalTiming.tempoBpm}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (Number.isFinite(val) && val >= 30 && val <= 300) {
-                  onSetTempo(val);
-                }
-              }}
-              className="tempo-number-input"
-              aria-label="Tempo in BPM"
-            />
-            <button
-              type="button"
-              className="tempo-stepper-btn"
-              onClick={() => onSetTempo(Math.min(300, project.globalTiming.tempoBpm + 5))}
-              aria-label="Increase tempo by 5 BPM"
-              title="+5 BPM"
-            >
-              +
-            </button>
-            <span className="tempo-unit">BPM</span>
-          </div>
-        </div>
-
-        {/* 3. Meter and Grouping Controls */}
+        {/* Meter and Grouping Controls */}
         <div
           className="transport-section transport-meter"
           role="group"
@@ -378,6 +352,7 @@ export function TransportBar({
           </span>
           <StepDurationControl
             variant="buttons"
+            label=""
             value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
             onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
             disabled={!selectedStepId}
@@ -390,7 +365,6 @@ export function TransportBar({
           role="group"
           aria-label="Groove and Swing"
         >
-          <span className="transport-label">Groove</span>
           <div className="groove-controls-group">
             <button
               type="button"
@@ -399,7 +373,7 @@ export function TransportBar({
               aria-pressed={project.groove.feel === "swing"}
               aria-label="Toggle Swing Feel"
             >
-              {project.groove.feel === "swing" ? "Swing" : "Straight"}
+              {project.groove.feel === "swing" ? "Swing Groove" : "Straight Groove"}
             </button>
 
             {project.groove.feel === "swing" && (
@@ -421,91 +395,6 @@ export function TransportBar({
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      <div
-        className="transport-group transport-playback-support"
-        role="group"
-        aria-label="Playback Support"
-      >
-        {/* 6. Loop Controls */}
-        <div className="transport-section transport-loop" role="group" aria-label="Loop Controls">
-          <span className="transport-label">Loop</span>
-          <div className="loop-controls-group">
-            <div className="loop-mode-selector" role="radiogroup" aria-label="Loop Mode">
-              <button
-                type="button"
-                className={`loop-mode-btn ${loopState.mode === "disabled" ? "is-active" : ""}`}
-                onClick={() => onSetLoopMode("disabled")}
-                aria-pressed={loopState.mode === "disabled"}
-              >
-                Off
-              </button>
-              <button
-                type="button"
-                className={`loop-mode-btn ${loopState.mode === "all" ? "is-active" : ""}`}
-                onClick={() => onSetLoopMode("all")}
-                aria-pressed={loopState.mode === "all"}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                className={`loop-mode-btn ${loopState.mode === "range" ? "is-active" : ""}`}
-                onClick={() => onSetLoopMode("range")}
-                aria-pressed={loopState.mode === "range"}
-              >
-                Range
-              </button>
-            </div>
-
-            {loopState.mode === "range" && steps.length > 0 && (
-              <div className="loop-range-selectors">
-                <label className="loop-range-label">
-                  From:
-                  <select
-                    value={loopRegion?.startStepId ?? steps[0]?.id}
-                    onChange={handleLoopRangeStartChange}
-                    className="loop-step-select"
-                    aria-label="Loop start step"
-                  >
-                    {steps.map((s, idx) => (
-                      <option key={s.id} value={s.id}>
-                        {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="loop-range-label">
-                  To:
-                  <select
-                    value={loopRegion?.endStepId ?? steps[steps.length - 1]?.id}
-                    onChange={handleLoopRangeEndChange}
-                    className="loop-step-select"
-                    aria-label="Loop end step"
-                  >
-                    {steps.map((s, idx) => (
-                      <option key={s.id} value={s.id}>
-                        {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 7. Metronome and Count-In Controls */}
-        <div className="transport-section transport-metronome">
-          <MetronomeControls
-            metronomeEnabled={metronomeEnabled}
-            countInEnabled={countInEnabled}
-            onToggleMetronome={onToggleMetronome}
-            onToggleCountIn={onToggleCountIn}
-          />
         </div>
       </div>
     </nav>

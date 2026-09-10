@@ -19,6 +19,15 @@ export type SetExpertiseModeCommand = ProjectCommand<SetExpertiseModePayload> & 
   readonly type: "presentation/set-expertise-mode";
 };
 
+export interface SetStaffBassVisibilityPayload {
+  readonly visible: boolean;
+  readonly nowIso: string;
+}
+
+export type SetStaffBassVisibilityCommand = ProjectCommand<SetStaffBassVisibilityPayload> & {
+  readonly type: "presentation/set-staff-bass-visibility";
+};
+
 export function setTheme(project: Project, command: SetThemeCommand): AppliedCommand {
   const previous = project.presentation.theme;
   return {
@@ -54,6 +63,27 @@ export function setExpertiseMode(
     inverse: {
       type: "presentation/set-expertise-mode",
       payload: { expertiseMode: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
+export function setStaffBassVisibility(
+  project: Project,
+  command: SetStaffBassVisibilityCommand,
+): AppliedCommand {
+  const previous = project.presentation.showBassInStaff;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        showBassInStaff: command.payload.visible,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-staff-bass-visibility",
+      payload: { visible: previous, nowIso: command.payload.nowIso },
     },
   };
 }

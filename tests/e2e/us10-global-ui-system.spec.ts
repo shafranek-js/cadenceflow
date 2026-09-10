@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -34,16 +35,16 @@ async function addSteps(page: Page, count: number): Promise<void> {
   for (let index = 0; index < count; index += 1) {
     await page
       .getByTestId(`chord-card-${functionIds[index % functionIds.length]!}`)
-      .getByRole("button", { name: /Add .* to progression/ })
-      .click();
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
   }
 }
 
 test.describe("US10 Batch 4 — global UI system", () => {
   test("organizes toolbar groups and keeps transport ownership unambiguous", async ({ page }) => {
     await waitForStudio(page);
+    await ensureHistoryControlsVisible(page);
 
-    await expect(page.getByRole("group", { name: "Application", exact: true })).toBeVisible();
     await expect(page.getByRole("group", { name: "Application controls" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Theme" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Expertise mode" })).toBeVisible();
@@ -51,6 +52,13 @@ test.describe("US10 Batch 4 — global UI system", () => {
     await expect(page.getByRole("group", { name: "Timing Controls" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Playback Support" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Progression playback controls" })).toBeVisible();
+
+    const progressionPanel = page.getByRole("region", { name: "My Progression" });
+    await expect(progressionPanel.locator('nav[aria-label="Playback Transport"]')).toBeVisible();
+    await expect(
+      progressionPanel.locator('[role="group"][aria-label="Timing Controls"]'),
+    ).toBeVisible();
+    await expect(progressionPanel.locator('[aria-label="History Controls"]')).toHaveCount(0);
 
     const playbackTransport = page.getByRole("navigation", { name: "Playback Transport" });
     await expect(playbackTransport.getByRole("button", { name: "Play", exact: true })).toHaveCount(
@@ -62,15 +70,13 @@ test.describe("US10 Batch 4 — global UI system", () => {
 
     expect(await page.locator(".ui-icon").count()).toBeGreaterThan(10);
     await expect(page.locator(".project-selector-button .ui-icon-disclosure")).toBeVisible();
-    await expect(
-      page.getByTestId("chord-card-I").locator(".card-settings-button .ui-icon"),
-    ).toBeVisible();
+    await expect(page.getByTestId("chord-card-I").locator(".card-settings-button")).toHaveCount(0);
 
     const labels = (await page.locator(".transport-label").allTextContents()).map((label) =>
       label.trim(),
     );
     expect(labels).toEqual(
-      expect.arrayContaining(["Tempo", "Meter", "Step Duration", "Groove", "Loop"]),
+      expect.arrayContaining(["Tempo", "Meter", "Step Duration"]),
     );
     expect(
       await page
@@ -84,35 +90,39 @@ test.describe("US10 Batch 4 — global UI system", () => {
     await expect(menu).toBeVisible();
     await expect(menu.getByRole("group", { name: "Portable project actions" })).toBeVisible();
     await expect(menu.getByRole("button", { name: /Save Project As/ })).toBeVisible();
-    await expect(menu.getByRole("button", { name: /Export Project/ })).toBeVisible();
     await expect(menu.getByRole("button", { name: /Open Project File/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByTestId("export-menu-toggle").click();
+    const exportMenu = page.getByRole("menu", { name: "Export menu" });
+    await expect(exportMenu.getByTestId("project-export-btn")).toBeVisible();
+    await expect(exportMenu.getByTestId("export-midi-btn")).toBeVisible();
+    await expect(exportMenu.getByTestId("export-musicxml-btn")).toBeVisible();
   });
 
   test("keeps frequent hit areas stable and prevents geometry movement on hover", async ({
     page,
   }) => {
     await waitForStudio(page);
-    const add = page
-      .getByTestId("chord-card-I")
-      .getByRole("button", { name: "Add I to progression" });
-    const settings = page
-      .getByTestId("chord-card-I")
-      .getByRole("button", { name: "Settings for I" });
+    const chordMain = page.getByTestId("chord-card-I").locator(".chord-main");
 
-    await settings.scrollIntoViewIfNeeded();
-    const before = await add.boundingBox();
+    await chordMain.scrollIntoViewIfNeeded();
+    await expect(chordMain).toHaveAttribute(
+      "title",
+      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+    );
+    const before = await chordMain.boundingBox();
     expect(before).not.toBeNull();
     expect(before?.width).toBeGreaterThanOrEqual(32);
     expect(before?.height).toBeGreaterThanOrEqual(32);
-    const settingsBefore = await settings.boundingBox();
-    await settings.hover();
-    const settingsAfter = await settings.boundingBox();
-    expect(settingsBefore).not.toBeNull();
-    expect(settingsAfter).not.toBeNull();
-    expect(settingsAfter?.x).toBe(settingsBefore?.x);
-    expect(settingsAfter?.y).toBe(settingsBefore?.y);
-    expect(settingsAfter?.width).toBe(settingsBefore?.width);
-    expect(settingsAfter?.height).toBe(settingsBefore?.height);
+    const mainBefore = await chordMain.boundingBox();
+    await chordMain.hover();
+    const mainAfter = await chordMain.boundingBox();
+    expect(mainBefore).not.toBeNull();
+    expect(mainAfter).not.toBeNull();
+    expect(mainAfter?.x).toBe(mainBefore?.x);
+    expect(mainAfter?.y).toBe(mainBefore?.y);
+    expect(mainAfter?.width).toBe(mainBefore?.width);
+    expect(mainAfter?.height).toBe(mainBefore?.height);
 
     const tokens = await page.evaluate(() => {
       const style = getComputedStyle(document.documentElement);

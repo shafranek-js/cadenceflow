@@ -7,14 +7,14 @@ test("US2 explores a mid-progression branch, compares paths, rejoins, and commit
   for (const fn of ["I", "vi", "IV", "V"])
     await page
       .getByTestId(`chord-card-${fn}`)
-      .getByRole("button", {
-        name: new RegExp(`Add ${fn.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")} to progression`),
-      })
-      .click();
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
   await expect(page.getByTestId("progression-step")).toHaveCount(4);
+  await expect(page.locator('[data-context="composition-intent"]')).toHaveCount(0);
 
   await page.getByLabel("Branch origin").selectOption({ label: "After 2: vi" });
   await page.getByRole("button", { name: "Explore Alternative" }).click();
+  await expect(page.locator('[data-context="composition-intent"]')).toBeVisible();
   await page.getByLabel("Branch rejoin").selectOption({ label: "4: V" });
 
   await page.getByTestId("chord-card-ii").locator(".chord-main").click();

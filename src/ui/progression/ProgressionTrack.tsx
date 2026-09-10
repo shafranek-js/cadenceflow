@@ -2,56 +2,81 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
 import type { Project } from "../../domain/project/project";
 import type { CardViewId, StepPerformance } from "../../domain/progression/step";
-import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
+import { formatChordSymbol } from "../../domain/harmony/chord";
+import { realizeChord } from "../../domain/harmony/realization";
+import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  formatMusicalDuration,
+  musicalDuration,
+  type MusicalDuration,
+} from "../../domain/timing/duration";
+import {
+  createProgressionMeasureLayout,
+  type ProgressionMeasureFragment,
+  type ProgressionMeasureItem,
+} from "../../domain/timing/measureLayout";
+import { rationalToNumber } from "../../domain/timing/rational";
 import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
-import { StepDurationControl } from "./StepDurationControl";
 import { Icon } from "../common/Icon";
+import { MeasureStaffView, type MeasureStaffEvent } from "../staff/MeasureStaffView";
+
+function segmentStyle(
+  durationBeats: MusicalDuration["beats"],
+  barLengthBeats: MusicalDuration["beats"],
+): CSSProperties {
+  const ratio = rationalToNumber(durationBeats) / rationalToNumber(barLengthBeats);
+  return { flex: `${Math.max(0, ratio)} 1 0` };
+}
 
 export function ProgressionTrack({
   project,
-  previewFunctionId,
   currentPlayingStepIndex,
   loopState,
   onSelectStep,
   onClearSelection,
   onEditPerformance,
-  onDurationChange,
-  onSetStepView,
   onSetAllViews,
-  onReplace,
-  onReset,
   onRemove,
   onReorder,
   onAddRest,
+  onFocusMatrix,
+  onFillGapWithRest,
+  onExtendFinalChord,
+  onRepeatFinalChord,
 }: {
   readonly project: Project;
-  readonly previewFunctionId?: string;
   readonly currentPlayingStepIndex?: number | null;
   readonly loopState?: LoopState;
   readonly onSelectStep: (stepId: string) => void;
   readonly onClearSelection?: () => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
-  readonly onDurationChange?: (stepId: string, duration: MusicalDuration) => void;
-  readonly onSetStepView: (stepId: string, view: CardViewId) => void;
   readonly onSetAllViews: (view: CardViewId) => void;
-  readonly onReplace: (stepId: string, functionId: string) => void;
-  readonly onReset: (stepId: string) => void;
   readonly onRemove: (stepId: string) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
-  readonly onAddRest?: () => void;
+  readonly onAddRest?: (duration?: MusicalDuration) => void;
+  readonly onFocusMatrix?: () => void;
+  readonly onFillGapWithRest?: () => void;
+  readonly onExtendFinalChord?: () => void;
+  readonly onRepeatFinalChord?: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [matrixGapHint, setMatrixGapHint] = useState<number | null>(null);
   const selectedStepId = project.progression.selectedStepId;
+  const layout = createProgressionMeasureLayout(
+    project.progression.steps,
+    project.globalTiming.meter,
+  );
   const loopIndices = (() => {
     if (!loopState?.enabled || !loopState.region) return null;
     const start = project.progression.steps.findIndex(
@@ -68,6 +93,40 @@ export function ProgressionTrack({
     chordViews.length && chordViews.every((view) => view === chordViews[0])
       ? chordViews[0]!
       : "mixed";
+
+  const staffEventsForMeasure = (measure: (typeof layout.measures)[number]): MeasureStaffEvent[] =>
+    measure.items.flatMap((item) => {
+      if (item.kind === "gap" || !item.startsHere) return [];
+      if (item.step.kind === "rest") {
+        return [
+          {
+            stepId: item.step.id,
+            label: "Rest",
+            pitches: [],
+            duration: musicalDuration(item.durationBeats),
+            rest: true,
+          },
+        ];
+      }
+      if (item.step.cardView !== "staff") return [];
+      const realization = realizeProgressionStepRealization(item.step, project.tonic);
+      const pitches =
+        project.presentation.showBassInStaff && realization.bassPitch
+          ? Object.freeze([realization.bassPitch, ...realization.pitches])
+          : realization.pitches;
+      return [
+        {
+          stepId: item.step.id,
+          label: formatChordSymbol({
+            ...realizeChord(item.step.harmonicFunction, project.tonic),
+            variant: item.step.harmonicVariant,
+          }),
+          pitches,
+          duration: musicalDuration(item.durationBeats),
+        },
+      ];
+    });
+
   const dragStart = (event: DragEvent<HTMLElement>, stepId: string) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (target?.closest("button, input, select, textarea, label, [data-no-drag]")) {
@@ -94,12 +153,10 @@ export function ProgressionTrack({
   };
   const restoreSelectedStepFocus = (stepId: string) => {
     const focus = () => {
-      const buttons = trackRef.current?.querySelectorAll<HTMLButtonElement>(
-        "[data-progression-step-select]",
-      );
-      const selectedButton = buttons
-        ? Array.from(buttons).find((button) => button.dataset.stepId === stepId)
-        : undefined;
+      const selectedButton = Array.from(
+        trackRef.current?.querySelectorAll<HTMLButtonElement>("[data-progression-step-select]") ??
+          [],
+      ).find((button) => button.dataset.stepId === stepId);
       selectedButton?.focus();
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
@@ -113,8 +170,203 @@ export function ProgressionTrack({
     restoreSelectedStepFocus(selectedStepId);
   };
   const handleBackgroundClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) onClearSelection?.();
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const clickedInteractive = target.closest(
+      ".progression-step-card, .progression-rest-card, .progression-step-continuation, .progression-measure-header, .progression-measure-gap, .progression-view-control, .progression-gap-hint, button, select, input, textarea, label",
+    );
+    if (clickedInteractive) return;
+    if (event.currentTarget.classList.contains("progression-step-cards")) {
+      event.stopPropagation();
+    }
+    onClearSelection?.();
   };
+
+  const focusMatrixForGap = (measureNumber: number) => {
+    onFocusMatrix?.();
+    setMatrixGapHint(measureNumber);
+  };
+
+  const renderRest = (fragment: ProgressionMeasureFragment) => {
+    const step = fragment.step;
+    const index = fragment.stepIndex;
+    const isPlaying = currentPlayingStepIndex === index;
+    const isInLoop = Boolean(loopIndices && index >= loopIndices.start && index <= loopIndices.end);
+    const isSelected = selectedStepId === step.id;
+    return (
+      <div
+        className={`progression-drag-item measure-step-segment ${dropTargetIndex === index ? "is-drop-target" : ""}`}
+        style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
+        draggable
+        data-progression-step-drag
+        data-step-id={step.id}
+        data-dragging={draggingStepId === step.id ? "true" : undefined}
+        onDragStart={(event) => dragStart(event, step.id)}
+        onDragOver={(event) => dragOver(event, index)}
+        onDrop={(event) => drop(event, index)}
+        onDragEnd={clearDragState}
+      >
+        <div
+          className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${isSelected ? "is-selected" : ""}`}
+          data-testid="progression-step"
+          data-playing={isPlaying ? "true" : undefined}
+          data-in-loop={isInLoop ? "true" : undefined}
+          onClick={() => onSelectStep(step.id)}
+        >
+          <span
+            className="progression-step-number"
+            data-testid="progression-step-number"
+            aria-hidden="true"
+          >
+            {index + 1}
+          </span>
+          <ProgressionStepRemoveButton
+            accessibleName={`Remove progression step ${index + 1}: Rest`}
+            onRemove={() => onRemove(step.id)}
+          />
+          <button
+            type="button"
+            className="progression-step-select-button"
+            data-progression-step-select
+            data-step-id={step.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectStep(step.id);
+            }}
+            aria-label={`Select progression step ${index + 1}: Rest${isPlaying ? ", Playing" : ""}`}
+            aria-pressed={isSelected}
+            aria-current={isPlaying ? "step" : undefined}
+          >
+            <span className="step-view">
+              <strong>Rest</strong>
+              <span>{formatMusicalDuration(step.duration)}</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFragment = (
+    fragment: ProgressionMeasureFragment,
+    measureNumber: number,
+    compactStaff: boolean,
+  ) => {
+    if (!fragment.startsHere) {
+      return (
+        <div
+          key={`${fragment.stepId}-continuation-${fragment.fragmentIndex}`}
+          className="progression-step-continuation measure-step-segment"
+          style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
+          data-testid="progression-step-continuation"
+          onClick={() => onSelectStep(fragment.stepId)}
+          role="button"
+          tabIndex={0}
+          aria-label={`Continuation of progression step ${fragment.stepIndex + 1} in measure ${measureNumber}, ${formatMusicalDuration(musicalDuration(fragment.durationBeats))}`}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelectStep(fragment.stepId);
+            }
+          }}
+        >
+          <span aria-hidden="true">↪</span>
+          <span>{formatMusicalDuration(musicalDuration(fragment.durationBeats))}</span>
+        </div>
+      );
+    }
+    if (fragment.step.kind === "rest") return renderRest(fragment);
+    const step = fragment.step;
+    const index = fragment.stepIndex;
+    const isPlaying = currentPlayingStepIndex === index;
+    const isInLoop = Boolean(loopIndices && index >= loopIndices.start && index <= loopIndices.end);
+    const isSelected = selectedStepId === step.id;
+    return (
+      <div
+        key={step.id}
+        className={`progression-drag-item measure-step-segment ${dropTargetIndex === index ? "is-drop-target" : ""}`}
+        style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
+        draggable
+        data-progression-step-drag
+        data-step-id={step.id}
+        data-dragging={draggingStepId === step.id ? "true" : undefined}
+        onDragStart={(event) => dragStart(event, step.id)}
+        onDragOver={(event) => dragOver(event, index)}
+        onDrop={(event) => drop(event, index)}
+        onDragEnd={clearDragState}
+      >
+        <ProgressionStepCard
+          step={step}
+          stepNumber={index + 1}
+          tonic={project.tonic}
+          compactStaff={compactStaff}
+          selected={isSelected}
+          playing={isPlaying}
+          inLoop={isInLoop}
+          showBassInStaff={project.presentation.showBassInStaff}
+          onSelect={() => onSelectStep(step.id)}
+          onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
+          onRemove={() => onRemove(step.id)}
+        />
+      </div>
+    );
+  };
+
+  const renderGap = (measureNumber: number, durationBeats: MusicalDuration["beats"]) => {
+    const finalStep = project.progression.steps.at(-1);
+    const canRepeatOrExtend = finalStep?.kind === "chord";
+    return (
+      <div
+        className="progression-measure-gap measure-step-segment"
+        style={segmentStyle(durationBeats, layout.barLengthBeats)}
+        data-testid="progression-measure-gap"
+        role="group"
+        aria-label={`Empty space in measure ${measureNumber}: ${formatMusicalDuration(musicalDuration(durationBeats))}`}
+      >
+        <strong>Empty</strong>
+        <span>{formatMusicalDuration(musicalDuration(durationBeats))}</span>
+        <div className="progression-gap-actions">
+          {onFocusMatrix ? (
+            <button
+              type="button"
+              onClick={() => focusMatrixForGap(measureNumber)}
+              aria-label={`Add chord to measure ${measureNumber}`}
+            >
+              <Icon name="add" /> Add chord
+            </button>
+          ) : null}
+          {onFillGapWithRest ? (
+            <button
+              type="button"
+              onClick={onFillGapWithRest}
+              aria-label={`Fill measure ${measureNumber} with rest`}
+            >
+              Rest
+            </button>
+          ) : null}
+          {onExtendFinalChord && canRepeatOrExtend ? (
+            <button
+              type="button"
+              onClick={onExtendFinalChord}
+              aria-label={`Extend chord to end of measure ${measureNumber}`}
+            >
+              Extend
+            </button>
+          ) : null}
+          {onRepeatFinalChord && canRepeatOrExtend ? (
+            <button
+              type="button"
+              onClick={onRepeatFinalChord}
+              aria-label={`Repeat chord to end of measure ${measureNumber}`}
+            >
+              Repeat
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       ref={trackRef}
@@ -144,7 +396,7 @@ export function ProgressionTrack({
           <button
             type="button"
             className="add-rest-btn"
-            onClick={onAddRest}
+            onClick={() => onAddRest()}
             aria-label="Add Rest to progression"
           >
             <Icon name="add" /> Rest
@@ -152,6 +404,12 @@ export function ProgressionTrack({
         ) : null}
       </div>
       <div className="progression-step-cards" onClick={handleBackgroundClick}>
+        {matrixGapHint !== null ? (
+          <p className="progression-gap-hint" role="status" data-testid="progression-gap-hint">
+            Choose a chord in Matrix; it will be added after the authored content in measure{" "}
+            {matrixGapHint}.
+          </p>
+        ) : null}
         {project.progression.steps.length === 0 ? (
           <div
             className="progression-empty-state"
@@ -164,117 +422,45 @@ export function ProgressionTrack({
             <span>Preview a chord in the Matrix, then press + to add it.</span>
           </div>
         ) : null}
-        {project.progression.steps.map((step, index) => {
-          const isPlaying = currentPlayingStepIndex === index;
-          const isInLoop = Boolean(
-            loopIndices && index >= loopIndices.start && index <= loopIndices.end,
-          );
-
-          const isSelected = project.progression.selectedStepId === step.id;
-
-          return step.kind === "rest" ? (
-            <div
-              key={step.id}
-              className={`progression-rest-card ${isPlaying ? "is-playing" : ""} ${isInLoop ? "is-in-loop" : ""} ${isSelected ? "is-selected" : ""} ${dropTargetIndex === index ? "is-drop-target" : ""}`}
-              data-testid="progression-step"
-              data-playing={isPlaying ? "true" : undefined}
-              data-in-loop={isInLoop ? "true" : undefined}
-              onClick={() => onSelectStep(step.id)}
-              onDragOver={(event) => dragOver(event, index)}
-              onDrop={(event) => drop(event, index)}
+        {layout.measures.map((measure) => {
+          const staffEvents = staffEventsForMeasure(measure);
+          const usesSharedStaff = staffEvents.length > 1;
+          return (
+            <section
+              key={measure.measureIndex}
+              className="progression-measure-card"
+              data-testid="progression-measure"
+              aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
             >
-              <span
-                className="progression-step-number"
-                data-testid="progression-step-number"
-                aria-hidden="true"
-              >
-                {index + 1}
-              </span>
-              <ProgressionStepRemoveButton
-                accessibleName={`Remove progression step ${index + 1}: Rest`}
-                onRemove={() => onRemove(step.id)}
-              />
-              <button
-                type="button"
-                className="progression-step-select-button"
-                data-progression-step-select
-                data-step-id={step.id}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelectStep(step.id);
-                }}
-                aria-label={`Select progression step ${index + 1}: Rest${isPlaying ? ", Playing" : ""}`}
-                aria-pressed={isSelected}
-                aria-current={isPlaying ? "step" : undefined}
-              >
-                <span className="step-view">
-                  <strong>Rest</strong>
-                  <span>{formatMusicalDuration(step.duration)}</span>
+              <header className="progression-measure-header">
+                <strong>Measure {measure.number}</strong>
+                <span>
+                  {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
                 </span>
-                {isPlaying ? (
-                  <span className="step-state-indicator playing-indicator" aria-hidden="true">
-                    <Icon name="play" /> Playing
-                  </span>
-                ) : null}
-              </button>
-              {isSelected ? (
-                <div
-                  className="step-editor"
-                  onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}
-                >
-                  {onDurationChange ? (
-                    <StepDurationControl
-                      value={step.duration}
-                      onChange={(duration) => onDurationChange(step.id, duration)}
-                    />
-                  ) : null}
-                  <div className="step-actions">
-                    <button
-                      type="button"
-                      className="remove-btn"
-                      onClick={() => onRemove(step.id)}
-                      aria-label={`Remove selected progression step ${index + 1}: Rest`}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
+                <span aria-label={`Grouping ${project.globalTiming.meter.grouping.join(" plus ")}`}>
+                  {project.globalTiming.meter.grouping.join("+")}
+                </span>
+              </header>
+              {usesSharedStaff ? (
+                <MeasureStaffView events={staffEvents} onSelect={onSelectStep} />
               ) : null}
-            </div>
-          ) : (
-            <div
-              key={step.id}
-              className={`progression-drag-item ${dropTargetIndex === index ? "is-drop-target" : ""}`}
-              draggable
-              data-progression-step-drag
-              data-step-id={step.id}
-              data-dragging={draggingStepId === step.id ? "true" : undefined}
-              onDragStart={(event: DragEvent<HTMLDivElement>) => dragStart(event, step.id)}
-              onDragOver={(event: DragEvent<HTMLDivElement>) => dragOver(event, index)}
-              onDrop={(event: DragEvent<HTMLDivElement>) => drop(event, index)}
-              onDragEnd={clearDragState}
-            >
-              <ProgressionStepCard
-                step={step}
-                stepNumber={index + 1}
-                tonic={project.tonic}
-                selected={isSelected}
-                playing={isPlaying}
-                inLoop={isInLoop}
-                canReplace={Boolean(previewFunctionId)}
-                onSelect={() => onSelectStep(step.id)}
-                onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
-                onDurationChange={(duration) => onDurationChange?.(step.id, duration)}
-                onViewChange={(view) => onSetStepView(step.id, view)}
-                onReplace={() => previewFunctionId && onReplace(step.id, previewFunctionId)}
-                onReset={() => onReset(step.id)}
-                onRemove={() => onRemove(step.id)}
-                onMoveLeft={() => onReorder(step.id, Math.max(0, index - 1))}
-                onMoveRight={() =>
-                  onReorder(step.id, Math.min(project.progression.steps.length - 1, index + 1))
-                }
-              />
-            </div>
+              <div className="progression-measure-grid" data-testid="progression-measure-grid">
+                {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
+                  <div
+                    key={
+                      item.kind === "gap"
+                        ? `gap-${itemIndex}`
+                        : `${item.stepId}-${item.fragmentIndex}`
+                    }
+                    className="measure-item-wrapper"
+                  >
+                    {item.kind === "gap"
+                      ? renderGap(measure.number, item.durationBeats)
+                      : renderFragment(item, measure.number, usesSharedStaff)}
+                  </div>
+                ))}
+              </div>
+            </section>
           );
         })}
       </div>

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -7,7 +8,7 @@ async function waitForStudio(page: Page): Promise<void> {
 }
 
 test.describe("Progression step dismissal", () => {
-  test("restores keyboard focus to a Rest step after Escape", async ({ page }) => {
+  test("keeps Rest settings in Selected step and restores focus after Escape", async ({ page }) => {
     await waitForStudio(page);
     await page.getByRole("button", { name: "Add Rest to progression" }).click();
 
@@ -16,7 +17,8 @@ test.describe("Progression step dismissal", () => {
       exact: true,
     });
     await restSelect.click();
-    await expect(page.locator(".progression-rest-card .step-editor")).toBeVisible();
+    await expect(page.getByTestId("step-performance-inspector")).toContainText("Selected step");
+    await expect(page.locator(".progression-rest-card .step-editor")).toHaveCount(0);
     await restSelect.focus();
     await page.keyboard.press("Escape");
 
@@ -24,12 +26,19 @@ test.describe("Progression step dismissal", () => {
     await expect(restSelect).toBeFocused();
   });
 
-  test("supports click and keyboard toggle, Escape focus restoration, and empty-background dismissal", async ({
+  test("selects and auditions without inline expansion, with Escape and empty-background dismissal", async ({
     page,
   }) => {
     await waitForStudio(page);
-    await page.getByRole("button", { name: "Add I to progression" }).click();
-    await page.getByRole("button", { name: "Add V to progression" }).click();
+    await ensureHistoryControlsVisible(page);
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+    await page
+      .getByTestId("chord-card-V")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     const first = steps.first();
@@ -38,19 +47,20 @@ test.describe("Progression step dismissal", () => {
 
     await firstSelect.click();
     await expect(first).toHaveAttribute("data-selected", "true");
-    await expect(first.locator(".step-editor")).toBeVisible();
+    await expect(first.locator(".step-editor")).toHaveCount(0);
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
 
-    // Repeated activation of the same card is the primary collapse path.
+    // Repeated activation re-auditions the same chord but never collapses it.
     await firstSelect.click();
-    await expect(first).not.toHaveAttribute("data-selected", "true");
+    await expect(first).toHaveAttribute("data-selected", "true");
     await expect(first.locator(".step-editor")).toHaveCount(0);
 
-    // Native keyboard activation follows the same single-selection toggle path.
+    // Native keyboard activation follows the same select-and-audition path.
     await firstSelect.focus();
     await page.keyboard.press("Enter");
     await expect(first).toHaveAttribute("data-selected", "true");
     await page.keyboard.press("Space");
-    await expect(first).not.toHaveAttribute("data-selected", "true");
+    await expect(first).toHaveAttribute("data-selected", "true");
     await expect(firstSelect).toBeFocused();
 
     // Selecting another card still switches the single selection as before.
@@ -61,38 +71,28 @@ test.describe("Progression step dismissal", () => {
     await expect(second).toHaveAttribute("data-selected", "true");
 
     await firstSelect.click();
-    await expect(first.locator(".step-editor")).toBeVisible();
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(first.locator(".step-editor")).toHaveCount(0);
     await expect(first).not.toHaveAttribute("data-selected", "true");
     await expect(firstSelect).toBeFocused();
 
-    // Click propagation from editor and card-view controls stays scoped; Escape remains a
-    // normal dismissal key and intentionally reaches the local Track handler.
+    // Duration editing is now in Selected step; Escape does not dismiss an external inspector.
     await firstSelect.click();
-    const editor = first.locator(".step-editor");
-    await editor.getByTestId("step-duration-select").selectOption("2/1");
-    await editor.getByTestId("step-duration-select").focus();
+    const selectedInspector = page.getByTestId("step-performance-inspector");
+    await selectedInspector.getByTestId("duration-preset-half").click();
+    await selectedInspector.getByTestId("duration-preset-half").focus();
     await page.keyboard.press("Escape");
-    await expect(first).not.toHaveAttribute("data-selected", "true");
-    await expect(editor).toHaveCount(0);
-
-    await firstSelect.click();
-    await expect(editor).toBeVisible();
-    await first
-      .getByRole("group", { name: /View for progression step/ })
-      .getByRole("button", {
-        name: "piano",
-        exact: true,
-      })
-      .click();
     await expect(first).toHaveAttribute("data-selected", "true");
-    await first
-      .getByRole("group", { name: /View for progression step/ })
-      .getByRole("button", { name: "piano", exact: true })
-      .focus();
-    await page.keyboard.press("Escape");
-    await expect(first).not.toHaveAttribute("data-selected", "true");
+    await expect(first.locator(".step-editor")).toHaveCount(0);
+
+    await expect(selectedInspector).toBeVisible();
+    await page.getByLabel("Progression Card View").selectOption("piano");
+    await expect(first.locator(".mini-piano")).toBeVisible();
+    await expect(first.getByRole("group", { name: /View for progression step/ })).toHaveCount(0);
+    await expect(first).toHaveAttribute("data-selected", "true");
+    await firstSelect.click();
+    await expect(first).toHaveAttribute("data-selected", "true");
 
     await firstSelect.click();
     await expect(first).toHaveAttribute("data-selected", "true");

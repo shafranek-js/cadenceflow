@@ -5,7 +5,9 @@ export interface StudioWorkspaceProps {
   readonly transport: ReactNode;
   readonly matrix: ReactNode;
   readonly inspector: ReactNode;
+  readonly selectedStepInspector?: ReactNode;
   readonly progression: ReactNode;
+  readonly statusBar?: ReactNode;
   readonly onProgressionBackgroundClick?: () => void;
   readonly overlays?: ReactNode;
 }
@@ -22,7 +24,9 @@ export function StudioWorkspace({
   transport,
   matrix,
   inspector,
+  selectedStepInspector,
   progression,
+  statusBar,
   onProgressionBackgroundClick,
   overlays,
 }: StudioWorkspaceProps) {
@@ -34,24 +38,33 @@ export function StudioWorkspace({
       <section className="studio-transport" aria-label="Transport">
         {transport}
       </section>
-      <section className="studio-grid" aria-label="Studio work area">
-        <div className="studio-main-column">
-          <div className="studio-matrix-area">{matrix}</div>
-          <section
-            className="progression-strip"
-            aria-label="My Progression"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) onProgressionBackgroundClick?.();
-            }}
-          >
-            {progression}
-          </section>
-        </div>
+      <section
+        className={`studio-grid${selectedStepInspector ? " has-selected-step" : ""}`}
+        aria-label="Studio work area"
+      >
+        <div className="studio-matrix-area">{matrix}</div>
         <aside className="inspector-stack" aria-label="Inspector">
           {inspector}
         </aside>
+        <section
+          className="progression-strip"
+          aria-label="My Progression"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) onProgressionBackgroundClick?.();
+          }}
+        >
+          {progression}
+        </section>
+        {selectedStepInspector ? (
+          <aside className="selected-step-stack" aria-label="Selected step">
+            {selectedStepInspector}
+          </aside>
+        ) : null}
       </section>
       {overlays}
+      <footer className="app-status-bar" role="contentinfo" aria-label="Status bar">
+        {statusBar}
+      </footer>
     </main>
   );
 }

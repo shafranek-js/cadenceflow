@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AudioClock,
   AudioNoteEvent,
@@ -108,6 +108,52 @@ function makeRest(id: string, num: number, den = 1): RestStep {
 }
 
 describe("T106 — Transport & Audio Scheduler Integration", () => {
+  it("plays a short final chord through the aligned silent tail", () => {
+    vi.useFakeTimers();
+    try {
+      const clock = new FakeAudioClock(0);
+      const provider = new MockAudioProvider();
+      const transportStore = new TransportStore();
+      const controller = new PlaybackController({
+        clock,
+        pianoProvider: provider,
+        transportStore,
+        lookAheadHorizonSeconds: 10,
+        tickIntervalMs: 25,
+      });
+
+      controller.start({
+        steps: [makeChord("half", 2)],
+        meter: meter(4, 4),
+        tempoBpm: 120,
+        groove: groove("straight"),
+        tonic: 0,
+        context: "major",
+      });
+      expect(transportStore.getState().status).toBe("playing");
+      expect(transportStore.getState().currentStepIndex).toBe(0);
+
+      // Two authored beats are over, but the 4/4 measure still has two beats
+      // of explicit session time in which no pitched event is scheduled.
+      clock.advance(1.01);
+      vi.advanceTimersByTime(30);
+      expect(transportStore.getState().status).toBe("playing");
+      expect(transportStore.getState().currentStepIndex).toBeNull();
+
+      clock.advance(0.98);
+      vi.advanceTimersByTime(30);
+      expect(transportStore.getState().status).toBe("playing");
+
+      clock.advance(0.02);
+      vi.advanceTimersByTime(30);
+      expect(transportStore.getState().status).toBe("stopped");
+      expect(transportStore.getState().currentStepIndex).toBeNull();
+      controller.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("schedules canonical AudioNoteEvents with exact beat-to-seconds conversion", () => {
     const clock = new FakeAudioClock(0.0);
     const provider = new MockAudioProvider();

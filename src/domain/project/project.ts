@@ -20,6 +20,8 @@ export interface PresentationState {
   readonly expertiseMode: PresentationMode;
   readonly theme: ThemeMode;
   readonly globalMatrixCardView: CardViewId;
+  /** Whether Staff View includes the independently voiced bass note. */
+  readonly showBassInStaff: boolean;
 }
 
 export interface MatrixCardTemplateState {

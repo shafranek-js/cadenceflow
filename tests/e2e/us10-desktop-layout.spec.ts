@@ -53,6 +53,9 @@ async function expectWrappedProgressionFlow(page: Page, expectedCount: number): 
     const cards = Array.from(
       document.querySelectorAll<HTMLElement>('[data-testid="progression-step"]'),
     );
+    const measures = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="progression-measure"]'),
+    );
     if (!progression) throw new Error("Progression card flow is missing");
 
     const rects = cards.map((card) => {
@@ -63,6 +66,10 @@ async function expectWrappedProgressionFlow(page: Page, expectedCount: number): 
         top: Math.round(rect.top),
         width: rect.width,
       };
+    });
+    const measureRects = measures.map((measure) => {
+      const rect = measure.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
     });
     const rows = Array.from(new Set(rects.map((rect) => rect.top)));
     const rowMajorOrder = rects.every((rect, index) => {
@@ -82,6 +89,7 @@ async function expectWrappedProgressionFlow(page: Page, expectedCount: number): 
       progressionRight: progressionRect.right,
       progressionScrollWidth: progression.scrollWidth,
       progressionClientWidth: progression.clientWidth,
+      measureRects,
       overflowX: getComputedStyle(progression).overflowX,
     };
   });
@@ -94,10 +102,13 @@ async function expectWrappedProgressionFlow(page: Page, expectedCount: number): 
   expect(evidence.progressionScrollWidth).toBeLessThanOrEqual(evidence.progressionClientWidth);
   expect(evidence.overflowX).toBe("visible");
   for (const rect of evidence.rects) {
-    expect(rect.width).toBeGreaterThanOrEqual(169);
-    expect(rect.width).toBeLessThanOrEqual(171);
+    expect(rect.width).toBeGreaterThan(0);
     expect(rect.left).toBeGreaterThanOrEqual(-1);
     expect(rect.right).toBeLessThanOrEqual(evidence.progressionRight + 1);
+  }
+  for (const rect of evidence.measureRects) {
+    expect(rect.width).toBeGreaterThan(evidence.progressionClientWidth - 2);
+    expect(rect.width).toBeLessThanOrEqual(evidence.progressionClientWidth + 1);
   }
 }
 
@@ -107,11 +118,18 @@ async function expectProgressionSequenceAndFit(page: Page, expectedCount: number
     const cards = Array.from(
       document.querySelectorAll<HTMLElement>('[data-testid="progression-step"]'),
     );
+    const measures = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="progression-measure"]'),
+    );
     if (!progression) throw new Error("Progression card flow is missing");
     const progressionRect = progression.getBoundingClientRect();
     const rects = cards.map((card) => {
       const rect = card.getBoundingClientRect();
       return { left: rect.left, right: rect.right, top: Math.round(rect.top), width: rect.width };
+    });
+    const measureRects = measures.map((measure) => {
+      const rect = measure.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
     });
     return {
       numbers: cards.map((card) =>
@@ -124,6 +142,7 @@ async function expectProgressionSequenceAndFit(page: Page, expectedCount: number
       progressionRight: progressionRect.right,
       progressionScrollWidth: progression.scrollWidth,
       progressionClientWidth: progression.clientWidth,
+      measureRects,
     };
   });
 
@@ -140,10 +159,13 @@ async function expectProgressionSequenceAndFit(page: Page, expectedCount: number
         rect.top > previous.top || (rect.top === previous.top && rect.left > previous.left),
       ).toBe(true);
     }
-    expect(rect.width).toBeGreaterThanOrEqual(169);
-    expect(rect.width).toBeLessThanOrEqual(171);
+    expect(rect.width).toBeGreaterThan(0);
     expect(rect.left).toBeGreaterThanOrEqual(-1);
     expect(rect.right).toBeLessThanOrEqual(evidence.progressionRight + 1);
+  }
+  for (const rect of evidence.measureRects) {
+    expect(rect.width).toBeGreaterThan(evidence.progressionClientWidth - 2);
+    expect(rect.width).toBeLessThanOrEqual(evidence.progressionClientWidth + 1);
   }
 }
 
@@ -176,20 +198,20 @@ async function expectMatrixAndInspectorAdjacent(page: Page): Promise<void> {
 
 async function expectProgressionBelowMatrix(page: Page): Promise<void> {
   const geometry = await page.evaluate(() => {
-    const main = document.querySelector<HTMLElement>(".studio-main-column");
+    const grid = document.querySelector<HTMLElement>(".studio-grid");
     const matrix = document.querySelector<HTMLElement>(".studio-matrix-area");
-    const progression = main?.querySelector<HTMLElement>(":scope > .progression-strip");
+    const progression = document.querySelector<HTMLElement>(".studio-grid > .progression-strip");
     const inspector = document.querySelector<HTMLElement>(".studio-grid > .inspector-stack");
-    if (!main || !matrix || !progression || !inspector) {
-      throw new Error("Studio main column or progression area is missing");
+    if (!grid || !matrix || !progression || !inspector) {
+      throw new Error("Studio grid or progression area is missing");
     }
-    const mainRect = main.getBoundingClientRect();
+    const gridRect = grid.getBoundingClientRect();
     const matrixRect = matrix.getBoundingClientRect();
     const progressionRect = progression.getBoundingClientRect();
     const inspectorRect = inspector.getBoundingClientRect();
     return {
-      mainLeft: mainRect.left,
-      mainRight: mainRect.right,
+      gridLeft: gridRect.left,
+      gridRight: gridRect.right,
       matrixLeft: matrixRect.left,
       matrixRight: matrixRect.right,
       matrixBottom: matrixRect.bottom,
@@ -200,11 +222,12 @@ async function expectProgressionBelowMatrix(page: Page): Promise<void> {
     };
   });
 
-  expect(Math.abs(geometry.mainLeft - geometry.matrixLeft)).toBeLessThan(1);
+  expect(Math.abs(geometry.gridLeft - geometry.matrixLeft)).toBeLessThan(1);
   expect(Math.abs(geometry.matrixLeft - geometry.progressionLeft)).toBeLessThan(1);
   expect(Math.abs(geometry.matrixRight - geometry.progressionRight)).toBeLessThan(1);
   expect(geometry.progressionTop).toBeGreaterThanOrEqual(geometry.matrixBottom);
-  expect(geometry.mainRight).toBeLessThanOrEqual(geometry.inspectorLeft);
+  expect(geometry.gridRight).toBeGreaterThan(geometry.inspectorLeft);
+  expect(geometry.matrixRight).toBeLessThanOrEqual(geometry.inspectorLeft);
   expect(geometry.progressionRight).toBeLessThanOrEqual(geometry.inspectorLeft);
 }
 
@@ -213,11 +236,10 @@ async function expectSharedLayoutSpacing(page: Page): Promise<void> {
     const rootStyle = getComputedStyle(document.documentElement);
     const shell = document.querySelector<HTMLElement>(".app-shell");
     const grid = document.querySelector<HTMLElement>(".studio-grid");
-    const main = document.querySelector<HTMLElement>(".studio-main-column");
     const matrix = document.querySelector<HTMLElement>(".matrix-panel");
     const progression = document.querySelector<HTMLElement>(".progression-strip");
     const inspector = document.querySelector<HTMLElement>(".inspector");
-    if (!shell || !grid || !main || !matrix || !progression || !inspector) {
+    if (!shell || !grid || !matrix || !progression || !inspector) {
       throw new Error("Studio layout surfaces are missing");
     }
 
@@ -227,14 +249,14 @@ async function expectSharedLayoutSpacing(page: Page): Promise<void> {
       panelPadding: rootStyle.getPropertyValue("--panel-padding").trim(),
       shellPaddingInline: getComputedStyle(shell).paddingInline,
       gridGap: getComputedStyle(grid).gap,
-      mainGap: getComputedStyle(main).gap,
+      mainGap: getComputedStyle(grid).rowGap,
       matrixPadding: getComputedStyle(matrix).padding,
       progressionPadding: getComputedStyle(progression).padding,
       inspectorPadding: getComputedStyle(inspector).padding,
     };
   });
 
-  expect(spacing.gutter).toBe("24px");
+  expect(spacing.gutter).toBe("12px");
   expect(spacing.panelGap).toBe("16px");
   expect(spacing.panelPadding).toBe("14px");
   expect(spacing.shellPaddingInline).toBe(spacing.gutter);
@@ -269,8 +291,8 @@ async function addChordAndCheck(page: Page, functionId: string): Promise<void> {
   const countBefore = await steps.count();
   await page
     .getByTestId(`chord-card-${functionId}`)
-    .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`, "i") })
-    .click();
+    .locator(".chord-main")
+    .click({ modifiers: ["Control"] });
   await expect(steps).toHaveCount(countBefore + 1);
   await expectNoPageHorizontalScroll(page);
 }
@@ -292,7 +314,7 @@ async function exerciseDesktopStudio(page: Page): Promise<void> {
   await expectVisibleControlsFit(page);
 
   await addChordAndCheck(page, "I");
-  await page.getByTestId("chord-card-I").getByRole("button", { name: "Settings for I" }).click();
+  await page.getByTestId("chord-card-I").locator(".chord-main").click();
   await expect(page.getByRole("region", { name: "Template settings for I" })).toBeVisible();
   await expectNoPageHorizontalScroll(page);
 

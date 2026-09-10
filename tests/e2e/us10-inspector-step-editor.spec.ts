@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  ensureHistoryControlsVisible,
+  ensurePreviewHarmonyVisible,
+  ensureRecommendationContextVisible,
+} from "./test-helpers/global-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -10,8 +15,8 @@ async function waitForStudio(page: Page): Promise<void> {
 async function addChord(page: Page, functionId: string): Promise<void> {
   await page
     .getByTestId(`chord-card-${functionId}`)
-    .getByRole("button", { name: `Add ${functionId} to progression` })
-    .click();
+    .locator(".chord-main")
+    .click({ modifiers: ["Control"] });
 }
 
 async function selectFirstStep(page: Page): Promise<void> {
@@ -51,24 +56,51 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     page,
   }) => {
     await waitForStudio(page);
+    await ensureRecommendationContextVisible(page);
+    await ensurePreviewHarmonyVisible(page);
     await expect(page.locator('[data-context="neutral"]')).toBeVisible();
     await expect(page.getByTestId("step-performance-inspector")).toHaveCount(0);
     await expect(page.getByTestId("matrix-template-inspector")).toHaveCount(0);
 
     await addChord(page, "I");
     const matrixCard = page.getByTestId("chord-card-I");
-    await matrixCard.getByRole("button", { name: "Settings for I" }).click();
+    await matrixCard.locator(".chord-main").click();
+    const harmony = page.locator("details[data-context='preview-harmony']");
+    await expect(harmony).toBeVisible();
+    await expect(harmony).not.toHaveAttribute("open", "");
+    await harmony.locator("summary").click();
+    await expect(harmony).toHaveAttribute("open", "");
+    const cardBox = await matrixCard.boundingBox();
+    expect(cardBox).not.toBeNull();
+    await matrixCard.click({ position: { x: 6, y: 6 } });
     const template = page.getByTestId("matrix-template-inspector");
     await expect(template).toBeVisible();
     await expect(template).toContainText("Matrix preview template");
     await expect(template).toContainText("Inheriting defaults");
     await expect(template.getByRole("button", { name: "Reset Card to Defaults" })).toBeDisabled();
+    await expect(template.getByTestId("duration-preset-whole")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    for (const selector of [
+      "details.template-register-disclosure",
+      "details.template-articulation-disclosure",
+      "details.template-duration-disclosure",
+      "details.template-velocity-disclosure",
+    ]) {
+      const disclosure = template.locator(selector);
+      await expect(disclosure).toHaveAttribute("open", "");
+      await disclosure.locator("summary").click();
+      await expect(disclosure).not.toHaveAttribute("open", "");
+      await disclosure.locator("summary").click();
+      await expect(disclosure).toHaveAttribute("open", "");
+    }
 
     await selectFirstStep(page);
     await expect(template).toHaveCount(0);
     await expect(page.getByTestId("step-performance-inspector")).toContainText("Selected step");
     await expect(page.getByTestId("step-performance-inspector")).toContainText(
-      "Quick edits stay on the card",
+      "All selected-step settings live here",
     );
 
     await page
@@ -76,11 +108,12 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       .first()
       .getByRole("button", { name: /Select progression step 1:/ })
       .click();
-    await expect(page.getByTestId("step-performance-inspector")).toHaveCount(0);
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
   });
 
   test("uses non-mutating disclosures and exact inherited/override controls", async ({ page }) => {
     await waitForStudio(page);
+    await ensureHistoryControlsVisible(page);
     await addChord(page, "I");
     await selectFirstStep(page);
 
@@ -88,6 +121,24 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     const undo = page.getByRole("button", { name: "Undo", exact: true });
     const selectedBefore = await step.getAttribute("data-selected");
     const undoBefore = await undo.isEnabled();
+    for (const selector of [
+      "details.register-disclosure",
+      "details.articulation-disclosure",
+      "details.duration-disclosure",
+    ]) {
+      const disclosure = page.locator(selector);
+      await expect(disclosure).toHaveAttribute("open", "");
+      await disclosure.locator("summary").click();
+      await expect(disclosure).not.toHaveAttribute("open", "");
+      await disclosure.locator("summary").click();
+      await expect(disclosure).toHaveAttribute("open", "");
+    }
+    const voicing = page.locator("details.voicing-disclosure");
+    await expect(voicing).toBeVisible();
+    await expect(voicing).toHaveAttribute("open", "");
+    await voicing.locator("summary").click();
+    await expect(voicing).not.toHaveAttribute("open", "");
+
     const perNote = page.locator("details.per-note-disclosure");
     await expect(perNote).toBeVisible();
     const openBefore = await perNote.evaluate((element) => (element as HTMLDetailsElement).open);
@@ -95,6 +146,12 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     expect(await step.getAttribute("data-selected")).toBe(selectedBefore);
     expect(await undo.isEnabled()).toBe(undoBefore);
     if (openBefore) await perNote.locator("summary").click();
+
+    const bass = page.locator("details.bass-disclosure");
+    await expect(bass).toBeVisible();
+    await expect(bass).toHaveAttribute("open", "");
+    await bass.locator("summary").click();
+    await expect(bass).not.toHaveAttribute("open", "");
 
     const firstRow = page.locator(".per-note-velocity-row").first();
     await expect(firstRow).toContainText("Inherits Master");
@@ -111,27 +168,22 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await waitForStudio(page);
     await addChord(page, "I");
     const matrixCard = page.getByTestId("chord-card-I");
-    await matrixCard.getByRole("button", { name: "Settings for I" }).click();
+    await matrixCard.locator(".chord-main").click();
     const template = page.getByTestId("matrix-template-inspector");
-    await template.getByRole("combobox").first().selectOption("arp-up");
-    await expect(template).toContainText("Customized · 1 overrides");
+    await template.getByRole("button", { name: "Articulation: Arp Up" }).click();
+    await template.getByTestId("duration-preset-half").click();
+    await expect(template).toContainText("Customized · 2 overrides");
+    await expect(template).toContainText("duration");
     await expect(template.getByRole("button", { name: "Reset Card to Defaults" })).toBeEnabled();
 
-    await page
-      .getByTestId("chord-card-I")
-      .getByRole("button", { name: /Preview I/ })
-      .click();
-    await expect(page.getByTestId("matrix-template-inspector")).toHaveCount(0);
+    await page.getByTestId("chord-card-I").locator(".chord-main").click();
+    await expect(page.getByTestId("matrix-template-inspector")).toBeVisible();
 
     await selectFirstStep(page);
     await expect(page.getByTestId("step-performance-inspector")).toContainText("Step Performance");
     await expect(page.getByRole("button", { name: "Reset Card to Defaults" })).toHaveCount(0);
 
-    await page
-      .getByTestId("chord-card-I")
-      .getByRole("button", { name: /Preview I/ })
-      .click();
-    await page.getByTestId("chord-card-I").getByRole("button", { name: "Settings for I" }).click();
+    await page.getByTestId("chord-card-I").locator(".chord-main").click();
     await page
       .getByTestId("matrix-template-inspector")
       .getByRole("button", { name: "Reset Card to Defaults" })
@@ -139,14 +191,18 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await expect(page.getByTestId("matrix-template-inspector")).toContainText(
       "Inheriting defaults",
     );
+
+    await template.getByRole("button", { name: "Articulation: Arp Up" }).click();
+    const progressionCount = await page.locator('[data-testid="progression-step"]').count();
+    await matrixCard.locator(".chord-main").click({ modifiers: ["Alt"] });
+    await expect(template).toContainText("Inheriting defaults");
+    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(progressionCount);
   });
 
   test("keeps recommendation language semantic outside Expert mode", async ({ page }) => {
     await waitForStudio(page);
-    await page
-      .getByTestId("chord-card-I")
-      .getByRole("button", { name: /Preview I/ })
-      .click();
+    await ensureRecommendationContextVisible(page);
+    await page.getByTestId("chord-card-I").locator(".chord-main").click();
     const recommendation = page.locator('[data-context="recommendation"]');
     await expect(recommendation).toBeVisible();
 
@@ -192,17 +248,34 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
 
         const metrics = await page.evaluate(() => {
           const stack = document.querySelector<HTMLElement>(".inspector-stack");
+          const matrix = document.querySelector<HTMLElement>(".studio-matrix-area");
           const inspector = document.querySelector<HTMLElement>(".piano-performance-inspector");
-          if (!stack || !inspector) throw new Error("Inspector is missing");
+          const progression = document.querySelector<HTMLElement>(".progression-strip");
+          const selectedStep = document.querySelector<HTMLElement>(".selected-step-stack");
+          if (!stack || !matrix || !inspector || !progression || !selectedStep) {
+            throw new Error("Inspector or selected-step layout is missing");
+          }
+          const matrixRect = matrix.getBoundingClientRect();
+          const progressionRect = progression.getBoundingClientRect();
+          const selectedStepRect = selectedStep.getBoundingClientRect();
           return {
             stackScrollWidth: stack.scrollWidth,
             stackClientWidth: stack.clientWidth,
             inspectorScrollWidth: inspector.scrollWidth,
             inspectorClientWidth: inspector.clientWidth,
+            matrixWidth: matrixRect.width,
+            progressionWidth: progressionRect.width,
+            progressionTop: progressionRect.top,
+            selectedStepTop: selectedStepRect.top,
+            progressionRight: progressionRect.right,
+            selectedStepLeft: selectedStepRect.left,
           };
         });
         expect(metrics.stackScrollWidth).toBeLessThanOrEqual(metrics.stackClientWidth);
         expect(metrics.inspectorScrollWidth).toBeLessThanOrEqual(metrics.inspectorClientWidth);
+        expect(Math.abs(metrics.matrixWidth - metrics.progressionWidth)).toBeLessThan(2);
+        expect(Math.abs(metrics.progressionTop - metrics.selectedStepTop)).toBeLessThan(2);
+        expect(metrics.selectedStepLeft).toBeGreaterThanOrEqual(metrics.progressionRight - 1);
 
         const pageOverflow = await readPageOverflow(page);
         expect(pageOverflow.documentScrollWidth).toBeLessThanOrEqual(

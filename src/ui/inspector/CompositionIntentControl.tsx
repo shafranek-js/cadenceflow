@@ -12,11 +12,9 @@ const INTENTS: readonly { readonly id: CompositionIntent; readonly label: string
 
 export function CompositionIntentControl({
   value,
-  disabled,
   onChange,
 }: {
   readonly value: CompositionIntent;
-  readonly disabled: boolean;
   readonly onChange: (intent: CompositionIntent) => void;
 }) {
   return (
@@ -24,7 +22,6 @@ export function CompositionIntentControl({
       <span>Composition Intent</span>
       <select
         aria-label="Composition Intent"
-        disabled={disabled}
         value={value}
         onChange={(event: ChangeEvent<HTMLSelectElement>) =>
           onChange(event.target.value as CompositionIntent)

@@ -66,8 +66,8 @@ export function resolvePreviousHarmonicContext(
 
 /**
  * Canonical Matrix Card preview realization.
- * Invariant: For any card and current preview settings:
- * Piano Card View pitches === Staff Card View pitches === audition AudioNoteEvent pitches.
+ * Piano Card View intentionally uses upperPitches only. Staff and audition retain
+ * the full realization in pitches/events, including an independent bass when present.
  */
 export function realizeMatrixCardPreview(
   project: Project,

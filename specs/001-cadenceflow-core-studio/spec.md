@@ -885,6 +885,27 @@ expertise controls without page-level horizontal scrolling.
 - **FR-182**: Any bundled third-party piano sample bank or SoundFont MUST retain required licensing and
   attribution metadata in the distributed application.
 
+### Measure-card composition layout
+
+- **FR-183**: My Progression MUST present a derived measure-card layout based on the project's global
+  Meter while retaining the ordered flat sequence of independent Progression Steps as its canonical
+  persisted model.
+- **FR-184**: A measure card MUST place each Chord Step or Rest Step at its exact proportional musical
+  position and MUST support multiple independent events in one measure.
+- **FR-185**: A Step crossing a barline MUST remain one persisted Step; its visual fragments MUST indicate
+  continuation without creating a second onset or changing playback semantics.
+- **FR-186**: An incomplete final measure MUST expose its remaining duration as an explicit interactive
+  gap. CadenceFlow MUST NOT silently duplicate or extend a chord to fill that gap.
+- **FR-187**: The final gap MUST offer explicit actions to add a chord, add a Rest Step, extend the final
+  chord, or repeat the final chord as a new independent Step.
+- **FR-188**: Full-progression playback and file export MUST preserve silence from the final authored event
+  to the next barline; MusicXML MUST encode that silence as a rest and MIDI MUST place End-of-Track at
+  the aligned bar boundary.
+- **FR-189**: `Whole`, `Half`, and other note-value durations MUST remain absolute musical durations. The
+  Progression duration editor MUST additionally offer `Full bar`, computed from the current Meter.
+- **FR-190**: The derived measure layout, gap actions, and all measure-level controls MUST preserve exact
+  Rational timing, Step independence, Undo/Redo behavior, keyboard access, and source-project immutability.
+
 ### Scope Boundaries
 
 #### Explicitly in v1

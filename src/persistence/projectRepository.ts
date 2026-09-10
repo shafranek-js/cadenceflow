@@ -14,6 +14,14 @@ export interface ProjectMetadata {
   readonly schemaVersion: number;
 }
 
+export type OpenProjectTabsSource = "initial" | "user";
+
+export interface OpenProjectTabsState {
+  readonly ids: readonly string[];
+  readonly source: OpenProjectTabsSource;
+  readonly updatedAt: number;
+}
+
 export interface ProjectRepository {
   listProjects(): Promise<readonly ProjectMetadata[]>;
   loadProject(id: string): Promise<Project | null>;
@@ -22,6 +30,18 @@ export interface ProjectRepository {
   getLastActiveProjectId(): Promise<string | null>;
   setLastActiveProjectId(id: string): Promise<void>;
   clearLastActiveProjectId(): Promise<void>;
+  getOpenProjectTabsState?(): Promise<OpenProjectTabsState | null>;
+  setOpenProjectTabsState?(state: OpenProjectTabsState): Promise<void>;
+}
+
+// v8 deliberately avoids adopting the incomplete snapshots written while the
+// first localStorage/IDB implementations were being corrected.
+const OPEN_PROJECT_TABS_METADATA_KEY = "openProjectTabs.v8";
+
+function normalizeOpenProjectIds(value: unknown): readonly string[] | null {
+  if (!Array.isArray(value)) return null;
+  const ids = value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+  return [...new Set(ids)];
 }
 
 export class DexieProjectRepository implements ProjectRepository {
@@ -97,6 +117,34 @@ export class DexieProjectRepository implements ProjectRepository {
 
   async clearLastActiveProjectId(): Promise<void> {
     await this.db.metadata.delete("lastActiveProjectId");
+  }
+
+  async getOpenProjectTabsState(): Promise<OpenProjectTabsState | null> {
+    const meta = await this.db.metadata.get(OPEN_PROJECT_TABS_METADATA_KEY);
+    if (!meta || typeof meta.value !== "object" || meta.value === null) return null;
+
+    const saved = meta.value as { ids?: unknown; source?: unknown; updatedAt?: unknown };
+    const ids = normalizeOpenProjectIds(saved.ids);
+    if (
+      !ids ||
+      (saved.source !== "initial" && saved.source !== "user") ||
+      typeof saved.updatedAt !== "number" ||
+      !Number.isFinite(saved.updatedAt)
+    ) {
+      return null;
+    }
+    return { ids, source: saved.source, updatedAt: saved.updatedAt };
+  }
+
+  async setOpenProjectTabsState(state: OpenProjectTabsState): Promise<void> {
+    await this.db.metadata.put({
+      key: OPEN_PROJECT_TABS_METADATA_KEY,
+      value: {
+        ids: normalizeOpenProjectIds(state.ids) ?? [],
+        source: state.source,
+        updatedAt: state.updatedAt,
+      },
+    });
   }
 }
 

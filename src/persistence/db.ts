@@ -4,7 +4,7 @@ import { Dexie, type EntityTable } from "dexie";
  * Dexie database schema definitions and types (T121).
  * Accepted v1 architecture:
  * - One canonical `projects` store containing latest valid Project snapshot.
- * - One small `metadata` store containing `lastActiveProjectId`.
+ * - One small `metadata` store containing recovery and session UI pointers.
  */
 
 export interface ProjectRecord {

@@ -113,6 +113,18 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       expect(cp.steps).toHaveLength(2);
       expect(compareRational(cp.steps[0].duration.beats, rational(4, 1))).toBe(0);
     });
+
+    it("defaults legacy portable projects to a hidden Staff bass", () => {
+      const serialized = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
+        string,
+        unknown
+      >;
+      const presentation = serialized["presentation"] as Record<string, unknown>;
+      delete presentation["showBassInStaff"];
+
+      const restored = decodePortableProject(JSON.stringify(serialized));
+      expect(restored.presentation.showBassInStaff).toBe(false);
+    });
   });
 
   describe("2. JSON-Safe Rational Representation", () => {
@@ -147,6 +159,22 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       expect(jsonText).not.toContain("[object Map]");
       expect(jsonText).not.toContain("[object Set]");
       expect(jsonText).not.toContain("[object Function]");
+    });
+  });
+
+  describe("2a. Legacy inherited performance defaults", () => {
+    it("upgrades a saved Block default to Humanized without changing step overrides", () => {
+      const raw = JSON.parse(encodePortableProject(createRichProjectFixture())) as {
+        defaults: { piano: { performance: { articulation: string } } };
+      };
+      raw.defaults.piano.performance.articulation = "block";
+
+      const restored = decodePortableProject(JSON.stringify(raw));
+
+      expect(restored.defaults.piano.performance.articulation).toBe("humanized");
+      expect((restored.progression.steps[1] as ChordStep).performance.articulation).toBe(
+        "broken-chord",
+      );
     });
   });
 

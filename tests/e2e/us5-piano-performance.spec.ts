@@ -14,8 +14,8 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
   test("Scenario 1 — repeated chord independence through UI", async ({ page }) => {
     // 1. Add the same chord 'I' twice
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
@@ -40,21 +40,27 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     await masterVelocityInput.fill("95");
 
     // 5. Set Piano Articulation to 'Arp Up'
-    await page.getByLabel("Piano Articulation", { exact: true }).selectOption("arp-up");
+    await page.getByRole("button", { name: "Articulation: Arp Up" }).click();
 
     // 6. Select Step 2
     await steps.nth(1).click();
     await expect(steps.nth(1)).toHaveClass(/is-selected/);
 
-    // 7. Verify Step 2 retains independent configuration (defaults: Block, 80, Auto voicing, musical view)
+    // 7. Verify Step 2 retains independent configuration (defaults: Humanized, 80, Auto voicing, musical view)
     await expect(page.getByLabel("Voicing Mode", { exact: true })).toHaveValue("auto");
-    await expect(page.getByLabel("Piano Articulation", { exact: true })).toHaveValue("block");
+    await expect(page.getByRole("button", { name: "Articulation: Humanized" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(page.locator(".velocity-readout")).toContainText("Exact: 80");
 
     // 8. Return to Step 1 and verify its settings remain exact
     await steps.nth(0).click();
     await expect(page.getByLabel("Voicing Mode", { exact: true })).toHaveValue("manual");
-    await expect(page.getByLabel("Piano Articulation", { exact: true })).toHaveValue("arp-up");
+    await expect(page.getByRole("button", { name: "Articulation: Arp Up" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(masterVelocityInput).toHaveValue("95");
   });
 
@@ -63,7 +69,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
   }) => {
     // Add chord 'I' and select it
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const step = page.locator('[data-testid="progression-step"]').first();
     await step.click();
 
@@ -92,7 +98,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     await expect(modal).not.toBeVisible();
 
     // Verify Piano view matches saved pitches
-    await step.getByRole("button", { name: /piano/i }).click();
+    await page.getByLabel("Progression Card View").selectOption("piano");
     const miniPiano = step.locator(".mini-piano");
     await expect(miniPiano).toBeVisible();
     await expect(miniPiano.locator('.mini-key[data-midi="60"]')).toHaveClass(/is-active/);
@@ -111,7 +117,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
   }) => {
     // Add chord and select it
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const step = page.locator('[data-testid="progression-step"]').first();
     await step.click();
 
@@ -173,7 +179,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
   }) => {
     // Add chord and select it
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const step = page.locator('[data-testid="progression-step"]').first();
     await step.click();
 

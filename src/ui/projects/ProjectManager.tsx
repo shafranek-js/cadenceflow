@@ -133,20 +133,22 @@ export function ProjectManager({
   };
 
   return (
-    <section className="project-manager" aria-label="Project">
+    <nav className="project-manager" aria-label="Project menu">
       <button
         ref={menuToggleRef}
         type="button"
-        className="project-selector-button"
+        className="project-selector-button project-menu-trigger"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         aria-controls="project-actions-menu"
-        aria-label={`Project: ${project.name}`}
+        aria-label="Project"
         data-testid="project-menu-toggle"
         disabled={busy}
         onClick={() => setMenuOpen((open) => !open)}
       >
-        <span>Project:</span> <strong>{project.name}</strong> <Icon name="disclosure" />
+        <span className="project-menu-trigger-label">Project</span>
+        <strong className="project-menu-trigger-current">{project.name}</strong>
+        <Icon name="disclosure" />
       </button>
 
       {menuOpen && (
@@ -158,10 +160,11 @@ export function ProjectManager({
           aria-label="Project actions"
         >
           <div className="project-menu-current" data-testid="active-project-name">
-            Active project: <strong>{project.name}</strong>
+            <span className="project-menu-kicker">Current project</span>
+            <strong>{project.name}</strong>
           </div>
           <label className="project-open-select-label" htmlFor="project-open-select">
-            Open named project
+            Open project
           </label>
           <select
             id="project-open-select"
@@ -366,6 +369,6 @@ export function ProjectManager({
           </section>
         </div>
       )}
-    </section>
+    </nav>
   );
 }

@@ -344,6 +344,20 @@ Deliver:
 Exit gate:
 - full SC-001..SC-017 suite passes.
 
+### Slice 10 — Measure-card composition layout
+
+Deliver:
+- pure Rational measure layout projection over the existing flat Progression Steps;
+- one measure card per bar in My Progression, with proportional event segments and an interactive
+  trailing gap;
+- explicit Rest, Extend, and Repeat gap actions with independent-step and Undo/Redo guarantees;
+- Full bar duration derived from the current Meter;
+- aligned trailing silence in playback, MIDI, and MusicXML without changing `.cadenceflow` storage.
+
+Exit gate:
+- four-beat and additive-meter measure fixtures, gap actions, playback boundary behavior, and both
+  export projections pass deterministic unit/integration tests and desktop Chromium acceptance.
+
 ## Performance and Audio Strategy
 
 - Recommendation calculations remain synchronous/pure while v1 vocabulary is small; move to worker only if profiling demonstrates a need.

@@ -85,8 +85,15 @@ export class LookAheadScheduler {
    * @param events Canonical events to schedule.
    * @param startAudioTime The audio clock time corresponding to t=0. Defaults to clock.now().
    * @param startOffsetSeconds Starting musical time offset.
+   * @param playbackDurationSeconds Optional explicit session duration. This is
+   * used for silent trailing rests, where no note event exists to determine the end.
    */
-  start(events: readonly AudioNoteEvent[], startAudioTime?: number, startOffsetSeconds = 0): void {
+  start(
+    events: readonly AudioNoteEvent[],
+    startAudioTime?: number,
+    startOffsetSeconds = 0,
+    playbackDurationSeconds?: number,
+  ): void {
     if (this.state === "disposed") {
       throw new Error("Cannot start a disposed LookAheadScheduler");
     }
@@ -108,6 +115,12 @@ export class LookAheadScheduler {
       const end = evt.startSeconds + evt.durationSeconds;
       return end > max ? end : max;
     }, 0);
+    if (playbackDurationSeconds !== undefined) {
+      if (!Number.isFinite(playbackDurationSeconds) || playbackDurationSeconds < 0) {
+        throw new RangeError("playbackDurationSeconds must be finite and non-negative");
+      }
+      this.maxDurationSeconds = Math.max(this.maxDurationSeconds, playbackDurationSeconds);
+    }
 
     const now = this.clock.now();
     this.startAudioTime = startAudioTime !== undefined ? startAudioTime : now - startOffsetSeconds;

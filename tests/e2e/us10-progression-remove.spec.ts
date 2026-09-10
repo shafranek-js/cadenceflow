@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 async function addChord(page: Page, functionId: string): Promise<void> {
   await page
     .getByTestId(`chord-card-${functionId}`)
-    .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`, "i") })
-    .click();
+    .locator(".chord-main")
+    .click({ modifiers: ["Control"] });
 }
 
 async function addRest(page: Page): Promise<void> {
@@ -34,6 +35,7 @@ test.beforeEach(async ({ page }) => {
     ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
   });
   await waitForStudio(page);
+  await ensureHistoryControlsVisible(page);
 });
 
 test.describe("US10 — direct progression-step removal", () => {
@@ -82,7 +84,7 @@ test.describe("US10 — direct progression-step removal", () => {
     const steps = page.locator('[data-testid="progression-step"]');
     await steps.nth(1).getByRole("button", { name: "Select progression step 2: vi" }).click();
     await expect(steps.nth(1)).toHaveAttribute("data-selected", "true");
-    await expect(steps.nth(1).locator(".step-editor")).toBeVisible();
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Performance settings for step vi" }),
     ).toBeVisible();
@@ -90,7 +92,7 @@ test.describe("US10 — direct progression-step removal", () => {
     await steps.nth(0).getByRole("button", { name: "Remove progression step 1: I" }).click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["vi", "IV"]);
     await expect(steps.first()).toHaveAttribute("data-selected", "true");
-    await expect(steps.first().locator(".step-editor")).toBeVisible();
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Performance settings for step vi" }),
     ).toBeVisible();
@@ -158,6 +160,9 @@ async function expectRemoveButtonsFit(page: Page): Promise<void> {
           cardRight: cardRect.right,
           cardTop: cardRect.top,
           cardBottom: cardRect.bottom,
+          measureWidth:
+            card.closest<HTMLElement>(".progression-measure-grid")?.getBoundingClientRect().width ??
+            cardRect.width,
           removeLeft: removeRect.left,
           removeRight: removeRect.right,
           removeTop: removeRect.top,
@@ -173,8 +178,8 @@ async function expectRemoveButtonsFit(page: Page): Promise<void> {
 
   expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.documentClientWidth);
   for (const card of metrics.cards) {
-    expect(card.cardWidth).toBeGreaterThanOrEqual(160);
-    expect(card.cardWidth).toBeLessThanOrEqual(180);
+    expect(card.cardWidth).toBeGreaterThan(0);
+    expect(card.cardWidth).toBeLessThanOrEqual(card.measureWidth + 1);
     expect(card.removeLeft).toBeGreaterThanOrEqual(card.cardLeft);
     expect(card.removeRight).toBeLessThanOrEqual(card.cardRight);
     expect(card.removeTop).toBeGreaterThanOrEqual(card.cardTop);

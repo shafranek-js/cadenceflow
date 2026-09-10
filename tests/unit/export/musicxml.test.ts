@@ -40,6 +40,7 @@ import { writeMusicXml, writeMusicXmlFile } from "../../../src/export/musicxml/w
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
   return Object.freeze({
     ...DEFAULT_PIANO_PERFORMANCE,
+    articulation: "block",
     ...overrides,
     ...(overrides.bass
       ? { bass: Object.freeze({ ...DEFAULT_PIANO_PERFORMANCE.bass, ...overrides.bass }) }
@@ -437,7 +438,7 @@ describe("US9 MusicXML semantic projection", () => {
         (sum, measure) => sum + measure.durationBeats.numerator / measure.durationBeats.denominator,
         0,
       ),
-    ).toBe(11 / 2);
+    ).toBe(8);
   });
 });
 

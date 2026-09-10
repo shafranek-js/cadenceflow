@@ -186,6 +186,7 @@ export function createRichProjectFixture(): Project {
       expertiseMode: "composer",
       theme: "dark",
       globalMatrixCardView: "harmonic",
+      showBassInStaff: false,
     }),
     defaults: Object.freeze({
       piano: Object.freeze({

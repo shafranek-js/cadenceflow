@@ -6,6 +6,7 @@ import type {
   RestStep,
   StepPerformance,
 } from "../../domain/progression/step";
+import { snapshotStepPerformance } from "../../domain/progression/step";
 import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
@@ -270,6 +271,50 @@ export function addRestStep(project: Project, command: AddRestStepCommand): Appl
     duration: command.payload.duration ?? musicalDuration(rational(1, 1)),
   });
   const steps = Object.freeze([...project.progression.steps, restStep]);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps }),
+    command.payload.nowIso,
+  );
+}
+
+export interface RepeatChordStepPayload {
+  readonly sourceStepId: string;
+  readonly stepId: string;
+  readonly duration: MusicalDuration;
+  readonly nowIso: string;
+}
+
+export type RepeatChordStepCommand = ProjectCommand<RepeatChordStepPayload> & {
+  readonly type: "progression/repeat-chord";
+};
+
+/** Adds a new, independent copy of the final chord for an explicitly chosen duration. */
+export function repeatChordStep(project: Project, command: RepeatChordStepCommand): AppliedCommand {
+  const sourceIndex = project.progression.steps.findIndex(
+    (step) => step.id === command.payload.sourceStepId,
+  );
+  if (sourceIndex === -1) {
+    throw new RangeError(`Unknown source chord step: ${command.payload.sourceStepId}`);
+  }
+  if (sourceIndex !== project.progression.steps.length - 1) {
+    throw new RangeError("Only the final progression chord can be repeated into the bar gap");
+  }
+  const source = project.progression.steps[sourceIndex]!;
+  if (source.kind !== "chord") {
+    throw new Error("Only a chord step can be repeated");
+  }
+  if (project.progression.steps.some((step) => step.id === command.payload.stepId)) {
+    throw new RangeError(`Progression step ID already exists: ${command.payload.stepId}`);
+  }
+
+  const repeated: ChordStep = Object.freeze({
+    ...source,
+    id: command.payload.stepId,
+    duration: command.payload.duration,
+    performance: snapshotStepPerformance(source.performance),
+  });
+  const steps = Object.freeze([...project.progression.steps, repeated]);
   return withInverse(
     project,
     Object.freeze({ ...project.progression, steps }),

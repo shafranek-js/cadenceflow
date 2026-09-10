@@ -1,9 +1,15 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 async function openProjectMenu(page: Page): Promise<void> {
   await page.getByTestId("project-menu-toggle").click();
   await expect(page.getByRole("menu", { name: "Project actions" })).toBeVisible();
+}
+
+async function openExportMenu(page: Page): Promise<void> {
+  await page.getByTestId("export-menu-toggle").click();
+  await expect(page.getByRole("menu", { name: "Export menu" })).toBeVisible();
 }
 
 async function waitForApp(page: Page): Promise<void> {
@@ -13,8 +19,10 @@ async function waitForApp(page: Page): Promise<void> {
 async function addChord(page: Page, functionId: string): Promise<void> {
   await page
     .getByTestId(`chord-card-${functionId}`)
-    .getByRole("button", { name: new RegExp(`Add ${functionId} to progression`, "i") })
-    .click();
+    .locator(".chord-main")
+    .click({
+      modifiers: ["Control"],
+    });
 }
 
 async function readDownload(download: Download): Promise<Buffer> {
@@ -29,6 +37,12 @@ async function clickExport(page: Page, testId: "export-midi-btn" | "export-music
   const download = await downloadPromise;
   return { download, bytes: await readDownload(download) };
 }
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+  await waitForApp(page);
+  await ensureHistoryControlsVisible(page);
+});
 
 function midiNoteOnCount(bytes: Uint8Array): number {
   let offset = 14;
@@ -102,25 +116,25 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
     // Export immediately after a fresh UI edit; no autosave wait or reload is used.
-    await openProjectMenu(page);
+    await openExportMenu(page);
     const firstMidi = await clickExport(page, "export-midi-btn");
     expect(firstMidi.download.suggestedFilename()).toBe("Session- - take--.mid");
     expect(firstMidi.bytes.subarray(0, 4).toString("ascii")).toBe("MThd");
     const noteCountBeforeBranch = midiNoteOnCount(firstMidi.bytes);
     expect(noteCountBeforeBranch).toBe(4);
-    await page.getByTestId("project-menu-toggle").click();
+    await page.getByTestId("export-menu-toggle").click();
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
     // Create a redo state before export and verify the pure export does not clear it.
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("button", { name: "Redo" })).toBeEnabled();
     const redoStepText = await firstStep.innerText();
-    await openProjectMenu(page);
+    await openExportMenu(page);
     const redoMidi = await clickExport(page, "export-midi-btn");
     expect(redoMidi.bytes.subarray(0, 4).toString("ascii")).toBe("MThd");
     expect(midiNoteOnCount(redoMidi.bytes)).toBe(noteCountBeforeBranch);
     await expect(page.getByRole("button", { name: "Redo" })).toBeEnabled();
-    await page.getByTestId("project-menu-toggle").click();
+    await page.getByTestId("export-menu-toggle").click();
     await page.getByRole("button", { name: "Redo" }).click();
     await expect(firstStep).toContainText(redoStepText.split("\n")[0] ?? "I");
 
@@ -132,7 +146,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await page.getByTestId("chord-card-iv").locator("button.chord-main").click();
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
 
-    await openProjectMenu(page);
+    await openExportMenu(page);
     const branchMidi = await clickExport(page, "export-midi-btn");
     expect(branchMidi.download.suggestedFilename()).toBe("Session- - take--.mid");
     expect(midiNoteOnCount(branchMidi.bytes)).toBe(noteCountBeforeBranch);
@@ -148,7 +162,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await expect(page.getByTestId("export-musicxml-status")).toContainText("Swing");
     await expect(page.getByTestId("export-musicxml-status")).toContainText("temporary branch");
 
-    await page.getByTestId("project-menu-toggle").click();
+    await page.getByTestId("export-menu-toggle").click();
     expect(await firstStep.innerText()).toContain("I");
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Redo" })).toBeDisabled();
@@ -159,14 +173,13 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await waitForApp(page);
     await page.getByRole("button", { name: "Explore Alternative" }).click();
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
-    await openProjectMenu(page);
+    await openExportMenu(page);
     await expect(page.getByTestId("export-empty-message")).toHaveText(
       "Add musical content to My Progression before exporting.",
     );
     await expect(page.getByTestId("export-midi-btn")).toBeDisabled();
     await expect(page.getByTestId("export-musicxml-btn")).toBeDisabled();
     await expect(page.getByTestId("project-export-btn")).toBeEnabled();
-    await expect(page.getByTestId("project-open-file-btn")).toBeEnabled();
   });
 
   test("exports a Rest-only progression and supports repeated downloads", async ({ page }) => {
@@ -175,7 +188,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await page.getByRole("button", { name: "Add Rest to progression" }).click();
     await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
 
-    await openProjectMenu(page);
+    await openExportMenu(page);
     await expect(page.getByTestId("export-midi-btn")).toBeEnabled();
     await expect(page.getByTestId("export-musicxml-btn")).toBeEnabled();
 
@@ -211,7 +224,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     page.on("download", () => {
       downloadObserved = true;
     });
-    await openProjectMenu(page);
+    await openExportMenu(page);
     await page.getByTestId("export-midi-btn").click();
     await expect(page.getByTestId("export-midi-status")).toHaveRole("alert");
     await expect(page.getByTestId("export-midi-status")).toContainText(

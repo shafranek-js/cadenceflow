@@ -32,10 +32,229 @@
   overflow: visible;
 }
 
-.progression-step-cards > div:not(.progression-empty-state) {
+/* Measure cards keep musical proportions while retaining the existing step controls. */
+.progression-step-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.progression-measure-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+}
+
+.progression-measure-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.progression-measure-header strong {
+  color: var(--text);
+}
+
+.progression-measure-header span:not(:first-of-type) {
+  padding: 2px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.measure-staff-view {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 8px 10px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: #fff;
+  color: #000;
+}
+
+.measure-staff {
+  width: 100%;
+  min-height: 150px;
+}
+
+.measure-staff-event-labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 4px;
+}
+
+.measure-staff-event-button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px 5px;
+  border: 1px solid #c4cbd4;
+  border-radius: 4px;
+  background: #fff;
+  color: #161b22;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.measure-staff-event-button span {
+  color: #586273;
+  font-size: 0.62rem;
+}
+
+.measure-staff-event-button:hover,
+.measure-staff-event-button:focus-visible {
+  border-color: #80613d;
+  outline: 2px solid #80613d;
+  outline-offset: 1px;
+}
+
+.compact-staff-label {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-height: 52px;
+  color: var(--text);
+  text-align: center;
+}
+
+.compact-staff-label small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.progression-measure-grid {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(25% - 1px),
+    color-mix(in srgb, var(--border-subtle) 70%, transparent) calc(25% - 1px),
+    color-mix(in srgb, var(--border-subtle) 70%, transparent) 25%
+  );
+}
+
+.measure-item-wrapper {
+  display: contents;
+}
+
+.measure-step-segment {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.progression-measure-grid > .measure-step-segment {
+  flex: 1 1 0;
+}
+
+.progression-measure-grid .progression-step-card,
+.progression-measure-grid .progression-rest-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 140px;
+  overflow: hidden;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+}
+
+.progression-step-continuation {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  min-height: 140px;
+  padding: 8px;
+  border-right: 1px dashed var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.progression-step-continuation:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.progression-measure-gap {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  min-width: 92px;
+  min-height: 140px;
+  padding: 8px;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.progression-measure-gap strong {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.progression-gap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.progression-gap-actions button {
+  min-height: 25px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.66rem;
+}
+
+.progression-gap-actions button:hover,
+.progression-gap-actions button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.progression-step-cards > div:not(.progression-empty-state):not(.progression-measure-card) {
   width: 170px;
   min-width: 170px;
   max-width: 170px;
+}
+
+@media (max-width: 760px) {
+  .progression-measure-grid {
+    min-height: 126px;
+  }
+
+  .progression-measure-grid .progression-step-card,
+  .progression-measure-grid .progression-rest-card,
+  .progression-step-continuation,
+  .progression-measure-gap {
+    min-height: 116px;
+  }
+
+  .progression-measure-grid .step-editor,
+  .progression-measure-grid .step-card-view-switcher {
+    display: none;
+  }
 }
 
 .progression-heading {
@@ -237,4 +456,387 @@
 .progression-step-card,
 .progression-rest-card {
   border-radius: var(--radius-card);
+}
+
+/* -------------------------------------------------------------------------
+   Progression control rail
+
+   Keep the progression actions and playback settings on a predictable rail.
+   The transport buttons are deliberately icon-only in this context; their
+   accessible names and titles remain available to screen readers and on
+   hover/focus. Settings keep their labels because their meaning is not
+   apparent from an icon alone.
+   ------------------------------------------------------------------------- */
+.progression-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.progression-title-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.progression-preset-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progression-heading-tempo {
+  flex: 0 1 auto;
+  align-content: center;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding-right: var(--space-3);
+  border-right-color: var(--border-subtle);
+}
+
+.progression-heading-transport-cluster {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.progression-heading-transport-cluster .progression-heading-tempo {
+  width: max-content;
+  min-height: 0;
+  padding-right: 0;
+  padding-left: var(--space-3);
+  border-right: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.progression-heading-support-controls {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.progression-heading-support-controls .transport-label,
+.progression-heading-support-controls .loop-toggle-label,
+.progression-heading-support-controls .transport-toggle-button .toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.progression-heading-support-controls .loop-toggle-btn,
+.progression-heading-support-controls .transport-toggle-button {
+  position: relative;
+  display: inline-flex;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+.progression-heading-support-controls .ui-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.progression-heading-support-controls .metronome-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progression-heading .branch-controls {
+  justify-content: flex-end;
+}
+
+.progression-transport-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 1 auto;
+  margin: 0;
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+}
+
+.progression-transport-controls .transport-button {
+  position: relative;
+  display: inline-grid;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  flex: 0 0 var(--control-height);
+  place-items: center;
+  padding: 0;
+  gap: 0;
+}
+
+.progression-transport-controls .transport-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progression-transport-controls .transport-btn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.progression-transport-controls .transport-status-badge {
+  margin-left: var(--space-1);
+}
+
+/* On wide progression panels timing and support controls share one row. */
+.progression-playback-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.progression-playback-settings .transport-group {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.progression-playback-settings .transport-timing {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.15fr) minmax(390px, 1.35fr) max-content;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  flex-basis: 0;
+}
+
+.progression-playback-settings .transport-playback-support {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 1 auto;
+}
+
+.progression-playback-settings .transport-group > .transport-section {
+  align-content: center;
+  min-width: 0;
+  padding-right: var(--space-2);
+  border-right-color: var(--border-subtle);
+}
+
+.progression-playback-settings .transport-group > .transport-section:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.progression-playback-settings .transport-section > .transport-label {
+  flex: 0 0 auto;
+}
+
+.progression-playback-settings .transport-step-duration > .transport-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.progression-playback-settings .transport-meter .meter-controls-group,
+.progression-playback-settings .transport-step-duration .duration-buttons-control,
+.progression-playback-settings .transport-step-duration .duration-buttons-group {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.progression-playback-settings .transport-meter .meter-controls-group {
+  flex-wrap: wrap;
+}
+
+.progression-playback-settings .transport-playback-support .transport-metronome {
+  justify-content: flex-end;
+}
+
+/* Playback support uses compact, familiar toggle icons rather than a row of
+   mutually exclusive text buttons. The underlying loop state still resolves
+   to the complete progression when enabled. */
+.progression-playback-settings .transport-loop > .transport-label,
+.progression-playback-settings .loop-toggle-label,
+.progression-playback-settings .transport-toggle-button .toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.progression-playback-settings .loop-toggle-btn,
+.progression-playback-settings .transport-toggle-button {
+  position: relative;
+  display: inline-flex;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+.progression-playback-settings .loop-toggle-btn .ui-icon,
+.progression-playback-settings .transport-toggle-button .ui-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.progression-playback-settings .transport-loop {
+  justify-content: flex-start;
+}
+
+/* Keep the timing rail together until the progression panel itself is wide
+   enough for support controls to sit beside it without clipping labels or
+   controls. The breakpoint is intentionally conservative because the
+   progression panel is narrower than the browser viewport when the Inspector
+   is visible. */
+@media (max-width: 1699px) {
+  .progression-playback-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .progression-playback-settings .transport-playback-support {
+    grid-template-columns: max-content max-content;
+    justify-content: start;
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .progression-playback-settings .transport-timing {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .progression-playback-settings .transport-groove {
+    border-right: 0;
+  }
+}
+
+@media (min-width: 901px) {
+  .progression-playback-settings .transport-step-duration {
+    display: flex;
+    align-items: center;
+  }
+
+  .progression-playback-settings .transport-step-duration .duration-buttons-group {
+    flex: 1 1 auto;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .progression-playback-settings .transport-step-duration .duration-preset-row,
+  .progression-playback-settings .transport-step-duration .duration-modifier-row {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .progression-playback-settings .transport-step-duration .custom-duration-group {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 760px) {
+  .progression-heading {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .progression-title-group {
+    flex-wrap: wrap;
+  }
+
+  .progression-heading .branch-controls {
+    justify-content: flex-start;
+  }
+
+  .progression-playback-settings .transport-timing,
+  .progression-playback-settings .transport-playback-support {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .progression-playback-settings .transport-group > .transport-section {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .progression-playback-settings .transport-playback-support .transport-metronome {
+    justify-content: flex-start;
+  }
+
+  .progression-playback-settings .transport-playback-support {
+    width: 100%;
+  }
+}
+
+/* Keep the heading and timing controls visually connected. The transport
+   group already provides the visible frame; an additional full-width frame
+   around its nav only creates a second separator and a tall empty strip. */
+.progression-playback-settings {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  margin: var(--space-2) 0;
+  padding: 0;
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.progression-playback-settings .transport-timing {
+  width: 100%;
 }

@@ -18,7 +18,7 @@ describe("Matrix Preview/Add", () => {
     expect(store.project.progression.steps).toHaveLength(0);
   });
 
-  it("explicit Add creates an independent progression step", () => {
+  it("the Matrix add command creates an independent progression step", () => {
     const store = new AppStore(
       createDefaultProject("project-1", "Add test", "2026-09-04T12:00:00.000Z"),
     );

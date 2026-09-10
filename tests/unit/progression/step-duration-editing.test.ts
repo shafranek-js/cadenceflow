@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { musicalDuration, type MusicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
+import { meter } from "../../../src/domain/timing/meter";
 import { createProgressionTimeline } from "../../../src/domain/timing/timeline";
 import { resetChordStepPerformance } from "../../../src/domain/progression/reset";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
@@ -358,6 +359,34 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
   });
 
   describe("2. UI Component: StepDurationControl", () => {
+    it("offers a meter-derived Full bar option without switching to Custom mode", () => {
+      const onChange = vi.fn();
+      const root = createRoot(container);
+      const currentMeter = meter(7, 8, [2, 2, 3]);
+
+      act(() => {
+        root.render(
+          createElement(StepDurationControl, {
+            value: musicalDuration(rational(1, 1)),
+            meter: currentMeter,
+            includeFullBar: true,
+            onChange,
+          }),
+        );
+      });
+
+      const select = container.querySelector("select") as HTMLSelectElement;
+      expect(select.querySelector('option[value="full-bar"]')?.textContent).toContain("7/2");
+      act(() => {
+        select.value = "full-bar";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect((onChange.mock.calls[0]![0] as MusicalDuration).beats).toEqual(rational(7, 2));
+      expect(container.querySelector('[data-testid="step-duration-custom-input"]')).toBeNull();
+      act(() => root.unmount());
+    });
+
     it("renders Duration label programmatically associated with select element", () => {
       const onChange = vi.fn();
       const root = createRoot(container);
@@ -502,7 +531,6 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
     it("Item 5: card summary reflects duration change · 4 -> · 2 immediately", () => {
       const p0 = createDefaultProject("test-card-summary", "Card Summary Test");
       const step = createMatrixChordStep(p0, "I", "step-1");
-      const onDurationChange = vi.fn();
       const root = createRoot(container);
 
       // Render with 4 beats
@@ -512,16 +540,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             step,
             tonic: p0.tonic,
             selected: true,
-            canReplace: false,
             onSelect: vi.fn(),
             onPerformanceChange: vi.fn(),
-            onDurationChange,
-            onViewChange: vi.fn(),
-            onReplace: vi.fn(),
-            onReset: vi.fn(),
             onRemove: vi.fn(),
-            onMoveLeft: vi.fn(),
-            onMoveRight: vi.fn(),
           }),
         );
       });
@@ -529,9 +550,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       const summarySpan = container.querySelector(".step-view > span");
       expect(summarySpan?.textContent).toContain("· 4");
 
-      // Verify Duration control exists inside .step-editor after Register
-      const durationSelect = container.querySelector('[data-testid="step-duration-select"]');
-      expect(durationSelect).not.toBeNull();
+      expect(container.querySelector(".step-editor")).toBeNull();
 
       // Render updated step with 2 beats
       const stepUpdated: ChordStep = {
@@ -545,16 +564,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             step: stepUpdated,
             tonic: p0.tonic,
             selected: true,
-            canReplace: false,
             onSelect: vi.fn(),
             onPerformanceChange: vi.fn(),
-            onDurationChange,
-            onViewChange: vi.fn(),
-            onReplace: vi.fn(),
-            onReset: vi.fn(),
             onRemove: vi.fn(),
-            onMoveLeft: vi.fn(),
-            onMoveRight: vi.fn(),
           }),
         );
       });
@@ -584,7 +596,6 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         },
       };
 
-      const onDurationChange = vi.fn();
       const root = createRoot(container);
 
       act(() => {
@@ -593,18 +604,14 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             project,
             onSelectStep: vi.fn(),
             onEditPerformance: vi.fn(),
-            onDurationChange,
-            onSetStepView: vi.fn(),
             onSetAllViews: vi.fn(),
-            onReplace: vi.fn(),
-            onReset: vi.fn(),
             onRemove: vi.fn(),
             onReorder: vi.fn(),
           }),
         );
       });
 
-      // Rest card has summary and expanded editor when selected
+      // Rest card has a summary but no inline editor when selected.
       const restCard = container.querySelector(".progression-rest-card.is-selected");
       expect(restCard).not.toBeNull();
       expect(restCard?.textContent).toContain("Rest");
@@ -615,19 +622,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         ),
       ).toEqual(["1", "2"]);
 
-      const durationSelect = restCard?.querySelector(
-        '[data-testid="step-duration-select"]',
-      ) as HTMLSelectElement;
-      expect(durationSelect).not.toBeNull();
-      expect(durationSelect.value).toBe("4/1");
-
-      // Change rest duration to Half
-      act(() => {
-        durationSelect.value = "2/1";
-        durationSelect.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-
-      expect(onDurationChange).toHaveBeenCalledWith("r1", musicalDuration(rational(2, 1)));
+      expect(restCard?.querySelector(".step-editor")).toBeNull();
 
       act(() => {
         root.unmount();
@@ -698,28 +693,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
               step: selected,
               tonic: proj.tonic,
               selected: true,
-              canReplace: false,
               onSelect: vi.fn(),
               onPerformanceChange: vi.fn(),
-              onDurationChange: (dur) => {
-                store.dispatch(
-                  {
-                    type: "timing/set-step-duration",
-                    payload: {
-                      stepId: selected.id,
-                      duration: dur,
-                      nowIso: new Date().toISOString(),
-                    },
-                  },
-                  setStepDuration,
-                );
-              },
-              onViewChange: vi.fn(),
-              onReplace: vi.fn(),
-              onReset: vi.fn(),
               onRemove: vi.fn(),
-              onMoveLeft: vi.fn(),
-              onMoveRight: vi.fn(),
             }),
         );
       }
@@ -734,15 +710,18 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       const cardSummary = container.querySelector(".step-view > span");
       expect(cardSummary?.textContent).toContain("· 4");
 
-      // Action: Change 4 -> 2 in My Progression Card Editor
-      const cardSelect = container.querySelector(
-        '[data-testid="step-duration-select"]',
-      ) as HTMLSelectElement;
-      expect(cardSelect).not.toBeNull();
-
       act(() => {
-        cardSelect.value = "2/1";
-        cardSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        store.dispatch(
+          {
+            type: "timing/set-step-duration",
+            payload: {
+              stepId: "s1",
+              duration: musicalDuration(rational(2, 1)),
+              nowIso: new Date().toISOString(),
+            },
+          },
+          setStepDuration,
+        );
       });
 
       // Re-render to propagate store update
@@ -828,28 +807,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
               step: selected,
               tonic: proj.tonic,
               selected: true,
-              canReplace: false,
               onSelect: vi.fn(),
               onPerformanceChange: vi.fn(),
-              onDurationChange: (dur) => {
-                store.dispatch(
-                  {
-                    type: "timing/set-step-duration",
-                    payload: {
-                      stepId: selected.id,
-                      duration: dur,
-                      nowIso: new Date().toISOString(),
-                    },
-                  },
-                  setStepDuration,
-                );
-              },
-              onViewChange: vi.fn(),
-              onReplace: vi.fn(),
-              onReset: vi.fn(),
               onRemove: vi.fn(),
-              onMoveLeft: vi.fn(),
-              onMoveRight: vi.fn(),
             }),
         );
       }
@@ -896,11 +856,8 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       // My Progression summary immediately reflects · 3/2
       expect(container.querySelector(".step-view > span")?.textContent).toContain("· 3/2");
 
-      // My Progression card dropdown reflects 3/2 preset
-      const cardSelect = container.querySelector(
-        '[data-testid="step-duration-select"]',
-      ) as HTMLSelectElement;
-      expect(cardSelect.value).toBe("3/2");
+      // The compact My Progression card remains synchronized through its summary.
+      expect(container.querySelector(".step-editor")).toBeNull();
 
       act(() => {
         root.unmount();

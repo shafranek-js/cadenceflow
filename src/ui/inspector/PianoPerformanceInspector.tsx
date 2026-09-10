@@ -11,9 +11,10 @@ import type {
   BassOctaveOffset,
   ChordStep,
   DynamicsViewPreference,
-  PianoArticulation,
   StepPerformance,
 } from "../../domain/progression/step";
+import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
+import type { Meter } from "../../domain/timing/meter";
 import {
   PIANO_DYNAMICS_PRESETS,
   PIANO_RANGE_MAX_MIDI,
@@ -28,15 +29,9 @@ import {
 } from "../../instruments/piano/dynamics";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { RegisterControl } from "./RegisterControl";
-
-const ARTICULATIONS: readonly { readonly value: PianoArticulation; readonly label: string }[] =
-  Object.freeze([
-    Object.freeze({ value: "block", label: "Block" }),
-    Object.freeze({ value: "arp-up", label: "Arp Up" }),
-    Object.freeze({ value: "arp-down", label: "Arp Down" }),
-    Object.freeze({ value: "broken-chord", label: "Broken Chord" }),
-    Object.freeze({ value: "humanized", label: "Humanized" }),
-  ]);
+import { ArticulationControl } from "./ArticulationControl";
+import { StepActions } from "../progression/StepActions";
+import { StepDurationControl } from "../progression/StepDurationControl";
 
 const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
   Object.freeze([
@@ -55,6 +50,24 @@ const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label:
   ]);
 
 const MUSICAL_DYNAMICS: readonly MusicalDynamicLabel[] = ["pp", "p", "mp", "mf", "f", "ff"];
+
+const DYNAMICS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.dynamics-disclosure-open";
+const PER_NOTE_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.per-note-disclosure-open";
+const BASS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.bass-disclosure-open";
+const VOICING_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.voicing-disclosure-open";
+const REGISTER_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.register-disclosure-open";
+const ARTICULATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.articulation-disclosure-open";
+const DURATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.duration-disclosure-open";
+
+function readDisclosureState(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored === null ? fallback : stored === "true";
+  } catch {
+    return fallback;
+  }
+}
 
 const PC_TO_DEFAULT_SPELLING: Readonly<Record<number, PitchSpelling>> = {
   0: { step: "C", alter: 0 },
@@ -75,7 +88,15 @@ export interface PianoPerformanceInspectorProps {
   readonly step: ChordStep;
   readonly tonic: number;
   readonly context: HarmonicContext;
+  readonly meter?: Meter;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
+  readonly onDurationChange?: (duration: MusicalDuration) => void;
+  readonly canReplace?: boolean;
+  readonly onReplace?: () => void;
+  readonly onReset?: () => void;
+  readonly onRemove?: () => void;
+  readonly onMoveLeft?: () => void;
+  readonly onMoveRight?: () => void;
   readonly onOpenVoicingEditor: () => void;
 }
 
@@ -83,7 +104,15 @@ export function PianoPerformanceInspector({
   step,
   tonic,
   context,
+  meter,
   onPerformanceChange,
+  onDurationChange,
+  canReplace = false,
+  onReplace,
+  onReset,
+  onRemove,
+  onMoveLeft,
+  onMoveRight,
   onOpenVoicingEditor,
 }: PianoPerformanceInspectorProps) {
   const perf = step.performance;
@@ -91,13 +120,39 @@ export function PianoPerformanceInspector({
   const overrideCount = Object.keys(perf.perNoteVelocityOverrides || {}).length;
 
   const [customBassError, setCustomBassError] = useState<string | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(() =>
+    readDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [articulationOpen, setArticulationOpen] = useState(() =>
+    readDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [durationOpen, setDurationOpen] = useState(() =>
+    readDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [dynamicsOpen, setDynamicsOpen] = useState(() =>
+    readDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [perNoteOpen, setPerNoteOpen] = useState(() =>
+    readDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [bassOpen, setBassOpen] = useState(() =>
+    readDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, true),
+  );
+  const [voicingOpen, setVoicingOpen] = useState(() =>
+    readDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, true),
+  );
+
+  const persistDisclosureState = (key: string, open: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, String(open));
+    } catch {
+      // Disclosure preferences are best-effort when storage is unavailable.
+    }
+  };
 
   // Realize current full chord step (upper voices + bass voice) within actual harmonic context
   const realization = realizeProgressionStepRealization(step, tonic, context);
-
-  const handleArticulationChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    onPerformanceChange({ articulation: e.target.value as PianoArticulation });
-  };
 
   const handleVoicingModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const mode = e.target.value as "auto" | "manual";
@@ -230,134 +285,235 @@ export function PianoPerformanceInspector({
         <div>
           <span className="inspector-context-kicker">Selected step</span>
           <h3>Step Performance: {step.harmonicFunction.functionId}</h3>
-          <span>Quick edits stay on the card; advanced performance lives here.</span>
+          <span>All selected-step settings live here.</span>
         </div>
       </header>
 
-      {/* Voicing Mode & Manual Voicing Editor */}
-      <div className="inspector-group" role="group" aria-label="Voicing mode controls">
-        <label htmlFor="voicing-mode-select">Voicing Mode</label>
-        <select
-          id="voicing-mode-select"
-          value={perf.voicingMode}
-          onChange={handleVoicingModeChange}
-          aria-label="Voicing Mode"
-        >
-          <option value="auto">Auto Voicing</option>
-          <option value="manual">Manual Exact Voicing</option>
-        </select>
-        <button
-          type="button"
-          onClick={onOpenVoicingEditor}
-          className="open-voicing-editor-btn"
-          aria-label="Open Piano Voicing Editor"
-        >
-          {isManual
-            ? `Edit Manual Voicing (${perf.manualVoicing?.length ?? 0} notes)`
-            : "Customize Exact Voicing..."}
-        </button>
-      </div>
+      {/* Primary step controls */}
+      <details
+        className="inspector-disclosure register-disclosure"
+        open={registerOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setRegisterOpen(open);
+          persistDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, open);
+        }}
+      >
+        <summary>
+          <span>Register</span>
+          <span className="disclosure-status">
+            {perf.register === "auto"
+              ? "Auto"
+              : `${perf.register > 0 ? "+" : ""}${perf.register} oct.`}
+          </span>
+        </summary>
+        <div className="inspector-disclosure-body">
+          <div className="inspector-group" role="group" aria-label="Register controls">
+            <RegisterControl
+              value={perf.register}
+              disabled={isManual}
+              showLabel={false}
+              onChange={(register) => onPerformanceChange({ register })}
+            />
+            {isManual && (
+              <p className="hint-text">Register offset does not shift manual exact voicings.</p>
+            )}
+          </div>
+        </div>
+      </details>
 
-      {/* Register Control */}
-      <div className="inspector-group" role="group" aria-label="Register controls">
-        <RegisterControl
-          value={perf.register}
-          disabled={isManual}
-          onChange={(register) => onPerformanceChange({ register })}
-        />
-        {isManual && (
-          <p className="hint-text">Register offset does not shift manual exact voicings.</p>
-        )}
-      </div>
+      <details
+        className="inspector-disclosure articulation-disclosure"
+        open={articulationOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setArticulationOpen(open);
+          persistDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
+        }}
+      >
+        <summary>
+          <span>Articulation</span>
+          <span className="disclosure-status">{perf.articulation}</span>
+        </summary>
+        <div className="inspector-disclosure-body">
+          <ArticulationControl
+            value={perf.articulation}
+            showLabel={false}
+            onChange={(articulation) => onPerformanceChange({ articulation })}
+          />
+        </div>
+      </details>
+
+      {onDurationChange ? (
+        <details
+          className="inspector-disclosure duration-disclosure"
+          open={durationOpen}
+          onToggle={(event) => {
+            const open = event.currentTarget.open;
+            setDurationOpen(open);
+            persistDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, open);
+          }}
+        >
+          <summary>
+            <span>Duration</span>
+            <span className="disclosure-status">{formatMusicalDuration(step.duration)} beats</span>
+          </summary>
+          <div className="inspector-disclosure-body">
+            <div
+              className="inspector-group selected-step-duration"
+              role="group"
+              aria-label="Step duration controls"
+            >
+              <StepDurationControl
+                variant="buttons"
+                label=""
+                value={step.duration}
+                meter={meter}
+                includeFullBar={Boolean(meter)}
+                onChange={onDurationChange}
+              />
+            </div>
+          </div>
+        </details>
+      ) : null}
+
+      {/* Voicing Mode & Manual Voicing Editor */}
+      <details
+        className="inspector-disclosure voicing-disclosure"
+        open={voicingOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setVoicingOpen(open);
+          persistDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, open);
+        }}
+      >
+        <summary>
+          <span>Voicing mode</span>
+          <span className="disclosure-status">
+            {perf.voicingMode === "manual" ? "Manual" : "Auto"}
+          </span>
+        </summary>
+        <div className="inspector-disclosure-body">
+          <div className="inspector-group" role="group" aria-label="Voicing mode controls">
+            <label htmlFor="voicing-mode-select">Voicing Mode</label>
+            <select
+              id="voicing-mode-select"
+              value={perf.voicingMode}
+              onChange={handleVoicingModeChange}
+              aria-label="Voicing Mode"
+            >
+              <option value="auto">Auto Voicing</option>
+              <option value="manual">Manual Exact Voicing</option>
+            </select>
+            <button
+              type="button"
+              onClick={onOpenVoicingEditor}
+              className="open-voicing-editor-btn"
+              aria-label="Open Piano Voicing Editor"
+            >
+              {isManual
+                ? `Edit Manual Voicing (${perf.manualVoicing?.length ?? 0} notes)`
+                : "Customize Exact Voicing..."}
+            </button>
+          </div>
+        </div>
+      </details>
 
       {/* Independent Bass Controls */}
-      <div className="inspector-group" role="group" aria-label="Bass voice controls">
-        <h4>Independent Bass</h4>
-        <div className="subgroup">
-          <label htmlFor="bass-choice-select">Bass Note</label>
-          <select
-            id="bass-choice-select"
-            value={perf.bass.choice}
-            onChange={handleBassChoiceChange}
-            aria-label="Bass Note"
-          >
-            {BASS_CHOICES.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+      <details
+        className="inspector-disclosure bass-disclosure"
+        open={bassOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setBassOpen(open);
+          persistDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, open);
+        }}
+      >
+        <summary>
+          <span>Bass</span>
+          <span className="disclosure-status">Independent voice</span>
+        </summary>
+        <div className="inspector-disclosure-body">
+          <div className="inspector-group" role="group" aria-label="Bass voice controls">
+            <h4>Independent Bass</h4>
+            <div className="subgroup">
+              <label htmlFor="bass-choice-select">Bass Note</label>
+              <select
+                id="bass-choice-select"
+                value={perf.bass.choice}
+                onChange={handleBassChoiceChange}
+                aria-label="Bass Note"
+              >
+                {BASS_CHOICES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {perf.bass.choice === "custom" ? (
+              <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
+                <label htmlFor="custom-bass-midi-input">
+                  Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
+                </label>
+                <input
+                  id="custom-bass-midi-input"
+                  type="number"
+                  min={PIANO_RANGE_MIN_MIDI}
+                  max={PIANO_RANGE_MAX_MIDI}
+                  value={perf.bass.customPitch?.midiNumber ?? 36}
+                  onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
+                  aria-label="Custom Bass MIDI Number"
+                />
+                {perf.bass.customPitch && (
+                  <span className="custom-bass-readout">
+                    Pitch: {perf.bass.customPitch.spelling.step}
+                    {perf.bass.customPitch.spelling.alter === 1
+                      ? "#"
+                      : perf.bass.customPitch.spelling.alter === -1
+                        ? "b"
+                        : ""}
+                    {perf.bass.customPitch.octave}
+                  </span>
+                )}
+                {customBassError && (
+                  <p className="error-text" role="alert">
+                    {customBassError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="subgroup">
+                <label htmlFor="bass-octave-select">Bass Octave</label>
+                <select
+                  id="bass-octave-select"
+                  value={String(perf.bass.octaveOffset)}
+                  onChange={handleBassOctaveChange}
+                  aria-label="Bass Octave"
+                >
+                  {BASS_OCTAVES.map((opt) => (
+                    <option key={String(opt.value)} value={String(opt.value)}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
-
-        {perf.bass.choice === "custom" ? (
-          <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
-            <label htmlFor="custom-bass-midi-input">
-              Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
-            </label>
-            <input
-              id="custom-bass-midi-input"
-              type="number"
-              min={PIANO_RANGE_MIN_MIDI}
-              max={PIANO_RANGE_MAX_MIDI}
-              value={perf.bass.customPitch?.midiNumber ?? 36}
-              onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
-              aria-label="Custom Bass MIDI Number"
-            />
-            {perf.bass.customPitch && (
-              <span className="custom-bass-readout">
-                Pitch: {perf.bass.customPitch.spelling.step}
-                {perf.bass.customPitch.spelling.alter === 1
-                  ? "#"
-                  : perf.bass.customPitch.spelling.alter === -1
-                    ? "b"
-                    : ""}
-                {perf.bass.customPitch.octave}
-              </span>
-            )}
-            {customBassError && (
-              <p className="error-text" role="alert">
-                {customBassError}
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="subgroup">
-            <label htmlFor="bass-octave-select">Bass Octave</label>
-            <select
-              id="bass-octave-select"
-              value={String(perf.bass.octaveOffset)}
-              onChange={handleBassOctaveChange}
-              aria-label="Bass Octave"
-            >
-              {BASS_OCTAVES.map((opt) => (
-                <option key={String(opt.value)} value={String(opt.value)}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Articulation Control */}
-      <div className="inspector-group" role="group" aria-label="Articulation controls">
-        <label htmlFor="piano-articulation-select">Articulation</label>
-        <select
-          id="piano-articulation-select"
-          value={perf.articulation}
-          onChange={handleArticulationChange}
-          aria-label="Piano Articulation"
-        >
-          {ARTICULATIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      </details>
 
       {/* Dynamics & Velocity Controls */}
-      <details className="inspector-disclosure dynamics-disclosure" open>
+      <details
+        className="inspector-disclosure dynamics-disclosure"
+        open={dynamicsOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setDynamicsOpen(open);
+          persistDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
+        }}
+      >
         <summary>
           <span>Dynamics &amp; velocity</span>
           <span className="disclosure-status">Master + per-note</span>
@@ -466,7 +622,15 @@ export function PianoPerformanceInspector({
             </div>
 
             {/* Per-Note Velocity Editor */}
-            <details className="inspector-disclosure per-note-disclosure" open>
+            <details
+              className="inspector-disclosure per-note-disclosure"
+              open={perNoteOpen}
+              onToggle={(event) => {
+                const open = event.currentTarget.open;
+                setPerNoteOpen(open);
+                persistDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, open);
+              }}
+            >
               <summary>
                 <span>Per-note velocity overrides</span>
                 <span className="disclosure-status">
@@ -547,6 +711,17 @@ export function PianoPerformanceInspector({
           </div>
         </div>
       </details>
+
+      {onReplace && onReset && onRemove && onMoveLeft && onMoveRight ? (
+        <StepActions
+          canReplace={canReplace}
+          onReplace={onReplace}
+          onReset={onReset}
+          onRemove={onRemove}
+          onMoveLeft={onMoveLeft}
+          onMoveRight={onMoveRight}
+        />
+      ) : null}
     </section>
   );
 }

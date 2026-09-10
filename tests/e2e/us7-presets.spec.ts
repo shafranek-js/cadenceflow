@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 
 test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test.beforeEach(async ({ page }) => {
@@ -9,18 +10,19 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     });
     await page.goto("/");
     await expect(page.locator(".app-shell")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
   });
 
   // Helper to add a 4-step baseline progression: I - vi - IV - V
   async function addFourStepBaseline(page: import("@playwright/test").Page) {
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardVi = page.getByTestId("chord-card-vi");
-    await cardVi.getByRole("button", { name: /Add vi to progression/i }).click();
+    await cardVi.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIv = page.getByTestId("chord-card-IV");
-    await cardIv.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
     await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(4);
   }
 
@@ -216,9 +218,9 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 6 — Replace Progression", async ({ page }) => {
     // Start with 2 steps: I and IV
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIv = page.getByTestId("chord-card-IV");
-    await cardIv.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
 
@@ -266,9 +268,9 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 7 — Append to End", async ({ page }) => {
     // Existing progression: I and V
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(2);
@@ -311,11 +313,11 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 8 — Insert at Selected Step", async ({ page }) => {
     // Prepare A B C: I, vi, IV
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardVi = page.getByTestId("chord-card-vi");
-    await cardVi.getByRole("button", { name: /Add vi to progression/i }).click();
+    await cardVi.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIv = page.getByTestId("chord-card-IV");
-    await cardIv.getByRole("button", { name: /Add IV to progression/i }).click();
+    await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(3);
@@ -364,7 +366,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 9 — Insert unavailable without selection", async ({ page }) => {
     // Non-empty progression, NO selected step
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     // Open Presets and Apply dialog
     await page.getByTestId("progression-presets-btn").click();
@@ -421,10 +423,10 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 11 — Rest-containing Save rejection", async ({ page }) => {
     // Create Chord -> Rest -> Chord
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     await page.getByRole("button", { name: "Add Rest to progression" }).click();
     const cardV = page.getByTestId("chord-card-V");
-    await cardV.getByRole("button", { name: /Add V to progression/i }).click();
+    await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(3);
@@ -491,13 +493,13 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test("Scenario 14 — current defaults are applied at application time", async ({ page }) => {
     // Build 1 step
     const cardI = page.getByTestId("chord-card-I");
-    await cardI.getByRole("button", { name: /Add I to progression/i }).click();
+    await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
     const steps = page.locator('[data-testid="progression-step"]');
     await steps.first().click();
 
     // Modify step performance to non-default settings
-    await page.getByLabel("Piano Articulation").selectOption("arp-up");
+    await page.getByRole("button", { name: "Articulation: Arp Up" }).click();
     await page.getByLabel("Musical Dynamic Label").selectOption("ff");
 
     // Save as Custom Preset
@@ -515,8 +517,11 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     // Select the newly applied step and inspect its performance
     await steps.first().click();
 
-    // Newly applied step has clean default settings (Block articulation, mf dynamic), NOT the customized Arp Up / ff
-    await expect(page.getByLabel("Piano Articulation")).toHaveValue("block");
+    // Newly applied step has clean default settings (Humanized articulation, mf dynamic), NOT the customized Arp Up / ff
+    await expect(page.getByRole("button", { name: "Articulation: Humanized" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(page.getByLabel("Musical Dynamic Label")).toHaveValue("mf");
   });
 

@@ -46,7 +46,12 @@
   --ready: #68db82;
   --disabled: #a0a8b4;
   --success: #68db82;
-  --studio-gutter: 24px;
+  --piano-pressed-key: #d6a174;
+  --piano-pressed-key-border: #8a5732;
+  --piano-pressed-key-shadow: #b8733c;
+  --piano-black-key: #30353c;
+  --piano-black-key-edge: #171a1f;
+  --studio-gutter: 12px;
   --panel-gap: 16px;
   --panel-padding: 14px;
 
@@ -118,6 +123,11 @@
   --ready: #137333;
   --disabled: #536579;
   --success: #137333;
+  --piano-pressed-key: #d6a174;
+  --piano-pressed-key-border: #8a5732;
+  --piano-pressed-key-shadow: #b8733c;
+  --piano-black-key: #30353c;
+  --piano-black-key-edge: #171a1f;
 }
 
 * {
