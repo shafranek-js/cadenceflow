@@ -423,9 +423,9 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
   Instrument/Mute/Solo/Volume controls with keyboard/focus lifecycle coverage.
 - [x] T171 [US12] Add Melody Staff projection/rendering, clef/instrument mapping, rests/tuplets,
   cross-bar ties, and active-note highlighting without changing Piano staff semantics.
-- [ ] T172 [US12] Add the licensed FluidR3Mono preparation/provenance path and lazy SoundFont provider
-  integration with offline loading and explicit failure/Retry fallback.
-- [ ] T173 [US12] Route Melody playback through a separate provider/channel role with exact velocity,
+- [x] T172 [US12] Add verified licensed local FluidR3_GM sample assets and a lazy sampled-instrument
+  provider with offline integrity checking and explicit failure/Retry behavior.
+- [x] T173 [US12] Route Melody playback through a separate provider/channel role with exact velocity,
   Mute/Solo/Volume behavior, current-note highlighting, and piano-continuation fallback.
 - [ ] T174 [US12] Add the deterministic Melody track to MIDI format-1 export while preserving byte-for-byte
   output for projects without melody.

@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-10
-**Current implementation stage:** Phase 16 / User Story 12 editor and derived Staff accepted through T171; T172–T173 are the next controlled batch
-**Task progress:** 156 accepted tasks, 156 / 176 total tasks
+**Current implementation stage:** Phase 16 / User Story 12 sampled playback accepted through T173; T174 MIDI export is the next controlled batch
+**Task progress:** 158 accepted tasks, 158 / 176 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is accepted through **T171**: contracts, generator, Project schema v2 persistence, undoable commands, accessible melody editor/track controls, and deterministic Melody Staff are complete. Licensed SoundFont preparation and separate live Melody playback begin in T172–T173. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is accepted through **T173**: contracts, generator, Project schema v2 persistence, undoable commands, accessible melody editor/track controls, deterministic Melody Staff, verified local sampled instruments, isolated preview, separate live Melody routing, and exact active-note highlighting are complete. Melody MIDI and MusicXML export remain in T174–T175. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -579,16 +579,21 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 16 / US12 — Batch D T172–T173
+## 8. Next development sequence: Phase 16 / US12 — Batch E T174
 
-T166–T171 are accepted after independent review and correction. The next controlled scope prepares the
-licensed offline SoundFont asset/provider and routes live Melody playback through its own channel while
-preserving Piano fallback. MIDI and MusicXML remain deferred to T174–T175.
+T166–T173 are accepted after independent review and correction. Melody playback uses verified local
+FluidR3_GM MP3 sample maps through `soundfont-player`; the quarantined `stb-vorbis`/SF3 path is not used,
+and no antivirus exclusion is required. The next controlled scope adds Melody to MIDI export only;
+MusicXML remains deferred to T175.
 
-- **T172**: [ ] Add the licensed FluidR3Mono preparation/provenance path and lazy SoundFont provider
-  integration with offline loading and explicit failure/Retry fallback.
-- **T173**: [ ] Route Melody playback through a separate provider/channel role with exact velocity,
-  Mute/Solo/Volume behavior, current-note highlighting, and piano-continuation fallback.
+- **T174**: [ ] Add deterministic Melody output as a separate track in Standard MIDI File format 1 while
+  preserving byte-for-byte output compatibility for projects without Melody.
+
+T172–T173 focused acceptance: offline asset verification PASS; 5 focused Vitest files / 17 tests PASS;
+US12 Chromium 2 / 2 PASS with `--workers=1 --retries=0`; TypeScript, scoped ESLint, Prettier, and
+`git diff --check` PASS. Review corrections preserve contextual preview realization, rebase audition to
+an immediate start, fix the octave label, and ensure a clean checkout no longer imports removed
+`spessasynth_lib`/`stb-vorbis` dependencies.
 
 ## 9. Handoff operating model
 
