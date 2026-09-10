@@ -1,4 +1,4 @@
-import type { ChordStep, ProgressionStep } from "../domain/progression/step";
+import type { ProgressionStep } from "../domain/progression/step";
 import type { Project } from "../domain/project/project";
 import { realizeChordMelody, type MelodyEvent } from "../domain/melody/projection";
 import type { MelodyInstrument } from "../domain/melody/types";
@@ -6,13 +6,15 @@ import { getHarmonicModule } from "../domain/harmony/moduleRegistry";
 import {
   addRational,
   compareRational,
-  rational,
   subtractRational,
   ZERO,
   type Rational,
 } from "../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
-import { realizeProgressionStepRealization } from "../instruments/piano/profile";
+import {
+  realizeOrderedPianoProgression,
+  type OrderedPianoRealization,
+} from "../instruments/piano/progressionRealization";
 import type { ExactPitch } from "../domain/harmony/pitch";
 
 export type MelodyStaffClef = "treble" | "bass";
@@ -124,7 +126,7 @@ function createMelodyEvent(
 function addStepSpan(
   step: ProgressionStep,
   stepStart: Rational,
-  context: ReturnType<typeof contextForProject>,
+  realization: OrderedPianoRealization | null,
   spans: TimelineSpan[],
   events: MelodyTimelineEvent[],
   restOrdinal: number,
@@ -142,10 +144,10 @@ function addStepSpan(
     return restOrdinal + 1;
   }
 
-  const realization = realizeProgressionStepRealization(step, context.tonic, context);
+  if (!realization) throw new Error(`missing piano realization for chord step ${step.id}`);
   const phrase = realizeChordMelody({
     sourceStepId: step.id,
-    upperPitches: realization.pitches,
+    upperPitches: realization.upperPitches,
     durationBeats: step.duration.beats,
     recipe: step.melody,
   });
@@ -230,10 +232,22 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
   const spans: TimelineSpan[] = [];
   const events: MelodyTimelineEvent[] = [];
   const context = contextForProject(project);
+  const orderedRealizations = realizeOrderedPianoProgression({
+    steps: project.progression.steps,
+    tonic: project.tonic,
+    context,
+  });
   let cursor = ZERO;
   let restOrdinal = 0;
-  project.progression.steps.forEach((step) => {
-    restOrdinal = addStepSpan(step, cursor, context, spans, events, restOrdinal);
+  project.progression.steps.forEach((step, stepIndex) => {
+    restOrdinal = addStepSpan(
+      step,
+      cursor,
+      orderedRealizations[stepIndex] ?? null,
+      spans,
+      events,
+      restOrdinal,
+    );
     cursor = addRational(cursor, step.duration.beats);
   });
   if (compareRational(layout.playbackDurationBeats, cursor) > 0) {

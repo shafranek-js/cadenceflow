@@ -1,7 +1,6 @@
 import type { AudioNoteEvent } from "./contracts";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
-import { realizeChord as realizeHarmonyChord } from "../domain/harmony/realization";
 import type { ChordStep, ProgressionStep } from "../domain/progression/step";
 import {
   addRational,
@@ -23,7 +22,7 @@ import {
   createDeterministicRandomSource,
   resolveEffectiveNoteVelocity,
 } from "../instruments/piano/dynamics";
-import { pianoProfile } from "../instruments/piano/profile";
+import { realizeOrderedPianoProgression } from "../instruments/piano/progressionRealization";
 
 const PERFORMANCE_GATE_RATIO = rational(19, 20);
 const NUMBER_RATIONAL_PRECISION = 1_000_000;
@@ -67,7 +66,7 @@ interface StepEnvelope extends TimedEvent {
   readonly stepIndex: number;
 }
 
-interface EffectiveStepTiming {
+export interface EffectiveStepTiming {
   readonly semanticStartBeats: Rational;
   readonly startBeats: Rational;
   readonly durationBeats: Rational;
@@ -97,7 +96,7 @@ function sortPitches(pitches: readonly ExactPitch[], descending: boolean): reado
     .map(({ pitch }) => pitch);
 }
 
-function projectStepEnvelopes(
+export function projectProgressionStepTimings(
   steps: readonly ProgressionStep[],
   grooveSettings: GrooveSettings,
 ): {
@@ -159,11 +158,16 @@ export function realizeProgressionPerformanceEvents(
     throw new RangeError("tempoBpm must be positive");
   }
 
-  const projected = projectStepEnvelopes(input.steps, input.groove ?? createGroove());
+  const projected = projectProgressionStepTimings(input.steps, input.groove ?? createGroove());
   const events: PerformanceBeatNoteEvent[] = [];
   const stepRealizations: PerformanceStepRealization[] = [];
-  let previousUpperPitches = input.previousPitches;
-  let previousBassPitch = input.previousBassPitch;
+  const orderedRealizations = realizeOrderedPianoProgression({
+    steps: input.steps,
+    tonic: input.tonic,
+    context: input.context,
+    ...(input.previousPitches ? { previousPitches: input.previousPitches } : {}),
+    ...(input.previousBassPitch ? { previousBassPitch: input.previousBassPitch } : {}),
+  });
   let emissionIndex = 0;
 
   const addEvent = (
@@ -197,20 +201,14 @@ export function realizeProgressionPerformanceEvents(
     const timing = projected.timings.get(stepIndex);
     if (!timing) throw new Error(`missing projected timing for step ${stepIndex}`);
 
-    const baseChord = realizeHarmonyChord(step.harmonicFunction, input.tonic);
-    const realization = pianoProfile.realizeChord({
-      context: input.context,
-      chord: { ...baseChord, variant: step.harmonicVariant },
-      performance: step.performance,
-      ...(previousUpperPitches ? { previousPitches: previousUpperPitches } : {}),
-      ...(previousBassPitch ? { previousBassPitch } : {}),
-    });
+    const realization = orderedRealizations[stepIndex];
+    if (!realization) throw new Error(`missing piano realization for chord step ${step.id}`);
 
     stepRealizations.push(
       Object.freeze({
         stepIndex,
         stepId: step.id,
-        upperPitches: realization.pitches,
+        upperPitches: realization.upperPitches,
         bassPitch: realization.bassPitch,
       }),
     );
@@ -236,7 +234,7 @@ export function realizeProgressionPerformanceEvents(
       );
     };
 
-    const upperPitches = realization.pitches;
+    const upperPitches = realization.upperPitches;
     switch (step.performance.articulation) {
       case "block":
         upperPitches.forEach((pitch) => addUpperAtOffset(pitch, ZERO));
@@ -282,9 +280,6 @@ export function realizeProgressionPerformanceEvents(
         break;
       }
     }
-
-    previousUpperPitches = realization.pitches;
-    previousBassPitch = realization.bassPitch;
   });
 
   events.sort(performanceEventComparator);
@@ -338,6 +333,7 @@ export function realizeStepAudioEvents(input: RealizeStepEventsInput): RealizedS
       durationSeconds: rationalToNumber(event.durationBeats) * secondsPerBeat,
       velocity: event.velocity,
       channelRole: event.channelRole,
+      stepIndex: event.stepIndex,
     }),
   );
   const realization = performance.stepRealizations[0];
@@ -375,6 +371,7 @@ export function realizeProgressionAudioEvents(
         durationSeconds: rationalToNumber(event.durationBeats) * secondsPerBeat,
         velocity: event.velocity,
         channelRole: event.channelRole,
+        stepIndex: event.stepIndex,
       }),
     ),
   );
