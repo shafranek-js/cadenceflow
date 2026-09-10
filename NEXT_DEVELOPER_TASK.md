@@ -1,245 +1,123 @@
-# Next Developer Assignment — CadenceFlow US12, Batch D
+# Next Developer Assignment — CadenceFlow US12, Batch E
 
-**Assignment:** T172–T173 only, plus the contextual-realization correction described below.
+**Assignment:** T174 only — deterministic Melody track in Standard MIDI File format 1.
 
-**Do not implement T174+ in this batch.** MIDI and MusicXML output must remain unchanged.
+**Do not implement T175 or T176.** Do not change MusicXML, UI, Project schema, playback behavior, or the
+accepted Melody generator/provider.
 
-**Goal:** bundle and verify licensed offline FluidR3_GM instrument samples, add one lazy Melody SoundFont
-provider, and route derived Melody events through a separate playback role/channel. Piano and metronome
-must continue when Melody is unavailable. Staff must highlight the exact sounding Melody event.
+## Accepted baseline
 
-> **Security correction (2026-09-10):** the earlier FluidR3Mono SF3/SpessaSynth route is superseded.
-> Microsoft Defender detected `Trojan:Script/ObfusScript.A!ml` in the transitive
-> `stb-vorbis/dist/index.js` decoder. Although `DidThreatExecute=False` and this is consistent with a
-> heuristic false positive, do not restore `spessasynth_lib`, `stb-vorbis`, the SF3 asset, or an antivirus
-> exclusion. The approved implementation uses local FluidR3_GM MP3 sample maps through
-> `soundfont-player@0.12.0` and keeps their hashes, provenance, and CC BY 3.0 attribution in the repository.
+Work on the current `master` baseline containing:
 
-Authoritative sources:
+- `18bd946 fix(us12): share contextual melody realization`;
+- `28e9863 feat(us12): add safe sampled melody playback`;
+- `a5287f2 test(us12): complete melody playback acceptance`;
+- `866810a fix(us12): complete safe melody playback acceptance`;
+- `acd1210 docs(status): accept us12 sampled melody playback`.
 
-- `specs/001-cadenceflow-core-studio/spec.md`, US12 and FR-191–FR-207;
-- `specs/001-cadenceflow-core-studio/us12-melody-from-chords-plan.md`;
-- accepted derived timeline in `src/notation/melodyStaffProjection.ts`;
-- existing audio seams in `src/audio/contracts.ts`, `eventRealizer.ts`, `scheduler.ts`,
-  `playbackController.ts`, and `soundfont/spessaProvider.ts`.
+Before editing, report `git status --short` and `git log -6 --oneline`. Preserve all untracked
+visual-polish/QA/source-information files and do not stage them. Do not push.
 
-## Preflight and scope
+## Required behavior
 
-1. Work on the accepted baseline containing:
-   - `21607f8 fix(us12): correct melody staff groups and interactions`;
-   - `5fea349 docs(status): accept us12 melody editor and staff`.
-2. Use Node `24.14.0` and pnpm `10.12.4`.
-3. Report `git status --short` and `git log -5 --oneline` before editing.
-4. Preserve every existing untracked QA/visual-polish/source-information item; do not stage it.
-5. Do not change `spec.md`, `plan.md`, `tasks.md`, or `PROJECT_STATUS.md`; T172/T173 stay unchecked until
-   independent review.
-6. Do not push.
+### Projection
 
-## Required T171 follow-up — one canonical contextual upper realization
+- Extend the semantic MIDI projection without reconstructing Melody from live WebAudio or Staff SVG.
+- Generate Melody from the accepted contextual upper-voicing and exact Rational recipe timeline.
+- Straight subdivisions follow the same Swing onset projection as live Melody; triplet grids remain
+  unswung. Quantize only at the existing MIDI PPQ boundary using the established deterministic half-up
+  policy.
+- Melody events inherit the velocity of their corresponding pre-octave-offset upper source note.
+  Melody Track Volume must not overwrite note velocity; it is exported separately as CC7.
+- `Mute` and `Solo` are playback controls only and must not remove or alter exported Piano or Melody data.
+- Temporary Branch recipes and runtime/highlight state must not enter MIDI.
+- Preserve aligned final-measure silence through End-of-Track; do not create phantom notes.
+- Keep the source `Project` and all projection DTOs immutable and deterministic.
 
-Before adding sound, remove the current Step-local ambiguity in Melody projection:
+### Format-1 writer
 
-- Extract/reuse one pure progression-level Piano realization helper under `src/instruments/piano/` that
-  walks authored Steps in order and carries `previousPitches` and `previousBassPitch` through automatic
-  voice leading.
-- Both the canonical performance/audio projection and `createMelodyTimeline` must consume the same
-  ordered realization result. Do not make notation import from `src/audio/`.
-- Melody continues to receive upper pitches only. Independent bass is carried solely for contextual Piano
-  realization and is never passed into `realizeChordMelody`.
-- Manual voicing remains authoritative; RestStep advances musical time but does not invent a realization.
-- Prove with an `I → IV` automatic-voicing fixture that Melody Staff pitches equal the contextual upper
-  realization used by playback and differ from a deliberately chosen non-contextual candidate where
-  applicable.
-- Do not change existing Piano card/Staff presentation semantics in this correction.
+When at least one authored Progression ChordStep has a Melody recipe, write exactly four tracks in this
+order:
 
-Commit this correction separately, preferably:
-`fix(us12): share contextual melody realization`.
+1. `CadenceFlow Conductor` — tempo and meter;
+2. `CadenceFlow Melody` — Melody notes;
+3. `CadenceFlow Chords` — Piano upper notes;
+4. `CadenceFlow Bass` — independent Piano bass notes.
 
-## T172 — licensed offline samples and lazy provider
+Melody track requirements:
 
-### Reproducible local assets
+- zero-based MIDI channel `2` for channel prefix, program change, CC7, note-on, and note-off;
+- track name `CadenceFlow Melody`;
+- instrument-name meta event from the selected human-readable instrument label;
+- program mapping: Violin `40`, Cello `42`, Oboe `68`, Clarinet `71`, Flute `73`, Synth Lead `80`;
+- CC7 value equals the stored integer Melody Track Volume `0..127`;
+- at a shared tick, note-off precedes note-on, including consecutive notes of the same pitch;
+- End-of-Track is emitted at the same aligned `totalTicks` as every other track.
 
-- Bundle only the six required FluidR3_GM MP3 instrument maps under `public/audio/melody/FluidR3_GM/`:
-  Violin, Cello, Oboe, Clarinet, Flute, and Lead 1 Square.
-- Keep `public/audio/melody/manifest.json` deterministic and complete: canonical source repository, license,
-  relative filenames, byte sizes, and SHA-256 values for every runtime asset.
-- Keep the CC BY 3.0 legal text and attribution under `public/licenses/`.
-- Runtime playback must use only these local files and must not make CDN/network requests.
-- Verification must fail on a missing, renamed, empty, or hash-mismatched sample, manifest, or license.
-- Do not restore an SF2/SF3 decoder, WASM decoder, `spessasynth_lib`, or `stb-vorbis`.
+Do not emit a nonstandard clef event: MIDI has no portable clef semantic.
 
-### Melody provider
+### Strict backward compatibility
 
-- Keep `SpessaSoundFontProvider` generic/backward compatible, but do not use or import SpessaSynth for
-  Melody. Use the dedicated `MelodySoundFontProvider` backed by `soundfont-player@0.12.0`.
-- Map each supported Melody instrument to its exact local FluidR3_GM sample-map URL; no silent Piano or
-  oscillator fallback is allowed.
-- Use the same AudioContext/clock as the HQ Piano provider. Do not create an extra AudioContext when the
-  shared context exists.
-- Load lazily only when:
-  - a project first contains a Melody recipe, or
-  - the user requests audible Melody preview.
-  Projects without recipes must not fetch/parse/import the SF3 path.
-- Deduplicate concurrent `prepare()` calls. State lifecycle must be observable and deterministic:
-  `idle → loading → ready`, or `idle/loading → error`; Retry starts a fresh attempt and can reach `ready`.
-- Retain the underlying error message/cause for UI diagnostics without persisting it in Project.
-- Apply the selected zero-based GM program before scheduling/preview:
+- A project with no authored Melody recipe must produce byte-for-byte identical output from
+  `projectProjectToMidi` + `writeMidiFile` to the accepted pre-T174 baseline.
+- Such a file remains format 1 with the existing three tracks in the existing order.
+- `writeStandardMidiFile` keeps its accepted format-0 behavior and bytes.
+- The presence of only a Temporary Branch Melody recipe does not enable the Melody track.
 
-  | Instrument | Program |
-  |---|---:|
-  | Violin | 40 |
-  | Cello | 42 |
-  | Oboe | 68 |
-  | Clarinet | 71 |
-  | Flute | 73 |
-  | Synth Lead | 80 |
+## Suggested interfaces
 
-- Apply global Melody Volume as channel gain/GM CC7 (implementation according to the verified installed
-  API), not by overwriting each note's inherited velocity.
-- `stop`, cancellation, Retry, instrument change, and disposal must prevent stuck notes and stale timers.
-- Extend Melody Track UI with concise `Loading`, `Ready`, and identified `Error` state plus a keyboard-
-  accessible `Retry`.
-- Add a compact standard Play-icon button to the `Notation preview` header in the Melody editor. It auditions
-  the **current local draft** Pattern/Grid/Octave/Instrument before Apply, using exactly the notes shown in
-  that preview and the real Melody provider. While sounding, the same control becomes Stop (standard square
-  icon); its accessible name and tooltip must be `Play melody preview` / `Stop melody preview`, and its state
-  must not be conveyed by icon or color alone.
-- Preview must start from its first note on every Play, replace/cancel a previous Melody preview, and stop
-  immediately when Pattern, Grid, Octave, or Instrument changes; when the dialog closes, cancels, applies,
-  unmounts, or the source Step disappears; and when the Stop control is pressed. It must leave no timers or
-  stuck notes.
-- The preview has its own playback scope: it must not start/pause/stop the main Transport, change selection,
-  mutate Project/history, trigger autosave, or cancel a running progression Melody channel. Space activates
-  it only while the focused preview button handles Space and must not bubble into the global Transport
-  shortcut.
-- During provider `idle/loading`, the control shows a non-playing loading state and deduplicates preparation;
-  on provider error it is disabled in favor of the identified Retry path. Do not silently audition with the
-  Piano provider.
+Keep the existing public APIs working:
 
-Recommended commit:
-`feat(us12): prepare lazy melody soundfont provider`.
+- `projectProjectToMidi(project)`;
+- `projectProgressionToMidi(project)`;
+- `projectMidiEvents(project)`;
+- `writeMidiFile(projection)`;
+- `writeStandardMidiFile(projection)`.
 
-## T173 — separate Melody events, routing, and exact highlighting
+An optional immutable Melody section may be added to `MidiProjection`, but omit it entirely for
+no-Melody projects so backward-compatible callers and byte output remain stable. Reuse or extract the
+existing tick quantizer instead of duplicating a different rounding algorithm.
 
-### Pure performance projection
+## Required tests
 
-- Extend `AudioChannelRole` with `melody`. HQ Piano must never receive that role directly; composite routing
-  is responsible for separating it.
-- Add a pure immutable Melody performance projection built from the canonical contextual realization and
-  accepted recipe generator. Do not use serialized/generated Project notes.
-- Every derived playback event retains `eventKey = sourceStepId:eventIndex`, source Step identity, exact
-  Rational onset/duration, pitch, and inherited note velocity.
-- Velocity comes from the corresponding **source upper pitch** using current master velocity and per-note
-  override. When recipe octave offset changes output MIDI, resolve velocity from the pre-offset source pitch;
-  do not use bass velocity and do not clamp valid inherited velocity.
-- Written `createMelodyTimeline` remains unswung. For live Melody only:
-  - straight Grid events follow the current Swing projection;
-  - `eighth-triplet` and `sixteenth-triplet` remain unswung;
-  - exact semantic duration and Project recipe remain unchanged.
-- Full playback, Play From Here, pause/resume, trailing measure silence, and loop must use stable event keys
-  and avoid a duplicate attack when resuming inside an active event.
-- For Play From Here or a loop slice, first realize against the full preceding progression context, then
-  filter/rebase the requested session range. Do not lose prior voice-leading context at the slice boundary.
+Extend the focused MIDI tests with an independent SMF parser that verifies actual emitted bytes, not only
+internal DTOs:
 
-### Composite playback routing
+- four-track format-1 order and declared track count;
+- Melody channel prefix/channel `2`, instrument name, exact GM program, and CC7 volume;
+- exact Melody pitches, velocities, start/end ticks, and aligned EOT;
+- Swing changes straight-grid onsets but not triplet-grid onsets;
+- repeated same pitch has note-off before the following note-on;
+- Mute/Solo do not change exported data;
+- Temporary Branch is excluded;
+- output is deterministic and Project is not mutated;
+- a no-Melody fixture is byte-for-byte identical to a pinned pre-T174 golden byte sequence;
+- legacy `writeStandardMidiFile` format-0 bytes remain unchanged.
 
-- Extend `PlaybackController` with an optional Melody provider/settings input; do not create a second
-  independent scheduler or transport session.
-- Route in one composite provider:
-  - `upper` and `bass` → HQ Piano;
-  - `melody` → Melody SoundFont provider;
-  - `metronome` → Metronome provider.
-- Normal state: Piano + Melody + optional metronome.
-- `muted=true`: omit Melody scheduling; Piano/metronome unchanged.
-- `solo=true`: schedule Melody and metronome, omit Piano upper and bass.
-- Volume `0` is silent Melody but does not remove derived data or affect Piano/metronome.
-- If Melody is idle/loading/error at session start, continue Piano and metronome without Melody, expose an
-  explicit Melody unavailable/error state and Retry, and never put Transport into global error. Do not route
-  Melody notes to Piano as a hidden timbre fallback and do not join a Melody provider halfway through an
-  already-running session; restart/play again after Ready.
-- A Piano provider error retains existing fail-closed Transport behavior. A Melody error is isolated.
-- Stop/pause/project switch/unmount cancels all participating providers exactly once and leaves no stuck
-  Melody notes. Preview and progression scopes must not cancel each other.
+Use a fixture containing at least two contextual chords, one Rest, a trailing virtual gap, a velocity
+override, and a Melody octave offset. Cover all six instrument program mappings with a table-driven test.
 
-### Exact active-note state
-
-- Extend the runtime/Transport presentation state with `activeMelodyEventKey: string | null` (or an equally
-  explicit event identity), guarded by session ID like `currentStepIndex`.
-- Track Melody event half-open intervals `[start, end)` against scheduler elapsed session time, including
-  count-in offset and loop rebasing.
-- During count-in, rests, no-recipe Steps, trailing silence, Mute, provider-unavailable fallback, pause,
-  stop, and natural end, active Melody key is `null`.
-- On resume within a Melody note, reschedule only its remaining duration and restore its highlight; at an
-  exact adjacent boundary highlight only the next event.
-- Wire this state through `App → ProgressionTrack → MelodyStaffView`. Only the matching note is highlighted;
-  existing source Chord Step highlighting remains simultaneous and unchanged.
-- Runtime position/highlight is transient and must never enter Project, autosave, portable files, Undo/Redo,
-  presets, or export.
-
-Recommended commit:
-`feat(us12): route live melody playback and highlighting`.
-
-## Required focused tests
-
-### Preparation/provider
-
-- pinned package URL/name/SHA and hash mismatch fail-closed before extraction;
-- path traversal/extra archive members cannot escape or enter public output;
-- deterministic manifest, extracted-file hashes, idempotent prepare, offline verify with network disabled;
-- lazy zero-fetch project-without-melody case and concurrent prepare deduplication;
-- all six GM mappings, CC7/gain Volume, shared AudioContext, state transitions, Retry recovery;
-- schedule/cancel/stop/dispose and no stuck notes/timers;
-- editor Play/Stop previews the current unapplied draft, replaces prior preview, stops on every draft/dialog
-  lifecycle boundary, does not add Undo/autosave activity, and does not affect progression Transport;
-- no runtime remote URL.
-
-### Projection/controller
-
-- contextual `I → IV`, manual voicing, octave offset with pre-offset velocity override, bass exclusion;
-- straight vs triplet Swing, exact truncation, Rest/no-recipe spans, Play From Here context rebasing;
-- normal, Mute, Solo, Volume 0, provider loading/error fallback, and Piano-error behavior;
-- count-in, pause/resume inside a note, exact adjacent boundary, loop, trailing silence, stale session callback,
-  stop/natural end/project switch cleanup;
-- one scheduler/session only and correct provider batches by role;
-- exact active key plus simultaneous unchanged source-Step highlight;
-- Project immutability and no generated/runtime state persistence.
-
-### Focused Chromium
-
-- Create a Melody, observe lazy Loading → Ready using the real local asset path, play/stop the editor's
-  unapplied draft, change a draft field and verify preview cancellation, then Apply and play Piano + Melody.
-- Verify exact note highlight advances within one Chord Step.
-- Verify Mute, Solo, Volume, pause/resume, loop, Stop, instrument change, and keyboard Retry after an
-  intentionally intercepted SF3 failure.
-- Assert Piano transport continues during Melody failure and no remote asset request occurs.
-- Use one focused spec, Chromium `workers=1`, `retries=0`, at a supported desktop viewport.
-
-## Verification policy
+## Verification and reporting
 
 Run only:
 
-1. new preparation/provider/projection/playback tests;
-2. existing focused SoundFont, audio contract, scheduler, playback-controller, event-realizer, melody Staff,
-   transport-store, and Melody UI tests directly affected;
-3. offline asset verification;
-4. one focused Chromium spec with `--workers=1 --retries=0`;
-5. TypeScript;
-6. Prettier check for changed files only;
-7. `git diff --check`.
+1. focused MIDI Vitest files with `--maxWorkers=1`;
+2. the existing export projection consistency test if its MIDI contract is touched;
+3. TypeScript;
+4. ESLint and Prettier for changed files only;
+5. `git diff --check`.
 
-Do not run full Vitest, full Chromium, lint, or unrelated export tests. Build only once if required by the
-focused preview-based Chromium configuration. Restore dev server HTTP 200 at
-`http://127.0.0.1:5174/` afterward.
+Do not run full Vitest, full Chromium, MusicXML validation, or unrelated E2E. No Chromium test is required
+because this batch changes the existing export projection/writer behind an already accepted UI action.
+Keep the dev server responding at `http://127.0.0.1:5174/` after verification.
 
-## Report
+Commit implementation and tests together as:
 
-Return commit hashes and exact file lists; sample source URLs, asset/license hashes, and attribution evidence;
-offline verify result; inspected soundfont-player scheduling/gain behavior; lazy-load request evidence; routing table;
-velocity and Swing evidence; pause/resume/loop/highlight evidence; failure/Retry evidence; exact focused
-commands/results with Chromium retries `0`; final Git/ahead state; dev-server HTTP status; and
-`Spec deviations: none` or the complete list.
+`feat(us12): export melody as a separate midi track`
 
-**Acceptance condition:** CadenceFlow reproducibly bundles verified open-source FluidR3_GM samples, loads
-only the selected instrument when Melody needs it, plays derived Melody through an isolated instrument channel with correct
-settings and graceful failure, and highlights the exact sounding Melody note without changing Project or
-export semantics.
+Leave T174 unchecked and do not change `PROJECT_STATUS.md`, `spec.md`, `plan.md`, or `tasks.md`; acceptance
+status is updated only after independent review.
+
+Report the commit hash, exact changed files, parser evidence for every track/channel/program/CC7/EOT,
+no-Melody golden compatibility evidence, focused command results, final Git status/ahead count, HTTP status,
+and `Spec deviations: none` or the complete deviation list.
