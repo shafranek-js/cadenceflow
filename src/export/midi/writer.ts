@@ -1,4 +1,8 @@
-import type { MidiProjection, MidiProjectionNote } from "./eventProjection";
+import type {
+  MidiProjection,
+  MidiProjectionMelodyNote,
+  MidiProjectionNote,
+} from "./eventProjection";
 
 const MIDI_MAX_VLQ = 0x0fffffff;
 const MIDI_MAX_CHUNK_LENGTH = 0xffffffff;
@@ -12,6 +16,7 @@ interface MidiTrackEvent {
     | "tempo"
     | "meter"
     | "program-change"
+    | "control-change"
     | "note-off"
     | "note-on"
     | "eot";
@@ -19,6 +24,8 @@ interface MidiTrackEvent {
   readonly pitch?: number;
   readonly velocity?: number;
   readonly program?: number;
+  readonly controller?: number;
+  readonly value?: number;
   readonly text?: string;
   readonly roleOrder?: number;
   readonly order: number;
@@ -70,17 +77,19 @@ function eventKindOrder(kind: MidiTrackEvent["kind"]): number {
       return 3;
     case "program-change":
       return 4;
-    case "note-off":
+    case "control-change":
       return 5;
-    case "note-on":
+    case "note-off":
       return 6;
-    case "eot":
+    case "note-on":
       return 7;
+    case "eot":
+      return 8;
   }
 }
 
-function roleOrder(note: MidiProjectionNote): number {
-  return note.role === "bass" ? 0 : 1;
+function roleOrder(note: MidiProjectionNote | MidiProjectionMelodyNote): number {
+  return "role" in note && note.role === "bass" ? 0 : 1;
 }
 
 function compareEvents(a: MidiTrackEvent, b: MidiTrackEvent): number {
@@ -115,15 +124,31 @@ function validateProjection(projection: MidiProjection): void {
     if (note.endTick <= note.startTick)
       throw new RangeError("MIDI notes must have positive duration");
   }
+  if (projection.melody) {
+    assertUInt(projection.melody.program, 127, "Melody MIDI program");
+    assertUInt(projection.melody.volume, 127, "Melody Track Volume");
+    for (const note of projection.melody.notes) {
+      if (note.channel !== 2) throw new RangeError("Melody MIDI channel must be 2");
+      assertUInt(note.pitch, 127, "MIDI pitch");
+      if (!Number.isInteger(note.velocity) || note.velocity < 1 || note.velocity > 127) {
+        throw new RangeError("MIDI velocity must be an integer in 1..127");
+      }
+      assertUInt(note.startTick, projection.totalTicks, "note start tick");
+      assertUInt(note.endTick, projection.totalTicks, "note end tick");
+      if (note.endTick <= note.startTick)
+        throw new RangeError("MIDI notes must have positive duration");
+    }
+  }
 }
 
 interface TrackOptions {
-  readonly notes: readonly MidiProjectionNote[];
+  readonly notes: readonly (MidiProjectionNote | MidiProjectionMelodyNote)[];
   readonly includeTiming?: boolean;
   readonly trackName?: string;
   readonly instrumentName?: string;
   readonly channel?: number;
   readonly program?: number;
+  readonly controllerVolume?: number;
 }
 
 function buildTrackEvents(
@@ -161,6 +186,16 @@ function buildTrackEvents(
       kind: "program-change",
       channel: options.channel,
       program: options.program,
+      order: order++,
+    });
+  }
+  if (options.controllerVolume !== undefined && options.channel !== undefined) {
+    events.push({
+      tick: 0,
+      kind: "control-change",
+      channel: options.channel,
+      controller: 7,
+      value: options.controllerVolume,
       order: order++,
     });
   }
@@ -227,6 +262,9 @@ function encodeTrack(projection: MidiProjection, options: TrackOptions): Uint8Ar
       case "program-change":
         track.push(0xc0 | event.channel!, event.program!);
         break;
+      case "control-change":
+        track.push(0xb0 | event.channel!, event.controller!, event.value!);
+        break;
       case "note-on":
         track.push(0x90 | event.channel!, event.pitch!, event.velocity!);
         break;
@@ -278,6 +316,16 @@ export function writeMidiFile(projection: MidiProjection): Uint8Array {
     includeTiming: true,
     trackName: "CadenceFlow Conductor",
   });
+  const melodyTrack = projection.melody
+    ? encodeTrack(projection, {
+        notes: projection.melody.notes,
+        trackName: "CadenceFlow Melody",
+        instrumentName: projection.melody.instrumentName,
+        channel: 2,
+        program: projection.melody.program,
+        controllerVolume: projection.melody.volume,
+      })
+    : undefined;
   const upperTrack = encodeTrack(projection, {
     notes: projection.notes.filter((note) => note.role === "upper"),
     trackName: "CadenceFlow Chords",
@@ -296,7 +344,13 @@ export function writeMidiFile(projection: MidiProjection): Uint8Array {
   pushAscii(header, "MThd");
   pushU32(header, 6);
   pushU16(header, 1);
-  pushU16(header, 3);
+  pushU16(header, projection.melody ? 4 : 3);
   pushU16(header, projection.ppq);
-  return Uint8Array.from([...header, ...conductorTrack, ...upperTrack, ...bassTrack]);
+  return Uint8Array.from([
+    ...header,
+    ...conductorTrack,
+    ...(melodyTrack ? [...melodyTrack] : []),
+    ...upperTrack,
+    ...bassTrack,
+  ]);
 }

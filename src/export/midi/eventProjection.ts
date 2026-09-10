@@ -1,6 +1,8 @@
 import { realizeProgressionPerformanceEvents } from "../../audio/eventRealizer";
+import { realizeProgressionMelodyPerformance } from "../../audio/melodyPerformance";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { modeForModule } from "../../domain/harmony/functions";
+import type { MelodyInstrument } from "../../domain/melody/types";
 import type { Project } from "../../domain/project/project";
 import { addRational, subtractRational, ZERO, type Rational } from "../../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../../domain/timing/measureLayout";
@@ -15,6 +17,25 @@ import { createProgressionMeasureLayout } from "../../domain/timing/measureLayou
 export const MIDI_PPQ = 120;
 
 export type MidiProjectionRole = "upper" | "bass";
+
+export interface MidiProjectionMelodyNote {
+  readonly stepIndex: number;
+  readonly stepId: string;
+  readonly order: number;
+  readonly channel: 2;
+  readonly pitch: number;
+  readonly velocity: number;
+  readonly startTick: number;
+  readonly endTick: number;
+}
+
+export interface MidiProjectionMelody {
+  readonly instrument: MelodyInstrument;
+  readonly instrumentName: string;
+  readonly program: number;
+  readonly volume: number;
+  readonly notes: readonly MidiProjectionMelodyNote[];
+}
 
 export interface MidiProjectionNote {
   readonly stepIndex: number;
@@ -42,6 +63,8 @@ export interface MidiProjection {
   readonly meter: MidiProjectionMeter;
   readonly totalTicks: number;
   readonly notes: readonly MidiProjectionNote[];
+  /** Omitted for projects without an authored saved Melody recipe. */
+  readonly melody?: MidiProjectionMelody;
 }
 
 interface QuantizedStepTiming {
@@ -128,6 +151,95 @@ function rawNoteComparator(a: RawProjectionNote, b: RawProjectionNote): number {
   );
 }
 
+const MELODY_MIDI_METADATA: Readonly<
+  Record<MelodyInstrument, { readonly label: string; readonly program: number }>
+> = Object.freeze({
+  flute: Object.freeze({ label: "Flute", program: 73 }),
+  violin: Object.freeze({ label: "Violin", program: 40 }),
+  clarinet: Object.freeze({ label: "Clarinet", program: 71 }),
+  oboe: Object.freeze({ label: "Oboe", program: 68 }),
+  cello: Object.freeze({ label: "Cello", program: 42 }),
+  "synth-lead": Object.freeze({ label: "Synth Lead", program: 80 }),
+});
+
+function hasAuthoredMelody(project: Project): boolean {
+  return project.progression.steps.some(
+    (step) => step.kind === "chord" && step.melody !== undefined,
+  );
+}
+
+function projectMelodyToMidi(
+  project: Project,
+  quantizedSteps: ReadonlyMap<number, QuantizedStepTiming>,
+  totalTicks: number,
+): MidiProjectionMelody | undefined {
+  if (!hasAuthoredMelody(project)) return undefined;
+
+  // Deliberately omit track settings here: mute/solo are playback controls and
+  // must not change the saved semantic export. Melody performance still shares
+  // the accepted contextual realization and exact recipe/swing timeline.
+  const performance = realizeProgressionMelodyPerformance({
+    steps: project.progression.steps,
+    tonic: project.tonic,
+    context: createContext(project),
+    tempoBpm: project.globalTiming.tempoBpm,
+    groove: project.groove,
+  });
+  const rawNotes = performance.events.map((event) => {
+    const stepTiming = quantizedSteps.get(event.stepIndex);
+    if (!stepTiming) throw new Error(`missing quantized timing for melody step ${event.stepIndex}`);
+
+    const offsetBeats = subtractRational(event.startBeats, stepTiming.exactStartBeats);
+    const projectedStart = stepTiming.startTick + quantizeRationalToMidiTicks(offsetBeats);
+    const startTick = Math.min(
+      Math.max(stepTiming.startTick, projectedStart),
+      Math.max(0, totalTicks - 1),
+    );
+    const durationTicks = Math.max(1, quantizeRationalToMidiTicks(event.durationBeats));
+    const endTick = Math.min(totalTicks, startTick + durationTicks);
+
+    return {
+      stepIndex: event.stepIndex,
+      stepId: event.sourceStepId,
+      channel: 2 as const,
+      pitch: event.pitch,
+      velocity: event.velocity,
+      startTick,
+      endTick,
+      emissionIndex: event.eventIndex,
+    };
+  });
+  const notes = rawNotes
+    .sort(
+      (a, b) =>
+        a.startTick - b.startTick ||
+        a.pitch - b.pitch ||
+        a.stepIndex - b.stepIndex ||
+        a.emissionIndex - b.emissionIndex,
+    )
+    .map((note, order) =>
+      Object.freeze({
+        stepIndex: note.stepIndex,
+        stepId: note.stepId,
+        order,
+        channel: note.channel,
+        pitch: note.pitch,
+        velocity: note.velocity,
+        startTick: note.startTick,
+        endTick: note.endTick,
+      }),
+    );
+  const metadata = MELODY_MIDI_METADATA[project.melodyTrack.instrument];
+
+  return Object.freeze({
+    instrument: project.melodyTrack.instrument,
+    instrumentName: metadata.label,
+    program: metadata.program,
+    volume: project.melodyTrack.volume,
+    notes: Object.freeze(notes),
+  });
+}
+
 /**
  * Projects the saved progression through the same canonical performance events
  * used by live playback. Temporary branches and runtime transport state are not
@@ -188,12 +300,15 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     }),
   );
 
+  const melody = projectMelodyToMidi(project, quantizedSteps.timings, totalTicks);
+
   return Object.freeze({
     ppq: MIDI_PPQ,
     tempoBpm: project.globalTiming.tempoBpm,
     meter: freezeMeter(project),
     totalTicks,
     notes: Object.freeze(notes),
+    ...(melody ? { melody } : {}),
   });
 }
 

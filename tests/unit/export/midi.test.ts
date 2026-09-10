@@ -11,6 +11,7 @@ import { globalTiming, meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import { groove } from "../../../src/domain/timing/swing";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
+import { snapshotChordMelodyRecipe, type MelodyInstrument } from "../../../src/domain/melody/types";
 import {
   MIDI_PPQ,
   projectProjectToMidi,
@@ -50,6 +51,11 @@ function chord(
     duration: musicalDuration(rational(durationNumerator, durationDenominator)),
     performance: performance(performanceOverrides),
   });
+}
+
+function melodyChord(step: ChordStep, recipe: ChordStep["melody"]): ChordStep {
+  if (!recipe) throw new Error("melody fixture requires a recipe");
+  return Object.freeze({ ...step, melody: snapshotChordMelodyRecipe(recipe) });
 }
 
 function rest(id: string, numerator: number, denominator = 1): RestStep {
@@ -99,6 +105,39 @@ function makeManualProject(): Project {
     ],
     { ...project },
   );
+}
+
+function makeMelodyExportProject(instrument: MelodyInstrument = "violin"): Project {
+  const base = createDefaultProject("melody-midi-fixture", "Melody MIDI Fixture");
+  const firstUpper = [
+    exactPitch(60, { step: "C", alter: 0 }),
+    exactPitch(64, { step: "E", alter: 0 }),
+    exactPitch(67, { step: "G", alter: 0 }),
+  ];
+  const first = melodyChord(
+    chord(base, "I", "melody-first", 2, 1, {
+      voicingMode: "manual",
+      manualVoicing: firstUpper,
+      masterVelocity: 92,
+      perNoteVelocityOverrides: { "64": 111 },
+    }),
+    { pattern: "up", grid: "quarter", octaveOffset: 1 },
+  );
+  const second = melodyChord(chord(base, "V", "melody-second", 1, 1), {
+    pattern: "down",
+    grid: "quarter",
+    octaveOffset: 0,
+  });
+  return projectWithSteps([first, rest("melody-rest", 1, 2), second], {
+    globalTiming: globalTiming(120, meter(4, 4, [4])),
+    melodyTrack: Object.freeze({
+      ...base.melodyTrack,
+      instrument,
+      muted: false,
+      solo: false,
+      volume: 96,
+    }),
+  });
 }
 
 describe("US9 MIDI projection and deterministic SMF writer", () => {
@@ -309,11 +348,15 @@ interface ParsedFormatOneEvent {
     | "tempo"
     | "meter"
     | "program-change"
+    | "control-change"
     | "note-on"
     | "note-off"
     | "eot"
     | "other";
   readonly channel?: number;
+  readonly program?: number;
+  readonly controller?: number;
+  readonly value?: number;
   readonly pitch?: number;
   readonly velocity?: number;
   readonly text?: string;
@@ -459,8 +502,14 @@ function parseFormatOneSmf(bytes: Uint8Array): {
       const command = status & 0xf0;
       const channel = status & 0x0f;
       if (command === 0xc0) {
-        cursor.value += 1;
-        events.push({ tick, kind: "program-change", channel });
+        const program = bytes[cursor.value++]!;
+        events.push({ tick, kind: "program-change", channel, program });
+        continue;
+      }
+      if (command === 0xb0) {
+        const controller = bytes[cursor.value++]!;
+        const value = bytes[cursor.value++]!;
+        events.push({ tick, kind: "control-change", channel, controller, value });
         continue;
       }
       const pitch = bytes[cursor.value++]!;
@@ -660,5 +709,191 @@ describe("notation-friendly MIDI export", () => {
       expect.objectContaining({ kind: "eot", tick: projection.totalTicks }),
     ]);
     expect(Array.from(writeMidiFile(projection))).toEqual(Array.from(bytes));
+  });
+
+  it("writes Melody as a fourth track from contextual recipes with independent channel metadata", () => {
+    const project = makeMelodyExportProject();
+    const before = structuredClone(project);
+    const projection = projectProjectToMidi(project);
+    const bytes = writeMidiFile(projection);
+    const parsed = parseFormatOneSmf(bytes);
+
+    expect(parsed.format).toBe(1);
+    expect(parsed.division).toBe(MIDI_PPQ);
+    expect(parsed.tracks).toHaveLength(4);
+    expect(
+      parsed.tracks.map((track) => track.events.find((event) => event.kind === "track-name")?.text),
+    ).toEqual([
+      "CadenceFlow Conductor",
+      "CadenceFlow Melody",
+      "CadenceFlow Chords",
+      "CadenceFlow Bass",
+    ]);
+
+    const melodyEvents = parsed.tracks[1]!.events;
+    expect(melodyEvents).toContainEqual({
+      tick: 0,
+      kind: "instrument-name",
+      text: "Violin",
+    });
+    expect(melodyEvents).toContainEqual({ tick: 0, kind: "channel-prefix", channel: 2 });
+    expect(melodyEvents).toContainEqual({
+      tick: 0,
+      kind: "program-change",
+      channel: 2,
+      program: 40,
+    });
+    expect(melodyEvents).toContainEqual({
+      tick: 0,
+      kind: "control-change",
+      channel: 2,
+      controller: 7,
+      value: 96,
+    });
+    expect(
+      melodyEvents
+        .filter((event) => event.kind === "note-on")
+        .map((event) => [event.channel, event.pitch, event.velocity, event.tick]),
+    ).toEqual([
+      [2, 72, 92, 0],
+      [2, 76, 111, 120],
+      [2, 67, 80, 300],
+    ]);
+    expect(
+      melodyEvents
+        .filter((event) => event.kind === "note-off")
+        .map((event) => [event.channel, event.pitch, event.tick]),
+    ).toEqual([
+      [2, 72, 120],
+      [2, 76, 240],
+      [2, 67, 420],
+    ]);
+    expect(parsed.tracks.map((track) => track.events.at(-1))).toEqual([
+      expect.objectContaining({ kind: "eot", tick: 480 }),
+      expect.objectContaining({ kind: "eot", tick: 480 }),
+      expect.objectContaining({ kind: "eot", tick: 480 }),
+      expect.objectContaining({ kind: "eot", tick: 480 }),
+    ]);
+    expect(structuredClone(project)).toEqual(before);
+  });
+
+  it.each([
+    ["violin", 40],
+    ["cello", 42],
+    ["oboe", 68],
+    ["clarinet", 71],
+    ["flute", 73],
+    ["synth-lead", 80],
+  ] as const)("maps %s to GM program %s", (instrument, program) => {
+    const parsed = parseFormatOneSmf(
+      writeMidiFile(projectProjectToMidi(makeMelodyExportProject(instrument))),
+    );
+    expect(parsed.tracks[1]!.events).toContainEqual({
+      tick: 0,
+      kind: "program-change",
+      channel: 2,
+      program,
+    });
+  });
+
+  it("applies swing only to straight Melody subdivisions and keeps triplets straight", () => {
+    const base = makeMelodyExportProject();
+    const straight = projectProjectToMidi(base);
+    const swung = projectProjectToMidi(Object.freeze({ ...base, groove: groove("swing", 0.55) }));
+    const triplet = projectProjectToMidi(
+      Object.freeze({
+        ...base,
+        progression: Object.freeze({
+          steps: Object.freeze([
+            melodyChord(chord(base, "I", "triplet-melody", 1, 1), {
+              pattern: "up",
+              grid: "eighth-triplet",
+              octaveOffset: 0,
+            }),
+          ]),
+        }),
+        groove: groove("swing", 0.55),
+      }),
+    );
+
+    expect(straight.melody?.notes.map((note) => note.startTick)).toEqual([0, 120, 300]);
+    expect(swung.melody?.notes.map((note) => note.startTick)).toEqual([0, 142, 300]);
+    expect(triplet.melody?.notes.map((note) => note.startTick)).toEqual([0, 40, 80]);
+  });
+
+  it("orders repeated same-pitch note-off before the following note-on", () => {
+    const base = createDefaultProject("repeated-melody", "Repeated Melody");
+    const step = melodyChord(
+      chord(base, "I", "repeated-melody-step", 2, 1, {
+        voicingMode: "manual",
+        manualVoicing: [exactPitch(60, { step: "C", alter: 0 })],
+      }),
+      { pattern: "up", grid: "quarter", octaveOffset: 0 },
+    );
+    const parsed = parseFormatOneSmf(writeMidiFile(projectProjectToMidi(projectWithSteps([step]))));
+    expect(
+      parsed.tracks[1]!.events.filter(
+        (event) => event.tick === 120 && (event.kind === "note-off" || event.kind === "note-on"),
+      ).map((event) => event.kind),
+    ).toEqual(["note-off", "note-on"]);
+  });
+
+  it("keeps Mute, Solo, and Temporary Branch outside the exported Melody data", () => {
+    const base = makeMelodyExportProject();
+    const branchStep = melodyChord(chord(base, "ii", "branch-melody-only", 1, 1), {
+      pattern: "up",
+      grid: "quarter",
+      octaveOffset: 0,
+    });
+    const muted = Object.freeze({
+      ...base,
+      melodyTrack: Object.freeze({ ...base.melodyTrack, muted: true }),
+    });
+    const solo = Object.freeze({
+      ...base,
+      melodyTrack: Object.freeze({ ...base.melodyTrack, solo: true }),
+    });
+    const withBranch = Object.freeze({
+      ...muted,
+      temporaryBranch: Object.freeze({
+        id: "melody-branch",
+        originStepId: "melody-first",
+        originAtEnd: false,
+        rejoinStepId: "melody-second",
+        compositionIntent: "surprise" as const,
+        steps: Object.freeze([branchStep]),
+      }),
+    });
+
+    const original = projectProjectToMidi(base);
+    expect(projectProjectToMidi(muted)).toEqual(original);
+    expect(projectProjectToMidi(solo)).toEqual(original);
+    const branchProjection = projectProjectToMidi(withBranch);
+    expect(branchProjection).toEqual(original);
+    expect(branchProjection.melody?.notes.every((note) => !note.stepId.startsWith("branch-"))).toBe(
+      true,
+    );
+  });
+
+  it("pins no-Melody format-1 bytes and leaves legacy format-0 bytes unchanged", () => {
+    const base = createDefaultProject(
+      "pre-t174-golden",
+      "Pre T174 Golden",
+      "2026-09-10T00:00:00.000Z",
+    );
+    const step = createMatrixChordStep(base, "I", "golden-step");
+    const project = Object.freeze({
+      ...base,
+      progression: Object.freeze({ steps: Object.freeze([step]) }),
+    });
+    const projection = projectProjectToMidi(project);
+    expect(projection.melody).toBeUndefined();
+    const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString("hex");
+    expect(hex(writeMidiFile(projection))).toBe(
+      "4d546864000000060001000300784d54726b0000002d00ff0315436164656e6365466c6f7720436f6e647563746f7200ff51030927c000ff5804040218088360ff2f004d54726b0000005300ff0312436164656e6365466c6f772043686f72647300ff041441636f7573746963204772616e64205069616e6f00ff20010000c00000903c50019043500290405083298043000a80400001803c0029ff2f004d54726b0000004100ff0310436164656e6365466c6f77204261737300ff041441636f7573746963204772616e64205069616e6f00ff20010100c10000913050834881300018ff2f00",
+    );
+    expect(hex(writeStandardMidiFile(projection))).toBe(
+      "4d546864000000060000000100784d54726b0000003400ff51030927c000ff5804040218080090305000903c50019043500290405083298043000a80400001803c001180300018ff2f00",
+    );
   });
 });
