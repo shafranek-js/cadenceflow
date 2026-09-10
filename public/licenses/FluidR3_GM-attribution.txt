@@ -1,0 +1,19 @@
+FluidR3_GM sampled instruments
+================================
+
+CadenceFlow includes pre-rendered MP3 samples generated from FluidR3_GM.sf2 and distributed by the MIDI.js Soundfonts project:
+
+https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM
+
+The MIDI.js Soundfonts project identifies these FluidR3_GM assets as licensed under Creative Commons Attribution 3.0. A copy of the license is included in FluidR3_GM-CC-BY-3.0.txt.
+
+The application loads only the local copies committed with CadenceFlow. It does not fetch instrument samples from the project website at runtime.
+
+The committed local sample maps are:
+
+* violin-mp3.js
+* cello-mp3.js
+* oboe-mp3.js
+* clarinet-mp3.js
+* flute-mp3.js
+* lead_1_square-mp3.js

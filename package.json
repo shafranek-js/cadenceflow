@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:e2e:chromium": "playwright test --project=chromium",
     "verify:fixtures": "tsx scripts/verify-fixtures.ts",
+    "verify:melody-assets": "tsx scripts/verify-melody-assets.ts",
     "validate:musicxml": "tsx scripts/validate-musicxml.ts",
     "prepare:piano-bank": "tsx scripts/prepare-piano-bank.ts",
     "prepare:test-fixtures": "tsx scripts/prepare-piano-bank.ts --test-fixtures",
@@ -29,7 +30,7 @@
     "dexie": "^4.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "spessasynth_lib": "4.3.14",
+    "soundfont-player": "0.12.0",
     "vexflow": "^5.0.0"
   },
   "devDependencies": {

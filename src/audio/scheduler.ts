@@ -196,6 +196,7 @@ export class LookAheadScheduler {
         // Event spans across resume point: schedule remaining duration continuation
         const remainingDuration = evtEnd - offset;
         const remainingEvent: AudioNoteEvent = {
+          ...evt,
           pitch: evt.pitch,
           startSeconds: 0,
           durationSeconds: remainingDuration,
@@ -297,6 +298,7 @@ export class LookAheadScheduler {
         // Event is within the look-ahead window
         const relativeStart = Math.max(0, targetAudioTime - currentAudioTime);
         const scheduledEvent: AudioNoteEvent = {
+          ...event,
           pitch: event.pitch,
           startSeconds: relativeStart,
           durationSeconds: event.durationSeconds,

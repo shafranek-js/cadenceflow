@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "instrumentId": "fluidr3-gm-midi-js-samples",
+  "displayName": "FluidR3 GM sampled melody instruments",
+  "format": "MIDI.js MP3 sample maps",
+  "sourceRepository": "https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM",
+  "sourceRevision": "gh-pages",
+  "license": "CC-BY-3.0",
+  "licenseFile": "/licenses/FluidR3_GM-CC-BY-3.0.txt",
+  "attributionFile": "/licenses/FluidR3_GM-attribution.txt",
+  "assets": {
+    "violin-mp3.js": {
+      "size": 2870964,
+      "sha256": "3c169ac4c7781fe145e545e909993371188aa6bad617bc3a5f0692b7678995f8"
+    },
+    "cello-mp3.js": {
+      "size": 3005203,
+      "sha256": "fc72c9351e0dda586802f97a1b890e415640f54dc6cc397bd5dc32b078f6ce4c"
+    },
+    "oboe-mp3.js": {
+      "size": 2782850,
+      "sha256": "656bd2e0b6b9f7bb3b864d77bfc75a4efdbf79aff9bdbe860201b4e9c21c3d15"
+    },
+    "clarinet-mp3.js": {
+      "size": 2950454,
+      "sha256": "ef38d445ba297b459c1be464080ef37ddf48d9255ee3e517067ce1d11fab6eac"
+    },
+    "flute-mp3.js": {
+      "size": 2969583,
+      "sha256": "e2e35283876eec60b919beeb8bfa49f46f12dddf5b8c6025e7a45c5d2a24bda5"
+    },
+    "lead_1_square-mp3.js": {
+      "size": 3005211,
+      "sha256": "233a52d98f704399fcee0a41323a26e7e358d50a5a18fa81b59a4150b4fdda62"
+    }
+  }
+}

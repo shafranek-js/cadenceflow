@@ -9,6 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import type { Project } from "../../domain/project/project";
+import type { AudioProviderState } from "../../audio/contracts";
 import type { CardViewId, StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
@@ -72,6 +73,12 @@ export function ProgressionTrack({
   onRemoveMelodyRecipe,
   onMelodyTrackSettingsChange,
   activeMelodyEventKey,
+  melodyAudioState,
+  melodyAudioError,
+  onRetryMelodyAudio,
+  isMelodyPreviewPlaying,
+  onPlayMelodyPreview,
+  onStopMelodyPreview,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -94,7 +101,13 @@ export function ProgressionTrack({
   ) => void;
   readonly onRemoveMelodyRecipe?: (stepId: string) => void;
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
-  readonly activeMelodyEventKey?: string;
+  readonly activeMelodyEventKey?: string | null;
+  readonly melodyAudioState?: AudioProviderState;
+  readonly melodyAudioError?: string | null;
+  readonly onRetryMelodyAudio?: () => void;
+  readonly isMelodyPreviewPlaying?: boolean;
+  readonly onPlayMelodyPreview?: (project: Project) => void;
+  readonly onStopMelodyPreview?: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -529,6 +542,9 @@ export function ProgressionTrack({
         <MelodyTrackControls
           settings={project.melodyTrack}
           onChange={onMelodyTrackSettingsChange}
+          {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+          {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+          {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
         />
       ) : null}
       <div className="progression-step-cards" onClick={handleBackgroundClick}>
@@ -575,7 +591,7 @@ export function ProgressionTrack({
                   timeline={melodyTimeline}
                   measure={melodyTimeline.measures[measure.measureIndex]!}
                   {...(selectedStepId !== undefined ? { selectedStepId } : {})}
-                  {...(activeMelodyEventKey !== undefined ? { activeMelodyEventKey } : {})}
+                  {...(activeMelodyEventKey ? { activeMelodyEventKey } : {})}
                   onSelectStep={onSelectStep}
                 />
               ) : null}
@@ -658,6 +674,14 @@ export function ProgressionTrack({
                   onSetMelodyRecipe(step.id, recipe, instrument);
                   setMelodyEditorStepId(null);
                 }}
+                {...(onPlayMelodyPreview ? { onPlayPreview: onPlayMelodyPreview } : {})}
+                {...(onStopMelodyPreview ? { onStopPreview: onStopMelodyPreview } : {})}
+                {...(isMelodyPreviewPlaying !== undefined
+                  ? { isPreviewPlaying: isMelodyPreviewPlaying }
+                  : {})}
+                {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+                {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+                {...(onRetryMelodyAudio ? { onRetryAudio: onRetryMelodyAudio } : {})}
               />
             );
           })()

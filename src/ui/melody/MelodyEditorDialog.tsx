@@ -6,10 +6,12 @@ import type {
   MelodyOctaveOffset,
   MelodyPattern,
 } from "../../domain/melody/types";
+import type { AudioProviderState } from "../../audio/contracts";
 import type { ChordStep } from "../../domain/progression/step";
 import type { Project } from "../../domain/project/project";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import { useModalFocus } from "../common/useModalFocus";
+import { Icon } from "../common/Icon";
 import { MelodyStaffView } from "./MelodyStaffView";
 import { MELODY_GRID_LABELS, MELODY_INSTRUMENT_LABELS, MELODY_PATTERN_LABELS } from "./labels";
 
@@ -66,6 +68,12 @@ export interface MelodyEditorDialogProps {
   readonly restoreFocusRef?: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly onApply: (recipe: ChordMelodyRecipe, instrument: MelodyInstrument) => void;
+  readonly providerState?: AudioProviderState;
+  readonly providerError?: string | null;
+  readonly onRetryAudio?: () => void;
+  readonly isPreviewPlaying?: boolean;
+  readonly onPlayPreview?: (project: Project) => void;
+  readonly onStopPreview?: () => void;
 }
 
 export function MelodyEditorDialog({
@@ -76,6 +84,12 @@ export function MelodyEditorDialog({
   restoreFocusRef,
   onClose,
   onApply,
+  providerState = "idle",
+  providerError = null,
+  onRetryAudio,
+  isPreviewPlaying = false,
+  onPlayPreview,
+  onStopPreview,
 }: MelodyEditorDialogProps) {
   const patternRef = useRef<HTMLSelectElement | null>(null);
   const [recipe, setRecipe] = useState<ChordMelodyRecipe>(DEFAULT_MELODY_RECIPE);
@@ -94,6 +108,11 @@ export function MelodyEditorDialog({
     setRecipe(step.melody ? { ...step.melody } : { ...DEFAULT_MELODY_RECIPE });
     setInstrument(project.melodyTrack.instrument);
   }, [isOpen, project.melodyTrack.instrument, step]);
+
+  useEffect(() => {
+    onStopPreview?.();
+    return () => onStopPreview?.();
+  }, [instrument, isOpen, onStopPreview, recipe, step.id]);
 
   const preview = useMemo(() => {
     if (!isOpen) return { kind: "closed" as const };
@@ -237,6 +256,41 @@ export function MelodyEditorDialog({
               <div className="melody-editor-preview-heading">
                 <strong>Notation preview</strong>
                 <span>Concert pitch · Piano bass excluded</span>
+              </div>
+              <div className="melody-editor-audio-controls">
+                <button
+                  type="button"
+                  className="secondary-btn melody-editor-preview-icon-btn"
+                  data-testid="melody-editor-preview-audio"
+                  aria-label={isPreviewPlaying ? "Stop melody preview" : "Play melody preview"}
+                  title={isPreviewPlaying ? "Stop melody preview" : "Play melody preview"}
+                  disabled={
+                    preview.kind !== "ready" ||
+                    providerState === "loading" ||
+                    providerState === "error" ||
+                    !onPlayPreview
+                  }
+                  onClick={() => {
+                    if (isPreviewPlaying) onStopPreview?.();
+                    else if (preview.kind === "ready") onPlayPreview?.(preview.project);
+                  }}
+                >
+                  <Icon name={isPreviewPlaying ? "stop" : "play"} />
+                </button>
+                <span role={providerError ? "alert" : "status"}>
+                  {providerError
+                    ? `Melody audio error: ${providerError}`
+                    : providerState === "loading"
+                      ? "Loading melody audio…"
+                      : providerState === "ready"
+                        ? "Melody audio ready"
+                        : "Melody audio unavailable"}
+                </span>
+                {providerError && onRetryAudio ? (
+                  <button type="button" className="melody-track-retry" onClick={onRetryAudio}>
+                    Retry
+                  </button>
+                ) : null}
               </div>
               {preview.kind === "error" ? (
                 <p className="melody-editor-error" role="alert" data-testid="melody-editor-error">

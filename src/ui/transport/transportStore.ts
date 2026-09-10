@@ -6,6 +6,7 @@ export interface TransportState {
   readonly sessionId: string | null;
   readonly startingStepIndex: number;
   readonly currentStepIndex: number | null;
+  readonly activeMelodyEventKey: string | null;
   readonly pausedPositionSeconds: number | null;
   readonly loopAwareResetTarget: number;
   readonly playMode: TransportPlayMode;
@@ -39,6 +40,7 @@ export class TransportStore {
       sessionId: null,
       startingStepIndex: 0,
       currentStepIndex: null,
+      activeMelodyEventKey: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: 0,
       playMode: "from-start",
@@ -84,6 +86,7 @@ export class TransportStore {
       sessionId,
       startingStepIndex: startingIndex,
       currentStepIndex: startingIndex,
+      activeMelodyEventKey: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: startingIndex,
       playMode: "from-start",
@@ -134,6 +137,7 @@ export class TransportStore {
       sessionId,
       startingStepIndex: targetIndex,
       currentStepIndex: targetIndex,
+      activeMelodyEventKey: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: targetIndex,
       playMode: "from-here",
@@ -154,6 +158,7 @@ export class TransportStore {
     this.#state = Object.freeze({
       ...this.#state,
       status: "paused",
+      activeMelodyEventKey: null,
       pausedPositionSeconds:
         pausedPositionSeconds !== undefined
           ? pausedPositionSeconds
@@ -173,6 +178,7 @@ export class TransportStore {
     this.#state = Object.freeze({
       ...this.#state,
       status: "playing",
+      activeMelodyEventKey: null,
       error: null,
     });
     this.emit();
@@ -184,7 +190,11 @@ export class TransportStore {
    * Repeated stop is idempotent.
    */
   stop(): void {
-    if (this.#state.status === "stopped" && this.#state.currentStepIndex === null) {
+    if (
+      this.#state.status === "stopped" &&
+      this.#state.currentStepIndex === null &&
+      this.#state.activeMelodyEventKey === null
+    ) {
       return;
     }
 
@@ -193,6 +203,7 @@ export class TransportStore {
       sessionId: null,
       startingStepIndex: this.#state.loopAwareResetTarget,
       currentStepIndex: null,
+      activeMelodyEventKey: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",
@@ -231,6 +242,17 @@ export class TransportStore {
     this.emit();
   }
 
+  setActiveMelodyEventKey(key: string | null, sessionId?: string): void {
+    if (sessionId && sessionId !== this.#state.sessionId) return;
+    if (this.#state.status !== "playing" && key !== null) return;
+    if (this.#state.activeMelodyEventKey === key) return;
+    this.#state = Object.freeze({
+      ...this.#state,
+      activeMelodyEventKey: key,
+    });
+    this.emit();
+  }
+
   setLoopAwareResetTarget(target: number): void {
     this.#state = Object.freeze({
       ...this.#state,
@@ -262,6 +284,7 @@ export class TransportStore {
       sessionId: null,
       startingStepIndex: this.#state.loopAwareResetTarget,
       currentStepIndex: null,
+      activeMelodyEventKey: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",

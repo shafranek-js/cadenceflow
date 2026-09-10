@@ -43,6 +43,8 @@ export interface MelodyEvent {
   readonly sourceStepId: string;
   readonly index: number;
   readonly pitch: ExactPitch;
+  /** MIDI identity of the contextual upper pitch before octave offset. */
+  readonly sourcePitchMidi: number;
   readonly startOffsetBeats: Rational;
   readonly durationBeats: Rational;
 }

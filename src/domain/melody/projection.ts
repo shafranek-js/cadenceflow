@@ -88,10 +88,8 @@ function offsetPitches(
 export function realizeChordMelody(input: MelodyProjectionInput): MelodyPhrase {
   validateInput(input);
 
-  const patternCycle = offsetPitches(
-    orderMelodyPitches(input.upperPitches, input.recipe.pattern),
-    input.recipe.octaveOffset,
-  );
+  const sourcePatternCycle = orderMelodyPitches(input.upperPitches, input.recipe.pattern);
+  const patternCycle = offsetPitches(sourcePatternCycle, input.recipe.octaveOffset);
   const gridDuration = melodyGridDuration(input.recipe.grid);
   const events: MelodyEvent[] = [];
   let startOffsetBeats = ZERO;
@@ -102,11 +100,13 @@ export function realizeChordMelody(input: MelodyProjectionInput): MelodyPhrase {
     const durationBeats =
       compareRational(remainingBeats, gridDuration) < 0 ? remainingBeats : gridDuration;
     const pitch = patternCycle[index % patternCycle.length]!;
+    const sourcePitch = sourcePatternCycle[index % sourcePatternCycle.length]!;
     events.push(
       Object.freeze({
         sourceStepId: input.sourceStepId,
         index,
         pitch,
+        sourcePitchMidi: sourcePitch.midiNumber,
         startOffsetBeats,
         durationBeats,
       }),

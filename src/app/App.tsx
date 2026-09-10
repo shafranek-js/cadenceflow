@@ -59,6 +59,7 @@ import { RestStepInspector } from "../ui/inspector/RestStepInspector";
 import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
+import { MelodySoundFontProvider } from "../audio/soundfont/melodyProvider";
 import type { AudioProviderState } from "../audio/contracts";
 import { realizeStepAudioEvents } from "../audio/eventRealizer";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
@@ -79,6 +80,7 @@ import {
   resolvePreviousHarmonicContext,
 } from "../ui/matrix/previewRealization";
 import { MetronomeClickProvider } from "../audio/metronome";
+import { realizeProgressionMelodyPerformance } from "../audio/melodyPerformance";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
@@ -172,7 +174,7 @@ import {
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
 } from "./commands/presentationCommands";
-import type { PresentationMode, ThemeMode } from "../domain/project/project";
+import type { PresentationMode, ThemeMode, Project } from "../domain/project/project";
 import type {
   ChordMelodyRecipe,
   MelodyInstrument,
@@ -208,6 +210,10 @@ export function App() {
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
   const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
+  const sharedAudioContextRef = useRef<AudioContext | null>(null);
+  const [melodyAudioState, setMelodyAudioState] = useState<AudioProviderState>("idle");
+  const [melodyAudioError, setMelodyAudioError] = useState<string | null>(null);
+  const melodyProviderRef = useRef<MelodySoundFontProvider | null>(null);
   const [presetsPanelOpen, setPresetsPanelOpen] = useState(false);
   const [savePresetDialogOpen, setSavePresetDialogOpen] = useState(false);
   const [applyDialogPreset, setApplyDialogPreset] = useState<FunctionalPreset | null>(null);
@@ -219,6 +225,10 @@ export function App() {
   const [countInEnabled, setCountInEnabled] = useState(false);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
   const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
+  const melodyPreviewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
+  const melodyPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const melodyPreviewRequestRef = useRef(0);
+  const [isMelodyPreviewPlaying, setIsMelodyPreviewPlaying] = useState(false);
   const [projectReady, setProjectReady] = useState(false);
   const [projectBusy, setProjectBusy] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -232,6 +242,28 @@ export function App() {
   const persistedOpenProjectTabsRef = useRef<OpenProjectTabsState | null | undefined>(undefined);
   const openTabsUserChangedRef = useRef(false);
   const openTabsUpdatedAtRef = useRef(0);
+  const hasMelodyRecipe = useMemo(
+    () => project.progression.steps.some((step) => step.kind === "chord" && step.melody),
+    [project.progression.steps],
+  );
+
+  const ensureMelodyProvider = useCallback(() => {
+    if (!melodyProviderRef.current) {
+      const provider = new MelodySoundFontProvider({
+        ...(sharedAudioContextRef.current ? { audioContext: sharedAudioContextRef.current } : {}),
+        instrument: project.melodyTrack.instrument,
+        volume: project.melodyTrack.volume,
+        onStateChange: (state) => {
+          setMelodyAudioState(state);
+          if (state !== "error") setMelodyAudioError(null);
+        },
+      });
+      melodyProviderRef.current = provider;
+      setMelodyAudioState(provider.state);
+    }
+    melodyProviderRef.current.setTrackSettings(project.melodyTrack);
+    return melodyProviderRef.current;
+  }, [project.melodyTrack.instrument, project.melodyTrack.volume]);
 
   useEffect(() => {
     try {
@@ -247,6 +279,12 @@ export function App() {
   const stopProjectRuntime = useCallback(() => {
     playbackControllerRef.current?.stop();
     previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
+    if (melodyPreviewStopTimerRef.current !== null) {
+      clearTimeout(melodyPreviewStopTimerRef.current);
+      melodyPreviewStopTimerRef.current = null;
+    }
+    setIsMelodyPreviewPlaying(false);
     transportStore.stop();
     setLoopState(INITIAL_LOOP_STATE);
     setPendingSwitch(null);
@@ -376,11 +414,20 @@ export function App() {
     return () => {
       playbackControllerRef.current?.stop();
       previewAuditionControllerRef.current?.dispose();
+      melodyPreviewAuditionControllerRef.current?.dispose();
+      if (melodyPreviewStopTimerRef.current !== null) {
+        clearTimeout(melodyPreviewStopTimerRef.current);
+      }
+      melodyProviderRef.current?.stop();
+      void melodyProviderRef.current?.dispose();
     };
   }, []);
 
   useEffect(() => {
+    const sharedAudioContext = typeof AudioContext !== "undefined" ? new AudioContext() : undefined;
+    sharedAudioContextRef.current = sharedAudioContext ?? null;
     const provider = new HqSamplePianoProvider({
+      ...(sharedAudioContext ? { audioContext: sharedAudioContext } : {}),
       onStateChange: (s) => setAudioState(s),
     });
     audioProviderRef.current = provider;
@@ -388,7 +435,33 @@ export function App() {
     provider.prepare().catch(() => {
       // Handled and reflected in provider state
     });
+    return () => {
+      provider.stop();
+      void provider.dispose();
+      if (sharedAudioContextRef.current === sharedAudioContext) {
+        sharedAudioContextRef.current = null;
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (!hasMelodyRecipe) return;
+    const provider = ensureMelodyProvider();
+    void provider.prepare().catch((error) => {
+      setMelodyAudioError(error instanceof Error ? error.message : String(error));
+    });
+  }, [ensureMelodyProvider, hasMelodyRecipe, project.melodyTrack.instrument]);
+
+  useEffect(() => {
+    const provider = melodyProviderRef.current;
+    if (provider) provider.setTrackSettings(project.melodyTrack);
+  }, [project.melodyTrack]);
+
+  useEffect(() => {
+    if (!hasMelodyRecipe) return;
+    playbackControllerRef.current?.stop();
+    playbackControllerRef.current = null;
+  }, [hasMelodyRecipe]);
 
   useEffect(() => {
     let cancelled = false;
@@ -868,13 +941,18 @@ export function App() {
 
   const getPlaybackController = () => {
     if (!audioProviderRef.current) return null;
+    const melodyProvider = hasMelodyRecipe ? ensureMelodyProvider() : null;
     if (!playbackControllerRef.current) {
       const clock = audioProviderRef.current.clock;
       const metronomeProvider = new MetronomeClickProvider(audioProviderRef.current.audioCtx);
       playbackControllerRef.current = new PlaybackController({
         clock,
         pianoProvider: audioProviderRef.current,
+        ...(melodyProvider ? { melodyProvider } : {}),
         metronomeProvider,
+        onMelodyError: (error) => {
+          setMelodyAudioError(error instanceof Error ? error.message : String(error));
+        },
         transportStore,
       });
     }
@@ -892,6 +970,79 @@ export function App() {
     }
     return previewAuditionControllerRef.current;
   };
+
+  const getMelodyPreviewAuditionController = useCallback(() => {
+    const provider = ensureMelodyProvider();
+    if (!melodyPreviewAuditionControllerRef.current) {
+      melodyPreviewAuditionControllerRef.current = new PreviewAuditionController({
+        provider,
+        clock: provider.clock,
+      });
+    }
+    return melodyPreviewAuditionControllerRef.current;
+  }, [ensureMelodyProvider]);
+
+  const stopMelodyPreview = useCallback(() => {
+    melodyPreviewRequestRef.current += 1;
+    melodyPreviewAuditionControllerRef.current?.stop();
+    if (melodyPreviewStopTimerRef.current !== null) {
+      clearTimeout(melodyPreviewStopTimerRef.current);
+      melodyPreviewStopTimerRef.current = null;
+    }
+    setIsMelodyPreviewPlaying(false);
+  }, []);
+
+  const playMelodyPreview = useCallback(
+    async (previewProject: Project) => {
+      const provider = ensureMelodyProvider();
+      const requestId = ++melodyPreviewRequestRef.current;
+      try {
+        await provider.preparePreview(
+          previewProject.melodyTrack.instrument,
+          previewProject.melodyTrack.volume,
+        );
+      } catch (error) {
+        if (melodyPreviewRequestRef.current === requestId) {
+          setMelodyAudioError(error instanceof Error ? error.message : String(error));
+        }
+        return;
+      }
+      if (melodyPreviewRequestRef.current !== requestId) return;
+      setMelodyAudioError(null);
+      const mode = getHarmonicModule(previewProject.activeModule).mode;
+      const projection = realizeProgressionMelodyPerformance({
+        steps: previewProject.progression.steps,
+        tonic: previewProject.tonic,
+        context: {
+          tonic: previewProject.tonic,
+          mode,
+          moduleId: previewProject.activeModule,
+          spellingContext: { tonic: previewProject.tonic, mode },
+        },
+        tempoBpm: previewProject.globalTiming.tempoBpm,
+        groove: { feel: "straight", swingAmount: 0 },
+        melodyTrack: previewProject.melodyTrack,
+      });
+      const playback = getMelodyPreviewAuditionController()?.audition(projection.events);
+      if (!playback) return;
+      setIsMelodyPreviewPlaying(true);
+      if (melodyPreviewStopTimerRef.current !== null) {
+        clearTimeout(melodyPreviewStopTimerRef.current);
+      }
+      const durationSeconds = projection.events.reduce(
+        (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
+        0,
+      );
+      melodyPreviewStopTimerRef.current = setTimeout(
+        () => {
+          melodyPreviewStopTimerRef.current = null;
+          setIsMelodyPreviewPlaying(false);
+        },
+        Math.max(1, Math.ceil(durationSeconds * 1000)),
+      );
+    },
+    [ensureMelodyProvider, getMelodyPreviewAuditionController],
+  );
 
   const handlePlay = () => {
     const controller = getPlaybackController();
@@ -914,6 +1065,7 @@ export function App() {
       loopState,
       metronomeEnabled,
       countInEnabled,
+      melodyTrack: project.melodyTrack,
     });
   };
 
@@ -938,6 +1090,7 @@ export function App() {
       loopState,
       metronomeEnabled,
       countInEnabled,
+      melodyTrack: project.melodyTrack,
     });
   };
 
@@ -1401,6 +1554,18 @@ export function App() {
           <ProgressionTrack
             project={project}
             currentPlayingStepIndex={transportState.currentStepIndex}
+            activeMelodyEventKey={transportState.activeMelodyEventKey}
+            melodyAudioState={melodyAudioState}
+            melodyAudioError={melodyAudioError}
+            onRetryMelodyAudio={() => {
+              const provider = ensureMelodyProvider();
+              void provider.prepare().catch((error) => {
+                setMelodyAudioError(error instanceof Error ? error.message : String(error));
+              });
+            }}
+            isMelodyPreviewPlaying={isMelodyPreviewPlaying}
+            onPlayMelodyPreview={playMelodyPreview}
+            onStopMelodyPreview={stopMelodyPreview}
             loopState={loopState}
             onSelectStep={selectProgressionStep}
             onClearSelection={() => setProgressionSelection()}

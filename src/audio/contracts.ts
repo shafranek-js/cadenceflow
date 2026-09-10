@@ -1,5 +1,7 @@
+import type { Rational } from "../domain/timing/rational";
+
 export type AudioProviderState = "idle" | "loading" | "ready" | "fallback" | "error";
-export type AudioChannelRole = "upper" | "bass" | "metronome";
+export type AudioChannelRole = "upper" | "bass" | "melody" | "metronome";
 
 export interface AudioNoteEvent {
   readonly pitch: number;
@@ -7,6 +9,13 @@ export interface AudioNoteEvent {
   readonly durationSeconds: number;
   readonly velocity: number;
   readonly channelRole: AudioChannelRole;
+  /** Stable identity retained for derived live events and exact UI highlighting. */
+  readonly eventKey?: string | undefined;
+  readonly sourceStepId?: string | undefined;
+  readonly eventIndex?: number | undefined;
+  readonly stepIndex?: number | undefined;
+  readonly startBeats?: Rational | undefined;
+  readonly durationBeats?: Rational | undefined;
 }
 
 export interface AudioClock {

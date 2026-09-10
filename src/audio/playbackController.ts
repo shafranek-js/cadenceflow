@@ -1,12 +1,20 @@
-import type { AudioClock, AudioNoteEvent, InstrumentAudioProvider } from "./contracts";
+import type {
+  AudioClock,
+  AudioNoteEvent,
+  InstrumentAudioProvider,
+  ScheduledPlayback,
+} from "./contracts";
 import { LookAheadScheduler } from "./scheduler";
 import { realizeProgressionAudioEvents } from "./eventRealizer";
+import { projectProgressionStepTimings } from "./eventRealizer";
+import { realizeProgressionMelodyPerformance } from "./melodyPerformance";
 import { generateCountInEvents, generateMetronomeBarEvents } from "./metronome";
 import type { Meter } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ProgressionStep } from "../domain/progression/step";
+import type { MelodyTrackSettings } from "../domain/melody/types";
 import type { TransportStore } from "../ui/transport/transportStore";
 import type { LoopState } from "../ui/transport/loopState";
 import { resolveLoopRegion } from "../ui/transport/loopState";
@@ -22,7 +30,9 @@ import {
 export interface PlaybackControllerOptions {
   readonly clock: AudioClock;
   readonly pianoProvider: InstrumentAudioProvider;
+  readonly melodyProvider?: InstrumentAudioProvider | undefined;
   readonly metronomeProvider?: InstrumentAudioProvider | undefined;
+  readonly onMelodyError?: ((error: unknown) => void) | undefined;
   readonly transportStore: TransportStore;
   readonly lookAheadHorizonSeconds?: number | undefined;
   readonly tickIntervalMs?: number | undefined;
@@ -39,6 +49,7 @@ export interface PlaybackSessionParams {
   readonly metronomeEnabled?: boolean | undefined;
   readonly countInEnabled?: boolean | undefined;
   readonly startingStepIndex?: number | undefined;
+  readonly melodyTrack?: MelodyTrackSettings | undefined;
 }
 
 interface StepTimeBoundary {
@@ -47,10 +58,18 @@ interface StepTimeBoundary {
   readonly endSeconds: number;
 }
 
+interface MelodyTimeBoundary {
+  readonly eventKey: string;
+  readonly startSeconds: number;
+  readonly endSeconds: number;
+}
+
 export class PlaybackController {
   private readonly clock: AudioClock;
   private readonly pianoProvider: InstrumentAudioProvider;
+  private readonly melodyProvider?: InstrumentAudioProvider | undefined;
   private readonly metronomeProvider?: InstrumentAudioProvider | undefined;
+  private readonly onMelodyError?: ((error: unknown) => void) | undefined;
   private readonly transportStore: TransportStore;
 
   private scheduler: LookAheadScheduler | null = null;
@@ -58,6 +77,8 @@ export class PlaybackController {
   private currentParams: PlaybackSessionParams | null = null;
   private stepBoundaries: readonly StepTimeBoundary[] = [];
   private stepTrackingTimer: ReturnType<typeof setInterval> | null = null;
+  private melodyTimeBoundaries: readonly MelodyTimeBoundary[] = [];
+  private melodyAvailableForSession = false;
 
   private loopIteration = 0;
   private loopBaseAudioTime = 0;
@@ -71,7 +92,9 @@ export class PlaybackController {
   constructor(options: PlaybackControllerOptions) {
     this.clock = options.clock;
     this.pianoProvider = options.pianoProvider;
+    this.melodyProvider = options.melodyProvider;
     this.metronomeProvider = options.metronomeProvider;
+    this.onMelodyError = options.onMelodyError;
     this.transportStore = options.transportStore;
     this.lookAheadHorizonSeconds = options.lookAheadHorizonSeconds;
     this.tickIntervalMs = options.tickIntervalMs;
@@ -206,6 +229,8 @@ export class PlaybackController {
     this.currentParams = null;
     this.loopIteration = 0;
     this.loopBaseAudioTime = 0;
+    this.melodyTimeBoundaries = [];
+    this.melodyAvailableForSession = false;
   }
 
   private launchSessionPlayback(startingStepIndex: number, isLoopIteration: boolean): boolean {
@@ -247,6 +272,7 @@ export class PlaybackController {
     }
 
     const secondsPerBeat = 60 / tempoBpm;
+    const projectedTimings = projectProgressionStepTimings(steps, groove);
 
     const authoredStartBeats = steps
       .slice(0, sliceStart)
@@ -286,29 +312,66 @@ export class PlaybackController {
       this.loopBaseAudioTime = this.clock.now() + countInDurationSeconds;
     }
 
-    // 2. Realize progression steps into events and step boundaries
+    // 2. Realize the complete progression once, then filter/rebase the active
+    // range. This preserves preceding voice-leading context for loops and
+    // Play From Here without sounding prior steps.
+    const sliceBaseBeats =
+      projectedTimings.timings.get(sliceStart)?.startBeats ?? authoredStartBeats;
+    const sliceBaseSeconds = rationalToNumber(sliceBaseBeats) * secondsPerBeat;
+    const fullPianoEvents = realizeProgressionAudioEvents({
+      steps,
+      tonic,
+      context,
+      tempoBpm,
+      groove,
+    });
+    const activePianoEvents = fullPianoEvents
+      .filter(
+        (event) =>
+          event.stepIndex !== undefined &&
+          event.stepIndex >= sliceStart &&
+          event.stepIndex < sliceEnd,
+      )
+      .map((event) =>
+        Object.freeze({
+          ...event,
+          startSeconds: countInDurationSeconds + event.startSeconds - sliceBaseSeconds,
+        }),
+      );
+    const melodyProjection = params.melodyTrack
+      ? realizeProgressionMelodyPerformance({
+          steps,
+          tonic,
+          context,
+          tempoBpm,
+          groove,
+          melodyTrack: params.melodyTrack,
+        })
+      : null;
+    const activeMelodyEvents =
+      melodyProjection?.events
+        .filter((event) => event.stepIndex >= sliceStart && event.stepIndex < sliceEnd)
+        .map((event) =>
+          Object.freeze({
+            ...event,
+            startSeconds: countInDurationSeconds + event.startSeconds - sliceBaseSeconds,
+          }),
+        ) ?? [];
     const audioEvents: AudioNoteEvent[] = [
-      ...realizeProgressionAudioEvents({
-        steps: activeSteps,
-        tonic,
-        context,
-        tempoBpm,
-        groove,
-        initialStartSeconds: countInDurationSeconds,
-      }),
+      ...(params.melodyTrack?.solo ? [] : activePianoEvents),
+      ...activeMelodyEvents,
     ];
     const boundaries: StepTimeBoundary[] = [];
-
-    let currentSecondsAccumulator = countInDurationSeconds;
 
     for (let i = 0; i < activeSteps.length; i++) {
       const step = activeSteps[i]!;
       const actualStepIndex = sliceStart + i;
-      const stepDurationBeatsNum = step.duration.beats.numerator;
-      const stepDurationBeatsDen = step.duration.beats.denominator;
-      const stepDurationSeconds = (stepDurationBeatsNum / stepDurationBeatsDen) * secondsPerBeat;
-
-      const stepStartSeconds = currentSecondsAccumulator;
+      const timing = projectedTimings.timings.get(actualStepIndex);
+      if (!timing) throw new Error(`missing projected timing for step ${step.id}`);
+      const stepStartSeconds =
+        countInDurationSeconds +
+        rationalToNumber(subtractRational(timing.startBeats, sliceBaseBeats)) * secondsPerBeat;
+      const stepDurationSeconds = rationalToNumber(timing.durationBeats) * secondsPerBeat;
       const stepEndSeconds = stepStartSeconds + stepDurationSeconds;
 
       boundaries.push({
@@ -316,9 +379,17 @@ export class PlaybackController {
         startSeconds: stepStartSeconds,
         endSeconds: stepEndSeconds,
       });
-
-      currentSecondsAccumulator = stepEndSeconds;
     }
+
+    this.melodyTimeBoundaries = activeMelodyEvents.map((event) => ({
+      eventKey: event.eventKey,
+      startSeconds: event.startSeconds,
+      endSeconds: event.startSeconds + event.durationSeconds,
+    }));
+    this.melodyAvailableForSession =
+      activeMelodyEvents.length > 0 &&
+      Boolean(this.melodyProvider) &&
+      (this.melodyProvider?.state === "ready" || this.melodyProvider?.state === "fallback");
 
     // 3. Add metronome clicks during playback if enabled
     if (metronomeEnabled) {
@@ -393,9 +464,10 @@ export class PlaybackController {
 
   private createCompositeProvider(): InstrumentAudioProvider {
     const piano = this.pianoProvider;
+    const melody = this.melodyProvider;
     const metronome = this.metronomeProvider;
 
-    if (!metronome) {
+    if (!metronome && !melody) {
       return piano;
     }
 
@@ -403,18 +475,51 @@ export class PlaybackController {
       id: "composite-playback-provider",
       state: piano.state,
       prepare: async () => {
-        await Promise.all([piano.prepare?.(), metronome.prepare?.()]);
+        await Promise.all([piano.prepare?.(), metronome?.prepare?.()]);
       },
       schedule: (events, clock) => {
-        const pianoEvents = events.filter((e) => e.channelRole !== "metronome");
+        const pianoEvents = events.filter(
+          (e) => e.channelRole === "upper" || e.channelRole === "bass",
+        );
+        const melodyEvents = events.filter((e) => e.channelRole === "melody");
         const metronomeEvents = events.filter((e) => e.channelRole === "metronome");
 
-        const handles: Array<{ cancel: () => void }> = [];
+        const handles: ScheduledPlayback[] = [];
+        const readyPromises: Promise<void>[] = [];
         if (pianoEvents.length > 0) {
-          handles.push(piano.schedule(pianoEvents, clock));
+          const playback = piano.schedule(pianoEvents, clock);
+          handles.push(playback);
+          if (playback.ready) readyPromises.push(playback.ready);
+        }
+        if (
+          melody &&
+          melodyEvents.length > 0 &&
+          (melody.state === "ready" || melody.state === "fallback")
+        ) {
+          try {
+            const playback = melody.schedule(melodyEvents, clock);
+            handles.push(playback);
+            this.melodyAvailableForSession = true;
+            if (playback.ready) {
+              readyPromises.push(
+                playback.ready.catch((error) => {
+                  this.melodyAvailableForSession = false;
+                  this.onMelodyError?.(error);
+                }),
+              );
+            }
+          } catch (error) {
+            this.melodyAvailableForSession = false;
+            this.transportStore.setActiveMelodyEventKey(null, this.activeSessionId ?? undefined);
+            this.onMelodyError?.(error);
+          }
         }
         if (metronomeEvents.length > 0) {
-          handles.push(metronome.schedule(metronomeEvents, clock));
+          if (metronome) {
+            const playback = metronome.schedule(metronomeEvents, clock);
+            handles.push(playback);
+            if (playback.ready) readyPromises.push(playback.ready);
+          }
         }
 
         return {
@@ -422,14 +527,18 @@ export class PlaybackController {
           cancel: () => {
             for (const h of handles) h.cancel();
           },
+          ...(readyPromises.length > 0
+            ? { ready: Promise.all(readyPromises).then(() => undefined) }
+            : {}),
         };
       },
       stop: (scope) => {
         piano.stop(scope);
-        metronome.stop(scope);
+        melody?.stop(scope);
+        metronome?.stop(scope);
       },
       dispose: async () => {
-        await Promise.all([piano.dispose?.(), metronome.dispose?.()]);
+        await Promise.all([piano.dispose?.(), melody?.dispose?.(), metronome?.dispose?.()]);
       },
     };
   }
@@ -458,6 +567,17 @@ export class PlaybackController {
       }
 
       this.transportStore.setCurrentStepIndex(matchingStepIndex, sessionId);
+
+      let activeMelodyEventKey: string | null = null;
+      if (this.melodyAvailableForSession) {
+        const melodyEvent = this.melodyTimeBoundaries.find(
+          (boundary) =>
+            currentMusicalSeconds >= boundary.startSeconds &&
+            currentMusicalSeconds < boundary.endSeconds,
+        );
+        activeMelodyEventKey = melodyEvent?.eventKey ?? null;
+      }
+      this.transportStore.setActiveMelodyEventKey(activeMelodyEventKey, sessionId);
     }, 30);
   }
 
@@ -466,5 +586,6 @@ export class PlaybackController {
       clearInterval(this.stepTrackingTimer);
       this.stepTrackingTimer = null;
     }
+    this.transportStore.setActiveMelodyEventKey(null, this.activeSessionId ?? undefined);
   }
 }

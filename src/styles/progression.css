@@ -343,6 +343,24 @@
   flex: 0 0 auto;
 }
 
+.melody-track-audio-status,
+.melody-editor-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.melody-track-retry {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .melody-track-instrument select {
   max-width: 150px;
 }
@@ -474,6 +492,19 @@
 .melody-editor-preview-heading span {
   color: #5f6874;
   font-size: 0.68rem;
+}
+
+.melody-editor-audio-controls {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.melody-editor-preview-icon-btn {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
 }
 
 .melody-editor-preview-measures {

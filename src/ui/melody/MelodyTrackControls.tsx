@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { MelodyInstrument, MelodyTrackSettings } from "../../domain/melody/types";
 import { MELODY_INSTRUMENTS } from "../../domain/melody/types";
+import type { AudioProviderState } from "../../audio/contracts";
 import { melodyInstrumentLabel } from "./labels";
 
 export function MelodyTrackControls({
   settings,
   onChange,
+  providerState = "idle",
+  providerError = null,
+  onRetry,
 }: {
   readonly settings: MelodyTrackSettings;
   readonly onChange: (patch: Partial<MelodyTrackSettings>) => void;
+  readonly providerState?: AudioProviderState;
+  readonly providerError?: string | null;
+  readonly onRetry?: () => void;
 }) {
   const [volumeDraft, setVolumeDraft] = useState(settings.volume);
   const volumeDraftRef = useRef(settings.volume);
@@ -43,6 +50,20 @@ export function MelodyTrackControls({
       <div className="melody-track-title">
         <strong>Melody Track</strong>
         <span>Derived notation</span>
+      </div>
+      <div className="melody-track-audio-status" role={providerError ? "alert" : "status"}>
+        {providerError
+          ? `Melody audio error: ${providerError}`
+          : providerState === "loading"
+            ? "Melody audio loading…"
+            : providerState === "ready"
+              ? "Melody audio ready"
+              : "Melody audio unavailable"}
+        {providerError && onRetry ? (
+          <button type="button" className="melody-track-retry" onClick={onRetry}>
+            Retry
+          </button>
+        ) : null}
       </div>
       <label className="melody-track-instrument">
         <span>Instrument</span>

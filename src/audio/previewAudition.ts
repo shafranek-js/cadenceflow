@@ -10,6 +10,10 @@ export interface PreviewAuditionControllerOptions {
   readonly clock?: AudioClock;
 }
 
+interface PreviewCapableProvider extends InstrumentAudioProvider {
+  schedulePreview?(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback;
+}
+
 /**
  * Controller managing transient chord-preview audition playback scope.
  *
@@ -63,7 +67,10 @@ export class PreviewAuditionController {
     }
 
     try {
-      this.activePlayback = this.provider.schedule(events, this.clock);
+      const previewProvider = this.provider as PreviewCapableProvider;
+      this.activePlayback = previewProvider.schedulePreview
+        ? previewProvider.schedulePreview(events, this.clock)
+        : this.provider.schedule(events, this.clock);
       return this.activePlayback;
     } catch {
       // Audio scheduling failure must not corrupt application state
