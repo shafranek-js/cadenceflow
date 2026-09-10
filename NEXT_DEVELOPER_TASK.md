@@ -1,168 +1,155 @@
-# Next Developer Assignment — CadenceFlow US12, Batch A
+# Next Developer Assignment — CadenceFlow US12, Batch B
 
-**Assignment:** T166–T167 only
+**Assignment:** T168–T169 only
 
-**Do not implement T168+ in this batch.**
+**Do not implement T170+ in this batch.**
 
-**Goal:** закрепить требования US12 и реализовать чистое детерминированное ядро генерации мелодии без
-изменения сохраняемой Project schema, UI, audio, playback или export.
+**Goal:** сохранить Melody recipe/track settings в Project schema v2 и добавить единственный undoable
+command path, на который позже сможет опираться UI. Не реализовывать context menu, Staff, SoundFont,
+playback, MIDI или MusicXML.
 
-Полный утверждённый план:
+Утверждённый план:
 `specs/001-cadenceflow-core-studio/us12-melody-from-chords-plan.md`.
 
-## Preflight и границы рабочего дерева
+## Preflight и Git scope
 
-1. Использовать Node `24.14.0` и текущий package manager проекта.
-2. Перед изменениями показать `git status --short` и `git log -3 --oneline`.
-3. Не изменять и не добавлять в коммит существующие untracked-файлы:
-   - `cadenceflow_visual_polish_batches/`;
-   - `design-qa.md`;
-   - `progression-controls.png`;
-   - `progression-strip.png`;
-   - `qa-current.png`;
-   - `qa-wide.png`.
-4. Не делать push.
-5. Не отмечать T166/T167 выполненными и не обновлять `PROJECT_STATUS.md` до review оркестратора.
+1. Работать поверх accepted baseline, включающего:
+   - `9918c20 feat(us12): add deterministic melody projection`;
+   - `32a9b29 fix(us12): align melody contracts and validation evidence`;
+   - `9935159 docs(status): accept us12 melody projection batch`.
+2. Использовать Node `24.14.0` и pnpm `10.12.4`.
+3. До изменений показать `git status --short` и `git log -5 --oneline`.
+4. Не добавлять в staging существующие untracked QA/visual-polish материалы.
+5. Не менять `PROJECT_STATUS.md` и checkbox T168/T169 до review оркестратора.
+6. Не делать push.
 
-## T166 — требования и технический срез US12
+## T168 — Project schema v2 и persistence
 
-Обновить только `spec.md`, `plan.md` и `tasks.md`:
+### Domain contract
 
-- добавить User Story 12: создание связанной мелодической партии из выбранного ChordStep;
-- добавить новые FR после FR-190 и acceptance-сценарии, соответствующие утверждённому плану;
-- добавить в `plan.md` отдельный slice для melody generation;
-- добавить Phase 16 и задачи T166–T176;
-- сохранить все существующие task checkbox без изменений;
-- явно удалить из Future Scope противоречия новой принятой функции, но не расширять scope на ручной
-  piano-roll, произвольные SoundFont, несколько Melody Tracks или аудиоэкспорт;
-- зафиксировать, что melody использует только contextual upper voicing, не bass, и вычисляется из
-  recipe, а не хранится как список нот.
+- Расширить `src/domain/melody/types.ts`:
+  - `MelodyInstrument = "flute" | "violin" | "clarinet" | "oboe" | "cello" | "synth-lead"`;
+  - `MelodyTrackSettings` с `instrument`, `muted`, `solo`, `volume`;
+  - defaults: Flute, `muted=false`, `solo=false`, `volume=100`;
+  - pure snapshot/validation helpers для recipe и track settings.
+- Добавить optional `melody?: ChordMelodyRecipe` только в `ChordStep`. `RestStep` recipe не получает.
+- Добавить обязательный `melodyTrack: MelodyTrackSettings` в `Project`.
+- New Project создаётся только с `CURRENT_PROJECT_SCHEMA_VERSION = 2`; убрать независимый literal version
+  из factory.
+- Все новые recipe/settings и вложенные объекты должны быть immutable. Generated `MelodyEvent[]` в
+  Project не хранится.
 
-Нумерация Phase 16:
+### Migration v1 → v2
 
-- T166 — docs/spec/plan/task contracts;
-- T167 — pure melody types, patterns, grids and deterministic projection;
-- T168 — Project schema v2, migration and portable persistence;
-- T169 — undoable melody and track-setting commands;
-- T170 — accessible context menu, editor dialog and track controls;
-- T171 — Melody Staff rendering and active-note highlighting;
-- T172 — licensed FluidR3Mono asset preparation and provider;
-- T173 — playback routing, Mute/Solo/Volume and failure fallback;
-- T174 — MIDI melody track;
-- T175 — MusicXML melody part;
-- T176 — final integration and Chromium acceptance.
+- Увеличить `CURRENT_PROJECT_SCHEMA_VERSION` до `2`.
+- Реализовать чистую последовательную миграцию wire payload:
+  - не мутировать входной v1 object или вложенные progression/steps;
+  - заменить `schemaVersion` на `2`;
+  - добавить default `melodyTrack`;
+  - не добавлять melody recipes существующим ChordSteps;
+  - сохранить все остальные неизвестные допустимые v1 поля до последующей schema validation.
+- v2 payload должен возвращаться без семантических изменений; version `3+` отклоняется как future.
+- Изменение формы Project не требует новой Dexie table/index version: существующие records мигрируются на
+  repository/decode boundary и следующий autosave сохраняет v2.
 
-## T167 — чистый генератор мелодии
+### JSON Schema и `.cadenceflow`
 
-Добавить framework-independent domain-модуль, рекомендуемое расположение:
+- Обновить `cadenceflow-project.schema.json` до `schemaVersion const 2`.
+- Добавить обязательный root `melodyTrack` с закрытыми properties и строгими enum/range constraints.
+- Добавить optional `melody` только в chord step schema; recipe содержит только Pattern, Grid и integer
+  octave offset `-2..2`.
+- Portable encoder/decoder должен явно кодировать/декодировать recipe и settings; простой spread
+  доменного объекта в wire payload не использовать.
+- Recipe должен сохраняться и у ChordStep внутри Temporary Branch, если такой v2 payload поступил.
+- Отсутствие generated note/event arrays доказать literal JSON assertions.
+- Сохранить deterministic field order и явное отклонение malformed enum, volume, mute/solo types,
+  octave offset и recipe на RestStep.
+- V1 fixture должен успешно мигрировать/декодироваться; v2 round-trip должен быть deep-equal по всем
+  поддерживаемым semantics. Project source не мутируется.
+- Autosave/repository recovery v1 record должен вернуть v2 Project и после сохранения не создавать
+  дубликат проекта или историю Undo/Redo.
 
-- `src/domain/melody/types.ts`;
-- `src/domain/melody/patterns.ts`;
-- `src/domain/melody/projection.ts`;
-- `tests/unit/melody/projection.test.ts`.
+Рекомендуемый первый коммит:
+`feat(us12): persist melody recipes and track settings`.
 
-Публичные типы этого batch:
+## T169 — undoable melody commands
 
-```ts
-type MelodyPattern =
-  | "up"
-  | "down"
-  | "up-down"
-  | "down-up"
-  | "outside-in"
-  | "inside-out";
+Добавить отдельный command-модуль, например `src/app/commands/melodyCommands.ts`, и зарегистрировать все
+inverse/restore types в существующем dispatcher.
 
-type MelodyGrid =
-  | "quarter"
-  | "eighth"
-  | "sixteenth"
-  | "eighth-triplet"
-  | "sixteenth-triplet";
+### Recipe commands
 
-type MelodyOctaveOffset = -2 | -1 | 0 | 1 | 2;
+- Один `apply` command создаёт или редактирует recipe выбранного ChordStep.
+- Payload содержит `stepId`, полный validated recipe, optional выбранный Instrument и `nowIso`.
+- Recipe + optional Instrument применяются одной atomic Undo-операцией, как потребуется будущему dialog.
+- `remove` удаляет recipe, не удаляя Step и не меняя selection.
+- RestStep и неизвестный Step ID завершаются typed/Range error без мутации.
+- Restore/inverse должен восстанавливать точные previous recipe, Instrument, `updatedAt` policy и selection.
 
-interface ChordMelodyRecipe {
-  readonly pattern: MelodyPattern;
-  readonly grid: MelodyGrid;
-  readonly octaveOffset: MelodyOctaveOffset;
-}
-```
+### Melody Track commands
 
-Проекция этого batch принимает уже канонически реализованные upper pitches и точную duration. Она не
-должна самостоятельно реализовывать гармонию или импортировать piano profile. Предусмотреть API уровня:
+- Поддержать instrument, mute, solo и volume через validated settings command.
+- Включение Mute автоматически выключает Solo; включение Solo автоматически выключает Mute.
+- Payload, одновременно требующий `muted=true` и `solo=true`, отклоняется без мутации.
+- Volume принимает только integer `0..127`.
+- Команды заменяют immutable settings целиком или snapshot-ят patch; вложенный объект нельзя мутировать.
 
-```ts
-realizeChordMelody(input: {
-  readonly sourceStepId: string;
-  readonly upperPitches: readonly ExactPitch[];
-  readonly durationBeats: Rational;
-  readonly recipe: ChordMelodyRecipe;
-}): MelodyPhrase
-```
+### Existing progression behavior
 
-Каждый event должен содержать source Step ID, последовательный index, `ExactPitch`, точные Rational
-`startOffsetBeats` и `durationBeats`. Результат и вложенные массивы должны быть immutable.
+- `progression/repeat-chord` копирует recipe в новый независимый frozen object и сохраняет новый Step ID.
+- Extend duration и `timing/set-step-duration` сохраняют recipe и автоматически изменяют только будущую
+  derived projection.
+- Replace harmony сохраняет recipe на том же Step ID.
+- Reorder перемещает recipe вместе со Step.
+- Remove Step удаляет recipe вместе со Step и Undo восстанавливает его.
+- Reset Performance не удаляет recipe.
+- Custom Preset сохраняет только harmonic function + duration и не получает recipe/track settings.
+- Ни одна команда не сохраняет generated Melody events.
 
-Обязательная семантика:
+Рекомендуемый второй коммит:
+`feat(us12): add undoable melody project commands`.
 
-- входные upper pitches сортируются по `midiNumber`; исходный массив не мутируется;
-- octave offset сдвигает `midiNumber` и spelling octave на `12 * offset`, сохраняя note letter и
-  accidental;
-- bass в API отсутствует;
-- Up/Down — полный проход по возрастанию/убыванию;
-- Up-Down/Down-Up — разворот без повторения крайних нот;
-- Outside-In — lowest, highest, next-lowest, next-highest;
-- Inside-Out — от центра наружу; для чётного количества lower-middle, upper-middle, затем попеременно
-  наружу; для нечётного — middle, lower, upper и далее наружу;
-- sequence циклически повторяется и начинается заново для каждого вызова;
-- grid durations: `1`, `1/2`, `1/4`, `1/3`, `1/6` beats;
-- последняя нота сокращается ровно до остатка ChordStep;
-- duration короче grid всё равно создаёт одну ноту на всю duration;
-- пустой pitch list или неположительная duration завершаются typed domain validation error;
-- octave overflow за MIDI range 0–127 завершается typed error, без clamp;
-- exact duplicate MIDI pitches и octave doublings сохраняются;
-- один pitch повторяется до конца duration;
-- генерация deterministic и не использует float для музыкального времени.
+## Focused tests
 
-В этом batch не добавлять `melody` в `ChordStep`/Project, не менять schema version и codecs. T168 выполнит
-интеграцию типов в сохраняемую модель после review генератора.
+Обязательное покрытие:
 
-## Обязательные тесты
+- Project factory v2 defaults и deep immutability;
+- pure non-mutating v1 → v2 migration, idempotent v2 path, future-version rejection;
+- JSON Schema valid v2 и malformed recipe/settings cases;
+- v1 fixture import, v2 portable round-trip, deterministic repeated encoding;
+- active Temporary Branch recipe round-trip;
+- autosave/repository v1 recovery → v2 без duplicate records;
+- create/edit/remove recipe и optional instrument как одна Undo/Redo entry;
+- Mute/Solo mutual exclusion, volume/instrument validation и Undo/Redo;
+- Repeat/Extend/duration/Replace/Reorder/Remove/Reset Performance semantics;
+- selection и source Project immutability;
+- regression: Custom Preset wire/domain data не содержит melody.
 
-- шесть patterns на трёх, четырёх и пяти входных pitches с literal expected MIDI order;
-- octave doublings, exact duplicates и single-pitch cycle;
-- все пять grids;
-- exact fit и truncated tail (`5/6`, `7/8`, custom Rational);
-- duration меньше одного grid interval;
-- octave offsets `-2..+2` и MIDI range failure;
-- empty pitches и zero/negative duration failure;
-- source input, recipe и pitches не мутируются;
-- повторные вызовы глубоко равны и возвращают frozen/readonly projection.
+Запустить только:
 
-## Проверки для сдачи
+1. `tests/unit/melody/projection.test.ts`;
+2. новые migration/schema/command tests;
+3. существующие `portable-project`, `autosave-recovery`, `measure-gap-commands`, step-duration и preset
+   tests, реально затронутые изменениями;
+4. TypeScript;
+5. Prettier check только изменённых файлов;
+6. `git diff --check`.
 
-Запустить только focused-проверки этого batch:
-
-1. Новый melody unit test с `--maxWorkers=1`.
-2. Существующие focused Rational и piano realization tests, затронутые импортами.
-3. TypeScript.
-4. Prettier check только для изменённых файлов.
-5. `git diff --check`.
-
-Полный Vitest, build, lint и Chromium в этом batch не запускать. Dev server после работы должен снова
+Полный Vitest, build, lint и Chromium в Batch B не запускать. После проверок dev server должен снова
 отвечать на `http://127.0.0.1:5174/`.
 
-## Формат отчёта разработчика
+## Отчёт разработчика
 
 Вернуть:
 
-1. commit hash и точный список изменённых файлов;
-2. literal expected sequences для всех шести patterns;
-3. команды и результаты focused checks;
-4. подтверждение отсутствия Project/schema/UI/audio/export изменений;
-5. финальный `git status --short` и ahead/behind;
-6. `Spec deviations: none` либо точный перечень отклонений.
+1. два commit hash и точный file list каждого;
+2. описание v1 → v2 migration и доказательство отсутствия входной мутации;
+3. JSON fragment v2 с `melodyTrack` и одним ChordStep recipe, без generated notes;
+4. таблицу command → inverse → selection behavior;
+5. точные команды и результаты focused checks;
+6. финальный `git status --short`, ahead/behind и HTTP status dev server;
+7. `Spec deviations: none` либо полный перечень.
 
-**Acceptance condition:** требования US12 согласованы с основными артефактами, а чистый generator
-однозначно определяет pitch order и Rational timing для последующей persistence/UI/audio/export
-интеграции.
+**Acceptance condition:** старые проекты безопасно открываются как v2, recipe/settings детерминированно
+переживают autosave/portable round-trip, а все будущие UI-изменения могут использовать один проверенный
+undoable command path без сериализации производных нот.
