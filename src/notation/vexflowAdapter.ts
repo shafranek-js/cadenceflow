@@ -544,9 +544,17 @@ export function renderStaffSequence(
     Math.min(stave.getNoteEndX(), bassStave?.getNoteEndX() ?? Number.POSITIVE_INFINITY) -
     SEQUENCE_NOTE_EDGE_PADDING;
   const usableWidth = Math.max(timeEndX - timeStartX, 1);
-  const alignToTimeline = ({ entry, note }: (typeof notes)[number]) => {
+  const alignToTimeline = ({ entry, note }: RenderedSequenceTickable) => {
     const onsetRatio = rationalToNumber(entry.startOffsetBeats) / barLengthBeats;
-    note.getTickContext().setX(timeStartX + Math.min(Math.max(onsetRatio, 0), 1) * usableWidth);
+    const targetX = timeStartX + Math.min(Math.max(onsetRatio, 0), 1) * usableWidth;
+    const tickContext = note.getTickContext();
+    tickContext.setX(targetX);
+    // TickContext X is not the rendered note anchor: VexFlow adds the note's
+    // pre-format shift (for accidentals, displaced heads, and glyph padding).
+    // Correct for that stable shift so the actual note anchor, rather than its
+    // timing container, stays on the safe musical timeline. Without this the
+    // final onset can be drawn past the right barline in compact previews.
+    tickContext.setX(targetX + (targetX - note.getAbsoluteX()));
   };
   notes.forEach(alignToTimeline);
   bassNotes.forEach(alignToTimeline);

@@ -733,6 +733,7 @@ function buildMelodyPart(
       );
       continue;
     }
+    const recipe = entry.step.melody;
 
     const projectedChord = projectedChords.get(entry.stepIndex);
     if (!projectedChord) {
@@ -749,10 +750,10 @@ function buildMelodyPart(
           .filter((item) => item.role === "upper")
           .map((item) => item.pitch),
         durationBeats: entry.durationBeats,
-        recipe: entry.step.melody,
+        recipe,
       });
-      const type = melodyNoteType(entry.step.melody.grid);
-      const timeModification = melodyTimeModification(entry.step.melody.grid);
+      const type = melodyNoteType(recipe.grid);
+      const timeModification = melodyTimeModification(recipe.grid);
       phrase.events.forEach((event) => {
         const startBeats = addRational(entry.startBeats, event.startOffsetBeats);
         rawEvents.push(
@@ -767,11 +768,7 @@ function buildMelodyPart(
             pitch: musicXmlPitchForExactPitch(event.pitch),
             type,
             ...(timeModification ? { timeModification } : {}),
-            tupletMarks: melodyTupletMarks(
-              entry.step.melody.grid,
-              event.index,
-              phrase.events.length,
-            ),
+            tupletMarks: melodyTupletMarks(recipe.grid, event.index, phrase.events.length),
           }),
         );
       });
@@ -814,6 +811,8 @@ function buildMelodyPart(
       `Unsupported Melody instrument: ${String(melodyTrack.instrument)}.`,
     );
   }
+  const clef: MusicXmlMelodyPart["clef"] =
+    melodyTrack.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
   return Object.freeze({
     id: MUSICXML_MELODY_PART_ID,
     name: metadata.name,
@@ -821,7 +820,7 @@ function buildMelodyPart(
     instrument: melodyTrack.instrument,
     midiChannel: 3,
     midiProgram: metadata.program + 1,
-    clef: melodyTrack.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 },
+    clef,
     measures: Object.freeze(measures.map((measure) => freezeMelodyMeasure(measure, divisions))),
   });
 }

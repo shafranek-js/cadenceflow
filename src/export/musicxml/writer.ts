@@ -188,7 +188,7 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
     }
     assertInteger(measure.capacity, `Melody capacity for measure ${measure.number}`, 1);
     let duration = 0;
-    measure.events.forEach((event) => {
+    measure.events.forEach((event: MusicXmlMelodyMeasureEvent) => {
       if (event.kind === "note") validateMelodyNote(event);
       if (event.kind === "rest") validateMelodyRest(event);
       duration += event.duration;

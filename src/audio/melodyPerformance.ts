@@ -11,6 +11,7 @@ import {
   addRational,
   compareRational,
   rationalToNumber,
+  subtractRational,
   type Rational,
 } from "../domain/timing/rational";
 import { resolveEffectiveNoteVelocity } from "../instruments/piano/dynamics";
@@ -150,4 +151,30 @@ export function melodyPerformanceToAudioEvents(
   projection: MelodyPerformanceProjection,
 ): readonly MelodyPerformanceEvent[] {
   return projection.events;
+}
+
+/**
+ * Projects one authored Melody phrase for transient Chord Step audition.
+ * The complete progression is still realized first so automatic voicing uses
+ * the same preceding harmonic context as transport playback; only the chosen
+ * Step is then retained and rebased to start at zero.
+ */
+export function realizeMelodyStepAudition(
+  input: RealizeProgressionMelodyInput,
+  sourceStepId: string,
+): readonly MelodyPerformanceEvent[] {
+  const selected = realizeProgressionMelodyPerformance(input).events.filter(
+    (event) => event.sourceStepId === sourceStepId,
+  );
+  const first = selected[0];
+  if (!first) return Object.freeze([]);
+  return Object.freeze(
+    selected.map((event) =>
+      Object.freeze({
+        ...event,
+        startSeconds: event.startSeconds - first.startSeconds,
+        startBeats: subtractRational(event.startBeats, first.startBeats),
+      }),
+    ),
+  );
 }

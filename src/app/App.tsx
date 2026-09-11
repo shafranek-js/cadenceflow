@@ -80,7 +80,10 @@ import {
   resolvePreviousHarmonicContext,
 } from "../ui/matrix/previewRealization";
 import { MetronomeClickProvider } from "../audio/metronome";
-import { realizeProgressionMelodyPerformance } from "../audio/melodyPerformance";
+import {
+  realizeMelodyStepAudition,
+  realizeProgressionMelodyPerformance,
+} from "../audio/melodyPerformance";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
@@ -264,6 +267,17 @@ export function App() {
     melodyProviderRef.current.setTrackSettings(project.melodyTrack);
     return melodyProviderRef.current;
   }, [project.melodyTrack]);
+
+  const getMelodyPreviewAuditionController = useCallback(() => {
+    const provider = ensureMelodyProvider();
+    if (!melodyPreviewAuditionControllerRef.current) {
+      melodyPreviewAuditionControllerRef.current = new PreviewAuditionController({
+        provider,
+        clock: provider.clock,
+      });
+    }
+    return melodyPreviewAuditionControllerRef.current;
+  }, [ensureMelodyProvider]);
 
   useEffect(() => {
     try {
@@ -706,6 +720,50 @@ export function App() {
       tempoBpm: currentProject.globalTiming.tempoBpm,
     });
     getPreviewAuditionController()?.audition(realization.events);
+
+    const melodyRequestId = ++melodyPreviewRequestRef.current;
+    melodyPreviewAuditionControllerRef.current?.stop();
+    if (!step.melody) return;
+
+    const melodyEvents = realizeMelodyStepAudition(
+      {
+        steps: currentProject.progression.steps,
+        tonic: currentProject.tonic,
+        context: {
+          tonic: currentProject.tonic,
+          mode,
+          moduleId: currentProject.activeModule,
+          spellingContext: { tonic: currentProject.tonic, mode },
+        },
+        tempoBpm: currentProject.globalTiming.tempoBpm,
+        groove: currentProject.groove,
+        melodyTrack: currentProject.melodyTrack,
+      },
+      stepId,
+    );
+    if (melodyEvents.length === 0) return;
+
+    const melodyProvider = ensureMelodyProvider();
+    melodyProvider.setPreviewSettings(
+      currentProject.melodyTrack.instrument,
+      currentProject.melodyTrack.volume,
+    );
+    const playMelody = () => {
+      if (melodyPreviewRequestRef.current !== melodyRequestId) return;
+      getMelodyPreviewAuditionController()?.audition(melodyEvents);
+    };
+    if (melodyProvider.state === "ready" || melodyProvider.state === "fallback") {
+      playMelody();
+      return;
+    }
+    void melodyProvider
+      .prepare()
+      .then(playMelody)
+      .catch((error) => {
+        if (melodyPreviewRequestRef.current === melodyRequestId) {
+          setMelodyAudioError(error instanceof Error ? error.message : String(error));
+        }
+      });
   };
   const selectProgressionStep = (stepId: string) => {
     setProgressionSelection(stepId);
@@ -970,17 +1028,6 @@ export function App() {
     }
     return previewAuditionControllerRef.current;
   };
-
-  const getMelodyPreviewAuditionController = useCallback(() => {
-    const provider = ensureMelodyProvider();
-    if (!melodyPreviewAuditionControllerRef.current) {
-      melodyPreviewAuditionControllerRef.current = new PreviewAuditionController({
-        provider,
-        clock: provider.clock,
-      });
-    }
-    return melodyPreviewAuditionControllerRef.current;
-  }, [ensureMelodyProvider]);
 
   const stopMelodyPreview = useCallback(() => {
     melodyPreviewRequestRef.current += 1;

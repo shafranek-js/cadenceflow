@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { realizeProgressionMelodyPerformance } from "../../../src/audio/melodyPerformance";
+import {
+  realizeMelodyStepAudition,
+  realizeProgressionMelodyPerformance,
+} from "../../../src/audio/melodyPerformance";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import { realizeOrderedPianoProgression } from "../../../src/instruments/piano/progressionRealization";
 import { groove } from "../../../src/domain/timing/swing";
@@ -147,5 +150,27 @@ describe("T173 — live Melody performance projection", () => {
     });
     expect(muted.events).toHaveLength(0);
     expect(equalRational(muted.totalDurationBeats, rational(4))).toBe(true);
+  });
+
+  it("auditions only the selected Step melody, rebased to zero with full harmonic context", () => {
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "IV")];
+    const full = realizeProgressionMelodyPerformance({
+      ...baseInput,
+      steps,
+      melodyTrack: DEFAULT_TRACK,
+    });
+    const expected = full.events.filter((event) => event.sourceStepId === "step-2");
+
+    const audition = realizeMelodyStepAudition(
+      { ...baseInput, steps, melodyTrack: DEFAULT_TRACK },
+      "step-2",
+    );
+
+    expect(audition).toHaveLength(expected.length);
+    expect(audition[0]!.startSeconds).toBe(0);
+    expect(audition[0]!.startBeats).toEqual(rational(0));
+    expect(audition.map((event) => event.pitch)).toEqual(expected.map((event) => event.pitch));
+    expect(audition.every((event) => event.sourceStepId === "step-2")).toBe(true);
+    expect(realizeMelodyStepAudition({ ...baseInput, steps }, "missing")).toEqual([]);
   });
 });

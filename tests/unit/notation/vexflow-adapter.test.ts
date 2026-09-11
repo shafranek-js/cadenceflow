@@ -235,6 +235,22 @@ describe("renderStaffSequence", () => {
     expect(svg.querySelectorAll(".vf-timesignature")).toHaveLength(1);
   });
 
+  it("keeps the first and last rendered note anchors inside compact staff edges", () => {
+    const container = document.createElement("div");
+    Object.defineProperty(container, "clientWidth", { configurable: true, value: 320 });
+    const entries = [chord("first", 0, 1, 1, 2), chord("last", 7, 2, 1, 2)];
+    let positions: readonly StaffSequencePosition[] = [];
+
+    renderStaffSequence(container, entries, meter(4, 4), (next) => {
+      positions = next;
+    });
+
+    expect(positions).toHaveLength(2);
+    expect(positions[0]!.x).toBeGreaterThan(18);
+    expect(positions[1]!.x).toBeLessThan(320 - 18);
+    expect(positions[1]!.x).toBeGreaterThan(positions[0]!.x);
+  });
+
   it("renders a time-aligned bass staff and highlights only the playing chord", () => {
     const bassProjection = projectionFor([exactPitch(36, { step: "C", alter: 0 })]);
     const entries: readonly StaffSequenceEntry[] = [

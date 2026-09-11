@@ -29,6 +29,17 @@ test.describe("US12 — melody editor and derived staff", () => {
     const dialog = page.getByRole("dialog", { name: "Create Melody" });
     const play = dialog.getByRole("button", { name: "Play melody preview" });
     await expect(play).toBeEnabled();
+    const previewSvg = dialog.getByTestId("melody-staff-measure").locator("svg");
+    await expect(previewSvg).toBeVisible();
+    expect(
+      await previewSvg.evaluate((svg) => {
+        const surface = svg.getBoundingClientRect();
+        return [...svg.querySelectorAll(".vf-stavenote")].every((note) => {
+          const bounds = note.getBoundingClientRect();
+          return bounds.left >= surface.left && bounds.right <= surface.right;
+        });
+      }),
+    ).toBe(true);
 
     const sampleResponse = page.waitForResponse(
       (response) => response.url().endsWith("/audio/melody/FluidR3_GM/flute-mp3.js"),
