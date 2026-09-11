@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-10
-**Current implementation stage:** Phase 16 / User Story 12 MIDI export accepted through T174; T175 MusicXML export is the next controlled batch
-**Task progress:** 159 accepted tasks, 159 / 176 total tasks
+**Handoff date:** 2026-09-11
+**Current implementation stage:** Phase 16 / User Story 12 export accepted through T175; T176 final US12 acceptance is the next controlled batch
+**Task progress:** 160 accepted tasks, 160 / 176 total tasks
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is accepted through **T173**: contracts, generator, Project schema v2 persistence, undoable commands, accessible melody editor/track controls, deterministic Melody Staff, verified local sampled instruments, isolated preview, separate live Melody routing, and exact active-note highlighting are complete. Melody MIDI and MusicXML export remain in T174–T175. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is accepted through **T175**: contracts, generator, Project schema v2 persistence, undoable commands, accessible melody editor/track controls, deterministic Melody Staff, verified local sampled instruments, isolated preview, separate live Melody routing, exact active-note highlighting, and deterministic MIDI/MusicXML export are complete. Final US12 integration and supported-desktop Chromium acceptance remain in T176. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
 
 ## 2. Sources of truth
 
@@ -579,15 +579,15 @@ The real toolchain and test suite were verified on 2026-09-05:
 3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
 4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
 
-## 8. Next development sequence: Phase 16 / US12 — Batch F T175
+## 8. Next development sequence: Phase 16 / US12 — Batch G T176
 
-T166–T174 are accepted after independent review. Melody playback uses verified local FluidR3_GM MP3
+T166–T175 are accepted after independent review. Melody playback uses verified local FluidR3_GM MP3
 sample maps through `soundfont-player`; the quarantined `stb-vorbis`/SF3 path is not used, and no antivirus
-exclusion is required. Format-1 MIDI now adds a deterministic Melody track while preserving the exact
-three-track bytes for projects without Melody. The next controlled scope adds Melody to MusicXML only.
+exclusion is required. Format-1 MIDI and MusicXML now add deterministic Melody projections while
+preserving the accepted no-Melody bytes. The next controlled scope is final US12 acceptance only.
 
-- **T175**: [ ] Add a deterministic Melody MusicXML part with instrument metadata, clef, rests, tuplets,
-  cross-bar ties, and byte-for-byte no-Melody compatibility.
+- **T176**: [ ] Run final US12 integration and Chromium acceptance at supported desktop sizes. Product
+  changes are permitted only as narrow corrections to defects exposed by that acceptance evidence.
 
 T172–T173 focused acceptance: offline asset verification PASS; 5 focused Vitest files / 17 tests PASS;
 US12 Chromium 2 / 2 PASS with `--workers=1 --retries=0`; TypeScript, scoped ESLint, Prettier, and
@@ -601,6 +601,14 @@ notes/velocities/ticks, note-off ordering, and aligned EOT. T139 export consiste
 rebuilding its local `libxmljs2` native binding. TypeScript, scoped ESLint, Prettier, and `git diff --check`
 PASS. Mute/Solo and Temporary Branch are excluded from export policy, while no-Melody format-1 and legacy
 format-0 bytes remain pinned and unchanged.
+
+T175 focused acceptance: MusicXML Vitest 35 / 35 PASS and export projection consistency 1 / 1 PASS.
+Independent XML parsing confirms Melody `P2` before Piano `P1` in both part-list and score order; all six
+instrument names, clefs, one-based MIDI programs, channel 3, exact pitches, rests, tuplets, cross-bar ties,
+measure capacity, and no-Melody bytes are covered. Fresh Melody output passes the offline MusicXML 4.0
+XSD validator and a deliberate invalid document is rejected. TypeScript, scoped ESLint, Prettier, and
+`git diff --check` PASS. Review correction `a7691e8` restores legacy Piano octave serialization for strict
+no-Melody compatibility and makes malformed Melody DTO failures consistently typed.
 
 ## 9. Handoff operating model
 

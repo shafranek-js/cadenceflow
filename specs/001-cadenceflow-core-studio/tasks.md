@@ -429,7 +429,7 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
   Mute/Solo/Volume behavior, current-note highlighting, and piano-continuation fallback.
 - [x] T174 [US12] Add the deterministic Melody track to MIDI format-1 export while preserving byte-for-byte
   output for projects without melody.
-- [ ] T175 [US12] Add the deterministic Melody MusicXML part with instrument, clef, rests, tuplets, and
+- [x] T175 [US12] Add the deterministic Melody MusicXML part with instrument, clef, rests, tuplets, and
   cross-bar ties while preserving no-melody output compatibility and XSD validation.
 - [ ] T176 [US12] Run final US12 integration and Chromium acceptance at supported desktop sizes, then after
   independent review update project status and accept the reviewed Phase 16 tasks.
