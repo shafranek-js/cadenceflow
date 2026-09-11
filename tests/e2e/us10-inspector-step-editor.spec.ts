@@ -255,9 +255,13 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
           if (!stack || !matrix || !inspector || !progression || !selectedStep) {
             throw new Error("Inspector or selected-step layout is missing");
           }
+          const activeMeasure = document.querySelector<HTMLElement>(
+            ".progression-measure-card[data-has-selected-step='true']",
+          );
           const matrixRect = matrix.getBoundingClientRect();
           const progressionRect = progression.getBoundingClientRect();
           const selectedStepRect = selectedStep.getBoundingClientRect();
+          const activeMeasureRect = activeMeasure?.getBoundingClientRect();
           return {
             stackScrollWidth: stack.scrollWidth,
             stackClientWidth: stack.clientWidth,
@@ -266,6 +270,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
             matrixWidth: matrixRect.width,
             progressionWidth: progressionRect.width,
             progressionTop: progressionRect.top,
+            activeMeasureTop: activeMeasureRect?.top ?? 0,
             selectedStepTop: selectedStepRect.top,
             progressionRight: progressionRect.right,
             selectedStepLeft: selectedStepRect.left,
@@ -274,7 +279,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
         expect(metrics.stackScrollWidth).toBeLessThanOrEqual(metrics.stackClientWidth);
         expect(metrics.inspectorScrollWidth).toBeLessThanOrEqual(metrics.inspectorClientWidth);
         expect(Math.abs(metrics.matrixWidth - metrics.progressionWidth)).toBeLessThan(2);
-        expect(Math.abs(metrics.progressionTop - metrics.selectedStepTop)).toBeLessThan(2);
+        expect(Math.abs(metrics.activeMeasureTop - metrics.selectedStepTop)).toBeLessThan(2);
         expect(metrics.selectedStepLeft).toBeGreaterThanOrEqual(metrics.progressionRight - 1);
 
         const pageOverflow = await readPageOverflow(page);
@@ -286,4 +291,65 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       });
     });
   }
+
+  test("dynamically aligns Selected Step inspector vertically with active measure", async ({
+    page,
+  }) => {
+    await waitForStudio(page);
+    await addChord(page, "I");
+    await addChord(page, "IV");
+    await addChord(page, "V");
+
+    const measures = page.getByTestId("progression-measure");
+    await expect(measures).toHaveCount(3);
+
+    const steps = page.getByTestId("progression-step");
+    await expect(steps).toHaveCount(3);
+
+    const getAlignment = async (measureIndex: number) => {
+      return page.evaluate((mIdx) => {
+        const selectedStack = document.querySelector<HTMLElement>(".selected-step-stack");
+        const targetMeasure = document.querySelectorAll<HTMLElement>(".progression-measure-card")[mIdx];
+        const strip = document.querySelector<HTMLElement>(".progression-strip");
+        if (!selectedStack || !targetMeasure || !strip) throw new Error("Elements missing");
+        const stackRect = selectedStack.getBoundingClientRect();
+        const measureRect = targetMeasure.getBoundingClientRect();
+        const stripRect = strip.getBoundingClientRect();
+        const computed = window.getComputedStyle(selectedStack);
+        return {
+          diffTop: Math.abs(stackRect.top - measureRect.top),
+          stripOffset: stackRect.top - stripRect.top,
+          marginTopNumber: parseFloat(computed.marginTop) || 0,
+        };
+      }, measureIndex);
+    };
+
+    // 1. Select step in Measure 1 -> inspector aligns with Measure 1
+    await steps.nth(0).getByRole("button", { name: /Select progression step/ }).click();
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
+    await page.waitForTimeout(300);
+    const align1 = await getAlignment(0);
+    expect(align1.diffTop).toBeLessThanOrEqual(2);
+
+    // 2. Select step in Measure 2 -> inspector tracks down to Measure 2
+    await steps.nth(1).getByRole("button", { name: /Select progression step/ }).click();
+    await page.waitForTimeout(300);
+    const align2 = await getAlignment(1);
+    expect(align2.diffTop).toBeLessThanOrEqual(2);
+    expect(align2.stripOffset).toBeGreaterThan(align1.stripOffset + 40);
+
+    // 3. Select step in Measure 3 -> inspector tracks down to Measure 3
+    await steps.nth(2).getByRole("button", { name: /Select progression step/ }).click();
+    await page.waitForTimeout(300);
+    const align3 = await getAlignment(2);
+    expect(align3.diffTop).toBeLessThanOrEqual(2);
+    expect(align3.stripOffset).toBeGreaterThan(align2.stripOffset + 40);
+
+    // 4. Select step back in Measure 1 -> inspector returns up to Measure 1
+    await steps.nth(0).getByRole("button", { name: /Select progression step/ }).click();
+    await page.waitForTimeout(300);
+    const align1Return = await getAlignment(0);
+    expect(align1Return.diffTop).toBeLessThanOrEqual(2);
+    expect(Math.abs(align1Return.stripOffset - align1.stripOffset)).toBeLessThanOrEqual(2);
+  });
 });

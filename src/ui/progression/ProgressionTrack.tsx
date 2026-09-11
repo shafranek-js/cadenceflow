@@ -590,11 +590,16 @@ export function ProgressionTrack({
         {layout.measures.map((measure) => {
           const usesSharedStaff = commonView === "staff";
           const staffItems = usesSharedStaff ? staffItemsForMeasure(measure) : [];
+          const isSelectedMeasure = measure.items.some(
+            (item) => item.kind !== "gap" && item.stepId === selectedStepId,
+          );
           return (
             <section
               key={measure.measureIndex}
-              className={`progression-measure-card ${usesSharedStaff ? "has-shared-staff" : ""}`}
+              className={`progression-measure-card ${usesSharedStaff ? "has-shared-staff" : ""} ${isSelectedMeasure ? "has-selected-step" : ""}`}
               data-testid="progression-measure"
+              data-measure-index={measure.measureIndex}
+              data-has-selected-step={isSelectedMeasure ? "true" : undefined}
               aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
             >
               <header className="progression-measure-header">

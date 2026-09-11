@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export interface StudioWorkspaceProps {
   readonly header: ReactNode;
@@ -30,6 +30,73 @@ export function StudioWorkspace({
   onProgressionBackgroundClick,
   overlays,
 }: StudioWorkspaceProps) {
+  const progressionStripRef = useRef<HTMLElement>(null);
+  const [offsetY, setOffsetY] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!selectedStepInspector) {
+      setOffsetY(0);
+      return;
+    }
+
+    const updateOffset = () => {
+      const strip = progressionStripRef.current;
+      if (!strip) return;
+
+      const selectedMeasure = strip.querySelector<HTMLElement>(
+        ".progression-measure-card[data-has-selected-step='true']",
+      );
+      const targetCard =
+        selectedMeasure ??
+        strip.querySelector<HTMLElement>(
+          ".progression-step-card.is-selected, .progression-rest-card.is-selected",
+        );
+
+      if (!targetCard) {
+        setOffsetY(0);
+        return;
+      }
+
+      const stripRect = strip.getBoundingClientRect();
+      const targetRect = targetCard.getBoundingClientRect();
+      const calculatedOffset = Math.max(0, Math.round(targetRect.top - stripRect.top));
+      setOffsetY(calculatedOffset);
+    };
+
+    updateOffset();
+
+    const strip = progressionStripRef.current;
+    if (!strip) return;
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => {
+        updateOffset();
+      });
+      resizeObserver.observe(strip);
+    }
+
+    let mutationObserver: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => {
+        updateOffset();
+      });
+      mutationObserver.observe(strip, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-has-selected-step", "class"],
+      });
+    }
+
+    window.addEventListener("resize", updateOffset);
+
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener("resize", updateOffset);
+    };
+  }, [selectedStepInspector, progression]);
+
   return (
     <main className="app-shell" aria-label="CadenceFlow Studio">
       <header className="app-header" aria-label="Project and application controls">
@@ -47,6 +114,7 @@ export function StudioWorkspace({
           {inspector}
         </aside>
         <section
+          ref={progressionStripRef}
           className="progression-strip"
           aria-label="My Progression"
           onClick={(event) => {
@@ -56,7 +124,11 @@ export function StudioWorkspace({
           {progression}
         </section>
         {selectedStepInspector ? (
-          <aside className="selected-step-stack" aria-label="Selected step">
+          <aside
+            className="selected-step-stack"
+            aria-label="Selected step"
+            style={offsetY > 0 ? { marginTop: `${offsetY}px` } : undefined}
+          >
             {selectedStepInspector}
           </aside>
         ) : null}

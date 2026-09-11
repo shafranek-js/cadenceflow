@@ -47,6 +47,10 @@
   background: var(--surface-1);
 }
 
+.progression-measure-card.has-selected-step {
+  border-color: var(--border-strong);
+}
+
 .progression-measure-header {
   display: flex;
   align-items: center;
