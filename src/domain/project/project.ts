@@ -17,11 +17,17 @@ import {
 
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
+export type ProgressionView = "harmonic" | "piano" | "staff";
+export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4;
 
 export interface PresentationState {
   readonly expertiseMode: PresentationMode;
   readonly theme: ThemeMode;
   readonly globalMatrixCardView: CardViewId;
+  /** One synchronized view for every measure in My Progression. */
+  readonly progressionView: ProgressionView;
+  /** Maximum number of measures packed into one score system/row. */
+  readonly measuresPerSystem: MeasuresPerSystem;
   /** Whether Staff View includes the independently voiced bass note. */
   readonly showBassInStaff: boolean;
 }

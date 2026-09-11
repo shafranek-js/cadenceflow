@@ -1007,7 +1007,8 @@
   background: var(--surface);
   font-size: 0.58rem;
 }
-.card-template-inspector {
+.card-template-inspector,
+.progression-global-inspector {
   display: grid;
   gap: 10px;
   padding: 16px;
@@ -1015,20 +1016,25 @@
   background: var(--surface);
   border-radius: 14px;
 }
-.card-template-inspector header {
+.card-template-inspector header,
+.progression-global-inspector header {
   display: flex;
   justify-content: space-between;
   gap: 8px;
 }
-.card-template-inspector h3 {
+.card-template-inspector h3,
+.progression-global-inspector h3 {
   margin: 0;
 }
 .card-template-inspector header span,
-.card-template-inspector p {
+.card-template-inspector p,
+.progression-global-inspector header span,
+.progression-global-inspector p {
   color: var(--text-muted);
   font-size: 0.75rem;
 }
 .card-template-inspector label,
+.progression-global-inspector label,
 .step-editor label {
   display: grid;
   gap: 4px;
@@ -2905,7 +2911,10 @@ summary:focus-visible,
 .inspector-group button,
 .card-template-inspector select,
 .card-template-inspector input,
-.card-template-inspector button {
+.card-template-inspector button,
+.progression-global-inspector select,
+.progression-global-inspector input,
+.progression-global-inspector button {
   min-width: 0;
   max-width: 100%;
 }
@@ -2915,7 +2924,10 @@ summary:focus-visible,
 .inspector-group button,
 .card-template-inspector select,
 .card-template-inspector input,
-.card-template-inspector button {
+.card-template-inspector button,
+.progression-global-inspector select,
+.progression-global-inspector input,
+.progression-global-inspector button {
   min-height: 32px;
 }
 
@@ -3309,20 +3321,24 @@ summary:focus-visible,
   min-height: 32px;
 }
 
-.card-template-inspector header {
+.card-template-inspector header,
+.progression-global-inspector header {
   align-items: flex-start;
   flex-wrap: wrap;
 }
 
-.card-template-inspector header > div {
+.card-template-inspector header > div,
+.progression-global-inspector header > div {
   min-width: 0;
 }
 
-.card-template-inspector .inspector-context-kicker {
+.card-template-inspector .inspector-context-kicker,
+.progression-global-inspector .inspector-context-kicker {
   margin-bottom: 3px;
 }
 
-.card-template-inspector header span.template-status {
+.card-template-inspector header span.template-status,
+.progression-global-inspector header span.template-status {
   display: block;
   margin-top: 3px;
   font-weight: 700;

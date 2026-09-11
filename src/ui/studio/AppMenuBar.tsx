@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { CardViewId } from "../../domain/progression/step";
+import type { ProgressionView } from "../../domain/project/project";
 
 type AppMenuId = "export" | "edit" | "view";
 
@@ -18,8 +19,8 @@ export interface AppMenuBarProps {
   readonly onRedo: () => void;
   readonly cardView: CardViewId;
   readonly onCardViewChange: (view: CardViewId) => void;
-  readonly progressionCardView: CardViewId | "mixed";
-  readonly onProgressionCardViewChange: (view: CardViewId) => void;
+  readonly progressionView: ProgressionView;
+  readonly onProgressionViewChange: (view: ProgressionView) => void;
   readonly showBassInStaff: boolean;
   readonly onShowBassInStaffChange: (visible: boolean) => void;
 }
@@ -33,8 +34,8 @@ export function AppMenuBar({
   onRedo,
   cardView,
   onCardViewChange,
-  progressionCardView,
-  onProgressionCardViewChange,
+  progressionView,
+  onProgressionViewChange,
   showBassInStaff,
   onShowBassInStaffChange,
 }: AppMenuBarProps) {
@@ -237,21 +238,21 @@ export function AppMenuBar({
                 {cardView === view.id ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
-            <div className="app-menu-section-label">My Progression card view</div>
+            <div className="app-menu-section-label">My Progression view</div>
             {CARD_VIEWS.map((view) => (
               <button
                 key={`progression-${view.id}`}
                 type="button"
                 role="menuitemradio"
-                aria-checked={progressionCardView === view.id}
+                aria-checked={progressionView === view.id}
                 data-testid={`progression-card-view-${view.id}`}
                 onClick={() => {
-                  onProgressionCardViewChange(view.id);
+                  onProgressionViewChange(view.id);
                   closeMenu("view");
                 }}
               >
                 <span>{view.label}</span>
-                {progressionCardView === view.id ? <span aria-hidden="true">✓</span> : null}
+                {progressionView === view.id ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
             <div className="app-menu-section-label">Staff view</div>

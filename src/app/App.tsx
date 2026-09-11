@@ -56,6 +56,7 @@ import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
 import { RestStepInspector } from "../ui/inspector/RestStepInspector";
+import { ProgressionGlobalInspector } from "../ui/inspector/ProgressionGlobalInspector";
 import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
@@ -113,22 +114,26 @@ import {
 } from "./commands/matrixTemplateCommands";
 import {
   addRestStep,
+  batchEditStepPerformance,
+  batchSetStepDuration,
   editStepPerformance,
   removeStep,
   reorderStep,
   replaceStep,
+  resetAllStepPerformance,
   resetStepPerformance,
   selectStep,
-  setAllStepCardView,
   repeatChordStep,
   type AddRestStepCommand,
+  type BatchEditStepPerformanceCommand,
+  type BatchSetStepDurationCommand,
   type EditStepPerformanceCommand,
   type RemoveStepCommand,
   type ReorderStepCommand,
   type ReplaceStepCommand,
+  type ResetAllStepPerformanceCommand,
   type ResetStepPerformanceCommand,
   type SelectStepCommand,
-  type SetAllStepCardViewCommand,
   type RepeatChordStepCommand,
 } from "./commands/progressionCommands";
 import {
@@ -177,11 +182,21 @@ import {
   setTheme,
   setExpertiseMode,
   setStaffBassVisibility,
+  setProgressionView,
+  setMeasuresPerSystem,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
+  type SetProgressionViewCommand,
+  type SetMeasuresPerSystemCommand,
 } from "./commands/presentationCommands";
-import type { PresentationMode, ThemeMode, Project } from "../domain/project/project";
+import type {
+  MeasuresPerSystem,
+  PresentationMode,
+  ThemeMode,
+  Project,
+  ProgressionView,
+} from "../domain/project/project";
 import type {
   ChordMelodyRecipe,
   MelodyInstrument,
@@ -900,12 +915,13 @@ export function App() {
     };
     store.dispatch(command, editStepPerformance);
   };
-  const setProgressionViews = (view: CardViewId) => {
-    const command: SetAllStepCardViewCommand = {
-      type: "progression/set-all-card-view",
+  const changeProgressionView = (view: ProgressionView) => {
+    if (view === project.presentation.progressionView) return;
+    const command: SetProgressionViewCommand = {
+      type: "presentation/set-progression-view",
       payload: { view, nowIso: new Date().toISOString() },
     };
-    store.dispatch(command, setAllStepCardView);
+    store.dispatch(command, setProgressionView);
   };
   const replaceProgressionStep = (stepId: string, functionId: string) => {
     const command: ReplaceStepCommand = {
@@ -920,6 +936,27 @@ export function App() {
       payload: { stepId, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, resetStepPerformance);
+  };
+  const batchEditProgressionPerformance = (performance: Partial<StepPerformance>) => {
+    const command: BatchEditStepPerformanceCommand = {
+      type: "progression/batch-edit-performance",
+      payload: { performance, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchEditStepPerformance);
+  };
+  const batchSetProgressionDuration = (duration: MusicalDuration) => {
+    const command: BatchSetStepDurationCommand = {
+      type: "progression/batch-set-duration",
+      payload: { duration, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchSetStepDuration);
+  };
+  const resetAllProgressionPerformance = () => {
+    const command: ResetAllStepPerformanceCommand = {
+      type: "progression/reset-all-performance",
+      payload: { nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, resetAllStepPerformance);
   };
   const removeProgressionStep = (stepId: string) => {
     const command: RemoveStepCommand = {
@@ -1050,6 +1087,14 @@ export function App() {
       payload: { visible, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, setStaffBassVisibility);
+  };
+  const changeMeasuresPerSystem = (measuresPerSystem: MeasuresPerSystem) => {
+    if (measuresPerSystem === project.presentation.measuresPerSystem) return;
+    const command: SetMeasuresPerSystemCommand = {
+      type: "presentation/set-measures-per-system",
+      payload: { measuresPerSystem, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setMeasuresPerSystem);
   };
   const applyModuleSwitch = (
     destinationModule: HarmonicModuleId,
@@ -1307,6 +1352,14 @@ export function App() {
         ) {
           return;
         }
+        if (
+          project.progression.selectedStepId &&
+          !document.activeElement?.closest(".selected-step-stack")
+        ) {
+          e.preventDefault();
+          setProgressionSelection();
+          return;
+        }
         if (settingsFunctionId || store.matrixSession.previewFunctionId) {
           e.preventDefault();
           clearMatrixSelection();
@@ -1485,15 +1538,6 @@ export function App() {
     }
   };
 
-  const progressionChordViews = project.progression.steps
-    .filter((step): step is ChordStep => step.kind === "chord")
-    .map((step) => step.cardView);
-  const progressionCardView: CardViewId | "mixed" =
-    progressionChordViews.length > 0 &&
-    progressionChordViews.every((view) => view === progressionChordViews[0])
-      ? progressionChordViews[0]!
-      : "mixed";
-
   if (!projectReady) {
     return (
       <main className="app-shell">
@@ -1560,8 +1604,8 @@ export function App() {
                 onRedo={() => store.redo()}
                 cardView={project.presentation.globalMatrixCardView}
                 onCardViewChange={globalView}
-                progressionCardView={progressionCardView}
-                onProgressionCardViewChange={setProgressionViews}
+                progressionView={project.presentation.progressionView}
+                onProgressionViewChange={changeProgressionView}
                 showBassInStaff={project.presentation.showBassInStaff}
                 onShowBassInStaffChange={changeStaffBassVisibility}
               />
@@ -1703,7 +1747,16 @@ export function App() {
               )
             }
           />
-        ) : null
+        ) : (
+          <ProgressionGlobalInspector
+            project={project}
+            onBatchPerformanceChange={batchEditProgressionPerformance}
+            onBatchDurationChange={batchSetProgressionDuration}
+            onResetAll={resetAllProgressionPerformance}
+            onSetProgressionView={changeProgressionView}
+            onSetMeasuresPerSystem={changeMeasuresPerSystem}
+          />
+        )
       }
       onProgressionBackgroundClick={() => setProgressionSelection()}
       onMatrixBackgroundClick={clearMatrixSelection}
@@ -1802,7 +1855,7 @@ export function App() {
             onSelectStep={selectProgressionStep}
             onClearSelection={() => setProgressionSelection()}
             onEditPerformance={editProgressionPerformance}
-            onSetAllViews={setProgressionViews}
+            onSetProgressionView={changeProgressionView}
             onRemove={removeProgressionStep}
             onReorder={reorderProgressionStep}
             onAddRest={addRest}
@@ -1819,6 +1872,7 @@ export function App() {
             onRemoveMelodyRecipe={removeMelodyRecipeForStep}
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
+            onSetMeasuresPerSystem={changeMeasuresPerSystem}
           />
           <BranchComparison
             project={project}

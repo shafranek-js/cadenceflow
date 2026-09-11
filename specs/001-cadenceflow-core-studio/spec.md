@@ -443,6 +443,37 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
    projection is requested, **Then** piano playback continues with an explicit melody fallback state,
    while MIDI and MusicXML remain available and contain the deterministic melody projection.
 
+---
+
+### User Story 13 - Read My Progression as one coherent score (Priority: P2)
+
+As a composer, I want one global presentation mode for My Progression and professionally grouped Staff
+systems so that the same musical timeline remains coherent instead of becoming a mixture of unrelated
+per-measure cards.
+
+**Independent Test**: Open legacy uniform and mixed-view projects, switch the global Progression View
+between Harmonic, Piano, and Staff, choose Auto or one to four measures per system, and verify readable
+responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and preserved interactions.
+
+**Acceptance Scenarios**:
+
+1. **Given** My Progression, **When** the user switches its view from any exposed control, **Then** every
+   measure uses the same `Harmonic`, `Piano`, or `Staff` mode and no `Mixed` state is available.
+2. **Given** an older project without `presentation.progressionView`, **When** it is loaded, **Then** a
+   uniform saved `step.cardView` initializes that global view, while mixed or absent values initialize
+   `Harmonic`; subsequent saves persist the explicit presentation value without rewriting the Steps.
+3. **Given** Staff mode, **When** several measures fit, **Then** they render as a continuous score system
+   with common barlines and attack positions rather than independent staff cards.
+4. **Given** a narrow viewport or dense notation, **When** Staff systems are laid out, **Then** Auto or
+   the selected one-to-four measure setting acts as a maximum, reflow reduces the count when needed,
+   and a single over-dense measure scrolls internally without widening the page.
+5. **Given** at least one Melody recipe, **When** any Staff system renders, **Then** its Melody staff is
+   present and empty spans contain rests; Harmony treble is always present and bass depends only on the
+   saved `showBassInStaff` setting.
+6. **Given** selection, playback, reorder, context-menu, Rest, or trailing-gap actions, **When** the user
+   changes Progression View or the Staff system grouping, **Then** those interactions remain available
+   and musical, playback, Melody, and export semantics remain unchanged.
+
 ## Edge Cases
 
 - A requested harmonic recommendation has fewer than three strong Alternatives.
@@ -637,16 +668,15 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
   current preview realization. Changing inversion, register, harmonic variant, automatic/manual voicing,
   or another realization-affecting preview setting MUST update every applicable Card View consistently;
   Card Views MUST NOT own separate musical state.
-- **FR-066**: My Progression chord steps MUST support the same extensible Card View concept where
-  musically applicable, including `Harmonic`, `Piano`, and `Staff` in v1 and future instrument-specific
-  views registered by Instrument Profiles.
-- **FR-067**: A Progression Step Card View MUST project that step's own independent saved realization
-  and performance state, including its harmonic variant, exact/manual voicing where present, register,
-  bass, dynamics, and notation spelling; it MUST NOT read mutable preview settings from the Matrix card
-  from which the step was originally added.
-- **FR-068**: My Progression MUST support both per-step Card View selection and a progression-level
-  Card View control that switches all visible chord steps to one supported view without mutating their
-  musical state.
+- **FR-066**: Matrix Chord Cards MUST retain the extensible Card View concept with global selection and
+  optional per-card overrides. My Progression MUST expose a separate single global Progression View,
+  limited in v1 to `Harmonic`, `Piano`, or `Staff`; it MUST NOT expose per-step view selection.
+- **FR-067**: Every My Progression view MUST project each Step's own independent saved realization and
+  performance state, including harmonic variant, exact/manual voicing where present, register, bass,
+  dynamics, and notation spelling; it MUST NOT read mutable preview settings from the source Matrix card.
+- **FR-068**: Changing the global My Progression view MUST be presentational and undoable, MUST update
+  all visible measures coherently, and MUST NOT mutate `step.cardView`, Chord Steps, Melody recipes,
+  playback semantics, or export output. `Mixed` MUST NOT exist as a runtime or user-interface value.
 
 #### Chord variants and progression-step object model
 
@@ -1009,6 +1039,37 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
 - **FR-207**: When melody exists, MusicXML export MUST add a deterministic single-staff Melody part before
   Piano with instrument name, supported clef, concert-pitch notes, rests, tuplets, and cross-bar ties.
   Projects without melody MUST retain the existing MusicXML output.
+- **FR-208**: `PresentationState` MUST persist `progressionView` as `harmonic | piano | staff` and
+  `measuresPerSystem` as `auto | 1 | 2 | 3 | 4`. Both settings MUST be editable by undoable presentation
+  commands that do not change Progression Steps.
+- **FR-209**: The project schema version MUST remain unchanged for US13. When an older project lacks an
+  explicit `presentation.progressionView`, a non-empty uniform set of saved Chord Step `cardView` values
+  MUST initialize it; mixed, empty, or absent values MUST initialize `harmonic`. The legacy field remains
+  loadable but MUST be hidden, unwritten by Progression UI, and ignored by Progression rendering.
+- **FR-210**: Staff View MUST render one SVG per score system. A system MUST contain sequential measures
+  on one shared horizontal timeline with coincident barlines and equal x positions for simultaneous
+  Melody and Harmony attacks.
+- **FR-211**: `measuresPerSystem` MUST apply only to Staff and MUST be a maximum. Manual values `1`–`4`
+  remain hard maximums. For `auto`, Staff MUST calculate the maximum as
+  `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`, where
+  `measureDurationQuarterBeats = numerator × 4 / denominator`. Available width and attack density MAY
+  reduce the actual count. A normal measure width MUST be proportional to its musical duration at an
+  baseline of `84 px × measureDurationQuarterBeats`; the normal attack budget is two unique attacks
+  per quarter-note beat, and each attack beyond that budget adds `44 px`. This gives
+  approximately 168 px for 2/4, 252 px for 3/4 or 6/8, 336 px for 4/4, 294 px for 7/8, and allows
+  four normally dense 4/4 measures in a 1344 px desktop rail. Measures MUST be greedily packed until
+  the maximum count or available width is reached.
+- **FR-212**: A single Staff measure whose required width exceeds the available system width MUST retain
+  that width inside a local horizontal scroller; it MUST NOT create page-level horizontal overflow.
+- **FR-213**: When any Chord Step owns a Melody recipe, every Staff system MUST render the Melody staff
+  and fill silent spans with rests. Harmony treble MUST always render; bass MUST render exactly when
+  `showBassInStaff=true` and MUST NOT disappear automatically because of available width.
+- **FR-214**: Every Staff system MUST repeat the clef and only the first system MUST show the global time
+  signature. Harmonic/Piano views MUST ignore `measuresPerSystem` and render independent, full-width
+  measure sections in a vertical flow; steps within one measure MUST remain in one horizontal row with
+  measure-local adaptation or scrolling when needed. Neighboring measures MUST NOT be grouped or
+  dimension-matched as a score system. All three modes MUST preserve selection, playback highlighting,
+  drag/reorder, context menus, Rest representation, and trailing-gap actions.
 
 ### Scope Boundaries
 
@@ -1035,6 +1096,9 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
 - Beginner / Composer / Expert presentation modes.
 - Extensible Matrix Card Views with per-card and global switching; v1 includes Harmonic, Piano, and
   Staff views, while future Instrument Profiles can contribute views such as Guitar visualization.
+- One global My Progression View (`Harmonic`, `Piano`, or `Staff`) with no per-step or `Mixed` mode.
+  Harmonic/Piano use independent vertical measure sections; Staff uses responsive continuous score
+  systems, with Auto allowing two to six measures by meter and manual layout capped at four.
 - Multi-step what-if branch from any progression point, Original vs Alternative comparison, rejoin,
   selective or whole-branch commit.
 - Independent Progression Step objects and drag/drop reordering.
@@ -1101,6 +1165,11 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
 - **Card View**: Presentational projection of a Matrix Chord Card over the same harmonic/preview state,
   such as Harmonic, Piano, Staff, or a future instrument-specific view. It can be selected globally for
   visible cards or overridden per card without creating a new musical object.
+- **Progression View**: The single project presentation mode used by every measure in My Progression.
+  Harmonic and Piano use independent full-width vertical measure sections with one horizontal step row
+  per measure; Staff groups sequential measures into continuous systems.
+- **Score System**: A responsive Staff projection containing one or more consecutive measures and all
+  visible Melody/Harmony staves on a shared temporal x-axis.
 - **Chord Definition**: Base harmonic identity/function available in a Harmonic Context, separate from
   any specific progression occurrence.
 - **Chord Card Preview/Add Template**: Project-local editable audition/add-template state on a Matrix
@@ -1191,6 +1260,9 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
   generated events use only the source Chord Step's contextual upper pitches, retain exact Rational
   ordering and duration through Staff, playback, MIDI, MusicXML, save/reopen, and Undo/Redo, and never
   serialize a generated-note list.
+- **SC-019**: Across 1280×720, 1920×1080, light/dark themes, and 200% zoom, My Progression exposes no
+  `Mixed` state, Staff systems retain aligned Melody/Harmony attacks and readable reflow without
+  page-level horizontal overflow, and all progression interactions remain operable by mouse and keyboard.
 
 ## Assumptions
 

@@ -67,7 +67,7 @@ function renderHarness(): Harness {
       },
       onEditPerformance: () => undefined,
       onDurationChange: () => undefined,
-      onSetAllViews: () => undefined,
+      onSetProgressionView: () => undefined,
       onReplace: () => undefined,
       onReset: () => undefined,
       onRemove: () => undefined,

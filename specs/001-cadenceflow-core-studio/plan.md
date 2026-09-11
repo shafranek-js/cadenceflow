@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles.
+Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles. US13 separates Matrix Card Views from one global My Progression view and renders Staff as responsive multi-measure score systems.
 
 Audio is sample-based rather than oscillator-based: the launch piano uses a high-quality multisampled acoustic grand through an `InstrumentAudioProvider`, with web-optimized lazy loading/caching; an SF2/SF3 provider can be integrated independently. MIDI and MusicXML are separate projections of the same semantic model.
 
@@ -20,7 +20,7 @@ Audio is sample-based rather than oscillator-based: the launch piano uses a high
 **Project Type**: Single-page desktop-first web application; no backend in v1  
 **Performance Goals**: Matrix interaction response <100 ms for ordinary local actions; preview note scheduling audible without UI-frame-dependent jitter; recommendation refresh <100 ms for v1 vocabulary; 60 fps target for ordinary UI motion; no page-level horizontal scroll in supported desktop range  
 **Constraints**: Harmonic/domain core must be browser/UI/audio-library independent; large piano assets must not block UI; autosave must not persist Undo history; no silent harmonic conversion; no ML requirement  
-**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, one full production instrument profile, six curated Melody Track timbres, three v1 Card Views
+**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, one full production instrument profile, six curated Melody Track timbres, three Matrix Card Views, and three mutually exclusive My Progression views
 
 ## Constitution Check
 
@@ -295,7 +295,8 @@ Deliver:
 - manual Piano Voicing Editor.
 - bass/register/articulation/dynamics/per-note velocity.
 - dynamics presets.
-- My Progression drag/drop and step-local Card Views/settings.
+- My Progression drag/drop and step-local musical/performance settings; the historical per-step view
+  behavior is superseded by the global Progression View in Slice 12.
 
 Exit gate:
 - repeated same-chord steps remain independent through edit/save/reopen.
@@ -382,6 +383,27 @@ Exit gate:
   schema, UI, audio, playback, or export integration proceeds; the complete US12 acceptance follows in
   Phase 16 after review of the generator.
 
+### Slice 12 — User Story 13: global Progression View and score systems
+
+Deliver:
+- required `PresentationState.progressionView` and `measuresPerSystem` values, no schema-version bump,
+  deterministic legacy initialization from hidden `step.cardView`, portable persistence, and undoable
+  presentation-only commands;
+- one synchronized Progression View value in the toolbar, View menu, Global Inspector, and renderer,
+  with no `Mixed` runtime/UI state and no production mutation of legacy per-step views;
+- a pure score-system grouping projection using the documented measure-width and attack-density rules;
+- one VexFlow SVG per system with shared Melody/Harmony temporal positions, repeated clefs, first-system
+  meter, optional saved bass, rests, ties, tuplets, and local overflow for a single dense measure;
+- separate full-width vertical Harmonic/Piano measure sections with one horizontal step row per measure,
+  plus Staff-system interactions preserving selection,
+  playback highlight, reorder, context menus, Rest, and trailing-gap actions;
+- visual/accessibility polish and focused Chromium acceptance at supported viewports, themes, and zoom.
+
+Exit gate:
+- FR-208–FR-214 and SC-019 pass focused unit/integration/Chromium checks, production build, scoped
+  formatting, and independent diff review without changing Melody, playback, Matrix Card View, or export
+  semantics.
+
 ## Performance and Audio Strategy
 
 - Recommendation calculations remain synchronous/pure while v1 vocabulary is small; move to worker only if profiling demonstrates a need.
@@ -402,6 +424,8 @@ Exit gate:
 - Chord cards and their `+`/settings/reset affordances are keyboard reachable.
 - Recommendation state uses text/icon/shape in addition to color.
 - Global/per-card Card View switching preserves focus logically.
+- The global Progression View and measures-per-system controls preserve focus logically and never expose
+  a synthetic `Mixed` option.
 - Drag/drop has keyboard-accessible reorder commands.
 - Tooltips are supplementary; critical state is available via accessible names/descriptions.
 
@@ -413,6 +437,7 @@ Exit gate:
 - [x] Audio quality requirement does not couple harmonic semantics to one sound bank format.
 - [x] Progression Step independence is preserved through persistence/export.
 - [x] Acceptance criteria have corresponding implementation/test slices.
+- [x] US13 keeps score-system layout as a projection over canonical measure/music semantics.
 
 **Gate result**: PASS.
 

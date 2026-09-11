@@ -8,9 +8,9 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import type { Project } from "../../domain/project/project";
+import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/project/project";
 import type { AudioProviderState } from "../../audio/contracts";
-import type { CardViewId, StepPerformance } from "../../domain/progression/step";
+import type { StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
@@ -29,7 +29,8 @@ import type { LoopState } from "../transport/loopState";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
-import { MeasureStaffView, type MeasureStaffItem } from "../staff/MeasureStaffView";
+import type { MeasureStaffItem } from "../staff/MeasureStaffView";
+import { ScoreSystemView } from "../staff/ScoreSystemView";
 import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
 import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
 import { MelodyTrackControls } from "../melody/MelodyTrackControls";
@@ -41,7 +42,6 @@ import type {
   MelodyTrackSettings,
 } from "../../domain/melody/types";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
-import { MelodyStaffView } from "../melody/MelodyStaffView";
 import {
   canShiftPerformanceOctave,
   performanceOctaveShiftPatch,
@@ -63,7 +63,7 @@ export function ProgressionTrack({
   onSelectStep,
   onClearSelection,
   onEditPerformance,
-  onSetAllViews,
+  onSetProgressionView,
   onRemove,
   onReorder,
   onAddRest,
@@ -85,6 +85,7 @@ export function ProgressionTrack({
   isMelodyPreviewPlaying,
   onPlayMelodyPreview,
   onStopMelodyPreview,
+  onSetMeasuresPerSystem,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -92,7 +93,7 @@ export function ProgressionTrack({
   readonly onSelectStep: (stepId: string) => void;
   readonly onClearSelection?: () => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
-  readonly onSetAllViews: (view: CardViewId) => void;
+  readonly onSetProgressionView: (view: ProgressionView) => void;
   readonly onRemove: (stepId: string) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
   readonly onAddRest?: (duration?: MusicalDuration) => void;
@@ -118,6 +119,7 @@ export function ProgressionTrack({
   readonly isMelodyPreviewPlaying?: boolean;
   readonly onPlayMelodyPreview?: (project: Project) => void;
   readonly onStopMelodyPreview?: () => void;
+  readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -148,13 +150,6 @@ export function ProgressionTrack({
     if (start === -1 || end === -1 || start > end) return null;
     return { start, end };
   })();
-  const chordViews = project.progression.steps
-    .filter((step) => step.kind === "chord")
-    .map((step) => step.cardView);
-  const commonView =
-    chordViews.length && chordViews.every((view) => view === chordViews[0])
-      ? chordViews[0]!
-      : "mixed";
   const hasMelodyRecipe = project.progression.steps.some(
     (step) => step.kind === "chord" && step.melody !== undefined,
   );
@@ -312,6 +307,10 @@ export function ProgressionTrack({
     setMatrixGapHint(measureNumber);
   };
 
+  const handleProgressionViewChange = (view: ProgressionView) => {
+    onSetProgressionView(view);
+  };
+
   const renderRest = (fragment: ProgressionMeasureFragment) => {
     const step = fragment.step;
     const index = fragment.stepIndex;
@@ -438,6 +437,7 @@ export function ProgressionTrack({
           step={step}
           stepNumber={index + 1}
           tonic={project.tonic}
+          view={project.presentation.progressionView}
           compactStaff={compactStaff}
           selected={isSelected}
           playing={isPlaying}
@@ -512,6 +512,47 @@ export function ProgressionTrack({
     );
   };
 
+  const usesStaffSystems = project.presentation.progressionView === "staff";
+  const renderMeasureCard = (measure: (typeof layout.measures)[number]) => {
+    const isSelectedMeasure = measure.items.some(
+      (item) => item.kind !== "gap" && item.stepId === selectedStepId,
+    );
+    return (
+      <section
+        key={measure.measureIndex}
+        className={`progression-measure-card ${usesStaffSystems ? "has-shared-staff" : ""} ${isSelectedMeasure ? "has-selected-step" : ""}`}
+        data-testid="progression-measure"
+        data-measure-index={measure.measureIndex}
+        data-has-selected-step={isSelectedMeasure ? "true" : undefined}
+        aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
+      >
+        <header className="progression-measure-header">
+          <strong>Measure {measure.number}</strong>
+          <span>
+            {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
+          </span>
+          <span aria-label={`Grouping ${project.globalTiming.meter.grouping.join(" plus ")}`}>
+            {project.globalTiming.meter.grouping.join("+")}
+          </span>
+        </header>
+        <div className="progression-measure-grid" data-testid="progression-measure-grid">
+          {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
+            <div
+              key={
+                item.kind === "gap" ? `gap-${itemIndex}` : `${item.stepId}-${item.fragmentIndex}`
+              }
+              className="measure-item-wrapper"
+            >
+              {item.kind === "gap"
+                ? renderGap(measure.number, item.durationBeats)
+                : renderFragment(item, measure.number, usesStaffSystems)}
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div
       ref={trackRef}
@@ -524,19 +565,42 @@ export function ProgressionTrack({
           Progression View
           <select
             aria-label="Progression Card View"
-            value={commonView}
+            value={project.presentation.progressionView}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              event.target.value !== "mixed" && onSetAllViews(event.target.value as CardViewId)
+              handleProgressionViewChange(event.target.value as ProgressionView)
             }
           >
-            <option value="mixed" disabled>
-              Mixed
-            </option>
             <option value="harmonic">Harmonic</option>
             <option value="piano">Piano</option>
             <option value="staff">Staff</option>
           </select>
         </label>
+        {usesStaffSystems && onSetMeasuresPerSystem ? (
+          <label>
+            Measures / system
+            <select
+              aria-label="Measures Layout"
+              aria-describedby={
+                project.presentation.measuresPerSystem === "auto"
+                  ? "progression-measures-layout-description"
+                  : undefined
+              }
+              value={String(project.presentation.measuresPerSystem)}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                const value = event.target.value;
+                onSetMeasuresPerSystem(
+                  value === "auto" ? "auto" : (Number(value) as MeasuresPerSystem),
+                );
+              }}
+            >
+              <option value="auto">Auto (Responsive)</option>
+              <option value="4">4 Measures / System</option>
+              <option value="3">3 Measures / System</option>
+              <option value="2">2 Measures / System</option>
+              <option value="1">1 Measure / System (Full)</option>
+            </select>
+          </label>
+        ) : null}
         {onAddRest ? (
           <button
             type="button"
@@ -548,7 +612,7 @@ export function ProgressionTrack({
           </button>
         ) : null}
       </div>
-      {commonView === "staff" && onHarmonyTrackSettingsChange ? (
+      {project.presentation.progressionView === "staff" && onHarmonyTrackSettingsChange ? (
         <div className="track-controls-grid">
           <HarmonyTrackControls
             settings={project.harmonyTrack}
@@ -568,7 +632,12 @@ export function ProgressionTrack({
           ) : null}
         </div>
       ) : null}
-      <div className="progression-step-cards" onClick={handleBackgroundClick}>
+      <div
+        className="progression-step-cards"
+        data-view={project.presentation.progressionView}
+        data-layout={String(project.presentation.measuresPerSystem)}
+        onClick={handleBackgroundClick}
+      >
         {matrixGapHint !== null ? (
           <p className="progression-gap-hint" role="status" data-testid="progression-gap-hint">
             Choose a chord in Matrix; it will be added after the authored content in measure{" "}
@@ -587,78 +656,32 @@ export function ProgressionTrack({
             <span>Preview a chord in the Matrix, then press + to add it.</span>
           </div>
         ) : null}
-        {layout.measures.map((measure) => {
-          const usesSharedStaff = commonView === "staff";
-          const staffItems = usesSharedStaff ? staffItemsForMeasure(measure) : [];
-          const isSelectedMeasure = measure.items.some(
-            (item) => item.kind !== "gap" && item.stepId === selectedStepId,
-          );
-          return (
-            <section
-              key={measure.measureIndex}
-              className={`progression-measure-card ${usesSharedStaff ? "has-shared-staff" : ""} ${isSelectedMeasure ? "has-selected-step" : ""}`}
-              data-testid="progression-measure"
-              data-measure-index={measure.measureIndex}
-              data-has-selected-step={isSelectedMeasure ? "true" : undefined}
-              aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
+        {usesStaffSystems ? (
+          <>
+            <ScoreSystemView
+              project={project}
+              layout={layout}
+              melodyTimeline={melodyTimeline}
+              measuresPerSystem={project.presentation.measuresPerSystem}
+              selectedStepId={selectedStepId}
+              playingStepId={currentPlayingStepId}
+              activeMelodyEventKey={activeMelodyEventKey}
+              measureItemsForMeasure={staffItemsForMeasure}
+              onSelectStep={onSelectStep}
+              onOctaveChange={shiftStaffOctave}
+              {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
+            />
+            <div
+              className="progression-staff-step-grids"
+              data-testid="progression-staff-step-grids"
+              style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%", maxWidth: "100%" }}
             >
-              <header className="progression-measure-header">
-                <strong>Measure {measure.number}</strong>
-                <span>
-                  {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
-                </span>
-                <span aria-label={`Grouping ${project.globalTiming.meter.grouping.join(" plus ")}`}>
-                  {project.globalTiming.meter.grouping.join("+")}
-                </span>
-              </header>
-              {usesSharedStaff ? (
-                <div
-                  className={`progression-measure-score ${melodyTimeline ? "has-melody-staff" : ""}`}
-                  data-testid="progression-measure-score"
-                  role="group"
-                  aria-label={`Score for measure ${measure.number}`}
-                >
-                  {melodyTimeline ? (
-                    <MelodyStaffView
-                      project={project}
-                      timeline={melodyTimeline}
-                      measure={melodyTimeline.measures[measure.measureIndex]!}
-                      {...(selectedStepId !== undefined ? { selectedStepId } : {})}
-                      {...(activeMelodyEventKey ? { activeMelodyEventKey } : {})}
-                      onSelectStep={onSelectStep}
-                    />
-                  ) : null}
-                  <MeasureStaffView
-                    items={staffItems}
-                    meter={project.globalTiming.meter}
-                    barLengthBeats={layout.barLengthBeats}
-                    selectedStepId={selectedStepId}
-                    playingStepId={currentPlayingStepId}
-                    onSelect={onSelectStep}
-                    onOctaveChange={shiftStaffOctave}
-                    {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
-                  />
-                </div>
-              ) : null}
-              <div className="progression-measure-grid" data-testid="progression-measure-grid">
-                {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
-                  <div
-                    key={
-                      item.kind === "gap"
-                        ? `gap-${itemIndex}`
-                        : `${item.stepId}-${item.fragmentIndex}`
-                    }
-                    className="measure-item-wrapper"
-                  >
-                    {item.kind === "gap"
-                      ? renderGap(measure.number, item.durationBeats)
-                      : renderFragment(item, measure.number, usesSharedStaff)}
-                  </div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+              {layout.measures.map(renderMeasureCard)}
+            </div>
+          </>
+        ) : (
+          layout.measures.map(renderMeasureCard)
+        )}
       </div>
       {melodyMenu
         ? (() => {

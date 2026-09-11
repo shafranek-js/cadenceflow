@@ -65,7 +65,9 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(page.getByTestId("progression-step")).toHaveCount(3);
     await page.getByLabel("Progression Card View").selectOption("staff");
 
-    const staffEvents = page.getByTestId("progression-measure").locator(".measure-staff-event");
+    const staffEvents = page
+      .getByTestId("progression-score-systems")
+      .locator(".measure-staff-event");
     await expect(staffEvents).toHaveCount(3);
     const firstStep = staffEvents.first();
     await firstStep.locator(".measure-staff-event-select").click();
@@ -117,45 +119,45 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(controls).toBeVisible();
     await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
     await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
-    await expect(page.getByTestId("melody-staff-measure")).toHaveCount(2);
+    const scoreSystems = page.getByTestId("progression-score-system");
+    await expect(scoreSystems).toHaveCount(1);
+    const firstScore = scoreSystems.first();
+    const firstSvg = firstScore.locator(".score-system-canvas > svg");
+    await expect(firstSvg).toHaveCount(1);
+    await expect(firstScore.locator(".score-system-paper")).toHaveCSS(
+      "background-color",
+      "rgb(255, 255, 255)",
+    );
 
-    const measureScores = page.getByTestId("progression-measure-score");
-    await expect(measureScores).toHaveCount(2);
-    const firstScore = measureScores.first();
-    await expect(firstScore.getByTestId("melody-staff-measure")).toHaveCount(1);
-    await expect(firstScore.getByTestId("measure-staff-view")).toHaveCount(1);
-    await expect(firstScore).toHaveCSS("background-color", "rgb(255, 255, 255)");
-    await expect(firstScore.getByTestId("melody-staff-measure")).toHaveCSS("margin-bottom", "0px");
-    await expect(firstScore.getByTestId("measure-staff-view")).toHaveCSS("border-top-width", "1px");
-
-    const alignedStaffCanvases = firstScore.locator(".melody-staff-canvas, .measure-staff");
-    await expect(alignedStaffCanvases).toHaveCount(2);
-    const staffCanvasBounds = await alignedStaffCanvases.evaluateAll((nodes) =>
+    const alignedStaves = firstSvg.locator(".vf-stave");
+    await expect(alignedStaves).toHaveCount(4);
+    const staffCanvasBounds = await alignedStaves.evaluateAll((nodes) =>
       nodes.map((node) => {
         const bounds = node.getBoundingClientRect();
-        return { left: bounds.left, right: bounds.right };
+        return { left: bounds.left, right: bounds.right, top: bounds.top };
       }),
     );
-    expect(Math.abs(staffCanvasBounds[0]!.left - staffCanvasBounds[1]!.left)).toBeLessThanOrEqual(
-      1,
-    );
-    expect(Math.abs(staffCanvasBounds[0]!.right - staffCanvasBounds[1]!.right)).toBeLessThanOrEqual(
-      1,
-    );
+    for (const [melodyIndex, harmonyIndex] of [
+      [0, 2],
+      [1, 3],
+    ] as const) {
+      expect(
+        Math.abs(staffCanvasBounds[melodyIndex]!.left - staffCanvasBounds[harmonyIndex]!.left),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(staffCanvasBounds[melodyIndex]!.right - staffCanvasBounds[harmonyIndex]!.right),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(staffCanvasBounds[melodyIndex]!.top - staffCanvasBounds[harmonyIndex]!.top),
+      ).toBeGreaterThan(100);
+    }
 
-    const melodySvg = page.getByTestId("melody-staff-measure").first().locator("svg");
-    await expect(melodySvg).toHaveAttribute("data-staff-clef", "bass");
-    await expect(melodySvg).toHaveAttribute("data-staff-meter", "4/4");
-    await expect(melodySvg.locator(".vf-clef")).toHaveCount(1);
-    await expect(melodySvg.locator(".vf-timesignature")).toHaveCount(1);
+    await expect(firstSvg).toHaveAttribute("data-staff-system-clefs", "bass,treble");
+    await expect(firstSvg).toHaveAttribute("data-staff-meter", "4/4");
+    await expect(firstSvg.locator(".vf-clef")).toHaveCount(2);
+    await expect(firstSvg.locator(".vf-timesignature")).toHaveCount(2);
     await expect(page.locator("[data-melody-event-key]")).not.toHaveCount(0);
     await expect(page.locator(".melody-staff-note.is-continuation")).not.toHaveCount(0);
-    await expect(
-      page.getByTestId("measure-staff-view").first().locator(".measure-staff > svg"),
-    ).toHaveAttribute("data-staff-clef", "treble");
-    await expect(
-      page.getByTestId("measure-staff-view").first().locator(".measure-staff > svg"),
-    ).toHaveAttribute("data-staff-meter", "4/4");
 
     await select.click();
     await expect
@@ -163,23 +165,12 @@ test.describe("US12 — melody editor and derived staff", () => {
         () =>
           page
             .locator(
-              '.measure-staff > svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
+              '.score-system-canvas > svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
             )
             .count(),
         { intervals: [20, 20, 40, 60, 80] },
       )
       .toBeGreaterThan(0);
-    await expect
-      .poll(
-        () =>
-          page
-            .locator(
-              '[data-testid="melody-staff-measure"] svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
-            )
-            .count(),
-        { intervals: [20, 20, 40, 60, 80] },
-      )
-      .toBe(1);
     await expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -235,6 +226,6 @@ test.describe("US12 — melody editor and derived staff", () => {
 
     await page.keyboard.press("Control+Z");
     await expect(page.getByRole("region", { name: "Melody Track controls" })).toBeVisible();
-    await expect(page.getByTestId("melody-staff-measure")).toHaveCount(2);
+    await expect(page.getByTestId("progression-score-system")).toHaveCount(1);
   });
 });

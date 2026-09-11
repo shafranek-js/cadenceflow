@@ -175,6 +175,83 @@ export function resetStepPerformance(
   );
 }
 
+export interface BatchEditStepPerformancePayload {
+  readonly performance: Partial<StepPerformance>;
+  readonly nowIso: string;
+}
+export type BatchEditStepPerformanceCommand = ProjectCommand<BatchEditStepPerformancePayload> & {
+  readonly type: "progression/batch-edit-performance";
+};
+export function batchEditStepPerformance(
+  project: Project,
+  command: BatchEditStepPerformanceCommand,
+): AppliedCommand {
+  const steps = project.progression.steps.map((step) => {
+    if (step.kind !== "chord") return step;
+    const performance = Object.freeze({
+      ...step.performance,
+      ...command.payload.performance,
+      bass: command.payload.performance.bass
+        ? Object.freeze({ ...command.payload.performance.bass })
+        : step.performance.bass,
+      perNoteVelocityOverrides: command.payload.performance.perNoteVelocityOverrides
+        ? Object.freeze({ ...command.payload.performance.perNoteVelocityOverrides })
+        : step.performance.perNoteVelocityOverrides,
+      ...(command.payload.performance.manualVoicing
+        ? { manualVoicing: Object.freeze([...command.payload.performance.manualVoicing]) }
+        : {}),
+    });
+    return Object.freeze({ ...step, performance });
+  });
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface BatchSetStepDurationPayload {
+  readonly duration: MusicalDuration;
+  readonly nowIso: string;
+}
+export type BatchSetStepDurationCommand = ProjectCommand<BatchSetStepDurationPayload> & {
+  readonly type: "progression/batch-set-duration";
+};
+export function batchSetStepDuration(
+  project: Project,
+  command: BatchSetStepDurationCommand,
+): AppliedCommand {
+  const steps = project.progression.steps.map((step) =>
+    Object.freeze({ ...step, duration: command.payload.duration }),
+  );
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface ResetAllStepPerformancePayload {
+  readonly nowIso: string;
+}
+export type ResetAllStepPerformanceCommand = ProjectCommand<ResetAllStepPerformancePayload> & {
+  readonly type: "progression/reset-all-performance";
+};
+export function resetAllStepPerformance(
+  project: Project,
+  command: ResetAllStepPerformanceCommand,
+): AppliedCommand {
+  const steps = project.progression.steps.map((step) => {
+    if (step.kind !== "chord") return step;
+    return resetChordStepPerformance(step, project.defaults.piano);
+  });
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+    command.payload.nowIso,
+  );
+}
+
 export interface ReplaceStepPayload {
   readonly stepId: string;
   readonly functionId: string;

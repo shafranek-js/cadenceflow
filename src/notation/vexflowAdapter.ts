@@ -1,5 +1,6 @@
 import {
   Accidental,
+  Beam,
   Formatter,
   Fraction,
   GhostNote,
@@ -156,6 +157,27 @@ export interface StaffSequencePosition {
   readonly key: string;
   readonly x: number;
   readonly ratio: number;
+}
+
+export interface StaffSystemMeasureInput {
+  readonly measureIndex: number;
+  readonly widthPx: number;
+  readonly harmonyEntries: readonly StaffSequenceEntry[];
+  readonly melodyEntries?: readonly StaffSequenceEntry[];
+}
+
+export type StaffSystemStaff = "melody" | "harmony" | "bass";
+
+export interface StaffSystemPosition extends StaffSequencePosition {
+  readonly staff: StaffSystemStaff;
+  readonly measureIndex: number;
+}
+
+export interface StaffSystemRenderOptions {
+  readonly widthPx?: number;
+  readonly showTimeSignature?: boolean;
+  readonly showBass?: boolean;
+  readonly melodyClef?: StaffClef;
 }
 
 interface RenderedSequenceTickable {
@@ -640,6 +662,388 @@ export function renderStaffSequence(
   svg.dataset.staffSequencePositions = positions
     .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
     .join(",");
+
+  return () => container.replaceChildren();
+}
+
+interface SystemRow {
+  readonly staff: StaffSystemStaff;
+  readonly clef: StaffClef;
+  readonly entriesForMeasure: (measure: StaffSystemMeasureInput) => readonly StaffSequenceEntry[];
+}
+
+interface SystemRowLayout {
+  readonly row: SystemRow;
+  readonly staves: readonly Stave[];
+  readonly height: number;
+  readonly top: number;
+}
+
+interface RenderedSystemTickable extends RenderedSequenceTickable {
+  readonly staff: StaffSystemStaff;
+  readonly measureIndex: number;
+  readonly stave: Stave;
+}
+
+function entriesForBassStaff(
+  entries: readonly StaffSequenceEntry[],
+): readonly StaffSequenceEntry[] {
+  return Object.freeze(
+    entries.map((entry) => {
+      if (entry.kind === "chord" && entry.bassProjection) {
+        const { bassProjection: _bassProjection, ...withoutBassProjection } = entry;
+        return Object.freeze({ ...withoutBassProjection, projection: entry.bassProjection });
+      }
+      if (entry.kind === "rest" || entry.kind === "gap") return entry;
+      return Object.freeze({
+        key: entry.key,
+        kind: "gap" as const,
+        duration: entry.duration,
+        startOffsetBeats: entry.startOffsetBeats,
+      });
+    }),
+  );
+}
+
+function beamGroupsForMeter(meter: Meter): Fraction[] {
+  if (meter.grouping.length > 1) {
+    return meter.grouping.map((pulses) => new Fraction(pulses, meter.denominator));
+  }
+  // The score reference groups 4/4 eighth-notes by half-bar. This keeps four
+  // related attacks visually together while preserving a clear mid-bar break.
+  if (meter.numerator === 4 && meter.denominator === 4) {
+    return [new Fraction(2, 4)];
+  }
+  return Beam.getDefaultBeamGroups(`${meter.numerator}/${meter.denominator}`);
+}
+
+function createSystemBeams(
+  rendered: readonly RenderedSystemTickable[],
+  meter: Meter,
+): readonly Beam[] {
+  const notes = rendered
+    .map(({ note }) => note)
+    .filter((note): note is StaveNote => note instanceof StaveNote);
+  return Object.freeze(
+    Beam.generateBeams(notes, {
+      groups: beamGroupsForMeter(meter),
+      beamRests: false,
+      showStemlets: false,
+    }),
+  );
+}
+
+function systemStaffHeight(
+  entries: readonly StaffSequenceEntry[],
+  clef: StaffClef,
+  widthPx: number,
+  showTimeSignature: boolean,
+  meter: Meter,
+): number {
+  const probeStave = new Stave(0, 0, widthPx, {
+    leftBar: true,
+    rightBar: true,
+    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+  });
+  probeStave.addClef(clef);
+  if (showTimeSignature) probeStave.addTimeSignature(`${meter.numerator}/${meter.denominator}`);
+  const staffCenter = probeStave.getYForLine(2);
+  let topDistance = MIN_SEQUENCE_HEIGHT / 2;
+  let bottomDistance = MIN_SEQUENCE_HEIGHT / 2;
+  entries.forEach((entry) => {
+    if (entry.kind !== "chord" && entry.kind !== "note") return;
+    const rhythm = staffRhythmForDuration(entry.duration);
+    const note = createStaffNote(
+      entry.projection,
+      probeStave,
+      rhythm,
+      entry.duration,
+      false,
+      STAFF_INK,
+      clef,
+    );
+    const bounds = note.getNoteHeadBounds();
+    topDistance = Math.max(topDistance, staffCenter - bounds.yTop + SEQUENCE_LEDGER_SAFETY_MARGIN);
+    bottomDistance = Math.max(
+      bottomDistance,
+      bounds.yBottom - staffCenter + SEQUENCE_LEDGER_SAFETY_MARGIN,
+    );
+  });
+  return Math.ceil(Math.max(topDistance, bottomDistance, MIN_SEQUENCE_HEIGHT / 2) * 2);
+}
+
+function systemStaveOptions(hasBassStaff: boolean) {
+  return {
+    leftBar: !hasBassStaff,
+    rightBar: !hasBassStaff,
+    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+  };
+}
+
+/**
+ * Renders one continuous VexFlow SVG for a group of consecutive measures.
+ * Each voice is formatted per measure, then its tick contexts are moved onto
+ * the same explicit time axis across Melody, Harmony, and optional Bass rows.
+ */
+export function renderStaffSystem(
+  container: HTMLDivElement,
+  measures: readonly StaffSystemMeasureInput[],
+  meter: Meter,
+  onLayout?: (positions: readonly StaffSystemPosition[]) => void,
+  options: StaffSystemRenderOptions = {},
+): () => void {
+  container.replaceChildren();
+  if (measures.length === 0) return () => container.replaceChildren();
+
+  const showBass =
+    options.showBass ??
+    measures.some((measure) =>
+      measure.harmonyEntries.some(
+        (entry) => entry.kind === "chord" && Boolean(entry.bassProjection),
+      ),
+    );
+  const hasMelody = measures.some((measure) => measure.melodyEntries !== undefined);
+  const rows: SystemRow[] = [];
+  if (hasMelody) {
+    rows.push({
+      staff: "melody",
+      clef: options.melodyClef ?? "treble",
+      entriesForMeasure: (measure) => measure.melodyEntries ?? [],
+    });
+  }
+  rows.push({
+    staff: "harmony",
+    clef: "treble",
+    entriesForMeasure: (measure) => measure.harmonyEntries,
+  });
+  if (showBass) {
+    rows.push({
+      staff: "bass",
+      clef: "bass",
+      entriesForMeasure: (measure) => entriesForBassStaff(measure.harmonyEntries),
+    });
+  }
+
+  const baseWidths = measures.map((measure) => Math.max(1, measure.widthPx));
+  const requiredWidth = baseWidths.reduce((sum, width) => sum + width, 0);
+  // Score-system widths come from the presentation projection. Do not apply
+  // the single-staff minimum here: short meters such as 2/4 intentionally
+  // receive a proportionally shorter measure.
+  const width = Math.max(options.widthPx ?? requiredWidth, requiredWidth, 1);
+  const connectorInset = showBass ? 14 : 0;
+  const widthScale = Math.max(width - connectorInset, 1) / requiredWidth;
+  const measureWidths = baseWidths.map((measureWidth) => measureWidth * widthScale);
+  const measureX: number[] = [];
+  let cursorX = connectorInset;
+  measureWidths.forEach((measureWidth) => {
+    measureX.push(cursorX);
+    cursorX += measureWidth;
+  });
+  const showTimeSignature = options.showTimeSignature ?? false;
+  const staffHeights = rows.map((row) => {
+    const entries = measures.flatMap((measure) => row.entriesForMeasure(measure));
+    return systemStaffHeight(
+      entries,
+      row.clef,
+      Math.max(...measureWidths),
+      showTimeSignature,
+      meter,
+    );
+  });
+  const rowGap = 18;
+  const height =
+    staffHeights.reduce((sum, rowHeight) => sum + rowHeight, 0) + rowGap * (rows.length - 1);
+  const renderer = new Renderer(container, Renderer.Backends.SVG);
+  renderer.resize(width, height);
+  const context = renderer.getContext();
+  context.setFillStyle(STAFF_INK).setStrokeStyle(STAFF_INK).setLineWidth(1);
+
+  const rowLayouts: SystemRowLayout[] = [];
+  let rowTop = 0;
+  rows.forEach((row, rowIndex) => {
+    const rowHeight = staffHeights[rowIndex]!;
+    const staves = measures.map((measure, measureIndex) => {
+      const stave = new Stave(measureX[measureIndex]!, rowTop, measureWidths[measureIndex]!, {
+        ...systemStaveOptions(row.staff === "harmony" && showBass),
+      });
+      if (measureIndex === 0) {
+        stave.addClef(row.clef);
+        if (showTimeSignature) stave.addTimeSignature(`${meter.numerator}/${meter.denominator}`);
+      }
+      const center = stave.getYForLine(2);
+      // getYForLine() is absolute, so preserve this row's top offset while
+      // centering the stave. Subtracting the absolute value directly collapses
+      // every row onto the first one.
+      stave.setY(rowTop + rowHeight / 2 - (center - rowTop));
+      stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
+      stave.setContext(context).draw();
+      return stave;
+    });
+    rowLayouts.push({ row, staves: Object.freeze(staves), height: rowHeight, top: rowTop });
+    rowTop += rowHeight + rowGap;
+  });
+
+  const bassLayout = rowLayouts.find((layout) => layout.row.staff === "bass");
+  const harmonyLayout = rowLayouts.find((layout) => layout.row.staff === "harmony");
+  if (bassLayout && harmonyLayout) {
+    measures.forEach((_, measureIndex) => {
+      if (measureIndex === 0) {
+        new StaveConnector(harmonyLayout.staves[measureIndex]!, bassLayout.staves[measureIndex]!)
+          .setType("brace")
+          .setContext(context)
+          .draw();
+        new StaveConnector(harmonyLayout.staves[measureIndex]!, bassLayout.staves[measureIndex]!)
+          .setType("singleLeft")
+          .setContext(context)
+          .draw();
+      }
+      new StaveConnector(harmonyLayout.staves[measureIndex]!, bassLayout.staves[measureIndex]!)
+        .setType("singleRight")
+        .setContext(context)
+        .draw();
+    });
+  }
+
+  const playingInk =
+    getComputedStyle(container).getPropertyValue("--piano-pressed-key-border").trim() ||
+    STAFF_PLAYING_INK_FALLBACK;
+  const positions: StaffSystemPosition[] = [];
+  let tupletCount = 0;
+  let beamCount = 0;
+  const allRendered: RenderedSystemTickable[] = [];
+
+  rowLayouts.forEach((rowLayout) => {
+    measures.forEach((measure, measureIndex) => {
+      const stave = rowLayout.staves[measureIndex]!;
+      const entries = rowLayout.row.entriesForMeasure(measure);
+      if (entries.length === 0) return;
+      const rendered = entries.map((entry) => {
+        const rhythm = staffRhythmForDuration(entry.duration);
+        const note =
+          entry.kind === "gap"
+            ? createGapNote(stave, entry.duration)
+            : entry.kind === "rest"
+              ? createRestNote(stave, rhythm, entry.duration, rowLayout.row.clef)
+              : createStaffNote(
+                  entry.projection,
+                  stave,
+                  rhythm,
+                  entry.duration,
+                  false,
+                  entry.highlighted ? playingInk : STAFF_INK,
+                  rowLayout.row.clef,
+                );
+        note.setAttribute("data-staff-entry", entry.key);
+        if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
+          note.setAttribute("data-staff-playing", "true");
+        }
+        return { entry, note, rhythm, staff: rowLayout.row.staff, measureIndex, stave };
+      });
+      const tuplets = createSequenceTuplets(
+        rendered,
+        (entry) => entry.kind !== "gap" && entry.kind !== "rest",
+      );
+      const beams = createSystemBeams(rendered, meter);
+      tupletCount += tuplets.length;
+      beamCount += beams.length;
+      const voice = new Voice({ numBeats: meter.numerator, beatValue: meter.denominator }).setMode(
+        Voice.Mode.FULL,
+      );
+      voice.addTickables(rendered.map(({ note }) => note));
+      new Formatter().joinVoices([voice]).formatToStave([voice], stave);
+
+      const comparableStaves = rowLayouts.map((candidate) => candidate.staves[measureIndex]!);
+      const timeStartX =
+        Math.max(...comparableStaves.map((candidate) => candidate.getNoteStartX())) +
+        SEQUENCE_NOTE_EDGE_PADDING;
+      const timeEndX =
+        Math.min(...comparableStaves.map((candidate) => candidate.getNoteEndX())) -
+        SEQUENCE_NOTE_EDGE_PADDING;
+      const usableWidth = Math.max(timeEndX - timeStartX, 1);
+      rendered.forEach((item) => {
+        const barLengthBeats = (meter.numerator * 4) / meter.denominator;
+        const onsetRatio = rationalToNumber(item.entry.startOffsetBeats) / barLengthBeats;
+        const targetX = timeStartX + Math.min(Math.max(onsetRatio, 0), 1) * usableWidth;
+        const tickContext = item.note.getTickContext();
+        tickContext.setX(targetX);
+        tickContext.setX(targetX + (targetX - item.note.getAbsoluteX()));
+      });
+      voice.draw(context, stave);
+      beams.forEach((beam) => beam.setContext(context).draw());
+      tuplets.forEach((tuplet) => tuplet.setContext(context).draw());
+      rendered.forEach((item) => allRendered.push(item));
+
+      rendered.forEach((item) => {
+        if (item.entry.kind === "gap") return;
+        positions.push(
+          Object.freeze({
+            key: item.entry.key,
+            x: item.note.getAbsoluteX(),
+            ratio: item.note.getAbsoluteX() / width,
+            staff: rowLayout.row.staff,
+            measureIndex: measure.measureIndex,
+          }),
+        );
+      });
+
+      rendered.forEach((item) => {
+        if (item.entry.kind !== "chord" && item.entry.kind !== "note") return;
+        const indexes = item.entry.projection.notes.map((_, index) => index);
+        if (item.entry.continuesFromPrevious) {
+          indexes.forEach((index) => {
+            new StaveTie({ lastNote: item.note, lastIndexes: [index] }).setContext(context).draw();
+          });
+        }
+        if (item.entry.continuesToNext) {
+          indexes.forEach((index) => {
+            new StaveTie({ firstNote: item.note, firstIndexes: [index] })
+              .setContext(context)
+              .draw();
+          });
+        }
+      });
+    });
+  });
+
+  const svg = container.querySelector("svg");
+  if (!svg) throw new Error("VexFlow did not create a score system surface");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.style.backgroundColor = "#fff";
+  const harmonyEntries = measures.flatMap((measure) => measure.harmonyEntries);
+  svg.dataset.staffSequenceLength = String(harmonyEntries.length);
+  svg.dataset.staffSystemMeasureCount = String(measures.length);
+  svg.dataset.staffSystem = "score";
+  svg.dataset.staffMeter = `${meter.numerator}/${meter.denominator}`;
+  svg.dataset.staffTimeSignature = showTimeSignature ? "true" : "false";
+  svg.dataset.staffSystemClefs = rows.map((row) => row.clef).join(",");
+  svg.dataset.staffBassEntries = showBass
+    ? harmonyEntries
+        .filter((entry) => entry.kind === "chord" && entry.bassProjection)
+        .map((entry) => entry.key)
+        .join(",")
+    : "";
+  svg.dataset.staffPlayingEntries = allRendered
+    .filter(
+      ({ entry }) =>
+        (entry.kind === "chord" || entry.kind === "note") && Boolean(entry.highlighted),
+    )
+    .map(({ entry }) => entry.key)
+    .join(",");
+  svg.dataset.staffTupletGroups = String(tupletCount);
+  svg.dataset.staffBeamGroups = String(beamCount);
+  svg.dataset.staffSystemPositions = positions
+    .map((position) => `${position.staff}:${position.key}:${position.ratio.toFixed(6)}`)
+    .join(",");
+  svg.dataset.staffSequencePositions = positions
+    .filter((position) => position.staff === "harmony")
+    .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
+    .join(",");
+  onLayout?.(Object.freeze(positions));
 
   return () => container.replaceChildren();
 }

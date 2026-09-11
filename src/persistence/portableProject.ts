@@ -1,7 +1,9 @@
 import type {
+  MeasuresPerSystem,
   MatrixCardTemplateState,
   ModuleTemplateState,
   PresentationState,
+  ProgressionView,
   Project,
 } from "../domain/project/project";
 import type { ProjectDefaults, StepCreationOverrides } from "../domain/project/defaults";
@@ -224,6 +226,59 @@ function decodeMelodyTrackSettings(raw: unknown): MelodyTrackSettings {
   return validateMelodyTrackSettings(raw);
 }
 
+function isProgressionView(value: unknown): value is ProgressionView {
+  return value === "harmonic" || value === "piano" || value === "staff";
+}
+
+function isMeasuresPerSystem(value: unknown): value is MeasuresPerSystem {
+  return value === "auto" || value === 1 || value === 2 || value === 3 || value === 4;
+}
+
+function inferLegacyProgressionView(rawDoc: Record<string, unknown>): ProgressionView {
+  const progression = rawDoc["progression"];
+  if (!progression || typeof progression !== "object" || Array.isArray(progression)) {
+    return "harmonic";
+  }
+
+  const steps = (progression as Record<string, unknown>)["steps"];
+  if (!Array.isArray(steps) || steps.length === 0) return "harmonic";
+
+  const chordViews: ProgressionView[] = [];
+  for (const rawStep of steps) {
+    if (!rawStep || typeof rawStep !== "object" || Array.isArray(rawStep)) return "harmonic";
+    const step = rawStep as Record<string, unknown>;
+    if (step["kind"] !== "chord") continue;
+    const cardView = step["cardView"];
+    if (!isProgressionView(cardView)) return "harmonic";
+    chordViews.push(cardView);
+  }
+
+  const first = chordViews[0];
+  return first && chordViews.every((view) => view === first) ? first : "harmonic";
+}
+
+function decodeProgressionView(
+  presentation: Record<string, unknown>,
+  rawDoc: Record<string, unknown>,
+): ProgressionView {
+  return isProgressionView(presentation["progressionView"])
+    ? presentation["progressionView"]
+    : inferLegacyProgressionView(rawDoc);
+}
+
+function decodeMeasuresPerSystem(presentation: Record<string, unknown>): MeasuresPerSystem {
+  const explicit = presentation["measuresPerSystem"];
+  if (isMeasuresPerSystem(explicit)) return explicit;
+
+  const legacy = presentation["measureLayoutColumns"];
+  if (legacy === "auto") return "auto";
+  if (legacy === "1" || legacy === 1) return 1;
+  if (legacy === "2" || legacy === 2) return 2;
+  if (legacy === "3" || legacy === 3) return 3;
+  if (legacy === "4" || legacy === 4) return 4;
+  return "auto";
+}
+
 function encodeHarmonyTrackSettings(settings: HarmonyTrackSettings): Record<string, unknown> {
   const snapshot = snapshotHarmonyTrackSettings(settings);
   return {
@@ -392,6 +447,8 @@ export function encodePortableProject(project: Project): string {
       expertiseMode: project.presentation.expertiseMode,
       theme: project.presentation.theme,
       globalMatrixCardView: project.presentation.globalMatrixCardView,
+      progressionView: project.presentation.progressionView,
+      measuresPerSystem: project.presentation.measuresPerSystem,
       showBassInStaff: project.presentation.showBassInStaff,
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
@@ -622,13 +679,15 @@ export function decodePortableProject(jsonString: string): Project {
     globalTiming: migrated["globalTiming"] as Project["globalTiming"],
     groove: migrated["groove"] as Project["groove"],
     presentation: (() => {
-      const presentation = migrated["presentation"] as Record<string, unknown>;
+      const presentation = (migrated["presentation"] as Record<string, unknown> | undefined) ?? {};
       return Object.freeze({
         expertiseMode: presentation["expertiseMode"] as PresentationState["expertiseMode"],
         theme: presentation["theme"] as PresentationState["theme"],
         globalMatrixCardView: presentation[
           "globalMatrixCardView"
         ] as PresentationState["globalMatrixCardView"],
+        progressionView: decodeProgressionView(presentation, migrated),
+        measuresPerSystem: decodeMeasuresPerSystem(presentation),
         // Portable projects created before this preference default to chord notes only.
         showBassInStaff: presentation["showBassInStaff"] === true,
       });

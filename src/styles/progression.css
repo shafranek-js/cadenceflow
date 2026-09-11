@@ -20,26 +20,80 @@
 }
 
 .progression-step-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 170px);
-  grid-auto-flow: row;
-  gap: 8px;
-  align-items: start;
-  justify-content: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow: visible;
 }
 
-/* Measure cards keep musical proportions while retaining the existing step controls. */
-.progression-step-cards {
+.progression-step-cards[data-view="staff"] {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
+}
+
+.progression-step-cards[data-view="staff"][data-layout="auto"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+}
+
+@media (min-width: 1200px) {
+  .progression-step-cards[data-view="staff"][data-layout="auto"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .progression-step-cards[data-view="staff"][data-layout="auto"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .progression-step-cards[data-view="staff"][data-layout="auto"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.progression-step-cards[data-view="staff"][data-layout="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.progression-step-cards[data-view="staff"][data-layout="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.progression-step-cards[data-view="staff"][data-layout="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.progression-step-cards[data-view="staff"][data-layout="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .progression-step-cards[data-view="staff"][data-layout="4"],
+  .progression-step-cards[data-view="staff"][data-layout="3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 550px) {
+  .progression-step-cards[data-view="staff"][data-layout="4"],
+  .progression-step-cards[data-view="staff"][data-layout="3"],
+  .progression-step-cards[data-view="staff"][data-layout="2"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.progression-gap-hint {
+  grid-column: 1 / -1;
 }
 
 .progression-measure-card {
+  width: 100%;
   min-width: 0;
   padding: 10px;
   border: 1px solid var(--border);
@@ -81,6 +135,55 @@
   background: #fff;
   color: #000;
   overflow: hidden;
+}
+
+.score-system-view {
+  display: grid;
+  gap: 12px;
+}
+
+.score-system-layout-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.progression-measure-score.score-system-card {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.score-system {
+  min-width: 0;
+}
+
+.score-system-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 30px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.score-system-header strong {
+  color: var(--text);
+  font-size: 0.72rem;
+}
+
+.score-system-scroll,
+.score-system-paper {
+  background: #fff;
+}
+
+.score-system-canvas > svg {
+  display: block;
 }
 
 .progression-measure-score > .melody-staff-view,
@@ -293,6 +396,17 @@
     color-mix(in srgb, var(--border-subtle) 70%, transparent) calc(25% - 1px),
     color-mix(in srgb, var(--border-subtle) 70%, transparent) 25%
   );
+}
+
+.progression-step-cards:not([data-view="staff"]) .progression-measure-grid {
+  overflow-x: auto;
+}
+
+.progression-step-cards:not([data-view="staff"])
+  .progression-measure-grid
+  > .measure-item-wrapper
+  > .measure-step-segment {
+  min-width: 124px;
 }
 
 .progression-measure-card.has-shared-staff .progression-measure-grid {

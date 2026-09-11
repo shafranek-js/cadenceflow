@@ -1,4 +1,10 @@
-import type { PresentationMode, Project, ThemeMode } from "../../domain/project/project";
+import type {
+  MeasuresPerSystem,
+  PresentationMode,
+  ProgressionView,
+  Project,
+  ThemeMode,
+} from "../../domain/project/project";
 import type { AppliedCommand, ProjectCommand } from ".";
 
 export interface SetThemePayload {
@@ -84,6 +90,66 @@ export function setStaffBassVisibility(
     inverse: {
       type: "presentation/set-staff-bass-visibility",
       payload: { visible: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
+export interface SetProgressionViewPayload {
+  readonly view: ProgressionView;
+  readonly nowIso: string;
+}
+
+export type SetProgressionViewCommand = ProjectCommand<SetProgressionViewPayload> & {
+  readonly type: "presentation/set-progression-view";
+};
+
+export function setProgressionView(
+  project: Project,
+  command: SetProgressionViewCommand,
+): AppliedCommand {
+  const previous = project.presentation.progressionView;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        progressionView: command.payload.view,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-progression-view",
+      payload: { view: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
+export interface SetMeasuresPerSystemPayload {
+  readonly measuresPerSystem: MeasuresPerSystem;
+  readonly nowIso: string;
+}
+
+export type SetMeasuresPerSystemCommand = ProjectCommand<SetMeasuresPerSystemPayload> & {
+  readonly type: "presentation/set-measures-per-system";
+};
+
+export function setMeasuresPerSystem(
+  project: Project,
+  command: SetMeasuresPerSystemCommand,
+): AppliedCommand {
+  const previous = project.presentation.measuresPerSystem;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        measuresPerSystem: command.payload.measuresPerSystem,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-measures-per-system",
+      payload: { measuresPerSystem: previous, nowIso: command.payload.nowIso },
     },
   };
 }

@@ -155,7 +155,7 @@ ChordStep
 - explicitSpellingOverrides?: ...
 - duration: MusicalDuration
 - performance: StepPerformance
-- cardView: CardViewId
+- cardView: CardViewId (legacy compatibility only; hidden and ignored by My Progression rendering)
 ```
 
 ### RestStep
@@ -329,9 +329,60 @@ Matrix has:
 - global selected Card View
 - optional per-card override
 
-My Progression has step-local Card View state.
+My Progression does not consume Card View state. Its presentation is controlled only by
+`PresentationState.progressionView`.
 
 All views consume the same current preview/step realization.
+
+## PresentationState
+
+```text
+PresentationState
+- expertiseMode: Beginner | Composer | Expert
+- theme: Dark | Light
+- globalMatrixCardView: CardViewId
+- progressionView: harmonic | piano | staff
+- measuresPerSystem: auto | 1 | 2 | 3 | 4
+- showBassInStaff: boolean
+- ...other existing presentation-only settings
+```
+
+### Progression-view invariants
+
+- `progressionView` is one required global value; `mixed` is not valid runtime or persisted state.
+- `measuresPerSystem` is a Staff-only maximum. Manual values `1`–`4` remain hard maximums. `auto`
+  calculates `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`, where one measure is
+  `numerator * 4 / denominator` quarter-note beats; available width and density may reduce the actual
+  count. Harmonic/Piano ignore this field and keep independent vertical measure sections.
+- Changing either value is undoable and never mutates Progression Steps or musical/export state.
+- The schema version does not change for this additive normalization. On load, an explicit valid
+  `progressionView` wins; otherwise a non-empty uniform set of legacy Chord Step `cardView` values seeds
+  it, and mixed/empty/absent legacy values seed `harmonic`.
+- Legacy `ChordStep.cardView` remains loadable for old files but is hidden, is not written by My
+  Progression UI, and is ignored by My Progression rendering.
+
+## ScoreSystemProjection
+
+Pure presentation projection over the exact measure layout:
+
+```text
+ScoreSystemProjection
+- systems: ScoreSystem[]
+
+ScoreSystem
+- index: integer
+- measures: consecutive MeasureProjection[]
+- requiredWidthPx: number
+- horizontallyScrollable: boolean
+```
+
+Each measure requires a base width of
+`84 × measureDurationQuarterBeats` pixels, where one measure is `numerator * 4 / denominator`
+quarter-note beats. The normal attack budget is two unique attacks per quarter-note beat; every attack
+above that budget adds `44` pixels. This gives approximately 168 px for 2/4, 252 px for 3/4 or 6/8,
+336 px for 4/4, and 294 px for 7/8. Measures are greedily packed in order up to the Staff maximum and
+available width. A single over-dense measure keeps its required width inside a local scroller. Melody
+and all visible Harmony staves share the same measure boundaries and temporal x-coordinate mapping.
 
 ## Preset
 

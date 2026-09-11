@@ -344,8 +344,8 @@ async function assertThemesAndLayout(page: Page): Promise<void> {
     if ((await button.getAttribute("aria-pressed")) !== "true") await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(progression.getByRole("region", { name: "Melody Track controls" })).toBeVisible();
-    await expect(page.getByTestId("progression-measure-score").first()).toBeVisible();
-    await expect(page.getByTestId("melody-staff-measure").first()).toBeVisible();
+    await expect(page.getByTestId("progression-score-system").first()).toBeVisible();
+    await expect(page.locator(".score-system-canvas > svg").first()).toBeVisible();
     await expect(page.locator(".melody-staff-note.is-selected").first()).toBeVisible();
     await assertNoHorizontalScroll(page);
   }
@@ -383,7 +383,8 @@ for (const viewport of VIEWPORTS) {
       await expect(controls).toBeVisible();
       await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
       await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
-      await expect(page.getByTestId("melody-staff-measure")).not.toHaveCount(0);
+      await expect(page.getByTestId("progression-score-system")).not.toHaveCount(0);
+      await expect(page.locator(".score-system-canvas > svg")).not.toHaveCount(0);
 
       const undo = page.getByRole("button", { name: "Undo", exact: true });
       const redo = page.getByRole("button", { name: "Redo", exact: true });
@@ -456,31 +457,29 @@ for (const viewport of VIEWPORTS) {
       await expect(persistedInvoker).toBeFocused();
 
       const melodyInstrument = progression.getByLabel("Melody Track Instrument");
-      const melodySvg = page.getByTestId("melody-staff-measure").first().locator("svg");
-      const pianoSvg = page
-        .getByTestId("measure-staff-view")
+      const scoreSvg = page
+        .getByTestId("progression-score-system")
         .first()
         .locator(".measure-staff > svg");
-      const pianoClefBefore = await pianoSvg.getAttribute("data-staff-clef");
+      const pianoClefsBefore = await scoreSvg.getAttribute("data-staff-system-clefs");
       const pianoPresentationBefore = await page
-        .getByTestId("measure-staff-view")
+        .getByTestId("progression-score-system")
         .first()
         .locator(".measure-staff-event-select")
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
       await melodyInstrument.selectOption("flute");
-      await expect(melodySvg).toHaveAttribute("data-staff-clef", "treble");
-      await expect(pianoSvg).toHaveAttribute("data-staff-clef", pianoClefBefore!);
+      await expect(scoreSvg).toHaveAttribute("data-staff-system-clefs", "treble,treble");
       await expect
         .poll(() =>
           page
-            .getByTestId("measure-staff-view")
+            .getByTestId("progression-score-system")
             .first()
             .locator(".measure-staff-event-select")
             .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
         )
         .toEqual(pianoPresentationBefore);
       await melodyInstrument.selectOption("cello");
-      await expect(melodySvg).toHaveAttribute("data-staff-clef", "bass");
+      await expect(scoreSvg).toHaveAttribute("data-staff-system-clefs", pianoClefsBefore!);
       await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
 
       const play = progression.getByRole("button", { name: "Play", exact: true });

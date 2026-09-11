@@ -306,6 +306,9 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     const measures = page.getByTestId("progression-measure");
     await expect(measures).toHaveCount(3);
 
+    // Switch to 1-bar layout so measures are strictly stacked vertically for this alignment test
+    await page.getByLabel("Measures Layout", { exact: true }).selectOption("1");
+
     const steps = page.getByTestId("progression-step");
     await expect(steps).toHaveCount(3);
 

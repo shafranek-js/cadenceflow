@@ -38,9 +38,13 @@ import {
   setTheme,
   setExpertiseMode,
   setStaffBassVisibility,
+  setProgressionView,
+  setMeasuresPerSystem,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
+  type SetProgressionViewCommand,
+  type SetMeasuresPerSystemCommand,
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
@@ -68,7 +72,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
     case "matrix-template/restore-all":
       return restoreAllTemplates(project, command as RestoreAllTemplateCommand).project;
     case "matrix-template/restore-global":
-      return restoreGlobalMatrixTemplate(project, command as RestoreGlobalMatrixTemplateCommand).project;
+      return restoreGlobalMatrixTemplate(project, command as RestoreGlobalMatrixTemplateCommand)
+        .project;
     case "matrix/set-global-card-view":
       return setGlobalCardView(project, command as SetGlobalCardViewCommand).project;
     case "matrix/set-card-view-override":
@@ -83,6 +88,10 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setExpertiseMode(project, command as SetExpertiseModeCommand).project;
     case "presentation/set-staff-bass-visibility":
       return setStaffBassVisibility(project, command as SetStaffBassVisibilityCommand).project;
+    case "presentation/set-progression-view":
+      return setProgressionView(project, command as SetProgressionViewCommand).project;
+    case "presentation/set-measures-per-system":
+      return setMeasuresPerSystem(project, command as SetMeasuresPerSystemCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
     case "harmony/restore-state":

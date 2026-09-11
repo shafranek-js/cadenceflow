@@ -604,7 +604,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             project,
             onSelectStep: vi.fn(),
             onEditPerformance: vi.fn(),
-            onSetAllViews: vi.fn(),
+            onSetProgressionView: vi.fn(),
             onRemove: vi.fn(),
             onReorder: vi.fn(),
           }),

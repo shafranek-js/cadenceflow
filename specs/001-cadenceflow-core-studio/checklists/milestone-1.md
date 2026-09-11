@@ -12,15 +12,15 @@
 - [x] React/TSX source passes a local syntax/type smoke using temporary external-library declaration stubs.
 - [x] VexFlow Staff adapter follows the VexFlow 5 low-level SVG rendering API shape.
 
-## Runtime validation still required on a dependency-enabled machine
+## Runtime validation
 
-- [ ] Install the approved dependency set and create the lockfile with `pnpm install`.
-- [ ] Run `pnpm test` (Vitest).
-- [ ] Run `pnpm verify:fixtures`.
-- [ ] Run `pnpm build` (TypeScript 7 + Vite 8.1).
-- [ ] Run `pnpm exec playwright test tests/e2e/us1-build-progression.spec.ts`.
-- [ ] Visually verify Harmonic / Piano / Staff Card Views with the real React/VexFlow packages.
+- [x] Install the approved dependency set and create the lockfile with `pnpm install`.
+- [x] Run `pnpm test` (Vitest).
+- [x] Run `pnpm verify:fixtures`.
+- [x] Run `pnpm build` (TypeScript 7 + Vite 8.1).
+- [x] Run `pnpm exec playwright test tests/e2e/us1-build-progression.spec.ts`.
+- [x] Visually verify Harmonic / Piano / Staff Card Views with the real React/VexFlow packages.
 
 ## Environment note
 
-The current execution container has Node.js and a global TypeScript 5.8 compiler, but no installed `pnpm` or project dependencies and no usable package-registry access. Therefore external-library build/test results are intentionally not reported as PASS.
+Validated on 2026-09-11 with Node.js 24.14.0 and pnpm 10.12.4. The dependency install was already up to date; Vitest passed 85 files / 686 tests, fixture verification passed 21 files, the production build passed, the focused US1 Chromium test passed 1/1, and Harmonic / Piano / Staff Card Views were visually inspected in the running application.

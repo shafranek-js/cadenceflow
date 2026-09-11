@@ -58,6 +58,24 @@ async function expectStaffGeometry(page: Page, staff: Locator): Promise<void> {
   expect(geometry.viewHeight).toBeGreaterThan(0);
 }
 
+async function expectMeasureStaffGeometry(staff: Locator, expectedRows: number): Promise<void> {
+  await expect(staff).toBeVisible();
+  await expect(staff).toHaveAttribute("role", "img");
+  const svg = staff.locator("svg");
+  await expect(svg).toHaveAttribute("preserveAspectRatio", "xMidYMid meet");
+  await expect(svg.locator(".vf-stave path")).toHaveCount(expectedRows * 5);
+  await expect(svg).toHaveAttribute("data-staff-sequence-length", "1");
+  await expect(svg).toHaveAttribute("data-staff-meter", "4/4");
+  const rowTops = await svg
+    .locator(".vf-stave")
+    .evaluateAll((staves) =>
+      [...new Set(staves.map((stave) => Math.round(stave.getBoundingClientRect().top)))].sort(
+        (left, right) => left - right,
+      ),
+    );
+  expect(rowTops).toHaveLength(expectedRows);
+}
+
 async function expectNoPageHorizontalScroll(page: Page): Promise<void> {
   const metrics = await page.evaluate(() => ({
     documentScrollWidth: document.documentElement.scrollWidth,
@@ -109,18 +127,15 @@ async function exerciseStaffView(page: Page): Promise<void> {
 
   await tonicCard.locator(".staff-card-preview-button").click({ modifiers: ["Control"] });
   await page.getByLabel("Progression Card View").selectOption("staff");
-  const progressionStaff = page.locator('[data-testid="progression-step"] .mini-staff');
-  await expectStaffGeometry(page, progressionStaff);
-  await expect(progressionStaff.locator("svg")).toHaveAttribute(
-    "data-staff-pitches",
-    "48,60,64,67",
-  );
+  const progressionStaff = page
+    .locator('[data-testid="progression-score-system"] .score-system-canvas')
+    .first();
+  await expectMeasureStaffGeometry(progressionStaff, 2);
 
   await page.getByTestId("view-menu-toggle").click();
   await expect(page.getByTestId("show-bass-in-staff")).toHaveAttribute("aria-checked", "true");
   await page.getByTestId("show-bass-in-staff").click();
   await expect(matrixStaff.locator("svg")).toHaveAttribute("data-staff-pitches", "60,64,67");
-  await expect(progressionStaff.locator("svg")).toHaveAttribute("data-staff-pitches", "60,64,67");
 
   for (const [theme, button] of [
     ["light", "Light theme"],
@@ -129,7 +144,7 @@ async function exerciseStaffView(page: Page): Promise<void> {
     await page.getByRole("button", { name: button, exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await expectStaffGeometry(page, matrixStaff);
-    await expectStaffGeometry(page, progressionStaff);
+    await expectMeasureStaffGeometry(progressionStaff, 1);
   }
 
   await expectNoPageHorizontalScroll(page);

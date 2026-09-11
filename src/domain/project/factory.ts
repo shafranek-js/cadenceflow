@@ -46,6 +46,8 @@ export function createDefaultProject(
       expertiseMode: "composer",
       theme: "dark",
       globalMatrixCardView: "harmonic",
+      progressionView: "harmonic",
+      measuresPerSystem: "auto",
       showBassInStaff: false,
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,

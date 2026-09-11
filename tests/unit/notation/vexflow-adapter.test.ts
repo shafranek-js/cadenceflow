@@ -8,8 +8,11 @@ import { rational } from "../../../src/domain/timing/rational";
 import { projectPitchesToStaff } from "../../../src/notation/staffProjection";
 import {
   renderStaffProjection,
+  renderStaffSystem,
   renderStaffSequence,
   staffRhythmForDuration,
+  type StaffSystemMeasureInput,
+  type StaffSystemPosition,
   type StaffSequenceEntry,
   type StaffSequencePosition,
 } from "../../../src/notation/vexflowAdapter";
@@ -378,5 +381,235 @@ describe("renderStaffSequence", () => {
 
     expect(svg.dataset.staffTupletGroups).toBe("2");
     expect(svg.querySelectorAll(".vf-tuplet")).toHaveLength(2);
+  });
+});
+
+describe("renderStaffSystem", () => {
+  const cMajor = projectionFor([
+    exactPitch(60, { step: "C", alter: 0 }),
+    exactPitch(64, { step: "E", alter: 0 }),
+    exactPitch(67, { step: "G", alter: 0 }),
+  ]);
+  const bassProjection = projectionFor([exactPitch(36, { step: "C", alter: 0 })]);
+
+  function systemMeasure(
+    measureIndex: number,
+    harmonyEntries: readonly StaffSequenceEntry[],
+    melodyEntries?: readonly StaffSequenceEntry[],
+    widthPx = 280,
+  ): StaffSystemMeasureInput {
+    return {
+      measureIndex,
+      widthPx,
+      harmonyEntries,
+      ...(melodyEntries ? { melodyEntries } : {}),
+    };
+  }
+
+  it("renders two consecutive measures as one SVG with shared Melody/Harmony attacks", () => {
+    const harmony = (key: string, bass = false): StaffSequenceEntry => ({
+      key,
+      kind: "chord",
+      projection: cMajor,
+      ...(bass ? { bassProjection } : {}),
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    });
+    const melody = (key: string): StaffSequenceEntry => ({
+      key,
+      kind: "note",
+      projection: projectionFor([exactPitch(72, { step: "C", alter: 0 })]),
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    });
+    const container = document.createElement("div");
+    let positions: readonly StaffSystemPosition[] = [];
+
+    renderStaffSystem(
+      container,
+      [
+        systemMeasure(0, [harmony("harmony-1", true)], [melody("melody-1")]),
+        systemMeasure(1, [harmony("harmony-2", true)], [melody("melody-2")]),
+      ],
+      meter(4, 4),
+      (next) => {
+        positions = next;
+      },
+      { showBass: true, showTimeSignature: true },
+    );
+
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(svg.dataset.staffSystemMeasureCount).toBe("2");
+    expect(svg.dataset.staffTimeSignature).toBe("true");
+    expect(svg.querySelectorAll(".vf-clef")).toHaveLength(3);
+    expect(svg.querySelectorAll(".vf-timesignature")).toHaveLength(3);
+
+    const harmonyPositions = positions.filter((position) => position.staff === "harmony");
+    const melodyPositions = positions.filter((position) => position.staff === "melody");
+    expect(harmonyPositions.map((position) => position.x)).toEqual(
+      melodyPositions.map((position) => position.x),
+    );
+    expect(harmonyPositions[1]!.x).toBeGreaterThan(harmonyPositions[0]!.x);
+    expect(svg.dataset.staffBassEntries).toBe("harmony-1,harmony-2");
+  });
+
+  it("uses the available width for a complete system without adding a page-wide minimum", () => {
+    const container = document.createElement("div");
+
+    renderStaffSystem(
+      container,
+      [
+        systemMeasure(
+          0,
+          [
+            {
+              key: "short-1",
+              kind: "chord",
+              projection: cMajor,
+              startOffsetBeats: rational(0),
+              duration: musicalDuration(rational(2)),
+            },
+          ],
+          undefined,
+          168,
+        ),
+        systemMeasure(
+          1,
+          [
+            {
+              key: "short-2",
+              kind: "chord",
+              projection: cMajor,
+              startOffsetBeats: rational(0),
+              duration: musicalDuration(rational(2)),
+            },
+          ],
+          undefined,
+          168,
+        ),
+      ],
+      meter(2, 4),
+      undefined,
+      { widthPx: 600 },
+    );
+
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    expect(svg.getAttribute("width")).toBe("600");
+    expect(svg.dataset.staffSystemMeasureCount).toBe("2");
+  });
+
+  it("beams short notes according to the meter grouping", () => {
+    const eighthNotes = Array.from({ length: 8 }, (_, index): StaffSequenceEntry => ({
+      key: `eighth-${index + 1}`,
+      kind: "note",
+      projection: projectionFor([exactPitch(72 + (index % 3), { step: "C", alter: 0 })]),
+      startOffsetBeats: rational(index, 2),
+      duration: musicalDuration(rational(1, 2)),
+    }));
+    const container = document.createElement("div");
+
+    renderStaffSystem(
+      container,
+      [
+        systemMeasure(
+          0,
+          [
+            {
+              key: "harmony",
+              kind: "chord",
+              projection: cMajor,
+              startOffsetBeats: rational(0),
+              duration: musicalDuration(rational(4)),
+            },
+          ],
+          eighthNotes,
+        ),
+      ],
+      meter(4, 4),
+      undefined,
+      { showTimeSignature: true },
+    );
+
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    expect(svg.dataset.staffBeamGroups).toBe("2");
+    expect(svg.querySelectorAll(".vf-beam")).toHaveLength(2);
+  });
+
+  it("keeps cross-measure ties and tuplets in the single system surface", () => {
+    const tieStart: readonly StaffSequenceEntry[] = [
+      {
+        key: "tie-start",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(4)),
+        continuesToNext: true,
+      },
+    ];
+    const tieEnd: readonly StaffSequenceEntry[] = [
+      {
+        key: "tie-end",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(4)),
+        continuesFromPrevious: true,
+      },
+    ];
+    const triplets: readonly StaffSequenceEntry[] = [
+      {
+        key: "triplet-1",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(1, 3)),
+      },
+      {
+        key: "triplet-2",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(1, 3),
+        duration: musicalDuration(rational(1, 3)),
+      },
+      {
+        key: "triplet-3",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(2, 3),
+        duration: musicalDuration(rational(1, 3)),
+      },
+      {
+        key: "remaining",
+        kind: "rest",
+        startOffsetBeats: rational(1),
+        duration: musicalDuration(rational(3)),
+      },
+    ];
+    const tieContainer = document.createElement("div");
+
+    renderStaffSystem(
+      tieContainer,
+      [systemMeasure(0, tieStart), systemMeasure(1, tieEnd)],
+      meter(4, 4),
+      undefined,
+      { showTimeSignature: false },
+    );
+
+    const tupletsContainer = document.createElement("div");
+    renderStaffSystem(tupletsContainer, [systemMeasure(0, triplets)], meter(4, 4), undefined, {
+      showTimeSignature: false,
+    });
+
+    const tieSvg = tieContainer.querySelector("svg");
+    const tupletSvg = tupletsContainer.querySelector("svg");
+    if (!tieSvg || !tupletSvg) throw new Error("Score system SVG was not rendered");
+    expect(tieSvg.dataset.staffTimeSignature).toBe("false");
+    expect(tieSvg.querySelectorAll(".vf-stavetie").length).toBeGreaterThan(0);
+    expect(tupletSvg.dataset.staffTupletGroups).toBe("1");
+    expect(tupletSvg.querySelectorAll(".vf-tuplet")).toHaveLength(1);
   });
 });

@@ -2,6 +2,7 @@ import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
+import type { ProgressionView } from "../../domain/project/project";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { formatMusicalDuration } from "../../domain/timing/duration";
@@ -19,6 +20,7 @@ export function ProgressionStepCard({
   step,
   stepNumber = 1,
   tonic,
+  view = "harmonic",
   compactStaff = false,
   selected,
   playing = false,
@@ -32,6 +34,8 @@ export function ProgressionStepCard({
   readonly step: ChordStep;
   readonly stepNumber?: number;
   readonly tonic: PitchClassIdentity;
+  /** Global My Progression view; legacy step.cardView is intentionally ignored. */
+  readonly view?: ProgressionView;
   readonly compactStaff?: boolean;
   readonly selected: boolean;
   readonly playing?: boolean;
@@ -109,7 +113,7 @@ export function ProgressionStepCard({
         accessibleName={`Remove progression step ${stepNumber}: ${step.harmonicFunction.functionId}`}
         onRemove={onRemove}
       />
-      {step.cardView === "staff" && !compactStaff ? (
+      {view === "staff" && !compactStaff ? (
         <StaffCardView
           className="progression-step-select-button"
           pitches={staffPitches}
@@ -150,7 +154,7 @@ export function ProgressionStepCard({
             </span>
           ) : null}
           <span className="step-view">
-            {step.cardView === "harmonic" ? (
+            {view === "harmonic" ? (
               <>
                 <strong data-testid="step-function">{step.harmonicFunction.functionId}</strong>
                 <span>
@@ -159,10 +163,10 @@ export function ProgressionStepCard({
                 </span>
               </>
             ) : null}
-            {step.cardView === "piano" ? (
+            {view === "piano" ? (
               <PianoCardView chordPitches={pianoPitches} chordLabel={chordLabel} />
             ) : null}
-            {step.cardView === "staff" ? (
+            {view === "staff" ? (
               <span className="compact-staff-label">
                 <strong>{chordLabel}</strong>
                 <small>{durationLabel}</small>

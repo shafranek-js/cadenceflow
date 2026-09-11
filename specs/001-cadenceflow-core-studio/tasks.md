@@ -184,7 +184,7 @@ description: "Executable implementation task list for CadenceFlow v1"
 - [x] T071 [US3] Implement customized-state marker, override count, and Inspector override list in `src/ui/chord-card/CustomizedIndicator.tsx` and `src/ui/inspector/CardTemplateInspector.tsx`
 - [x] T072 [US3] Implement explicit `Replace Step` command/action while ordinary Matrix click remains Preview-only in `src/app/commands/progressionCommands.ts` and `src/ui/progression/StepActions.tsx`
 - [x] T073 [US3] Implement My Progression drag/drop plus keyboard-accessible reorder commands in `src/ui/progression/ProgressionTrack.tsx` and `src/app/commands/progressionCommands.ts`
-- [x] T074 [US3] Implement My Progression per-step editor and step-local Card Views (`Chord`, `Piano`, `Staff`) in `src/ui/progression/ProgressionStepCard.tsx` and `src/ui/progression/StepCardViewSwitcher.tsx`
+- [x] T074 [US3] Implement My Progression per-step editor and historical step-local Card Views (`Chord`, `Piano`, `Staff`) in `src/ui/progression/ProgressionStepCard.tsx` and `src/ui/progression/StepCardViewSwitcher.tsx`; the progression-view portion is superseded by US13 while this completed historical task remains checked
 - [x] T075 [US3] Implement `Reset Step Performance` preserving harmonic identity/variant/tensions, duration, and position in `src/domain/progression/reset.ts` and `src/app/commands/progressionCommands.ts`
 - [x] T076 [US3] Write Playwright acceptance for repeated-chord independence, Dashboard reset, explicit Replace Step, and step reset in `tests/e2e/us3-step-independence.spec.ts`
 
@@ -431,8 +431,60 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
   output for projects without melody.
 - [x] T175 [US12] Add the deterministic Melody MusicXML part with instrument, clef, rests, tuplets, and
   cross-bar ties while preserving no-melody output compatibility and XSD validation.
-- [ ] T176 [US12] Run final US12 integration and Chromium acceptance at supported desktop sizes, then after
+- [x] T176 [US12] Run final US12 integration and Chromium acceptance at supported desktop sizes, then after
   independent review update project status and accept the reviewed Phase 16 tasks.
+
+---
+
+## Phase 17: User Story 13 - Global Progression View and professional score systems (Priority: P2)
+
+**Goal**: My Progression has one global Harmonic/Piano/Staff mode, and Staff renders responsive
+multi-measure score systems with a shared Melody/Harmony timeline and no `Mixed` state.
+
+**Independent Test**: Open uniform and mixed legacy projects, switch one synchronized Progression View,
+exercise Auto/1–4 measure grouping across dense and sparse notation, and verify score alignment, reflow,
+accessibility, interaction preservation, and unchanged musical/export data.
+
+### Contracts and state
+
+- [x] T177 [US13] Record US13, FR-208–FR-214, SC-019, corrected FR-066–FR-068, the PresentationState and
+  score-system contracts, implementation slice, and this Phase 17 in `spec.md`, `plan.md`, `data-model.md`,
+  and `tasks.md`, then perform non-destructive cross-artifact analysis.
+- [x] T178 [US13] Add global `progressionView` and `measuresPerSystem` presentation fields, legacy
+  normalization, portable persistence, and undoable `presentation/set-progression-view` and
+  `presentation/set-measures-per-system` commands in `src/domain/project/project.ts`,
+  `src/persistence/portableProject.ts`, and `src/app/commands/presentationCommands.ts` without changing
+  Chord Steps or the schema version.
+- [x] T179 [US13] Convert the toolbar, View menu, Global Inspector, and `ProgressionTrack` to
+  `presentation.progressionView`; remove `Mixed` and every production mutation/read of `step.cardView`
+  for My Progression in `src/app/App.tsx`, `src/ui/studio/AppMenuBar.tsx`, and
+  `src/ui/progression/ProgressionTrack.tsx` while leaving Matrix Card Views unchanged.
+
+### Score systems
+
+- [ ] T180 [P] [US13] Add a pure `ScoreSystemProjection` over the existing measure layout with Staff-only
+  manual maxima 1–4, meter-aware Auto `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`,
+  duration-proportional widths, attack-density expansion, greedy packing, and local-overflow rules in
+  `src/notation/scoreSystemProjection.ts`, with focused unit tests.
+- [ ] T181 [US13] Render one VexFlow SVG per system with shared measure boundaries and Melody/Harmony
+  attack positions, repeated clefs, first-system meter, rests, ties, tuplets, and saved bass visibility in
+  `src/notation/vexflowAdapter.ts` and `src/ui/staff/ScoreSystemView.tsx`.
+- [ ] T182 [US13] Integrate Staff systems and distinct full-width Harmonic/Piano measure layouts in
+  `src/ui/progression/ProgressionTrack.tsx`: apply measures-per-system only to Staff, keep Harmonic/Piano
+  as independent full-width vertical measure sections with one horizontal step row per measure, and
+  preserve selection, playback highlight, drag/reorder, context menus, Rest, and trailing-gap actions.
+
+### Polish and acceptance
+
+- [ ] T183 [US13] Polish `src/styles/progression.css` and Staff components with paper theme tokens,
+  compact chord labels, no persistent pitch pills/octave buttons on the score, and equivalent Inspector
+  or accessible descriptions.
+- [ ] T184 [US13] Add focused Chromium acceptance in `tests/e2e/progression-score-systems.spec.ts`, run
+  independent acceptance at 1280×720, 1920×1080, light/dark, and 200% zoom, and only then update
+  `PROJECT_STATUS.md` and Phase 17 checkbox states.
+
+**Checkpoint**: One global Progression View drives every measure; Staff uses responsive score systems
+with aligned Melody/Harmony time, preserved interactions, and no page-level overflow.
 
 ---
 
@@ -457,8 +509,10 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
   playback/export projections (US9).
 - **US12** → depends on canonical contextual upper voicing (US5), exact Step/measure timing (US6/US11),
   persistence (US8), Staff rendering (US10/US11), and independent export projections (US9).
+- **US13** → depends on exact measure layout (US11), Melody Staff projection (US12), persisted
+  presentation state (US8/US10), and existing progression interactions.
 - **Phase 14 Polish** → its final full-suite gate runs after US11 and US12; earlier completed polish tasks
-  remain valid but T150–T158 must cover the final accumulated product.
+  remain valid but T150–T158 must cover the final accumulated product including US13.
 
 ### User Story Dependency Graph
 
@@ -471,7 +525,7 @@ Setup → Foundation → US1
 Foundation ─────────────────→ US6 ──┘
 US3 + US4/US4A ─────────────→ US7
 Foundation + accumulated state ────→ US8
-All earlier product stories ───────→ US10 → US11 → US12 → Polish
+All earlier product stories ───────→ US10 → US11 → US12 → US13 → Polish
 ```
 
 ### Parallel Opportunities
@@ -505,8 +559,8 @@ Complete Phases 13 and 15. Exit when the wide desktop studio and exact measure-c
 pass their focused desktop, timing, playback, and export acceptance.
 
 ### Milestone 7 — Linked Melody + Release Candidate
-Complete Phase 16, then finish the remaining Phase 14 gates. Exit when linked Melody generation,
-persistence, Staff, playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC-018
+Complete Phase 16 and Phase 17, then finish the remaining Phase 14 gates. Exit when linked Melody generation,
+persistence, Staff, playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC-019
 regression suite pass.
 
 ## MVP First
@@ -528,3 +582,25 @@ regression suite pass.
 - No task may silently map ambiguous harmonic content during module/mode changes.
 - MIDI and MusicXML must project from canonical semantics independently; neither is reconstructed from the other.
 - `spec.md` remains the product authority; if implementation reveals a product ambiguity, return to clarification rather than silently inventing behavior.
+
+## Product Backlog (not scheduled)
+
+- **T185 [Backlog] [US13+] Staff direct editing**: After selection, Melody context-menu, delete,
+  reorder, Rest/trailing-gap, continuation, playback, keyboard, and touch interactions are migrated to
+  the Staff score, remove the duplicate Staff step cards while keeping Harmonic/Piano cards.
+- **T186 [Backlog] [US12+] Melody enrichment**: Separate Pitch Motion, Rhythm, and Connection; begin with
+  deterministic chord-only patterns and rhythm presets, defer contextual voice-leading, and replace the
+  flat select with a grouped preview gallery in a separate batch.
+- **T187 [Backlog] [US13+] Suzuki note colors**: Add a persisted global presentation toggle, default off,
+  that decoratively colors visible noteheads using the confirmed Suzuki pitch-color mapping without
+  changing musical data, playback, MIDI, or MusicXML. Colors MUST NOT be the sole accessibility cue;
+  light/dark/print contrast and the exact palette plus preview/export scope MUST be fixed before work starts.
+- **T188 [Backlog] [US12+] Melody instrument palette expansion**: Audit the available/licensed
+  FluidR3_GM assets and target the full General MIDI program range (0–127) where local realtime samples
+  are feasible. Define one canonical instrument catalog for stable id, GM program, family/label, clef,
+  playable range, sample asset, and availability; drive Melody validation, grouped/searchable UI,
+  lazy audio loading, MIDI, and MusicXML from that catalog. Preserve the current six instrument ids and
+  persisted projects, keep export metadata available for programs without a local sample when valid,
+  show explicit audio-unavailable state, and avoid preloading the full bank. Add catalog completeness,
+  persistence migration, program/clef/export, lazy-loader, and representative audio-availability tests;
+  the final palette and asset set remain subject to licensing, bundle-size, and browser-performance gates.
