@@ -555,7 +555,14 @@ function addFragment(
       chord: role === "upper" ? upperPitchIndex++ > 0 : false,
       sourceMidi: pitch.midiNumber,
       role,
-      pitch: musicXmlPitchForExactPitch(pitch),
+      // Preserve the accepted Piano DTO/XML semantics exactly. Melody uses
+      // musicXmlPitchForExactPitch below because its octave-offset spelling
+      // must remain concert-pitch accurate, but the legacy Piano part keeps
+      // the stored ExactPitch octave for no-Melody byte compatibility.
+      pitch: Object.freeze({
+        ...mapPitchSpellingToMusicXml(pitch.spelling),
+        octave: pitch.octave,
+      }),
       ties: Object.freeze([...ties]),
       // Piano arpeggiation affects upper voices; the independent bass stays on beat.
       ...(isFirstFragment && role === "upper" && projectedChord.arpeggiate

@@ -83,14 +83,39 @@ function validateRest(event: MusicXmlRestEvent): void {
 }
 
 function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
+  if (!event || typeof event !== "object") {
+    throw new MusicXmlWriterError("MusicXML Melody note must be an object.");
+  }
   assertInteger(event.duration, `duration for ${event.stepId}`, 1);
   assertInteger(event.sourceMidi, `source MIDI for ${event.stepId}`, 0);
   assertInteger(event.sourcePitchMidi, `source pitch MIDI for ${event.stepId}`, 0);
   if (event.sourceMidi > 127 || event.sourcePitchMidi > 127) {
     throw new MusicXmlWriterError(`source MIDI for ${event.stepId} must be <= 127.`);
   }
-  if (!Number.isSafeInteger(event.pitch.octave) || !Number.isSafeInteger(event.pitch.alter)) {
+  if (
+    !event.pitch ||
+    typeof event.pitch !== "object" ||
+    !["A", "B", "C", "D", "E", "F", "G"].includes(event.pitch.step) ||
+    !Number.isSafeInteger(event.pitch.octave) ||
+    !Number.isSafeInteger(event.pitch.alter)
+  ) {
     throw new MusicXmlWriterError(`pitch for ${event.stepId} must contain safe integer values.`);
+  }
+  const naturalPitchClass: Readonly<Record<string, number>> = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
+  };
+  const writtenMidi =
+    (event.pitch.octave + 1) * 12 + naturalPitchClass[event.pitch.step]! + event.pitch.alter;
+  if (writtenMidi !== event.sourceMidi) {
+    throw new MusicXmlWriterError(
+      `Melody note ${event.stepId} pitch does not match its source MIDI value.`,
+    );
   }
   if (event.voice !== "1" || event.staff !== 1 || event.chord !== false) {
     throw new MusicXmlWriterError(
@@ -99,6 +124,9 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
   }
   if (!["quarter", "eighth", "16th"].includes(event.type)) {
     throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid written type.`);
+  }
+  if (!Array.isArray(event.ties) || !Array.isArray(event.tupletMarks)) {
+    throw new MusicXmlWriterError(`Melody note ${event.stepId} tie/tuplet marks must be arrays.`);
   }
   for (const tie of event.ties) {
     if (tie !== "start" && tie !== "stop") {
@@ -111,6 +139,11 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
     }
   }
   if (event.timeModification) {
+    if (typeof event.timeModification !== "object") {
+      throw new MusicXmlWriterError(
+        `Melody note ${event.stepId} has an invalid time modification.`,
+      );
+    }
     if (
       event.timeModification.actualNotes !== 3 ||
       event.timeModification.normalNotes !== 2 ||
@@ -120,10 +153,19 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
         `Melody note ${event.stepId} has an invalid time modification.`,
       );
     }
+    const expectedType = event.timeModification.normalType === "16th" ? "16th" : "eighth";
+    if (event.type !== expectedType) {
+      throw new MusicXmlWriterError(
+        `Melody note ${event.stepId} written type disagrees with its time modification.`,
+      );
+    }
   }
 }
 
 function validateMelodyRest(event: MusicXmlMelodyMeasureEvent & { readonly kind: "rest" }): void {
+  if (!event || typeof event !== "object") {
+    throw new MusicXmlWriterError("MusicXML Melody rest must be an object.");
+  }
   assertInteger(event.duration, `duration for ${event.stepId}`, 1);
   if (event.voice !== "1" || event.staff !== 1) {
     throw new MusicXmlWriterError(`Melody rest ${event.stepId} must use voice 1 and staff 1.`);
@@ -168,6 +210,14 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
   if (melody.midiProgram > 128) {
     throw new MusicXmlWriterError("Melody MIDI program must be <= 128.");
   }
+  if (
+    !melody.clef ||
+    typeof melody.clef !== "object" ||
+    !["G", "F"].includes(melody.clef.sign) ||
+    !Number.isSafeInteger(melody.clef.line)
+  ) {
+    throw new MusicXmlWriterError("MusicXML Melody clef must contain a supported sign and line.");
+  }
   const expectedClef =
     melody.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
   if (melody.clef.sign !== expectedClef.sign || melody.clef.line !== expectedClef.line) {
@@ -181,6 +231,11 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
     throw new MusicXmlWriterError("MusicXML Melody must have one measure for every Piano measure.");
   }
   melody.measures.forEach((measure, index) => {
+    if (!measure || typeof measure !== "object" || !Array.isArray(measure.events)) {
+      throw new MusicXmlWriterError(
+        `MusicXML Melody measure ${index + 1} must contain an events array.`,
+      );
+    }
     if (measure.number !== index + 1) {
       throw new MusicXmlWriterError(
         "MusicXML Melody measures must be numbered consecutively from 1.",
@@ -189,8 +244,9 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
     assertInteger(measure.capacity, `Melody capacity for measure ${measure.number}`, 1);
     let duration = 0;
     measure.events.forEach((event: MusicXmlMelodyMeasureEvent) => {
-      if (event.kind === "note") validateMelodyNote(event);
-      if (event.kind === "rest") validateMelodyRest(event);
+      if (event?.kind === "note") validateMelodyNote(event);
+      else if (event?.kind === "rest") validateMelodyRest(event);
+      else throw new MusicXmlWriterError("MusicXML Melody measure contains an invalid event.");
       duration += event.duration;
     });
     if (duration !== measure.capacity) {

@@ -282,6 +282,24 @@ function extractPartIds(xml: string): { readonly partList: string[]; readonly sc
   };
 }
 
+async function parsePartIds(
+  xml: string,
+): Promise<{ readonly partList: string[]; readonly score: string[] }> {
+  const libxml = await import("libxmljs2");
+  const document = libxml.parseXml(xml) as unknown as {
+    find(path: string): readonly {
+      attr(name: string): { value(): string } | null;
+    }[];
+  };
+  const ids = (path: string) =>
+    document.find(path).map((part) => {
+      const id = part.attr("id")?.value();
+      if (!id) throw new Error(`Missing MusicXML part id for ${path}`);
+      return id;
+    });
+  return { partList: ids("//part-list/score-part"), score: ids("//part") };
+}
+
 const PRE_T175_NO_MELODY_GOLDEN_BASE64 =
   "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHNjb3JlLXBhcnR3aXNlIHZlcnNpb249IjQuMCI+CiAgPHdvcms+CiAgICA8d29yay10aXRsZT5UMTc1IEdvbGRlbjwvd29yay10aXRsZT4KICA8L3dvcms+CiAgPHBhcnQtbGlzdD4KICAgIDxzY29yZS1wYXJ0IGlkPSJQMSI+CiAgICAgIDxwYXJ0LW5hbWU+UGlhbm88L3BhcnQtbmFtZT4KICAgIDwvc2NvcmUtcGFydD4KICA8L3BhcnQtbGlzdD4KICA8cGFydCBpZD0iUDEiPgogICAgPG1lYXN1cmUgbnVtYmVyPSIxIj4KICAgICAgPGF0dHJpYnV0ZXM+CiAgICAgICAgPGRpdmlzaW9ucz4xPC9kaXZpc2lvbnM+CiAgICAgICAgPGtleT4KICAgICAgICAgIDxmaWZ0aHM+MDwvZmlmdGhzPgogICAgICAgICAgPG1vZGU+bWFqb3I8L21vZGU+CiAgICAgICAgPC9rZXk+CiAgICAgICAgPHRpbWU+CiAgICAgICAgICA8YmVhdHM+NDwvYmVhdHM+CiAgICAgICAgICA8YmVhdC10eXBlPjQ8L2JlYXQtdHlwZT4KICAgICAgICA8L3RpbWU+CiAgICAgICAgPHN0YXZlcz4yPC9zdGF2ZXM+CiAgICAgICAgPHBhcnQtc3ltYm9sIHRvcC1zdGFmZj0iMSIgYm90dG9tLXN0YWZmPSIyIj5icmFjZTwvcGFydC1zeW1ib2w+CiAgICAgICAgPGNsZWYgbnVtYmVyPSIxIj4KICAgICAgICAgIDxzaWduPkc8L3NpZ24+CiAgICAgICAgICA8bGluZT4yPC9saW5lPgogICAgICAgIDwvY2xlZj4KICAgICAgICA8Y2xlZiBudW1iZXI9IjIiPgogICAgICAgICAgPHNpZ24+Rjwvc2lnbj4KICAgICAgICAgIDxsaW5lPjQ8L2xpbmU+CiAgICAgICAgPC9jbGVmPgogICAgICA8L2F0dHJpYnV0ZXM+CiAgICAgIDxkaXJlY3Rpb24gcGxhY2VtZW50PSJhYm92ZSI+CiAgICAgICAgPGRpcmVjdGlvbi10eXBlPgogICAgICAgICAgPG1ldHJvbm9tZT4KICAgICAgICAgICAgPGJlYXQtdW5pdD5xdWFydGVyPC9iZWF0LXVuaXQ+CiAgICAgICAgICAgIDxwZXItbWludXRlPjEwMDwvcGVyLW1pbnV0ZT4KICAgICAgICAgIDwvbWV0cm9ub21lPgogICAgICAgIDwvZGlyZWN0aW9uLXR5cGU+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICAgIDxzb3VuZCB0ZW1wbz0iMTAwIi8+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8ZGlyZWN0aW9uIHBsYWNlbWVudD0iYmVsb3ciPgogICAgICAgIDxkaXJlY3Rpb24tdHlwZT4KICAgICAgICAgIDxkeW5hbWljcz4KICAgICAgICAgICAgPG1mLz4KICAgICAgICAgIDwvZHluYW1pY3M+CiAgICAgICAgPC9kaXJlY3Rpb24tdHlwZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8aGFybW9ueT4KICAgICAgICA8cm9vdD4KICAgICAgICAgIDxyb290LXN0ZXA+Qzwvcm9vdC1zdGVwPgogICAgICAgIDwvcm9vdD4KICAgICAgICA8a2luZD5tYWpvcjwva2luZD4KICAgICAgPC9oYXJtb255PgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT40PC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjE8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4xPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgICA8bm90ZT4KICAgICAgICA8Y2hvcmQvPgogICAgICAgIDxwaXRjaD4KICAgICAgICAgIDxzdGVwPkU8L3N0ZXA+CiAgICAgICAgICA8b2N0YXZlPjQ8L29jdGF2ZT4KICAgICAgICA8L3BpdGNoPgogICAgICAgIDxkdXJhdGlvbj40PC9kdXJhdGlvbj4KICAgICAgICA8dm9pY2U+MTwvdm9pY2U+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICA8L25vdGU+CiAgICAgIDxub3RlPgogICAgICAgIDxjaG9yZC8+CiAgICAgICAgPHBpdGNoPgogICAgICAgICAgPHN0ZXA+Rzwvc3RlcD4KICAgICAgICAgIDxvY3RhdmU+NDwvb2N0YXZlPgogICAgICAgIDwvcGl0Y2g+CiAgICAgICAgPGR1cmF0aW9uPjQ8L2R1cmF0aW9uPgogICAgICAgIDx2b2ljZT4xPC92b2ljZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvbm90ZT4KICAgICAgPGJhY2t1cD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgIDwvYmFja3VwPgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT4zPC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjI8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4yPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgPC9tZWFzdXJlPgogIDwvcGFydD4KPC9zY29yZS1wYXJ0d2lzZT4K";
 
@@ -719,6 +737,20 @@ describe("T175 Melody MusicXML part", () => {
     expect(projectProjectToMusicXml(project).melody).toBeUndefined();
   });
 
+  it("preserves accepted Piano spelling/octave semantics without Melody", () => {
+    const base = createDefaultProject("legacy-spelling", "Legacy Spelling");
+    const step = Object.freeze({
+      ...chordStep(base, "I", "legacy-step", { numerator: 4, denominator: 1 }),
+      explicitSpellingOverrides: Object.freeze({ "upper:60": { step: "B" as const, alter: 1 } }),
+    });
+    const project = Object.freeze({
+      ...base,
+      progression: Object.freeze({ steps: Object.freeze([step]) }),
+    });
+    const xml = writeMusicXml(projectProjectToMusicXml(project));
+    expect(xml).toMatch(/<step>B<\/step>[\s\S]*?<alter>1<\/alter>[\s\S]*?<octave>4<\/octave>/);
+  });
+
   it("writes Melody as P2 before the stable Piano P1 with instrument metadata", () => {
     const projection = projectProjectToMusicXml(melodyProject());
     const xml = writeMusicXml(projection);
@@ -732,6 +764,11 @@ describe("T175 Melody MusicXML part", () => {
     );
     expect(xml).toContain('<part id="P1">');
     expect(xml.indexOf('<part id="P2">')).toBeLessThan(xml.indexOf('<part id="P1">'));
+  });
+
+  it("confirms Melody/Piano part order and IDs with an independently parsed document", async () => {
+    const parsed = await parsePartIds(writeMusicXml(projectProjectToMusicXml(melodyProject())));
+    expect(parsed).toEqual({ partList: ["P2", "P1"], score: ["P2", "P1"] });
   });
 
   it("projects contextual exact pitches, written types, rests, tuplets, ties, and complete bars", () => {
@@ -935,6 +972,12 @@ describe("T175 Melody MusicXML part", () => {
     } as unknown as MusicXmlProjection;
     expect(() => writeMusicXml(invalid)).toThrowError(MusicXmlWriterError);
     expect(() => writeMusicXml(invalid)).toThrowError(/duration .* does not equal capacity/);
+
+    const invalidClef = {
+      ...projection,
+      melody: { ...projection.melody!, clef: undefined },
+    } as unknown as MusicXmlProjection;
+    expect(() => writeMusicXml(invalidClef)).toThrowError(MusicXmlWriterError);
 
     const malformed = melodyProject();
     const malformedStep = malformed.progression.steps[0] as ChordStep;
