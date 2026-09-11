@@ -1,0 +1,2 @@
+# Preserve the exact bytes of vendored Melody sample bundles.
+public/audio/melody/FluidR3_GM/*-mp3.js -text
