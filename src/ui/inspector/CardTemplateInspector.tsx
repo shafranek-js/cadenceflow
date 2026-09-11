@@ -62,30 +62,49 @@ export function CardTemplateInspector({
   const [velocityOpen, setVelocityOpen] = useState(() =>
     readDisclosureState(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, true),
   );
-  if (!functionId) return null;
-  const card = project.moduleTemplateStates[project.activeModule].cards[functionId];
-  const resolved = resolveStepCreationDefaults(project.defaults.piano, card?.explicitOverrides);
-  const keys = matrixCardOverrideKeys(card);
-  const count = matrixCardOverrideCount(card);
+  const isGlobal = !functionId;
+  const card = functionId
+    ? project.moduleTemplateStates[project.activeModule].cards[functionId]
+    : undefined;
+  const resolved = isGlobal
+    ? project.defaults.piano
+    : resolveStepCreationDefaults(project.defaults.piano, card?.explicitOverrides);
+  const keys = isGlobal ? Object.freeze([]) : matrixCardOverrideKeys(card);
+  const count = isGlobal ? 0 : matrixCardOverrideCount(card);
   return (
     <section
       className="card-template-inspector"
-      aria-label={`Template settings for ${functionId}`}
+      aria-label={
+        isGlobal
+          ? "Global template settings for all matrix cards"
+          : `Template settings for ${functionId}`
+      }
       data-context="matrix-template"
+      data-scope={isGlobal ? "global" : "card"}
       data-testid="matrix-template-inspector"
     >
       <header>
         <div>
           <span className="inspector-context-kicker">Matrix preview template</span>
-          <h3>{functionId} Template</h3>
+          <h3>{isGlobal ? "All Cards Template" : `${functionId} Template`}</h3>
           <span
-            className={count ? "template-status is-customized" : "template-status is-inherited"}
+            className={
+              isGlobal
+                ? "template-status is-inherited"
+                : count
+                  ? "template-status is-customized"
+                  : "template-status is-inherited"
+            }
           >
-            {count ? `Customized · ${count} overrides` : "Inheriting defaults · Inherited"}
+            {isGlobal
+              ? "Global defaults · All matrix cards"
+              : count
+                ? `Customized · ${count} overrides`
+                : "Inheriting defaults · Inherited"}
           </span>
         </div>
-        <button type="button" disabled={count === 0} onClick={onReset}>
-          Reset Card to Defaults
+        <button type="button" disabled={isGlobal ? false : count === 0} onClick={onReset}>
+          {isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
         </button>
       </header>
       <details
@@ -157,7 +176,11 @@ export function CardTemplateInspector({
               variant="buttons"
               value={resolved.duration}
               onChange={onDurationChange}
-              id={`matrix-template-duration-${functionId}`}
+              id={
+                isGlobal
+                  ? "matrix-template-duration-global"
+                  : `matrix-template-duration-${functionId}`
+              }
               label=""
             />
           </div>
@@ -194,7 +217,9 @@ export function CardTemplateInspector({
           </label>
         </div>
       </details>
-      {keys.length ? (
+      {isGlobal ? (
+        <p>These settings apply globally to all cards in the Harmonic Matrix.</p>
+      ) : keys.length ? (
         <p>Overrides: {keys.join(", ")}</p>
       ) : (
         <p>No explicit overrides. Values follow current Project/Piano Defaults.</p>

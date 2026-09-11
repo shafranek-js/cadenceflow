@@ -101,10 +101,14 @@ import {
 } from "./commands/timingCommands";
 import {
   patchMatrixTemplate,
+  patchGlobalMatrixTemplate,
   resetCardTemplate,
+  resetGlobalMatrixTemplate,
   resetMatrixScope,
   type PatchMatrixTemplateCommand,
+  type PatchGlobalMatrixTemplateCommand,
   type ResetCardTemplateCommand,
+  type ResetGlobalMatrixTemplateCommand,
   type ResetMatrixScopeCommand,
 } from "./commands/matrixTemplateCommands";
 import {
@@ -655,29 +659,68 @@ export function App() {
   };
 
   const patchTemplatePerformance = (overrides: StepPerformanceOverrides) => {
-    if (!settingsFunctionId) return;
-    const command: PatchMatrixTemplateCommand = {
-      type: "matrix-template/patch",
-      payload: {
-        functionId: settingsFunctionId,
-        performanceOverrides: overrides,
-        nowIso: new Date().toISOString(),
-      },
-    };
-    store.dispatch(command, patchMatrixTemplate);
+    const nowIso = new Date().toISOString();
+    if (settingsFunctionId) {
+      const command: PatchMatrixTemplateCommand = {
+        type: "matrix-template/patch",
+        payload: {
+          functionId: settingsFunctionId,
+          performanceOverrides: overrides,
+          nowIso,
+        },
+      };
+      store.dispatch(command, patchMatrixTemplate);
+    } else {
+      const command: PatchGlobalMatrixTemplateCommand = {
+        type: "matrix-template/patch-global",
+        payload: {
+          performanceOverrides: overrides,
+          nowIso,
+        },
+      };
+      store.dispatch(command, patchGlobalMatrixTemplate);
+    }
   };
 
   const patchTemplateDuration = (duration: MusicalDuration) => {
-    if (!settingsFunctionId) return;
-    const command: PatchMatrixTemplateCommand = {
-      type: "matrix-template/patch",
-      payload: {
-        functionId: settingsFunctionId,
-        durationOverride: duration,
-        nowIso: new Date().toISOString(),
-      },
-    };
-    store.dispatch(command, patchMatrixTemplate);
+    const nowIso = new Date().toISOString();
+    if (settingsFunctionId) {
+      const command: PatchMatrixTemplateCommand = {
+        type: "matrix-template/patch",
+        payload: {
+          functionId: settingsFunctionId,
+          durationOverride: duration,
+          nowIso,
+        },
+      };
+      store.dispatch(command, patchMatrixTemplate);
+    } else {
+      const command: PatchGlobalMatrixTemplateCommand = {
+        type: "matrix-template/patch-global",
+        payload: {
+          durationOverride: duration,
+          nowIso,
+        },
+      };
+      store.dispatch(command, patchGlobalMatrixTemplate);
+    }
+  };
+
+  const resetTemplate = () => {
+    const nowIso = new Date().toISOString();
+    if (settingsFunctionId) {
+      const command: ResetCardTemplateCommand = {
+        type: "matrix-template/reset-card",
+        payload: { functionId: settingsFunctionId, nowIso },
+      };
+      store.dispatch(command, resetCardTemplate);
+    } else {
+      const command: ResetGlobalMatrixTemplateCommand = {
+        type: "matrix-template/reset-global",
+        payload: { nowIso },
+      };
+      store.dispatch(command, resetGlobalMatrixTemplate);
+    }
   };
   const changeMatrixStaffOctave = (functionId: string, direction: StaffOctaveDirection) => {
     const currentProject = store.project;
@@ -1598,7 +1641,7 @@ export function App() {
             functionId={settingsFunctionId}
             onPerformancePatch={patchTemplatePerformance}
             onDurationChange={patchTemplateDuration}
-            onReset={() => settingsFunctionId && resetCard(settingsFunctionId)}
+            onReset={resetTemplate}
           />
         </>
       }

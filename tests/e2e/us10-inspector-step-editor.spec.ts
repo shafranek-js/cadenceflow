@@ -60,7 +60,10 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await ensurePreviewHarmonyVisible(page);
     await expect(page.locator('[data-context="neutral"]')).toBeVisible();
     await expect(page.getByTestId("step-performance-inspector")).toHaveCount(0);
-    await expect(page.getByTestId("matrix-template-inspector")).toHaveCount(0);
+    await expect(page.getByTestId("matrix-template-inspector")).toHaveAttribute(
+      "data-scope",
+      "global",
+    );
 
     await addChord(page, "I");
     const matrixCard = page.getByTestId("chord-card-I");
@@ -97,7 +100,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     }
 
     await selectFirstStep(page);
-    await expect(template).toHaveCount(0);
+    await expect(template).toHaveAttribute("data-scope", "global");
     await expect(page.getByTestId("step-performance-inspector")).toContainText("Selected step");
     await expect(page.getByTestId("step-performance-inspector")).toContainText(
       "All selected-step settings live here",
@@ -353,7 +356,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     expect(Math.abs(align1Return.stripOffset - align1.stripOffset)).toBeLessThanOrEqual(2);
   });
 
-  test("dismisses Matrix chord card selection via Escape key and empty background click", async ({
+  test("displays Global Matrix Template when unselected and switches to Card Template when selected", async ({
     page,
   }) => {
     await waitForStudio(page);
@@ -362,28 +365,79 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     const buttonI = cardI.locator(".chord-main");
     const templateInspector = page.getByTestId("matrix-template-inspector");
 
-    // 1. Initially unselected
+    // 1. Initially unselected: Global template inspector is visible
     await expect(cardI).not.toHaveClass(/is-selected/);
-    await expect(templateInspector).not.toBeVisible();
+    await expect(templateInspector).toBeVisible();
+    await expect(templateInspector.locator("h3")).toHaveText("All Cards Template");
+    await expect(templateInspector).toHaveAttribute("data-scope", "global");
 
-    // 2. Select card I
+    // 2. Select card I -> switches to single-card template
     await buttonI.click();
     await expect(cardI).toHaveClass(/is-selected/);
     await expect(templateInspector).toBeVisible();
+    await expect(templateInspector.locator("h3")).toHaveText("I Template");
+    await expect(templateInspector).toHaveAttribute("data-scope", "card");
 
-    // 3. Press Escape -> dismisses selection
+    // 3. Press Escape -> dismisses selection and returns to Global template
     await page.keyboard.press("Escape");
     await expect(cardI).not.toHaveClass(/is-selected/);
-    await expect(templateInspector).not.toBeVisible();
+    await expect(templateInspector).toBeVisible();
+    await expect(templateInspector.locator("h3")).toHaveText("All Cards Template");
+    await expect(templateInspector).toHaveAttribute("data-scope", "global");
 
     // 4. Select card I again
     await buttonI.click();
     await expect(cardI).toHaveClass(/is-selected/);
-    await expect(templateInspector).toBeVisible();
+    await expect(templateInspector.locator("h3")).toHaveText("I Template");
 
-    // 5. Click on empty space in the matrix workbench -> dismisses selection
+    // 5. Click on empty space in the matrix workbench -> returns to Global template
     await page.locator(".matrix-workbench").click({ position: { x: 5, y: 5 } });
     await expect(cardI).not.toHaveClass(/is-selected/);
-    await expect(templateInspector).not.toBeVisible();
+    await expect(templateInspector).toBeVisible();
+    await expect(templateInspector.locator("h3")).toHaveText("All Cards Template");
+    await expect(templateInspector).toHaveAttribute("data-scope", "global");
+  });
+
+  test("modifies global template options and applies them across matrix cards", async ({
+    page,
+  }) => {
+    await waitForStudio(page);
+
+    const templateInspector = page.getByTestId("matrix-template-inspector");
+    await expect(templateInspector.locator("h3")).toHaveText("All Cards Template");
+
+    // 1. Change global duration to 2 beats (Half note)
+    const durationControl = templateInspector.getByTestId("matrix-template-duration");
+    const halfButton = durationControl.getByRole("button", {
+      name: /Half note \(2 canonical beats\)/,
+    });
+    await halfButton.click();
+    await expect(halfButton).toHaveAttribute("aria-pressed", "true");
+
+    // 2. Add card I to progression
+    await addChord(page, "I");
+    const step1 = page.getByTestId("progression-step").nth(0);
+    await expect(step1).toContainText("2");
+
+    // 3. Add card V to progression
+    await addChord(page, "V");
+    const step2 = page.getByTestId("progression-step").nth(1);
+    await expect(step2).toContainText("2");
+
+    // 4. Dismiss card selection to return to Global Template inspector
+    await page.keyboard.press("Escape");
+    await expect(templateInspector.locator("h3")).toHaveText("All Cards Template");
+
+    // 5. Click Reset All Cards to Defaults
+    const resetButton = templateInspector.getByRole("button", {
+      name: "Reset All Cards to Defaults",
+    });
+    await resetButton.click();
+
+    // 6. Add card IV to progression -> should now be back to default 4 beats
+    await addChord(page, "IV");
+    const step3 = page.getByTestId("progression-step").nth(2);
+    await expect(step3).toContainText("4");
   });
 });
+

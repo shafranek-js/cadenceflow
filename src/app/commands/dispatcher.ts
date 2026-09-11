@@ -20,8 +20,10 @@ import { restoreBranchState, type RestoreBranchStateCommand } from "./branchComm
 import {
   restoreModuleTemplate,
   restoreAllTemplates,
+  restoreGlobalMatrixTemplate,
   type RestoreModuleTemplateCommand,
   type RestoreAllTemplateCommand,
+  type RestoreGlobalMatrixTemplateCommand,
 } from "./matrixTemplateCommands";
 import {
   setGlobalCardView,
@@ -65,6 +67,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return restoreModuleTemplate(project, command as RestoreModuleTemplateCommand).project;
     case "matrix-template/restore-all":
       return restoreAllTemplates(project, command as RestoreAllTemplateCommand).project;
+    case "matrix-template/restore-global":
+      return restoreGlobalMatrixTemplate(project, command as RestoreGlobalMatrixTemplateCommand).project;
     case "matrix/set-global-card-view":
       return setGlobalCardView(project, command as SetGlobalCardViewCommand).project;
     case "matrix/set-card-view-override":

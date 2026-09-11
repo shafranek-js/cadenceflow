@@ -19,16 +19,18 @@ export const DEFAULT_PIANO_PERFORMANCE: StepPerformance = Object.freeze({
   dynamicsViewPreference: "musical",
 });
 
+export const DEFAULT_PIANO_DEFAULTS = Object.freeze({
+  duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }),
+  performance: DEFAULT_PIANO_PERFORMANCE,
+});
+
 export function createDefaultProject(
   id: string,
   name = "Untitled",
   nowIso = new Date().toISOString(),
 ): Project {
   const defaults = Object.freeze({
-    piano: Object.freeze({
-      duration: musicalDuration(rational(4), { kind: "bars", bars: 1 }),
-      performance: DEFAULT_PIANO_PERFORMANCE,
-    }),
+    piano: DEFAULT_PIANO_DEFAULTS,
   });
   return Object.freeze({
     id,

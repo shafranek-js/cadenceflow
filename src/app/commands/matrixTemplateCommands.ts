@@ -3,7 +3,10 @@ import type { HarmonicVariant } from "../../domain/harmony/chord";
 import type {
   StepCreationOverrides,
   StepPerformanceOverrides,
+  ProjectDefaults,
 } from "../../domain/project/defaults";
+import { resolveStepPerformance } from "../../domain/project/defaults";
+import { DEFAULT_PIANO_DEFAULTS } from "../../domain/project/factory";
 import type {
   MatrixCardTemplateState,
   ModuleTemplateState,
@@ -223,3 +226,175 @@ export function resetMatrixScope(
     },
   };
 }
+
+function cleanCardOverridesForGlobal(
+  card: MatrixCardTemplateState,
+  hasDurationChange: boolean,
+  performanceKeys: readonly string[],
+): MatrixCardTemplateState {
+  let nextExplicit = card.explicitOverrides;
+  if (hasDurationChange && nextExplicit.duration) {
+    const { duration: _d, ...rest } = nextExplicit;
+    nextExplicit = Object.freeze(rest);
+  }
+  if (performanceKeys.length > 0 && nextExplicit.performance) {
+    const nextPerf = { ...nextExplicit.performance };
+    let changed = false;
+    for (const key of performanceKeys) {
+      if (key in nextPerf) {
+        delete (nextPerf as Record<string, unknown>)[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      if (Object.keys(nextPerf).length > 0) {
+        nextExplicit = Object.freeze({ ...nextExplicit, performance: Object.freeze(nextPerf) });
+      } else {
+        const { performance: _p, ...rest } = nextExplicit;
+        nextExplicit = Object.freeze(rest);
+      }
+    }
+  }
+  return Object.freeze({
+    ...card,
+    explicitOverrides: nextExplicit,
+  });
+}
+
+export interface PatchGlobalMatrixTemplatePayload {
+  readonly durationOverride?: StepCreationOverrides["duration"] | null;
+  readonly performanceOverrides?: StepPerformanceOverrides;
+  readonly nowIso: string;
+}
+export type PatchGlobalMatrixTemplateCommand = ProjectCommand<PatchGlobalMatrixTemplatePayload> & {
+  readonly type: "matrix-template/patch-global";
+};
+
+export function patchGlobalMatrixTemplate(
+  project: Project,
+  command: PatchGlobalMatrixTemplateCommand,
+): AppliedCommand {
+  const previousDefaults = project.defaults;
+  const previousPiano = previousDefaults.piano;
+  const hasDurationChange =
+    command.payload.durationOverride !== undefined && command.payload.durationOverride !== null;
+  const nextDuration = hasDurationChange ? command.payload.durationOverride! : previousPiano.duration;
+  const performanceKeys = command.payload.performanceOverrides
+    ? Object.keys(command.payload.performanceOverrides)
+    : [];
+  const nextPerformance = command.payload.performanceOverrides
+    ? resolveStepPerformance(previousPiano.performance, command.payload.performanceOverrides)
+    : previousPiano.performance;
+
+  const nextDefaults: ProjectDefaults = Object.freeze({
+    ...previousDefaults,
+    piano: Object.freeze({
+      duration: nextDuration,
+      performance: nextPerformance,
+    }),
+  });
+
+  const nextModuleTemplateStates: Record<string, ModuleTemplateState> = {};
+  for (const [moduleId, moduleState] of Object.entries(project.moduleTemplateStates)) {
+    const nextCards: Record<string, MatrixCardTemplateState> = {};
+    for (const [funcId, card] of Object.entries(moduleState.cards)) {
+      nextCards[funcId] = cleanCardOverridesForGlobal(card, hasDurationChange, performanceKeys);
+    }
+    nextModuleTemplateStates[moduleId] = Object.freeze({ cards: Object.freeze(nextCards) });
+  }
+
+  const nextProject: Project = Object.freeze({
+    ...project,
+    updatedAt: command.payload.nowIso,
+    defaults: nextDefaults,
+    moduleTemplateStates: Object.freeze(nextModuleTemplateStates as Project["moduleTemplateStates"]),
+  });
+
+  return {
+    project: nextProject,
+    inverse: {
+      type: "matrix-template/restore-global",
+      payload: {
+        defaults: previousDefaults,
+        moduleTemplateStates: project.moduleTemplateStates,
+        nowIso: command.payload.nowIso,
+      },
+    },
+  };
+}
+
+export interface RestoreGlobalMatrixTemplatePayload {
+  readonly defaults: ProjectDefaults;
+  readonly moduleTemplateStates: Project["moduleTemplateStates"];
+  readonly nowIso: string;
+}
+export type RestoreGlobalMatrixTemplateCommand = ProjectCommand<RestoreGlobalMatrixTemplatePayload> & {
+  readonly type: "matrix-template/restore-global";
+};
+
+export function restoreGlobalMatrixTemplate(
+  project: Project,
+  command: RestoreGlobalMatrixTemplateCommand,
+): AppliedCommand {
+  const previousDefaults = project.defaults;
+  const previousStates = project.moduleTemplateStates;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      defaults: command.payload.defaults,
+      moduleTemplateStates: command.payload.moduleTemplateStates,
+    }),
+    inverse: {
+      type: "matrix-template/restore-global",
+      payload: {
+        defaults: previousDefaults,
+        moduleTemplateStates: previousStates,
+        nowIso: command.payload.nowIso,
+      },
+    },
+  };
+}
+
+export interface ResetGlobalMatrixTemplatePayload {
+  readonly nowIso: string;
+}
+export type ResetGlobalMatrixTemplateCommand = ProjectCommand<ResetGlobalMatrixTemplatePayload> & {
+  readonly type: "matrix-template/reset-global";
+};
+
+export function resetGlobalMatrixTemplate(
+  project: Project,
+  command: ResetGlobalMatrixTemplateCommand,
+): AppliedCommand {
+  const previousDefaults = project.defaults;
+  const previousStates = project.moduleTemplateStates;
+
+  const nextDefaults: ProjectDefaults = Object.freeze({
+    ...previousDefaults,
+    piano: DEFAULT_PIANO_DEFAULTS,
+  });
+
+  const emptyStates = Object.freeze({
+    progressions: Object.freeze({ cards: Object.freeze({}) }),
+    "dark-harmony": Object.freeze({ cards: Object.freeze({}) }),
+  });
+
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      defaults: nextDefaults,
+      moduleTemplateStates: emptyStates,
+    }),
+    inverse: {
+      type: "matrix-template/restore-global",
+      payload: {
+        defaults: previousDefaults,
+        moduleTemplateStates: previousStates,
+        nowIso: command.payload.nowIso,
+      },
+    },
+  };
+}
+
