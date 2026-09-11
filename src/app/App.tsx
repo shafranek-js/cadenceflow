@@ -183,6 +183,7 @@ import type {
   MelodyInstrument,
   MelodyTrackSettings,
 } from "../domain/melody/types";
+import type { HarmonyTrackSettings } from "../domain/harmony/track";
 import {
   createPatchMelodyTrackSettingsCommand,
   createRemoveMelodyRecipeCommand,
@@ -191,6 +192,10 @@ import {
   setMelodyRecipe as applySetMelodyRecipe,
   setMelodyTrackSettings as applyMelodyTrackSettings,
 } from "./commands/melodyCommands";
+import {
+  createPatchHarmonyTrackSettingsCommand,
+  setHarmonyTrackSettings as applyHarmonyTrackSettings,
+} from "./commands/harmonyCommands";
 
 function useStore(store: AppStore) {
   const [, force] = useState(0);
@@ -479,6 +484,10 @@ export function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    audioProviderRef.current?.setVolume(project.harmonyTrack.volume);
+  }, [project.harmonyTrack.volume]);
 
   useEffect(() => {
     if (!hasMelodyRecipe) return;
@@ -884,6 +893,10 @@ export function App() {
     const command = createPatchMelodyTrackSettingsCommand(patch, new Date().toISOString());
     store.dispatch(command, applyMelodyTrackSettings);
   };
+  const changeHarmonyTrackSettings = (patch: Partial<HarmonyTrackSettings>) => {
+    const command = createPatchHarmonyTrackSettingsCommand(patch, new Date().toISOString());
+    store.dispatch(command, applyHarmonyTrackSettings);
+  };
   const reorderProgressionStep = (stepId: string, targetIndex: number) => {
     const command: ReorderStepCommand = {
       type: "progression/reorder-step",
@@ -1181,6 +1194,7 @@ export function App() {
       loopState,
       metronomeEnabled,
       countInEnabled,
+      harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
     });
   };
@@ -1209,6 +1223,7 @@ export function App() {
       loopState,
       metronomeEnabled,
       countInEnabled,
+      harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
     });
   };
@@ -1683,6 +1698,11 @@ export function App() {
             }
             melodyAudioState={melodyAudioState}
             melodyAudioError={melodyAudioError}
+            harmonyAudioState={audioState}
+            onRetryHarmonyAudio={() => {
+              const provider = audioProviderRef.current;
+              if (provider) void provider.prepare();
+            }}
             onRetryMelodyAudio={() => {
               const provider = ensureMelodyProvider();
               void provider.prepare().catch((error) => {
@@ -1711,6 +1731,7 @@ export function App() {
             onRepeatFinalChord={repeatFinalChordToBar}
             onSetMelodyRecipe={setMelodyRecipeForStep}
             onRemoveMelodyRecipe={removeMelodyRecipeForStep}
+            onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
           />
           <BranchComparison

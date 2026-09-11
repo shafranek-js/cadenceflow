@@ -9,6 +9,7 @@ import type { ChordStep, RestStep } from "../../src/domain/progression/step";
 import type { TemporaryBranch } from "../../src/domain/progression/branch";
 import type { FunctionalPreset } from "../../src/domain/progression/presets";
 import { snapshotChordMelodyRecipe } from "../../src/domain/melody/types";
+import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../../src/domain/harmony/track";
 
 /**
  * Rich, canonical Project fixture covering all accepted semantic domains (US1–US12).
@@ -180,7 +181,7 @@ export function createRichProjectFixture(): Project {
 
   return Object.freeze({
     id: "project-us8-rich-fixture-001",
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: "Rich US8 Acceptance Project",
     createdAt: "2026-09-05T20:00:00.000Z",
     updatedAt: "2026-09-05T20:30:00.000Z",
@@ -194,6 +195,7 @@ export function createRichProjectFixture(): Project {
       globalMatrixCardView: "harmonic",
       showBassInStaff: false,
     }),
+    harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: Object.freeze({
       instrument: "violin",
       muted: false,

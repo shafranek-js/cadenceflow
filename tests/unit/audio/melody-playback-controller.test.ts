@@ -74,6 +74,49 @@ function chord(id: string, functionId: string): ChordStep {
 }
 
 describe("T173 — Melody playback routing and active event state", () => {
+  it("routes Harmony Track Mute/Solo state alongside Melody playback", () => {
+    const steps = [chord("only-step", "I")];
+    const clock = new FakeClock();
+    const piano = new RecordingProvider("piano");
+    const melody = new RecordingProvider("melody");
+    const transport = new TransportStore();
+    const controller = new PlaybackController({
+      clock,
+      pianoProvider: piano,
+      melodyProvider: melody,
+      transportStore: transport,
+      lookAheadHorizonSeconds: 10,
+      tickIntervalMs: 10,
+    });
+
+    expect(
+      controller.start({
+        steps,
+        meter: meter(4, 4),
+        tempoBpm: 120,
+        groove: groove("straight"),
+        tonic: 0,
+        context: "major",
+        harmonyTrack: Object.freeze({
+          instrument: "piano",
+          muted: true,
+          solo: false,
+          volume: 100,
+        }),
+        melodyTrack: Object.freeze({
+          instrument: "flute",
+          muted: false,
+          solo: false,
+          volume: 100,
+        }),
+      }),
+    ).toBe(true);
+
+    expect(piano.batches.flat().filter((event) => event.channelRole === "upper")).toHaveLength(0);
+    expect(melody.batches.flat().length).toBeGreaterThan(0);
+    controller.stop();
+  });
+
   it("realizes full context before Play From Here and tracks half-open active melody keys", () => {
     vi.useFakeTimers();
     try {

@@ -5,6 +5,7 @@ import {
   validateChordMelodyRecipe,
   validateMelodyTrackSettings,
 } from "../../../src/domain/melody/types";
+import { createDefaultHarmonyTrackSettings } from "../../../src/domain/harmony/track";
 import {
   CURRENT_PROJECT_SCHEMA_VERSION,
   migrateProjectData,
@@ -35,6 +36,7 @@ type MutableProjectPayload = {
   updatedAt: string;
   schemaVersion: number;
   melodyTrack?: MutableMelodyTrackPayload;
+  harmonyTrack?: Record<string, unknown>;
   progression: { steps: Array<Record<string, unknown>> };
   temporaryBranch: { steps: Array<Record<string, unknown>> };
   [key: string]: unknown;
@@ -46,6 +48,7 @@ function createV1Payload(): MutableProjectPayload {
   ) as MutableProjectPayload;
   payload.schemaVersion = 1;
   delete payload.melodyTrack;
+  delete payload.harmonyTrack;
   for (const step of payload.progression.steps) delete step.melody;
   for (const step of payload.temporaryBranch?.steps ?? []) delete step.melody;
   return payload;
@@ -55,12 +58,13 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-describe("T168 — US12 Project schema v2, migration, and persistence", () => {
-  it("creates v2 projects with frozen default Melody Track settings", () => {
+describe("T168 — US12 Project schema v3, migration, and persistence", () => {
+  it("creates v3 projects with frozen default Harmony and Melody Track settings", () => {
     const project = createDefaultProject("melody-defaults", "Melody Defaults");
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(2);
-    expect(project.schemaVersion).toBe(2);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(3);
+    expect(project.schemaVersion).toBe(3);
+    expect(project.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(project.melodyTrack).toEqual({
       instrument: "flute",
       muted: false,
@@ -69,6 +73,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     });
     expect(Object.isFrozen(project)).toBe(true);
     expect(Object.isFrozen(project.melodyTrack)).toBe(true);
+    expect(Object.isFrozen(project.harmonyTrack)).toBe(true);
     expect(createDefaultMelodyTrackSettings()).toEqual(project.melodyTrack);
     expect(Object.isFrozen(createDefaultMelodyTrackSettings())).toBe(true);
   });
@@ -93,14 +98,15 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     expect(() => validateMelodyTrackSettings({ ...settings, volume: 127.5 })).toThrow();
   });
 
-  it("migrates v1 to v2 without mutating the root, progression, or steps", () => {
+  it("migrates v1 to v3 without mutating the root, progression, or steps", () => {
     const v1 = createV1Payload();
     const before = clone(v1);
     const migrated = migrateProjectData(v1);
 
     expect(v1).toEqual(before);
     expect(migrated).not.toBe(v1);
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(migrated.melodyTrack).toEqual({
       instrument: "flute",
       muted: false,
@@ -114,7 +120,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     expect(migrated.temporaryBranch.steps[0]).not.toBe(v1.temporaryBranch.steps[0]);
   });
 
-  it("preserves v2 semantics through an idempotent migration path and rejects future versions", () => {
+  it("preserves v3 semantics through an idempotent migration path and rejects future versions", () => {
     const v2 = JSON.parse(encodePortableProject(createRichProjectFixture())) as Record<
       string,
       unknown
@@ -125,7 +131,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     expect(migrated).toEqual(before);
     expect(migrated).not.toBe(v2);
     expect(v2).toEqual(before);
-    expect(() => migrateProjectData({ ...v2, schemaVersion: 3 })).toThrow(
+    expect(() => migrateProjectData({ ...v2, schemaVersion: 4 })).toThrow(
       UnsupportedProjectVersionError,
     );
   });
@@ -137,7 +143,13 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     const raw = JSON.parse(first) as MutableProjectPayload;
 
     expect(first).toBe(second);
-    expect(raw.schemaVersion).toBe(2);
+    expect(raw.schemaVersion).toBe(3);
+    expect(raw.harmonyTrack).toEqual({
+      instrument: "piano",
+      muted: false,
+      solo: false,
+      volume: 100,
+    });
     expect(raw.melodyTrack).toEqual({
       instrument: "violin",
       muted: false,
@@ -235,7 +247,7 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     expect(() => decodePortableProject(JSON.stringify(raw))).toThrow(InvalidPortableProjectError);
   });
 
-  it("recovers a v1 autosave as v2 and saves back to one record", async () => {
+  it("recovers a v1 autosave as v3 and saves back to one record", async () => {
     const db = createCadenceFlowDb("MelodyV1RecoveryDB");
     const repo = createProjectRepository(db);
     const autosave = createAutosaveEngine({ db, repo });
@@ -252,15 +264,16 @@ describe("T168 — US12 Project schema v2, migration, and persistence", () => {
     await repo.setLastActiveProjectId(v1.id);
 
     const recovered = await autosave.loadAutosavedProject();
-    expect(recovered?.schemaVersion).toBe(2);
+    expect(recovered?.schemaVersion).toBe(3);
+    expect(recovered?.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(recovered?.melodyTrack).toEqual(createDefaultMelodyTrackSettings());
     expect(recovered?.progression.steps[0]).not.toHaveProperty("melody");
 
     if (recovered) await repo.saveProject(recovered);
     expect(await db.projects.count()).toBe(1);
     const stored = await db.projects.get(v1.id);
-    expect(stored?.schemaVersion).toBe(2);
-    expect(JSON.parse(stored!.payload).schemaVersion).toBe(2);
+    expect(stored?.schemaVersion).toBe(3);
+    expect(JSON.parse(stored!.payload).schemaVersion).toBe(3);
 
     autosave.dispose();
     await db.delete();

@@ -3,8 +3,9 @@
  */
 
 import { createDefaultMelodyTrackSettings } from "../melody/types";
+import { createDefaultHarmonyTrackSettings } from "../harmony/track";
 
-export const CURRENT_PROJECT_SCHEMA_VERSION = 2;
+export const CURRENT_PROJECT_SCHEMA_VERSION = 3;
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(
@@ -50,8 +51,10 @@ export function migrateProjectData(data: unknown): Record<string, unknown> {
   }
 
   if (version === 1) {
-    return migrateV1ToV2(record);
+    return migrateV2ToV3(migrateV1ToV2(record));
   }
+
+  if (version === 2) return migrateV2ToV3(record);
 
   // A shallow root copy keeps v2 decoding pure while preserving every supported
   // v2 field exactly as supplied. Future migrations can be appended above.
@@ -87,9 +90,17 @@ function migrateV1ToV2(record: Record<string, unknown>): Record<string, unknown>
 
   return {
     ...record,
-    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    schemaVersion: 2,
     melodyTrack: createDefaultMelodyTrackSettings(),
     ...(migratedProgression !== undefined ? { progression: migratedProgression } : {}),
     ...(migratedTemporaryBranch !== undefined ? { temporaryBranch: migratedTemporaryBranch } : {}),
+  };
+}
+
+function migrateV2ToV3(record: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...record,
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    harmonyTrack: createDefaultHarmonyTrackSettings(),
   };
 }

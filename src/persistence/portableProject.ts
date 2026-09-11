@@ -30,6 +30,11 @@ import {
   type MelodyTrackSettings,
 } from "../domain/melody/types";
 import {
+  snapshotHarmonyTrackSettings,
+  validateHarmonyTrackSettings,
+  type HarmonyTrackSettings,
+} from "../domain/harmony/track";
+import {
   CURRENT_PROJECT_SCHEMA_VERSION,
   InvalidProjectDataError,
   migrateProjectData,
@@ -219,6 +224,20 @@ function decodeMelodyTrackSettings(raw: unknown): MelodyTrackSettings {
   return validateMelodyTrackSettings(raw);
 }
 
+function encodeHarmonyTrackSettings(settings: HarmonyTrackSettings): Record<string, unknown> {
+  const snapshot = snapshotHarmonyTrackSettings(settings);
+  return {
+    instrument: snapshot.instrument,
+    muted: snapshot.muted,
+    solo: snapshot.solo,
+    volume: snapshot.volume,
+  };
+}
+
+function decodeHarmonyTrackSettings(raw: unknown): HarmonyTrackSettings {
+  return validateHarmonyTrackSettings(raw);
+}
+
 // Wire step representations
 function encodeStep(step: ProgressionStep): Record<string, unknown> {
   if (step.kind === "rest") {
@@ -375,6 +394,7 @@ export function encodePortableProject(project: Project): string {
       globalMatrixCardView: project.presentation.globalMatrixCardView,
       showBassInStaff: project.presentation.showBassInStaff,
     },
+    harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
     defaults,
     moduleTemplateStates,
@@ -588,6 +608,7 @@ export function decodePortableProject(jsonString: string): Project {
     "dark-harmony": { cards: darkHarmonyCards },
   };
 
+  const harmonyTrack = decodeHarmonyTrackSettings(migrated["harmonyTrack"]);
   const melodyTrack = decodeMelodyTrackSettings(migrated["melodyTrack"]);
 
   const project: Project = Object.freeze({
@@ -612,6 +633,7 @@ export function decodePortableProject(jsonString: string): Project {
         showBassInStaff: presentation["showBassInStaff"] === true,
       });
     })(),
+    harmonyTrack,
     melodyTrack,
     defaults,
     moduleTemplateStates,

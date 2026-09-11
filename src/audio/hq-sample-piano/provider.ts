@@ -9,6 +9,10 @@ import type {
 import { type HqPianoManifest, resolveSampleRegion, validatePianoManifest } from "./manifest";
 import { SampleCache } from "./sampleCache";
 
+function clampMidi(value: number): number {
+  return Math.max(0, Math.min(127, Math.round(value)));
+}
+
 export interface HqSamplePianoProviderOptions {
   readonly id?: string | undefined;
   readonly manifestUrl?: string | undefined;
@@ -17,6 +21,7 @@ export interface HqSamplePianoProviderOptions {
   readonly sampleCache?: SampleCache | undefined;
   readonly fetchFn?: typeof fetch | undefined;
   readonly destination?: AudioNode | undefined;
+  readonly volume?: number | undefined;
   readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
 }
 
@@ -43,6 +48,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
   private readonly destinationNode?: AudioNode | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
+  private trackVolume: number;
 
   private sampleCache: SampleCache | null = null;
   private activePlaybacks: ActivePlaybackRecord[] = [];
@@ -54,6 +60,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
     this.initialManifestData = options.manifestData;
     this.audioContext = options.audioContext ?? null;
     this.destinationNode = options.destination;
+    this.trackVolume = clampMidi(options.volume ?? 100);
     this.onStateChange = options.onStateChange;
     this.fetchImpl =
       options.fetchFn ??
@@ -95,6 +102,10 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
         this.audioContext?.currentTime ??
         (typeof performance !== "undefined" ? performance.now() / 1000 : 0),
     };
+  }
+
+  setVolume(volume: number): void {
+    this.trackVolume = clampMidi(volume);
   }
 
   async prepare(): Promise<void> {
@@ -300,7 +311,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
       const gain = audioCtx.createGain();
       // Musical velocity scaling: fine-gain refinement inside the discrete layer
       const normalizedVel = evt.velocity / 127;
-      const gainValue = Math.pow(normalizedVel, 1.2);
+      const gainValue = Math.pow(normalizedVel, 1.2) * (this.trackVolume / 127);
 
       gain.gain.setValueAtTime(gainValue, Math.max(0, startTime));
       // Smooth release decay ramp at note off

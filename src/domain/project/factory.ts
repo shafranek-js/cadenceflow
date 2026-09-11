@@ -7,6 +7,7 @@ import type { StepPerformance } from "../progression/step";
 import type { Project } from "./project";
 import { CURRENT_PROJECT_SCHEMA_VERSION } from "./migrations";
 import { DEFAULT_MELODY_TRACK_SETTINGS } from "../melody/types";
+import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../harmony/track";
 
 export const DEFAULT_PIANO_PERFORMANCE: StepPerformance = Object.freeze({
   articulation: "humanized",
@@ -45,6 +46,7 @@ export function createDefaultProject(
       globalMatrixCardView: "harmonic",
       showBassInStaff: false,
     }),
+    harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,
     defaults,
     moduleTemplateStates: Object.freeze({

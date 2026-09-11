@@ -41,6 +41,7 @@ import {
   type SetStaffBassVisibilityCommand,
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
+import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -80,6 +81,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setStaffBassVisibility(project, command as SetStaffBassVisibilityCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
+    case "harmony/restore-state":
+      return restoreHarmonyState(project, command as RestoreHarmonyStateCommand).project;
     default:
       return project;
   }

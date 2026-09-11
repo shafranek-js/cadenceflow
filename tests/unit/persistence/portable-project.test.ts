@@ -317,13 +317,13 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
   });
 
   describe("8. Schema Version & Migration Contract", () => {
-    it("accepts currently supported schemaVersion 2", () => {
+    it("accepts currently supported schemaVersion 3", () => {
       const original = createRichProjectFixture();
       expect(original.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
 
       const jsonText = encodePortableProject(original);
       const restored = decodePortableProject(jsonText);
-      expect(restored.schemaVersion).toBe(2);
+      expect(restored.schemaVersion).toBe(3);
     });
 
     it("rejects unsupported future schemaVersion explicitly with UnsupportedProjectVersionError", () => {
@@ -339,7 +339,7 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
     it("distinguishes future version rejection from malformed JSON syntax errors", () => {
       const original = createRichProjectFixture();
       const rawObj = JSON.parse(encodePortableProject(original));
-      rawObj.schemaVersion = 3; // Future version
+      rawObj.schemaVersion = 4; // Future version
 
       expect(() => decodePortableProject(JSON.stringify(rawObj))).toThrow(
         UnsupportedProjectVersionError,

@@ -194,6 +194,38 @@ describe("T092 — HqSamplePianoProvider", () => {
     expect(createdSources[1].stop).toHaveBeenCalledWith(10.8);
   });
 
+  it("applies the Harmony Track volume to scheduled piano gain", async () => {
+    const { ctx, createdGains } = createMockAudioContext();
+    const provider = new HqSamplePianoProvider({
+      manifestData: createTestManifest(),
+      audioContext: ctx,
+      sampleCache: new SampleCache({
+        fetchAudioBuffer: async () => createMockAudioBuffer(),
+      }),
+      volume: 64,
+    });
+
+    await provider.prepare();
+    const playback = provider.schedule(
+      [
+        {
+          pitch: 60,
+          startSeconds: 0,
+          durationSeconds: 0.5,
+          velocity: 78,
+          channelRole: "upper",
+        },
+      ],
+      { now: () => 0 },
+    );
+    await (playback as { ready?: Promise<void> }).ready;
+
+    expect(createdGains[0]?.gain.setValueAtTime).toHaveBeenCalledWith(
+      Math.pow(78 / 127, 1.2) * (64 / 127),
+      0,
+    );
+  });
+
   it("inspectEventMapping resolves layer, pitch transposition, and asset path without playing", async () => {
     const { ctx } = createMockAudioContext();
     const manifest = createTestManifest();

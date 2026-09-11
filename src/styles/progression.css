@@ -345,45 +345,55 @@
   border-radius: 0;
 }
 
-.melody-track-controls {
+.track-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  margin: 8px 0 10px;
+}
+
+.track-controls,
+.melody-track-controls,
+.harmony-track-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   min-width: 0;
-  margin: 8px 0 10px;
   padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-1);
 }
 
-.melody-track-title,
-.melody-track-instrument,
-.melody-track-volume {
+.track-controls-title,
+.track-controls-instrument,
+.track-controls-volume {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
 }
 
-.melody-track-title {
+.track-controls-title {
   flex: 1 1 150px;
   flex-wrap: wrap;
   gap: 2px 7px;
 }
 
-.melody-track-title span,
-.melody-track-instrument span,
-.melody-track-volume span {
+.track-controls-title span,
+.track-controls-instrument span,
+.track-controls-volume span {
   color: var(--text-muted);
   font-size: 0.72rem;
 }
 
-.melody-track-title span {
+.track-controls-title span {
   flex: 0 0 auto;
 }
 
+.track-controls-audio-status,
 .melody-track-audio-status,
 .melody-editor-audio-controls {
   display: flex;
@@ -393,6 +403,7 @@
   font-size: 0.78rem;
 }
 
+.track-controls-retry,
 .melody-track-retry {
   padding: 0;
   border: 0;
@@ -402,10 +413,12 @@
   text-decoration: underline;
 }
 
+.track-controls-instrument select,
 .melody-track-instrument select {
   max-width: 150px;
 }
 
+.track-controls-toggle,
 .melody-track-toggle {
   min-height: 28px;
   padding: 4px 8px;
@@ -416,21 +429,22 @@
   font-size: 0.72rem;
 }
 
+.track-controls-toggle[aria-pressed="true"],
 .melody-track-toggle[aria-pressed="true"] {
   border-color: var(--selected);
   background: var(--surface-selected);
 }
 
-.melody-track-volume {
+.track-controls-volume {
   flex: 1 1 150px;
 }
 
-.melody-track-volume input {
+.track-controls-volume input {
   width: min(180px, 100%);
   min-width: 80px;
 }
 
-.melody-track-volume output {
+.track-controls-volume output {
   min-width: 26px;
   color: var(--text);
   font-size: 0.72rem;
@@ -665,8 +679,15 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .track-controls-title,
   .melody-track-title {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .track-controls-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

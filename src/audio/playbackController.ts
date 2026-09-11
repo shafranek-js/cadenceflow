@@ -15,6 +15,7 @@ import type { PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ProgressionStep } from "../domain/progression/step";
 import type { MelodyTrackSettings } from "../domain/melody/types";
+import type { HarmonyTrackSettings } from "../domain/harmony/track";
 import type { TransportStore } from "../ui/transport/transportStore";
 import type { LoopState } from "../ui/transport/loopState";
 import { resolveLoopRegion } from "../ui/transport/loopState";
@@ -49,6 +50,7 @@ export interface PlaybackSessionParams {
   readonly metronomeEnabled?: boolean | undefined;
   readonly countInEnabled?: boolean | undefined;
   readonly startingStepIndex?: number | undefined;
+  readonly harmonyTrack?: HarmonyTrackSettings | undefined;
   readonly melodyTrack?: MelodyTrackSettings | undefined;
 }
 
@@ -357,9 +359,14 @@ export class PlaybackController {
             startSeconds: countInDurationSeconds + event.startSeconds - sliceBaseSeconds,
           }),
         ) ?? [];
+    const harmonyEnabled = params.harmonyTrack?.muted !== true;
+    const melodyEnabled = params.melodyTrack?.muted !== true;
+    const harmonySolo = params.harmonyTrack?.solo === true;
+    const melodySolo = params.melodyTrack?.solo === true;
+    const hasSoloTrack = harmonySolo || melodySolo;
     const audioEvents: AudioNoteEvent[] = [
-      ...(params.melodyTrack?.solo ? [] : activePianoEvents),
-      ...activeMelodyEvents,
+      ...(harmonyEnabled && (!hasSoloTrack || harmonySolo) ? activePianoEvents : []),
+      ...(melodyEnabled && (!hasSoloTrack || melodySolo) ? activeMelodyEvents : []),
     ];
     const boundaries: StepTimeBoundary[] = [];
 

@@ -33,12 +33,14 @@ import { MeasureStaffView, type MeasureStaffItem } from "../staff/MeasureStaffVi
 import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
 import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
 import { MelodyTrackControls } from "../melody/MelodyTrackControls";
+import { HarmonyTrackControls } from "../harmony/HarmonyTrackControls";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import type {
   ChordMelodyRecipe,
   MelodyInstrument,
   MelodyTrackSettings,
 } from "../../domain/melody/types";
+import type { HarmonyTrackSettings } from "../../domain/harmony/track";
 import { MelodyStaffView } from "../melody/MelodyStaffView";
 import {
   canShiftPerformanceOctave,
@@ -72,10 +74,14 @@ export function ProgressionTrack({
   onSetMelodyRecipe,
   onRemoveMelodyRecipe,
   onMelodyTrackSettingsChange,
+  onHarmonyTrackSettingsChange,
   activeMelodyEventKey,
   melodyAudioState,
   melodyAudioError,
   onRetryMelodyAudio,
+  harmonyAudioState,
+  harmonyAudioError,
+  onRetryHarmonyAudio,
   isMelodyPreviewPlaying,
   onPlayMelodyPreview,
   onStopMelodyPreview,
@@ -101,10 +107,14 @@ export function ProgressionTrack({
   ) => void;
   readonly onRemoveMelodyRecipe?: (stepId: string) => void;
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
+  readonly onHarmonyTrackSettingsChange?: (patch: Partial<HarmonyTrackSettings>) => void;
   readonly activeMelodyEventKey?: string | null;
   readonly melodyAudioState?: AudioProviderState;
   readonly melodyAudioError?: string | null;
   readonly onRetryMelodyAudio?: () => void;
+  readonly harmonyAudioState?: AudioProviderState;
+  readonly harmonyAudioError?: string | null;
+  readonly onRetryHarmonyAudio?: () => void;
   readonly isMelodyPreviewPlaying?: boolean;
   readonly onPlayMelodyPreview?: (project: Project) => void;
   readonly onStopMelodyPreview?: () => void;
@@ -538,14 +548,25 @@ export function ProgressionTrack({
           </button>
         ) : null}
       </div>
-      {commonView === "staff" && hasMelodyRecipe && onMelodyTrackSettingsChange ? (
-        <MelodyTrackControls
-          settings={project.melodyTrack}
-          onChange={onMelodyTrackSettingsChange}
-          {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
-          {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
-          {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
-        />
+      {commonView === "staff" && onHarmonyTrackSettingsChange ? (
+        <div className="track-controls-grid">
+          <HarmonyTrackControls
+            settings={project.harmonyTrack}
+            onChange={onHarmonyTrackSettingsChange}
+            {...(harmonyAudioState ? { providerState: harmonyAudioState } : {})}
+            {...(harmonyAudioError !== undefined ? { providerError: harmonyAudioError } : {})}
+            {...(onRetryHarmonyAudio ? { onRetry: onRetryHarmonyAudio } : {})}
+          />
+          {hasMelodyRecipe && onMelodyTrackSettingsChange ? (
+            <MelodyTrackControls
+              settings={project.melodyTrack}
+              onChange={onMelodyTrackSettingsChange}
+              {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+              {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+              {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
+            />
+          ) : null}
+        </div>
       ) : null}
       <div className="progression-step-cards" onClick={handleBackgroundClick}>
         {matrixGapHint !== null ? (
