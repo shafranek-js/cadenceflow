@@ -731,6 +731,19 @@ export function App() {
     };
     store.dispatch(command, selectStep);
   };
+  const clearMatrixSelection = useCallback(() => {
+    const previousFunctionId = settingsFunctionId ?? store.matrixSession.previewFunctionId;
+    setSettingsFunctionId(null);
+    store.clearMatrixPreview();
+    if (previousFunctionId) {
+      requestAnimationFrame(() => {
+        const cardBtn = document.querySelector<HTMLButtonElement>(
+          `[data-testid="chord-card-${previousFunctionId}"] .chord-main`,
+        );
+        cardBtn?.focus();
+      });
+    }
+  }, [settingsFunctionId, store]);
   const auditionProgressionStep = (stepId: string) => {
     clearStepPreviewHighlights();
     const melodyRequestId = ++melodyPreviewRequestRef.current;
@@ -1242,6 +1255,22 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.repeat && !e.defaultPrevented) {
+        if (
+          voicingEditorOpen ||
+          presetsPanelOpen ||
+          savePresetDialogOpen ||
+          Boolean(pendingSwitch)
+        ) {
+          return;
+        }
+        if (settingsFunctionId || store.matrixSession.previewFunctionId) {
+          e.preventDefault();
+          clearMatrixSelection();
+          return;
+        }
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
         if (store.canUndo) {
           e.preventDefault();
@@ -1294,7 +1323,19 @@ export function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handlePause, handlePlay, handleResume, store, transportState.status]);
+  }, [
+    clearMatrixSelection,
+    handlePause,
+    handlePlay,
+    handleResume,
+    pendingSwitch,
+    presetsPanelOpen,
+    savePresetDialogOpen,
+    settingsFunctionId,
+    store,
+    transportState.status,
+    voicingEditorOpen,
+  ]);
 
   const changeTempo = (tempoBpm: number) => {
     const command: SetTempoCommand = {
@@ -1532,6 +1573,7 @@ export function App() {
           onResetCurrentModule={() => resetMatrix("current-module")}
           onResetAllModules={() => resetMatrix("all-modules")}
           onStaffOctaveChange={changeMatrixStaffOctave}
+          onClearSelection={clearMatrixSelection}
         />
       }
       inspector={
@@ -1621,6 +1663,7 @@ export function App() {
         ) : null
       }
       onProgressionBackgroundClick={() => setProgressionSelection()}
+      onMatrixBackgroundClick={clearMatrixSelection}
       progression={
         <>
           <div className="progression-heading">

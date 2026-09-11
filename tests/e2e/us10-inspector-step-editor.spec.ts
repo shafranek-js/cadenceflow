@@ -352,4 +352,38 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     expect(align1Return.diffTop).toBeLessThanOrEqual(2);
     expect(Math.abs(align1Return.stripOffset - align1.stripOffset)).toBeLessThanOrEqual(2);
   });
+
+  test("dismisses Matrix chord card selection via Escape key and empty background click", async ({
+    page,
+  }) => {
+    await waitForStudio(page);
+
+    const cardI = page.getByTestId("chord-card-I");
+    const buttonI = cardI.locator(".chord-main");
+    const templateInspector = page.getByTestId("matrix-template-inspector");
+
+    // 1. Initially unselected
+    await expect(cardI).not.toHaveClass(/is-selected/);
+    await expect(templateInspector).not.toBeVisible();
+
+    // 2. Select card I
+    await buttonI.click();
+    await expect(cardI).toHaveClass(/is-selected/);
+    await expect(templateInspector).toBeVisible();
+
+    // 3. Press Escape -> dismisses selection
+    await page.keyboard.press("Escape");
+    await expect(cardI).not.toHaveClass(/is-selected/);
+    await expect(templateInspector).not.toBeVisible();
+
+    // 4. Select card I again
+    await buttonI.click();
+    await expect(cardI).toHaveClass(/is-selected/);
+    await expect(templateInspector).toBeVisible();
+
+    // 5. Click on empty space in the matrix workbench -> dismisses selection
+    await page.locator(".matrix-workbench").click({ position: { x: 5, y: 5 } });
+    await expect(cardI).not.toHaveClass(/is-selected/);
+    await expect(templateInspector).not.toBeVisible();
+  });
 });

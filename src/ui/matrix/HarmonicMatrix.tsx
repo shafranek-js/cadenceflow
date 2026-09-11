@@ -36,6 +36,7 @@ export function HarmonicMatrix({
   onResetCurrentModule,
   onResetAllModules,
   onStaffOctaveChange,
+  onClearSelection,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -51,6 +52,7 @@ export function HarmonicMatrix({
   readonly onResetCurrentModule: () => void;
   readonly onResetAllModules: () => void;
   readonly onStaffOctaveChange: (functionId: string, direction: StaffOctaveDirection) => void;
+  readonly onClearSelection?: () => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -111,8 +113,30 @@ export function HarmonicMatrix({
     );
   };
 
+  const handleBackgroundClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const clickedInteractive = target.closest(
+      ".chord-card, .matrix-toolbar, button, select, input, textarea, label, a, [role='button'], [role='menu']",
+    );
+    if (clickedInteractive) return;
+    onClearSelection?.();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Escape" || !previewFunctionId || !onClearSelection) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClearSelection();
+  };
+
   return (
-    <section className="matrix-panel" aria-label="Harmonic Matrix">
+    <section
+      className="matrix-panel"
+      aria-label="Harmonic Matrix"
+      onClick={handleBackgroundClick}
+      onKeyDown={handleKeyDown}
+    >
       <header className="matrix-toolbar">
         <ModuleSelector value={project.activeModule} onChange={onModuleChange} />
         <TonicSelector

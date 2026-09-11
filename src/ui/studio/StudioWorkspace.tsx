@@ -9,6 +9,7 @@ export interface StudioWorkspaceProps {
   readonly progression: ReactNode;
   readonly statusBar?: ReactNode;
   readonly onProgressionBackgroundClick?: () => void;
+  readonly onMatrixBackgroundClick?: () => void;
   readonly overlays?: ReactNode;
 }
 
@@ -28,6 +29,7 @@ export function StudioWorkspace({
   progression,
   statusBar,
   onProgressionBackgroundClick,
+  onMatrixBackgroundClick,
   overlays,
 }: StudioWorkspaceProps) {
   const progressionStripRef = useRef<HTMLElement>(null);
@@ -108,8 +110,18 @@ export function StudioWorkspace({
       <section
         className={`studio-grid${selectedStepInspector ? " has-selected-step" : ""}`}
         aria-label="Studio work area"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onMatrixBackgroundClick?.();
+        }}
       >
-        <div className="studio-matrix-area">{matrix}</div>
+        <div
+          className="studio-matrix-area"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) onMatrixBackgroundClick?.();
+          }}
+        >
+          {matrix}
+        </div>
         <aside className="inspector-stack" aria-label="Inspector">
           {inspector}
         </aside>
