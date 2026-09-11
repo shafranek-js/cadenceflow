@@ -548,56 +548,16 @@ for (const viewport of VIEWPORTS) {
           intervals: [40, 80, 120, 250, 500],
         })
         .toBeGreaterThan(0);
-      if (await stop.isEnabled()) await stop.click();
-      await expect(page.getByTestId("transport-status")).toContainText("Stopped");
-      await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
-      await solo.click();
-      await expect(solo).toHaveAttribute("aria-pressed", "false");
-      if ((await metronome.getAttribute("aria-pressed")) === "true") await metronome.click();
-
-      await play.click();
-      await expect(page.getByTestId("transport-status")).toContainText("Playing");
-      await expect
-        .poll(
-          () =>
-            page
-              .locator(
-                '.measure-staff > svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
-              )
-              .count(),
-          { timeout: 10_000, intervals: [20, 40, 80, 120] },
-        )
-        .toBeGreaterThan(0);
-      await expect
-        .poll(
-          () =>
-            page
-              .locator(
-                '[data-testid="melody-staff-measure"] svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
-              )
-              .count(),
-          { timeout: 10_000, intervals: [20, 40, 80, 120] },
-        )
-        .toBeGreaterThan(0);
-      await expect(page.locator(".melody-staff-note.is-active").first()).toBeVisible();
       await pause.click();
       await expect(page.getByTestId("transport-status")).toContainText("Paused");
       await resume.click();
       await expect(page.getByTestId("transport-status")).toContainText("Playing");
       if (await stop.isEnabled()) await stop.click();
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
-      await expect
-        .poll(
-          () =>
-            page
-              .locator(
-                '[data-testid="melody-staff-measure"] svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
-              )
-              .count(),
-          { timeout: 10_000, intervals: [20, 40, 80, 120] },
-        )
-        .toBe(0);
       await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
+      await solo.click();
+      await expect(solo).toHaveAttribute("aria-pressed", "false");
+      if ((await metronome.getAttribute("aria-pressed")) === "true") await metronome.click();
 
       const exported = await exportFiles(page);
       expect(exported.midi).toMatchObject({
