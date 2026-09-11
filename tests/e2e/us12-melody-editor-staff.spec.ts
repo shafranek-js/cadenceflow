@@ -116,6 +116,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     const controls = progression.getByRole("region", { name: "Melody Track controls" });
     await expect(controls).toBeVisible();
     await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
+    await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
     await expect(page.getByTestId("melody-staff-measure")).toHaveCount(2);
 
     const melodySvg = page.getByTestId("melody-staff-measure").first().locator("svg");
@@ -131,6 +132,30 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(
       page.getByTestId("measure-staff-view").first().locator(".measure-staff > svg"),
     ).toHaveAttribute("data-staff-meter", "4/4");
+
+    await select.click();
+    await expect
+      .poll(
+        () =>
+          page
+            .locator(
+              '.measure-staff > svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
+            )
+            .count(),
+        { intervals: [20, 20, 40, 60, 80] },
+      )
+      .toBeGreaterThan(0);
+    await expect
+      .poll(
+        () =>
+          page
+            .locator(
+              '[data-testid="melody-staff-measure"] svg[data-staff-playing-entries]:not([data-staff-playing-entries=""])',
+            )
+            .count(),
+        { intervals: [20, 20, 40, 60, 80] },
+      )
+      .toBe(1);
     await expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -149,6 +174,9 @@ test.describe("US12 — melody editor and derived staff", () => {
       "aria-pressed",
       "true",
     );
+    const selectedMelodyNote = page.locator(".melody-staff-note.is-selected").first();
+    await expect(selectedMelodyNote).toHaveCSS("background-color", "rgb(241, 228, 213)");
+    await expect(selectedMelodyNote).toHaveCSS("color", "rgb(36, 23, 14)");
     await theme.getByRole("button", { name: "Light theme" }).click();
     await expect(theme.getByRole("button", { name: "Light theme" })).toHaveAttribute(
       "aria-pressed",

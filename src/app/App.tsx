@@ -232,6 +232,12 @@ export function App() {
   const melodyPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const melodyPreviewRequestRef = useRef(0);
   const [isMelodyPreviewPlaying, setIsMelodyPreviewPlaying] = useState(false);
+  const [previewPlayingStepId, setPreviewPlayingStepId] = useState<string | null>(null);
+  const [previewActiveMelodyEventKey, setPreviewActiveMelodyEventKey] = useState<string | null>(
+    null,
+  );
+  const stepPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const melodyHighlightTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [projectReady, setProjectReady] = useState(false);
   const [projectBusy, setProjectBusy] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -279,6 +285,17 @@ export function App() {
     return melodyPreviewAuditionControllerRef.current;
   }, [ensureMelodyProvider]);
 
+  const clearStepPreviewHighlights = useCallback(() => {
+    if (stepPreviewStopTimerRef.current !== null) {
+      clearTimeout(stepPreviewStopTimerRef.current);
+      stepPreviewStopTimerRef.current = null;
+    }
+    melodyHighlightTimerRefs.current.forEach((timer) => clearTimeout(timer));
+    melodyHighlightTimerRefs.current = [];
+    setPreviewPlayingStepId(null);
+    setPreviewActiveMelodyEventKey(null);
+  }, []);
+
   useEffect(() => {
     try {
       window.localStorage.setItem(
@@ -299,6 +316,7 @@ export function App() {
       melodyPreviewStopTimerRef.current = null;
     }
     setIsMelodyPreviewPlaying(false);
+    clearStepPreviewHighlights();
     transportStore.stop();
     setLoopState(INITIAL_LOOP_STATE);
     setPendingSwitch(null);
@@ -307,7 +325,7 @@ export function App() {
     setPresetsPanelOpen(false);
     setSavePresetDialogOpen(false);
     setApplyDialogPreset(null);
-  }, [transportStore]);
+  }, [clearStepPreviewHighlights, transportStore]);
 
   const projectController = useMemo(() => new ProjectController({ store }), [store]);
 
@@ -432,6 +450,10 @@ export function App() {
       if (melodyPreviewStopTimerRef.current !== null) {
         clearTimeout(melodyPreviewStopTimerRef.current);
       }
+      if (stepPreviewStopTimerRef.current !== null) {
+        clearTimeout(stepPreviewStopTimerRef.current);
+      }
+      melodyHighlightTimerRefs.current.forEach((timer) => clearTimeout(timer));
       melodyProviderRef.current?.stop();
       void melodyProviderRef.current?.dispose();
     };
@@ -701,6 +723,9 @@ export function App() {
     store.dispatch(command, selectStep);
   };
   const auditionProgressionStep = (stepId: string) => {
+    clearStepPreviewHighlights();
+    const melodyRequestId = ++melodyPreviewRequestRef.current;
+    melodyPreviewAuditionControllerRef.current?.stop();
     const currentProject = store.project;
     const step = currentProject.progression.steps.find(
       (candidate): candidate is ChordStep => candidate.id === stepId && candidate.kind === "chord",
@@ -719,10 +744,22 @@ export function App() {
       },
       tempoBpm: currentProject.globalTiming.tempoBpm,
     });
-    getPreviewAuditionController()?.audition(realization.events);
+    const chordPlayback = getPreviewAuditionController()?.audition(realization.events);
+    if (chordPlayback) {
+      setPreviewPlayingStepId(stepId);
+      const chordDurationSeconds = realization.events.reduce(
+        (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
+        0,
+      );
+      stepPreviewStopTimerRef.current = setTimeout(
+        () => {
+          stepPreviewStopTimerRef.current = null;
+          setPreviewPlayingStepId((current) => (current === stepId ? null : current));
+        },
+        Math.max(1, Math.ceil(chordDurationSeconds * 1000)),
+      );
+    }
 
-    const melodyRequestId = ++melodyPreviewRequestRef.current;
-    melodyPreviewAuditionControllerRef.current?.stop();
     if (!step.melody) return;
 
     const melodyEvents = realizeMelodyStepAudition(
@@ -750,7 +787,29 @@ export function App() {
     );
     const playMelody = () => {
       if (melodyPreviewRequestRef.current !== melodyRequestId) return;
-      getMelodyPreviewAuditionController()?.audition(melodyEvents);
+      const playback = getMelodyPreviewAuditionController()?.audition(melodyEvents);
+      if (!playback) return;
+      melodyHighlightTimerRefs.current.forEach((timer) => clearTimeout(timer));
+      melodyHighlightTimerRefs.current = melodyEvents.flatMap((event) => [
+        setTimeout(
+          () => {
+            if (melodyPreviewRequestRef.current === melodyRequestId) {
+              setPreviewActiveMelodyEventKey(event.eventKey);
+            }
+          },
+          Math.max(0, Math.floor(event.startSeconds * 1000)),
+        ),
+        setTimeout(
+          () => {
+            if (melodyPreviewRequestRef.current === melodyRequestId) {
+              setPreviewActiveMelodyEventKey((current) =>
+                current === event.eventKey ? null : current,
+              );
+            }
+          },
+          Math.max(1, Math.ceil((event.startSeconds + event.durationSeconds) * 1000)),
+        ),
+      ]);
     };
     if (melodyProvider.state === "ready" || melodyProvider.state === "fallback") {
       playMelody();
@@ -1099,6 +1158,9 @@ export function App() {
   );
 
   const handlePlay = () => {
+    clearStepPreviewHighlights();
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
     const controller = getPlaybackController();
     if (!controller) return;
     controller.start({
@@ -1124,6 +1186,9 @@ export function App() {
   };
 
   const handlePlayFromHere = (stepId: string) => {
+    clearStepPreviewHighlights();
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
     const controller = getPlaybackController();
     if (!controller) return;
     controller.playFromHere(stepId, {
@@ -1607,8 +1672,15 @@ export function App() {
           />
           <ProgressionTrack
             project={project}
-            currentPlayingStepIndex={transportState.currentStepIndex}
-            activeMelodyEventKey={transportState.activeMelodyEventKey}
+            currentPlayingStepIndex={
+              transportState.currentStepIndex ??
+              (previewPlayingStepId
+                ? project.progression.steps.findIndex((step) => step.id === previewPlayingStepId)
+                : null)
+            }
+            activeMelodyEventKey={
+              transportState.activeMelodyEventKey ?? previewActiveMelodyEventKey
+            }
             melodyAudioState={melodyAudioState}
             melodyAudioError={melodyAudioError}
             onRetryMelodyAudio={() => {

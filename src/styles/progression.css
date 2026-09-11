@@ -603,6 +603,11 @@
   outline-offset: 1px;
 }
 
+.melody-staff-note.is-selected {
+  background: #f1e4d5;
+  color: #24170e;
+}
+
 .melody-staff-note.is-active {
   border-color: var(--piano-pressed-key-border);
   background: var(--piano-pressed-key);
