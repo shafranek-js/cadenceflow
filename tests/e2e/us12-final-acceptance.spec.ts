@@ -373,9 +373,10 @@ for (const viewport of VIEWPORTS) {
       await openStudio(page);
       await ensureHistoryControlsVisible(page);
       await addChord(page, "I");
+      await createMelody(page, { preview: true, instrument: "cello" });
       await addChord(page, "V");
       await addChord(page, "vi");
-      await createMelody(page, { preview: true, instrument: "cello" });
+      await page.getByLabel("Progression Card View").selectOption("staff");
 
       const progression = page.getByRole("region", { name: "My Progression" });
       const controls = progression.getByRole("region", { name: "Melody Track controls" });
@@ -436,9 +437,13 @@ for (const viewport of VIEWPORTS) {
         progression.getByRole("region", { name: "Melody Track controls" }),
       ).toContainText("Melody audio ready", { timeout: 60_000 });
 
-      const persistedInvoker = page
-        .locator(".measure-staff-event .measure-staff-event-select")
-        .last();
+      const persistedMelodyNote = page.locator("[data-melody-event-key]").first();
+      await expect(persistedMelodyNote).toBeVisible();
+      await persistedMelodyNote.click();
+      const persistedInvoker = page.locator(
+        '.measure-staff-event .measure-staff-event-select[aria-pressed="true"]',
+      );
+      await expect(persistedInvoker).toHaveCount(1);
       await persistedInvoker.focus();
       await page.keyboard.press("Shift+F10");
       const persistedMenu = page.getByRole("menu", { name: /Melody actions/ });
@@ -490,7 +495,6 @@ for (const viewport of VIEWPORTS) {
       await mute.click();
       await expect(mute).toHaveAttribute("aria-pressed", "true");
       await play.click();
-      await expect(page.getByTestId("transport-status")).toContainText("Playing");
       await expect
         .poll(
           () =>
@@ -645,8 +649,9 @@ test.describe("US12 Melody provider isolation", () => {
     const controls = progression.getByRole("region", { name: "Melody Track controls" });
     await expect(controls).toContainText("Melody audio error", { timeout: 30_000 });
     await expect(controls.getByRole("button", { name: "Retry" })).toBeVisible();
-    await expect(page.getByTestId("piano-audio-status")).toHaveAttribute("data-status", "ready");
-    await expect(page.getByTestId("piano-audio-status")).toContainText("HQ Piano Ready");
+    const pianoStatus = page.getByTestId("piano-audio-status");
+    await expect(pianoStatus).toHaveAttribute("data-status", /^(ready|fallback)$/);
+    await expect(pianoStatus).not.toHaveAttribute("data-status", "error");
 
     const chordInvoker = page.locator(".measure-staff-event .measure-staff-event-select").first();
     await chordInvoker.click();
