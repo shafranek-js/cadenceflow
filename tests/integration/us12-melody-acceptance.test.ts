@@ -9,7 +9,8 @@ import {
 import { createDefaultProject } from "../../src/domain/project/factory";
 import type { Project } from "../../src/domain/project/project";
 import type { ChordStep, RestStep } from "../../src/domain/progression/step";
-import { rational, type Rational } from "../../src/domain/timing/rational";
+import { exactPitch } from "../../src/domain/harmony/pitch";
+import { addRational, rational, type Rational } from "../../src/domain/timing/rational";
 import { musicalDuration } from "../../src/domain/timing/duration";
 import { globalTiming, meter } from "../../src/domain/timing/meter";
 import { groove } from "../../src/domain/timing/swing";
@@ -77,6 +78,59 @@ const CANONICAL_MATRIX: readonly CanonicalCase[] = Object.freeze(
     })),
   ),
 );
+
+// Independent SC-018 oracle. These values intentionally do not use the
+// production pattern/grid helpers, so the acceptance test can catch a shared
+// mistake in both the realization and its consumers.
+const ORACLE_UPPER_PITCHES = Object.freeze([
+  exactPitch(60, { step: "C", alter: 0 }),
+  exactPitch(64, { step: "E", alter: 0 }),
+  exactPitch(67, { step: "G", alter: 0 }),
+  exactPitch(67, { step: "G", alter: 0 }),
+]);
+const ORACLE_PATTERN_PITCHES: Readonly<Record<MelodyPattern, readonly number[]>> = Object.freeze({
+  up: Object.freeze([60, 64, 67, 67]),
+  down: Object.freeze([67, 67, 64, 60]),
+  "up-down": Object.freeze([60, 64, 67, 67, 67, 64]),
+  "down-up": Object.freeze([67, 67, 64, 60, 64, 67]),
+  "outside-in": Object.freeze([60, 67, 64, 67]),
+  "inside-out": Object.freeze([64, 67, 60, 67]),
+});
+const ORACLE_GRID_EVENTS: Readonly<Record<MelodyGrid, readonly (readonly [Rational, Rational])[]>> =
+  Object.freeze({
+    quarter: Object.freeze([
+      [rational(0), rational(1)],
+      [rational(1), rational(1, 4)],
+    ]),
+    eighth: Object.freeze([
+      [rational(0), rational(1, 2)],
+      [rational(1, 2), rational(1, 2)],
+      [rational(1), rational(1, 4)],
+    ]),
+    sixteenth: Object.freeze([
+      [rational(0), rational(1, 4)],
+      [rational(1, 4), rational(1, 4)],
+      [rational(1, 2), rational(1, 4)],
+      [rational(3, 4), rational(1, 4)],
+      [rational(1), rational(1, 4)],
+    ]),
+    "eighth-triplet": Object.freeze([
+      [rational(0), rational(1, 3)],
+      [rational(1, 3), rational(1, 3)],
+      [rational(2, 3), rational(1, 3)],
+      [rational(1), rational(1, 4)],
+    ]),
+    "sixteenth-triplet": Object.freeze([
+      [rational(0), rational(1, 6)],
+      [rational(1, 6), rational(1, 6)],
+      [rational(1, 3), rational(1, 6)],
+      [rational(1, 2), rational(1, 6)],
+      [rational(2, 3), rational(1, 6)],
+      [rational(5, 6), rational(1, 6)],
+      [rational(1), rational(1, 6)],
+      [rational(7, 6), rational(1, 12)],
+    ]),
+  });
 
 function freezeChordWithMelody(
   step: ChordStep,
@@ -344,6 +398,7 @@ interface ParsedMusicXmlMelodyEvent {
   readonly onsetUnits: number;
   readonly duration: number;
   readonly pitch?: number;
+  readonly ties: readonly ("start" | "stop")[];
 }
 
 /** Independent XML DOM parse of the serialized P2 part. */
@@ -372,6 +427,11 @@ function parseMusicXmlMelody(xml: string): {
         onsetUnits,
         duration,
         ...(note.querySelector(":scope > rest") ? {} : { pitch: xmlPitch(note) }),
+        ties: Object.freeze(
+          [...note.querySelectorAll(":scope > tie")]
+            .map((tie) => tie.getAttribute("type"))
+            .filter((type): type is "start" | "stop" => type === "start" || type === "stop"),
+        ),
       });
       onsetUnits += duration;
     }
@@ -383,6 +443,23 @@ function parseMusicXmlMelody(xml: string): {
     clef: xmlText(part.querySelector(":scope > measure")!, ":scope > attributes > clef > sign"),
     events: Object.freeze(events),
   });
+}
+
+function collapseTiedMusicXmlNotes(
+  events: readonly ParsedMusicXmlMelodyEvent[],
+): readonly { readonly pitch: number }[] {
+  const notes: { pitch: number; tiedForward: boolean }[] = [];
+  for (const event of events) {
+    if (event.pitch === undefined) continue;
+    const previous = notes.at(-1);
+    const continuesPrevious = event.ties.includes("stop") && previous?.tiedForward === true;
+    if (continuesPrevious && previous.pitch === event.pitch) {
+      previous.tiedForward = event.ties.includes("start");
+      continue;
+    }
+    notes.push({ pitch: event.pitch, tiedForward: event.ties.includes("start") });
+  }
+  return Object.freeze(notes.map(({ pitch }) => Object.freeze({ pitch })));
 }
 
 function melodyProjectionNotes(
@@ -408,26 +485,95 @@ function applyProjectPatch(project: Project, patch: Partial<Project["melodyTrack
   });
 }
 
+function assertProjectPure<T>(project: Project, label: string, operation: () => T): T {
+  const before = JSON.stringify(project);
+  const result = operation();
+  expect(JSON.stringify(project), `${label} mutated Project`).toBe(before);
+  return result;
+}
+
 describe("T176 — US12 SC-018 final Melody acceptance", () => {
+  it("matches an independent oracle for all Pattern/Grid combinations and preserves pitch identity", () => {
+    for (const pattern of PATTERNS) {
+      for (const grid of GRIDS) {
+        const phrase = realizeChordMelody({
+          sourceStepId: `oracle-${pattern}-${grid}`,
+          upperPitches: ORACLE_UPPER_PITCHES,
+          durationBeats: rational(5, 4),
+          recipe: { pattern, grid, octaveOffset: 0 },
+        });
+        const expectedPitches = ORACLE_PATTERN_PITCHES[pattern]!;
+        const expectedGrid = ORACLE_GRID_EVENTS[grid]!;
+        expect(phrase.events).toHaveLength(expectedGrid.length);
+        expect(
+          phrase.events.map((event) => [
+            event.index,
+            event.pitch.midiNumber,
+            event.sourcePitchMidi,
+            event.startOffsetBeats,
+            event.durationBeats,
+          ]),
+        ).toEqual(
+          expectedGrid.map(([startOffsetBeats, durationBeats], index) => [
+            index,
+            expectedPitches[index % expectedPitches.length]!,
+            expectedPitches[index % expectedPitches.length]!,
+            startOffsetBeats,
+            durationBeats,
+          ]),
+        );
+      }
+    }
+
+    const input = {
+      sourceStepId: "oracle-octave-doubling",
+      upperPitches: ORACLE_UPPER_PITCHES,
+      durationBeats: rational(2),
+      recipe: { pattern: "up" as const, grid: "eighth" as const, octaveOffset: 1 as const },
+    };
+    const before = structuredClone(input);
+    const octavePhrase = realizeChordMelody(input);
+    expect(
+      octavePhrase.events.map((event) => [event.pitch.midiNumber, event.sourcePitchMidi]),
+    ).toEqual([
+      [72, 60],
+      [76, 64],
+      [79, 67],
+      [79, 67],
+    ]);
+    expect(octavePhrase.events.filter((event) => event.pitch.midiNumber === 79)).toHaveLength(2);
+    expect(ORACLE_UPPER_PITCHES.filter((pitch) => pitch.midiNumber === 67)).toHaveLength(2);
+    expect(input).toEqual(before);
+    expect(ORACLE_UPPER_PITCHES).toEqual(before.upperPitches);
+  });
+
   it("covers every Pattern/Grid through Staff, live performance, MIDI, and MusicXML", () => {
     const project = canonicalProject();
     const before = structuredClone(project);
     const context = contextFor(project);
-    const expected = allCanonicalEvents(project);
-    const timeline = createMelodyTimeline(project);
-    const performance = realizeProgressionMelodyPerformance({
-      steps: project.progression.steps,
-      tonic: project.tonic,
-      context,
-      tempoBpm: project.globalTiming.tempoBpm,
-      groove: project.groove,
-      melodyTrack: project.melodyTrack,
-    });
-    const ordered = realizeOrderedPianoProgression({
-      steps: project.progression.steps,
-      tonic: project.tonic,
-      context,
-    });
+    const expected = assertProjectPure(project, "canonical timeline oracle", () =>
+      allCanonicalEvents(project),
+    );
+    const timeline = assertProjectPure(project, "Staff timeline", () =>
+      createMelodyTimeline(project),
+    );
+    const performance = assertProjectPure(project, "live Melody performance", () =>
+      realizeProgressionMelodyPerformance({
+        steps: project.progression.steps,
+        tonic: project.tonic,
+        context,
+        tempoBpm: project.globalTiming.tempoBpm,
+        groove: project.groove,
+        melodyTrack: project.melodyTrack,
+      }),
+    );
+    const ordered = assertProjectPure(project, "ordered piano realization", () =>
+      realizeOrderedPianoProgression({
+        steps: project.progression.steps,
+        tonic: project.tonic,
+        context,
+      }),
+    );
     const authored = project.progression.steps.filter(
       (step): step is ChordStep => step.kind === "chord" && step.melody !== undefined,
     );
@@ -455,29 +601,16 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
       expected.map((event) => event.sourceStepId),
     );
     expect(directByStep.map((event) => event.index)).toEqual(expected.map((event) => event.index));
-    expect(
-      directByStep.map((event) => [
-        event.pitch.midiNumber,
-        event.sourcePitchMidi,
-        event.startOffsetBeats,
-        event.durationBeats,
-      ]),
-    ).toEqual(
-      authored.flatMap((step, stepIndex) => {
-        const realization = ordered[stepIndex]!;
-        return realizeChordMelody({
-          sourceStepId: step.id,
-          upperPitches: realization.upperPitches,
-          durationBeats: step.duration.beats,
-          recipe: step.melody!,
-        }).events.map((event) => [
-          event.pitch.midiNumber,
-          event.sourcePitchMidi,
-          event.startOffsetBeats,
-          event.durationBeats,
-        ]);
-      }),
-    );
+    expect(directByStep.every((event, index) => event.index === expected[index]?.index)).toBe(true);
+    for (const step of authored) {
+      const events = directByStep.filter((event) => event.sourceStepId === step.id);
+      expect(events.map((event) => event.index)).toEqual(
+        Array.from({ length: events.length }, (_, index) => index),
+      );
+      expect(
+        events.reduce((total, event) => addRational(total, event.durationBeats), rational(0)),
+      ).toEqual(step.duration.beats);
+    }
     expect(
       directByStep.every((event) =>
         authored.some((step) => {
@@ -539,8 +672,12 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
         .some((entry) => entry.kind === "rest"),
     ).toBe(true);
 
-    const midiProjection = projectProjectToMidi(project);
-    const midiBytes = writeMidiFile(midiProjection);
+    const midiProjection = assertProjectPure(project, "MIDI projection", () =>
+      projectProjectToMidi(project),
+    );
+    const midiBytes = assertProjectPure(project, "MIDI serializer", () =>
+      writeMidiFile(midiProjection),
+    );
     const parsedMidi = parseMidi(midiBytes);
     const melodyTrack = parsedMidi.tracks.find((track) => track.name === "CadenceFlow Melody");
     expect(parsedMidi).toMatchObject({ format: 1, ppq: midiProjection.ppq });
@@ -562,8 +699,12 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
     expect(melodyTrack?.notes.some((note) => note.pitch === 0)).toBe(false);
     expect(new TextDecoder().decode(midiBytes)).not.toContain("sc018-temporary-branch");
 
-    const musicXmlProjection = projectProjectToMusicXml(project);
-    const musicXml = writeMusicXml(musicXmlProjection);
+    const musicXmlProjection = assertProjectPure(project, "MusicXML projection", () =>
+      projectProjectToMusicXml(project),
+    );
+    const musicXml = assertProjectPure(project, "MusicXML serializer", () =>
+      writeMusicXml(musicXmlProjection),
+    );
     const parsedXml = parseMusicXmlMelody(musicXml);
     const xmlNotes = parsedXml.events.filter((event) => event.pitch !== undefined);
     const expectedXmlNotes = melodyProjectionNotes(musicXmlProjection);
@@ -590,13 +731,32 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
     );
     expect(musicXml).toContain('<part id="P2">');
     expect(musicXml).not.toContain("sc018-temporary-branch");
-    expect(musicXml).toBe(writeMusicXml(projectProjectToMusicXml(project)));
+    const repeatedMidiProjection = assertProjectPure(project, "repeated MIDI projection", () =>
+      projectProjectToMidi(project),
+    );
+    const repeatedMidiBytes = assertProjectPure(project, "repeated MIDI serializer", () =>
+      writeMidiFile(repeatedMidiProjection),
+    );
+    const repeatedMusicXmlProjection = assertProjectPure(
+      project,
+      "repeated MusicXML projection",
+      () => projectProjectToMusicXml(project),
+    );
+    const repeatedMusicXml = assertProjectPure(project, "repeated MusicXML serializer", () =>
+      writeMusicXml(repeatedMusicXmlProjection),
+    );
+    expect(repeatedMidiProjection).toEqual(midiProjection);
+    expect([...repeatedMidiBytes]).toEqual([...midiBytes]);
+    expect(repeatedMusicXmlProjection).toEqual(musicXmlProjection);
+    expect(repeatedMusicXml).toBe(musicXml);
     expect(structuredClone(project)).toEqual(before);
   });
 
   it("keeps recipe-only persistence deterministic and separates groove, volume, mute, and solo", () => {
     const project = canonicalProject();
-    const encoded = encodePortableProject(project);
+    const encoded = assertProjectPure(project, "portable project encoder", () =>
+      encodePortableProject(project),
+    );
     const decoded = decodePortableProject(encoded);
     expect(decoded).toEqual(project);
     expect(encoded).not.toContain("startOffsetBeats");
@@ -627,27 +787,31 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
     expect(store.canRedo).toBe(false);
 
     const context = contextFor(project);
-    const basePerformance = realizeProgressionMelodyPerformance({
-      steps: project.progression.steps,
-      tonic: project.tonic,
-      context,
-      tempoBpm: project.globalTiming.tempoBpm,
-      groove: groove("straight"),
-      melodyTrack: project.melodyTrack,
-    });
+    const basePerformance = assertProjectPure(project, "straight Melody performance", () =>
+      realizeProgressionMelodyPerformance({
+        steps: project.progression.steps,
+        tonic: project.tonic,
+        context,
+        tempoBpm: project.globalTiming.tempoBpm,
+        groove: groove("straight"),
+        melodyTrack: project.melodyTrack,
+      }),
+    );
     const lowVolume = applyProjectPatch(project, { volume: 12 });
-    const lowVolumePerformance = realizeProgressionMelodyPerformance({
-      steps: lowVolume.progression.steps,
-      tonic: lowVolume.tonic,
-      context,
-      tempoBpm: lowVolume.globalTiming.tempoBpm,
-      groove: lowVolume.groove,
-      melodyTrack: lowVolume.melodyTrack,
-    });
+    const lowVolumePerformance = assertProjectPure(lowVolume, "low-volume Melody performance", () =>
+      realizeProgressionMelodyPerformance({
+        steps: lowVolume.progression.steps,
+        tonic: lowVolume.tonic,
+        context,
+        tempoBpm: lowVolume.globalTiming.tempoBpm,
+        groove: lowVolume.groove,
+        melodyTrack: lowVolume.melodyTrack,
+      }),
+    );
     expect(lowVolumePerformance.events.map((event) => event.velocity)).toEqual(
       basePerformance.events.map((event) => event.velocity),
     );
-    expect(
+    const mutedPerformance = assertProjectPure(project, "muted Melody performance", () =>
       realizeProgressionMelodyPerformance({
         steps: project.progression.steps,
         tonic: project.tonic,
@@ -655,22 +819,160 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
         tempoBpm: project.globalTiming.tempoBpm,
         groove: project.groove,
         melodyTrack: Object.freeze({ ...project.melodyTrack, muted: true, solo: false }),
-      }).events,
-    ).toHaveLength(0);
+      }),
+    );
+    expect(mutedPerformance.events).toHaveLength(0);
     for (const solo of [false, true] as const) {
       const projection = projectProjectToMidi(applyProjectPatch(project, { solo, muted: false }));
       expect(projection.melody?.notes.length).toBeGreaterThan(0);
     }
 
-    const swingProject = Object.freeze({ ...project, groove: groove("swing", 0.75) });
-    const swingPerformance = realizeProgressionMelodyPerformance({
-      steps: swingProject.progression.steps,
-      tonic: swingProject.tonic,
-      context,
-      tempoBpm: swingProject.globalTiming.tempoBpm,
-      groove: swingProject.groove,
-      melodyTrack: swingProject.melodyTrack,
+    const exportVariants = [
+      { label: "base", patch: { muted: false, solo: false, volume: 17 } },
+      { label: "muted", patch: { muted: true, solo: false, volume: 17 } },
+      { label: "solo", patch: { muted: false, solo: true, volume: 17 } },
+    ] as const;
+    const serializedVariants = exportVariants.map(({ label, patch }) => {
+      const variant = applyProjectPatch(project, patch);
+      const midiProjection = assertProjectPure(variant, `${label} MIDI projection`, () =>
+        projectProjectToMidi(variant),
+      );
+      const midiBytes = assertProjectPure(variant, `${label} MIDI serializer`, () =>
+        writeMidiFile(midiProjection),
+      );
+      const musicXmlProjection = assertProjectPure(variant, `${label} MusicXML projection`, () =>
+        projectProjectToMusicXml(variant),
+      );
+      const musicXml = assertProjectPure(variant, `${label} MusicXML serializer`, () =>
+        writeMusicXml(musicXmlProjection),
+      );
+      return {
+        label,
+        midi: parseMidi(midiBytes),
+        xml: parseMusicXmlMelody(musicXml),
+      };
     });
+    const baseVariant = serializedVariants[0]!;
+    const baseMidiTrack = baseVariant.midi.tracks.find(
+      (track) => track.name === "CadenceFlow Melody",
+    );
+    if (!baseMidiTrack) throw new Error("base export has no Melody MIDI track");
+    const baseMidiPitches = baseMidiTrack.notes.map((note) => note.pitch);
+    const baseXmlPitches = collapseTiedMusicXmlNotes(baseVariant.xml.events).map(
+      (event) => event.pitch,
+    );
+    expect(baseMidiPitches).toEqual(baseXmlPitches);
+    for (const serialized of serializedVariants) {
+      const melodyTrack = serialized.midi.tracks.find(
+        (track) => track.name === "CadenceFlow Melody",
+      );
+      if (!melodyTrack) throw new Error(`${serialized.label} export has no Melody MIDI track`);
+      expect(melodyTrack.volume, `${serialized.label} CC7`).toBe(17);
+      expect(melodyTrack.notes.map((note) => note.pitch)).toEqual(baseMidiPitches);
+      expect(collapseTiedMusicXmlNotes(serialized.xml.events).map((event) => event.pitch)).toEqual(
+        baseXmlPitches,
+      );
+    }
+
+    const swingProject = Object.freeze({ ...project, groove: groove("swing", 0.75) });
+    const swingPerformance = assertProjectPure(swingProject, "swing Melody performance", () =>
+      realizeProgressionMelodyPerformance({
+        steps: swingProject.progression.steps,
+        tonic: swingProject.tonic,
+        context,
+        tempoBpm: swingProject.globalTiming.tempoBpm,
+        groove: swingProject.groove,
+        melodyTrack: swingProject.melodyTrack,
+      }),
+    );
+
+    const binaryStepEvents = (events: typeof basePerformance.events) =>
+      events
+        .filter((event) => event.sourceStepId === "sc018-1-2")
+        .map((event) => [event.startBeats, event.durationBeats]);
+    expect(binaryStepEvents(basePerformance.events)).toEqual([
+      [rational(5, 4), rational(1, 2)],
+      [rational(7, 4), rational(1, 2)],
+      [rational(9, 4), rational(1, 6)],
+    ]);
+    expect(binaryStepEvents(swingPerformance.events)).toEqual([
+      [rational(5, 4), rational(5, 8)],
+      [rational(15, 8), rational(3, 8)],
+      [rational(9, 4), rational(1, 6)],
+    ]);
+
+    const straightMidiProjection = assertProjectPure(
+      project,
+      "straight swing MIDI projection",
+      () => projectProjectToMidi(project),
+    );
+    const swingMidiProjection = assertProjectPure(swingProject, "swing MIDI projection", () =>
+      projectProjectToMidi(swingProject),
+    );
+    const straightMidi = parseMidi(
+      assertProjectPure(project, "straight swing MIDI serializer", () =>
+        writeMidiFile(straightMidiProjection),
+      ),
+    );
+    const swingMidi = parseMidi(
+      assertProjectPure(swingProject, "swing MIDI serializer", () =>
+        writeMidiFile(swingMidiProjection),
+      ),
+    );
+    const straightMelodyTrack = straightMidi.tracks.find(
+      (track) => track.name === "CadenceFlow Melody",
+    );
+    const swingMelodyTrack = swingMidi.tracks.find((track) => track.name === "CadenceFlow Melody");
+    if (!straightMelodyTrack || !swingMelodyTrack)
+      throw new Error("swing MIDI Melody track missing");
+    const binaryMidiNotes = (track: ParsedMidiTrack) =>
+      track.notes
+        .filter((note) =>
+          straightMidiProjection.melody?.notes.some(
+            (projected) => projected.stepId === "sc018-1-2" && projected.pitch === note.pitch,
+          ),
+        )
+        .filter((note) => note.startTick >= 150 && note.startTick < 360)
+        .map((note) => [note.pitch, note.startTick, note.endTick]);
+    expect(binaryMidiNotes(straightMelodyTrack).map(([, start, end]) => [start, end])).toEqual([
+      [150, 210],
+      [210, 270],
+      [270, 290],
+    ]);
+    expect(binaryMidiNotes(swingMelodyTrack).map(([, start, end]) => [start, end])).toEqual([
+      [150, 225],
+      [225, 270],
+      [270, 290],
+    ]);
+    const tripletMidiNotes = (track: ParsedMidiTrack) =>
+      track.notes
+        .filter((note) => note.startTick >= 670 && note.startTick < 870)
+        .map((note) => [note.pitch, note.startTick, note.endTick]);
+    expect(tripletMidiNotes(swingMelodyTrack)).toEqual(tripletMidiNotes(straightMelodyTrack));
+
+    const straightTimeline = assertProjectPure(project, "straight Staff timeline", () =>
+      createMelodyTimeline(project),
+    );
+    const swingTimeline = assertProjectPure(swingProject, "swing Staff timeline", () =>
+      createMelodyTimeline(swingProject),
+    );
+    expect(swingTimeline.events).toEqual(straightTimeline.events);
+    const straightXmlProjection = assertProjectPure(project, "straight MusicXML projection", () =>
+      projectProjectToMusicXml(project),
+    );
+    const swingXmlProjection = assertProjectPure(swingProject, "swing MusicXML projection", () =>
+      projectProjectToMusicXml(swingProject),
+    );
+    expect(swingXmlProjection.melody).toEqual(straightXmlProjection.melody);
+    expect(
+      assertProjectPure(swingProject, "swing semantic MusicXML serializer", () =>
+        writeMusicXml(swingXmlProjection),
+      ),
+    ).toBe(
+      assertProjectPure(project, "straight semantic MusicXML serializer", () =>
+        writeMusicXml(straightXmlProjection),
+      ),
+    );
     const straightTriplets = basePerformance.events.filter((event) => {
       const step = project.progression.steps[event.stepIndex];
       return step?.kind === "chord" && step.melody?.grid.endsWith("-triplet");
@@ -691,8 +993,5 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
         );
       }),
     ).toBe(true);
-    expect(writeMusicXml(projectProjectToMusicXml(swingProject))).toBe(
-      writeMusicXml(projectProjectToMusicXml(project)),
-    );
   });
 });

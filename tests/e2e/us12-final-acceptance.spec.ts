@@ -98,6 +98,81 @@ async function assertFreshHistory(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Redo", exact: true })).toBeDisabled();
 }
 
+interface PlaybackObservation {
+  readonly pianoSchedules: string[][];
+  oscillatorCount: number;
+}
+
+interface PlaybackObservationWindow {
+  __cadenceflow_playback_observability__?: PlaybackObservation;
+}
+
+/** Uses the existing DEV/test audio hook and real user transport to observe channel isolation. */
+async function installPlaybackObservability(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type ScheduleEvent = { readonly channelRole?: string };
+    type ProviderPrototype = {
+      schedule: (events: readonly ScheduleEvent[], clock: unknown) => unknown;
+      __cadenceflowAcceptanceWrapped__?: boolean;
+    };
+    type AudioHookWindow = PlaybackObservationWindow & {
+      __cadenceflow_audio__?: {
+        HqSamplePianoProvider?: { prototype: ProviderPrototype };
+      };
+    };
+    const testWindow = window as unknown as AudioHookWindow;
+    const observation =
+      testWindow.__cadenceflow_playback_observability__ ??
+      ({ pianoSchedules: [], oscillatorCount: 0 } satisfies PlaybackObservation);
+    testWindow.__cadenceflow_playback_observability__ = observation;
+    const pianoPrototype = testWindow.__cadenceflow_audio__?.HqSamplePianoProvider?.prototype;
+    if (pianoPrototype && !pianoPrototype.__cadenceflowAcceptanceWrapped__) {
+      const originalSchedule = pianoPrototype.schedule;
+      pianoPrototype.schedule = function (this: unknown, events, clock) {
+        observation.pianoSchedules.push(events.map((event) => event.channelRole ?? "unknown"));
+        return originalSchedule.call(this, events, clock);
+      };
+      pianoPrototype.__cadenceflowAcceptanceWrapped__ = true;
+    }
+
+    type AudioContextPrototype = {
+      createOscillator: (this: AudioContext) => OscillatorNode;
+      __cadenceflowAcceptanceWrapped__?: boolean;
+    };
+    const audioContextPrototype = AudioContext.prototype as unknown as AudioContextPrototype;
+    if (!audioContextPrototype.__cadenceflowAcceptanceWrapped__) {
+      const originalCreateOscillator = audioContextPrototype.createOscillator;
+      audioContextPrototype.createOscillator = function (this: AudioContext) {
+        observation.oscillatorCount += 1;
+        return originalCreateOscillator.call(this);
+      };
+      audioContextPrototype.__cadenceflowAcceptanceWrapped__ = true;
+    }
+  });
+}
+
+async function resetPlaybackObservability(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const observation = (window as unknown as PlaybackObservationWindow)
+      .__cadenceflow_playback_observability__;
+    if (!observation) throw new Error("playback observability was not installed");
+    observation.pianoSchedules.length = 0;
+    observation.oscillatorCount = 0;
+  });
+}
+
+async function readPlaybackObservability(page: Page): Promise<PlaybackObservation> {
+  return page.evaluate(() => {
+    const observation = (window as unknown as PlaybackObservationWindow)
+      .__cadenceflow_playback_observability__;
+    if (!observation) throw new Error("playback observability was not installed");
+    return {
+      pianoSchedules: observation.pianoSchedules.map((roles) => [...roles]),
+      oscillatorCount: observation.oscillatorCount,
+    };
+  });
+}
+
 function readU16(bytes: Uint8Array, offset: number): number {
   return (bytes[offset]! << 8) | bytes[offset + 1]!;
 }
@@ -286,8 +361,14 @@ for (const viewport of VIEWPORTS) {
       test.setTimeout(180_000);
       await page.addInitScript(() => {
         (
-          window as unknown as { __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean }
+          window as unknown as {
+            __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean;
+            __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean;
+          }
         ).__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+        (
+          window as unknown as { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
+        ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
       });
       await openStudio(page);
       await ensureHistoryControlsVisible(page);
@@ -355,10 +436,121 @@ for (const viewport of VIEWPORTS) {
         progression.getByRole("region", { name: "Melody Track controls" }),
       ).toContainText("Melody audio ready", { timeout: 60_000 });
 
+      const persistedInvoker = page
+        .locator(".measure-staff-event .measure-staff-event-select")
+        .last();
+      await persistedInvoker.focus();
+      await page.keyboard.press("Shift+F10");
+      const persistedMenu = page.getByRole("menu", { name: /Melody actions/ });
+      await persistedMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
+      const editDialog = page.getByRole("dialog", { name: "Edit Melody" });
+      await expect(editDialog.getByLabel("Melody Pattern")).toHaveValue("inside-out");
+      await expect(editDialog.getByLabel("Melody Grid")).toHaveValue("eighth");
+      await expect(editDialog.getByLabel("Melody Instrument")).toHaveValue("cello");
+      await editDialog.getByRole("button", { name: "Cancel" }).click();
+      await expect(persistedInvoker).toBeFocused();
+
+      const melodyInstrument = progression.getByLabel("Melody Track Instrument");
+      const melodySvg = page.getByTestId("melody-staff-measure").first().locator("svg");
+      const pianoSvg = page
+        .getByTestId("measure-staff-view")
+        .first()
+        .locator(".measure-staff > svg");
+      const pianoClefBefore = await pianoSvg.getAttribute("data-staff-clef");
+      const pianoPresentationBefore = await page
+        .getByTestId("measure-staff-view")
+        .first()
+        .locator(".measure-staff-event-select")
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+      await melodyInstrument.selectOption("flute");
+      await expect(melodySvg).toHaveAttribute("data-staff-clef", "treble");
+      await expect(pianoSvg).toHaveAttribute("data-staff-clef", pianoClefBefore!);
+      await expect
+        .poll(() =>
+          page
+            .getByTestId("measure-staff-view")
+            .first()
+            .locator(".measure-staff-event-select")
+            .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+        )
+        .toEqual(pianoPresentationBefore);
+      await melodyInstrument.selectOption("cello");
+      await expect(melodySvg).toHaveAttribute("data-staff-clef", "bass");
+      await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
+
       const play = progression.getByRole("button", { name: "Play", exact: true });
       const pause = progression.getByRole("button", { name: "Pause", exact: true });
       const resume = progression.getByRole("button", { name: "Resume", exact: true });
       const stop = progression.getByRole("button", { name: "Stop", exact: true });
+
+      await installPlaybackObservability(page);
+      await resetPlaybackObservability(page);
+      const mute = controls.getByRole("button", { name: "Mute Melody Track" });
+      const solo = controls.getByRole("button", { name: "Solo Melody Track" });
+      await mute.click();
+      await expect(mute).toHaveAttribute("aria-pressed", "true");
+      await play.click();
+      await expect(page.getByTestId("transport-status")).toContainText("Playing");
+      await expect
+        .poll(
+          () =>
+            readPlaybackObservability(page).then(
+              (observation) => observation.pianoSchedules.length,
+            ),
+          {
+            timeout: 10_000,
+            intervals: [20, 40, 80, 120],
+          },
+        )
+        .toBeGreaterThan(0);
+      await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
+      await stop.click();
+      await expect(page.getByTestId("transport-status")).toContainText("Stopped");
+      await mute.click();
+      await expect(mute).toHaveAttribute("aria-pressed", "false");
+
+      await resetPlaybackObservability(page);
+      await solo.click();
+      await expect(solo).toHaveAttribute("aria-pressed", "true");
+      const metronome = page.getByRole("button", { name: "Toggle Metronome" });
+      if ((await metronome.getAttribute("aria-pressed")) !== "true") await metronome.click();
+      await play.click();
+      await expect(page.getByTestId("transport-status")).toContainText("Playing");
+      await expect
+        .poll(
+          () =>
+            readPlaybackObservability(page).then(
+              (observation) => observation.pianoSchedules.length,
+            ),
+          {
+            timeout: 10_000,
+            intervals: [20, 40, 80, 120],
+          },
+        )
+        .toBe(0);
+      await expect
+        .poll(
+          () => readPlaybackObservability(page).then((observation) => observation.oscillatorCount),
+          {
+            timeout: 10_000,
+            intervals: [20, 40, 80, 120],
+          },
+        )
+        .toBeGreaterThan(0);
+      expect((await readPlaybackObservability(page)).pianoSchedules).toHaveLength(0);
+      await expect
+        .poll(() => page.locator(".melody-staff-note.is-active").count(), {
+          timeout: 15_000,
+          intervals: [40, 80, 120, 250, 500],
+        })
+        .toBeGreaterThan(0);
+      await stop.click();
+      await expect(page.getByTestId("transport-status")).toContainText("Stopped");
+      await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
+      await solo.click();
+      await expect(solo).toHaveAttribute("aria-pressed", "false");
+      if ((await metronome.getAttribute("aria-pressed")) === "true") await metronome.click();
+
       await play.click();
       await expect(page.getByTestId("transport-status")).toContainText("Playing");
       await expect
@@ -434,6 +626,17 @@ test.describe("US12 Melody provider isolation", () => {
     page,
   }) => {
     test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      (
+        window as unknown as {
+          __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean;
+          __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean;
+        }
+      ).__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+      (
+        window as unknown as { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
+      ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
+    });
     await page.route("**/audio/melody/FluidR3_GM/**", (route) => route.abort());
     await openStudio(page);
     await addChord(page, "I");
@@ -441,7 +644,16 @@ test.describe("US12 Melody provider isolation", () => {
     const progression = page.getByRole("region", { name: "My Progression" });
     const controls = progression.getByRole("region", { name: "Melody Track controls" });
     await expect(controls).toContainText("Melody audio error", { timeout: 30_000 });
-    await expect(page.getByTestId("piano-audio-status")).toBeVisible();
+    await expect(controls.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(page.getByTestId("piano-audio-status")).toHaveAttribute("data-status", "ready");
+    await expect(page.getByTestId("piano-audio-status")).toContainText("HQ Piano Ready");
+
+    const chordInvoker = page.locator(".measure-staff-event .measure-staff-event-select").first();
+    await chordInvoker.click();
+    await expect(page.locator(".measure-staff-event.is-playing").first()).toBeVisible({
+      timeout: 10_000,
+    });
+
     await page.getByTestId("export-menu-toggle").click();
     await expect(page.getByRole("menu", { name: "Export menu" })).toBeVisible();
     await expect(page.getByTestId("export-midi-btn")).toBeEnabled();
