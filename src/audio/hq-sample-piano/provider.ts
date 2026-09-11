@@ -56,7 +56,11 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
 
   constructor(options: HqSamplePianoProviderOptions = {}) {
     this.id = options.id ?? "hq-sample-piano";
-    this.manifestUrl = options.manifestUrl ?? "/audio/piano-hq/manifest.json";
+    const defaultManifest =
+      typeof import.meta !== "undefined" && import.meta.env?.BASE_URL
+        ? `${import.meta.env.BASE_URL}audio/piano-hq/manifest.json`.replace(/\/+/g, "/")
+        : "/audio/piano-hq/manifest.json";
+    this.manifestUrl = options.manifestUrl ?? defaultManifest;
     this.initialManifestData = options.manifestData;
     this.audioContext = options.audioContext ?? null;
     this.destinationNode = options.destination;
