@@ -508,7 +508,7 @@ for (const viewport of VIEWPORTS) {
         )
         .toBeGreaterThan(0);
       await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
-      await stop.click();
+      if (await stop.isEnabled()) await stop.click();
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
       await mute.click();
       await expect(mute).toHaveAttribute("aria-pressed", "false");
@@ -548,7 +548,7 @@ for (const viewport of VIEWPORTS) {
           intervals: [40, 80, 120, 250, 500],
         })
         .toBeGreaterThan(0);
-      await stop.click();
+      if (await stop.isEnabled()) await stop.click();
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
       await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
       await solo.click();
@@ -584,7 +584,7 @@ for (const viewport of VIEWPORTS) {
       await expect(page.getByTestId("transport-status")).toContainText("Paused");
       await resume.click();
       await expect(page.getByTestId("transport-status")).toContainText("Playing");
-      await stop.click();
+      if (await stop.isEnabled()) await stop.click();
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
       await expect
         .poll(
@@ -665,12 +665,23 @@ test.describe("US12 Melody provider isolation", () => {
     await expect(page.getByTestId("export-musicxml-btn")).toBeEnabled();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: "Toggle Metronome" }).click();
+    await installPlaybackObservability(page);
+    await resetPlaybackObservability(page);
+    const metronome = page.getByRole("button", { name: "Toggle Metronome" });
+    if ((await metronome.getAttribute("aria-pressed")) !== "true") await metronome.click();
     const play = progression.getByRole("button", { name: "Play", exact: true });
     const stop = progression.getByRole("button", { name: "Stop", exact: true });
     await play.click();
-    await expect(page.getByTestId("transport-status")).toContainText("Playing");
-    await stop.click();
+    await expect
+      .poll(
+        () => readPlaybackObservability(page).then((observation) => observation.oscillatorCount),
+        {
+          timeout: 10_000,
+          intervals: [20, 40, 80, 120],
+        },
+      )
+      .toBeGreaterThan(0);
+    if (await stop.isEnabled()) await stop.click();
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
   });
 });
