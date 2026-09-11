@@ -173,6 +173,11 @@ export function MeasureStaffView({
       role="group"
       aria-label={`Measure staff: ${noteSummary}`}
     >
+      <header className="measure-staff-header">
+        <strong>Harmony</strong>
+        <span>Treble clef</span>
+        {useBassStaff ? <span>Bass staff</span> : null}
+      </header>
       <div className="measure-staff-paper">
         <div
           ref={ref}

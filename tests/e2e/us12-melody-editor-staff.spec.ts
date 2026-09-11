@@ -119,6 +119,30 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
     await expect(page.getByTestId("melody-staff-measure")).toHaveCount(2);
 
+    const measureScores = page.getByTestId("progression-measure-score");
+    await expect(measureScores).toHaveCount(2);
+    const firstScore = measureScores.first();
+    await expect(firstScore.getByTestId("melody-staff-measure")).toHaveCount(1);
+    await expect(firstScore.getByTestId("measure-staff-view")).toHaveCount(1);
+    await expect(firstScore).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(firstScore.getByTestId("melody-staff-measure")).toHaveCSS("margin-bottom", "0px");
+    await expect(firstScore.getByTestId("measure-staff-view")).toHaveCSS("border-top-width", "1px");
+
+    const alignedStaffCanvases = firstScore.locator(".melody-staff-canvas, .measure-staff");
+    await expect(alignedStaffCanvases).toHaveCount(2);
+    const staffCanvasBounds = await alignedStaffCanvases.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const bounds = node.getBoundingClientRect();
+        return { left: bounds.left, right: bounds.right };
+      }),
+    );
+    expect(Math.abs(staffCanvasBounds[0]!.left - staffCanvasBounds[1]!.left)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(Math.abs(staffCanvasBounds[0]!.right - staffCanvasBounds[1]!.right)).toBeLessThanOrEqual(
+      1,
+    );
+
     const melodySvg = page.getByTestId("melody-staff-measure").first().locator("svg");
     await expect(melodySvg).toHaveAttribute("data-staff-clef", "bass");
     await expect(melodySvg).toHaveAttribute("data-staff-meter", "4/4");

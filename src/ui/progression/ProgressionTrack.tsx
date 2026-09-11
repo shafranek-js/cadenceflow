@@ -585,27 +585,34 @@ export function ProgressionTrack({
                   {project.globalTiming.meter.grouping.join("+")}
                 </span>
               </header>
-              {usesSharedStaff && melodyTimeline ? (
-                <MelodyStaffView
-                  project={project}
-                  timeline={melodyTimeline}
-                  measure={melodyTimeline.measures[measure.measureIndex]!}
-                  {...(selectedStepId !== undefined ? { selectedStepId } : {})}
-                  {...(activeMelodyEventKey ? { activeMelodyEventKey } : {})}
-                  onSelectStep={onSelectStep}
-                />
-              ) : null}
               {usesSharedStaff ? (
-                <MeasureStaffView
-                  items={staffItems}
-                  meter={project.globalTiming.meter}
-                  barLengthBeats={layout.barLengthBeats}
-                  selectedStepId={selectedStepId}
-                  playingStepId={currentPlayingStepId}
-                  onSelect={onSelectStep}
-                  onOctaveChange={shiftStaffOctave}
-                  {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
-                />
+                <div
+                  className={`progression-measure-score ${melodyTimeline ? "has-melody-staff" : ""}`}
+                  data-testid="progression-measure-score"
+                  role="group"
+                  aria-label={`Score for measure ${measure.number}`}
+                >
+                  {melodyTimeline ? (
+                    <MelodyStaffView
+                      project={project}
+                      timeline={melodyTimeline}
+                      measure={melodyTimeline.measures[measure.measureIndex]!}
+                      {...(selectedStepId !== undefined ? { selectedStepId } : {})}
+                      {...(activeMelodyEventKey ? { activeMelodyEventKey } : {})}
+                      onSelectStep={onSelectStep}
+                    />
+                  ) : null}
+                  <MeasureStaffView
+                    items={staffItems}
+                    meter={project.globalTiming.meter}
+                    barLengthBeats={layout.barLengthBeats}
+                    selectedStepId={selectedStepId}
+                    playingStepId={currentPlayingStepId}
+                    onSelect={onSelectStep}
+                    onOctaveChange={shiftStaffOctave}
+                    {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
+                  />
+                </div>
               ) : null}
               <div className="progression-measure-grid" data-testid="progression-measure-grid">
                 {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
