@@ -112,12 +112,12 @@
 
 .chord-card {
   display: grid;
-  grid-template-rows: 20px minmax(58px, 1fr) auto;
-  gap: 6px;
+  grid-template-rows: 18px minmax(52px, 1fr) auto;
+  gap: 4px;
   width: 164px;
   min-width: 164px;
-  min-height: 132px;
-  padding: 8px;
+  min-height: 116px;
+  padding: 6px;
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease,
@@ -179,8 +179,8 @@
   position: relative;
   z-index: 0;
   min-width: 0;
-  min-height: 58px;
-  padding: 28px 0 26px;
+  min-height: 52px;
+  padding: 22px 0 20px;
   box-sizing: border-box;
 }
 
@@ -204,18 +204,18 @@
 
 .card-view-switcher {
   flex: 0 0 auto;
-  gap: 3px;
+  gap: 2px;
   overflow: visible;
 }
 
 .card-view-switcher button {
   position: relative;
   display: grid;
-  width: 24px;
-  height: 26px;
-  min-width: 24px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
   place-items: center;
-  border-radius: 5px;
+  border-radius: var(--radius-badge);
   font-size: 0;
 }
 
@@ -224,8 +224,8 @@
 }
 
 .card-view-glyph {
-  font-size: 0.66rem;
-  font-weight: 800;
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
 .card-view-label {
@@ -246,9 +246,9 @@
 }
 
 .card-settings-button {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-control);
 }
 
 .recommendation-badge {
@@ -265,7 +265,7 @@
 }
 
 .chord-card.is-previewed .chord-main {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--previewed) 10%, transparent);
 }
 
@@ -299,16 +299,16 @@
 /* Card view is a compact choice control, so it shares the Studio pill language. */
 .card-view-switcher {
   align-items: center;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius-badge);
   background: var(--surface-2);
 }
 
 .card-view-switcher button {
-  width: 24px;
-  height: var(--control-height);
-  min-width: 24px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
   border: 1px solid transparent;
   border-radius: var(--radius-badge);
   background: transparent;

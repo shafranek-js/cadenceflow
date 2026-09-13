@@ -1,5 +1,6 @@
 :root {
   font-family:
+    Geist,
     Inter,
     ui-sans-serif,
     system-ui,
@@ -7,28 +8,33 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   color-scheme: dark;
   background: var(--background);
   color: var(--text);
-  --background: #111318;
-  --surface: #181b21;
-  --surface-1: #181b21;
-  --surface-2: #222630;
-  --surface-3: #303846;
-  --surface-hover: #2a303b;
-  --surface-selected: #303a48;
-  --surface-preview: #2c263b;
-  --surface-warning: #3a3020;
-  --surface-error: #402322;
-  --surface-success: #193422;
-  --surface-disabled: #1c2027;
-  --text: #f4f5f7;
-  --text-muted: #c0c7d2;
-  --text-disabled: #a0a8b4;
-  --border: #596273;
-  --border-subtle: #343a46;
-  --border-strong: #748096;
-  --border-disabled: #4b5360;
+  --background: #101216;
+  --surface: #16181e;
+  --surface-1: #16181e;
+  --surface-2: #1e222a;
+  --surface-3: #2a303c;
+  --surface-hover: #262c37;
+  --surface-selected: #2c3544;
+  --surface-preview: #282335;
+  --surface-warning: #332b1c;
+  --surface-error: #381f1e;
+  --surface-success: #152d1d;
+  --surface-disabled: #181b21;
+  --text: #f0f2f5;
+  --text-muted: #9ba3b0;
+  --text-disabled: #6d7582;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-disabled: rgba(255, 255, 255, 0.04);
   --accent: #8fd0ff;
   --focus: #8fd0ff;
   --selected: #7cc4ff;
@@ -44,41 +50,41 @@
   --error: #ff8c84;
   --loading: #8fd0ff;
   --ready: #68db82;
-  --disabled: #a0a8b4;
+  --disabled: #6d7582;
   --success: #68db82;
   --piano-pressed-key: #d6a174;
   --piano-pressed-key-border: #8a5732;
   --piano-pressed-key-shadow: #b8733c;
   --piano-black-key: #30353c;
   --piano-black-key-edge: #171a1f;
-  --studio-gutter: 12px;
-  --panel-gap: 16px;
-  --panel-padding: 14px;
+  --studio-gutter: 8px;
+  --panel-gap: 10px;
+  --panel-padding: 10px;
 
-  /* Global UI system: non-semantic geometry and type tokens. */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --radius-panel: 12px;
-  --radius-card: 10px;
-  --radius-control: 7px;
-  --radius-badge: 999px;
-  --control-height: 32px;
-  --font-size-display: 1.15rem;
-  --font-size-title: 1rem;
-  --font-size-section: 0.86rem;
-  --font-size-body: 0.875rem;
-  --font-size-label: 0.75rem;
-  --font-size-meta: 0.6875rem;
-  --font-size-status: 0.75rem;
-  --line-tight: 1.2;
-  --line-body: 1.45;
-  --line-relaxed: 1.6;
+  /* Global UI system: refined compact geometry and type tokens. */
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 20px;
+  --radius-panel: 6px;
+  --radius-card: 4px;
+  --radius-control: 3px;
+  --radius-badge: 3px;
+  --control-height: 26px;
+  --font-size-display: 0.95rem;
+  --font-size-title: 0.875rem;
+  --font-size-section: 0.8rem;
+  --font-size-body: 0.8125rem;
+  --font-size-label: 0.72rem;
+  --font-size-meta: 0.65rem;
+  --font-size-status: 0.7rem;
+  --line-tight: 1.15;
+  --line-body: 1.4;
+  --line-relaxed: 1.5;
   --weight-regular: 400;
-  --weight-medium: 600;
-  --weight-strong: 750;
+  --weight-medium: 500;
+  --weight-strong: 600;
 }
 
 :root[data-theme="dark"] {
@@ -102,10 +108,10 @@
   --text: #132033;
   --text-muted: #405269;
   --text-disabled: #536579;
-  --border: #72869d;
-  --border-subtle: #9eafc0;
-  --border-strong: #506781;
-  --border-disabled: #aab8c6;
+  --border: rgba(0, 0, 0, 0.12);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.24);
+  --border-disabled: rgba(0, 0, 0, 0.05);
   --accent: #075eaf;
   --focus: #005fcc;
   --selected: #075eaf;
@@ -132,13 +138,36 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background: var(--background);
   color: var(--text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-body);
 }
 button,
 input,

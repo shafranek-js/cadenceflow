@@ -5,6 +5,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import type { PianoArticulation } from "../../domain/progression/step";
 import type { ChordMelodyRecipe } from "../../domain/melody/types";
@@ -95,6 +96,7 @@ export function ScoreSystemContextMenu({
   onClose,
 }: ScoreSystemContextMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
   const [activeSubmenu, setActiveSubmenu] = useState<"articulation" | "melody" | null>(null);
@@ -115,7 +117,13 @@ export function ScoreSystemContextMenu({
   useEffect(() => {
     const frameId = requestAnimationFrame(() => itemRefs.current[0]?.focus());
     const handleOutsidePointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !menuRef.current?.contains(event.target)) onClose();
+      if (
+        event.target instanceof Node &&
+        !menuRef.current?.contains(event.target) &&
+        !submenuRef.current?.contains(event.target)
+      ) {
+        onClose();
+      }
     };
     const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -220,17 +228,22 @@ export function ScoreSystemContextMenu({
       ? adjustedPosition.x + menuWidth + 2
       : Math.max(8, adjustedPosition.x - 200);
 
-  return (
-    <div
-      ref={menuRef}
-      className="melody-context-menu score-system-context-menu"
-      role="menu"
-      aria-label={`Actions for System ${system.index + 1}`}
-      tabIndex={-1}
-      style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
-      onKeyDownCapture={handleKeyDown}
-      data-testid="score-system-context-menu"
-    >
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <>
+      <div
+        ref={menuRef}
+        className="melody-context-menu score-system-context-menu"
+        role="menu"
+        aria-label={`Actions for System ${system.index + 1}`}
+        tabIndex={-1}
+        style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
+        onKeyDownCapture={handleKeyDown}
+        data-testid="score-system-context-menu"
+      >
       {/* 1. Playback & Rehearsal */}
       {onPlayFromHere ? (
         <button
@@ -536,14 +549,19 @@ export function ScoreSystemContextMenu({
           </button>
         </>
       ) : null}
+      </div>
 
       {/* Submenu for Articulation */}
       {activeSubmenu === "articulation" && onSetArticulation ? (
         <div
+          ref={submenuRef}
           className="melody-context-menu score-system-submenu"
           role="menu"
           aria-label="Articulation styles"
-          style={{ left: submenuX, top: submenuTop }}
+          style={{
+            left: submenuX,
+            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 190)),
+          }}
           data-testid="score-system-articulation-submenu"
         >
           {ARTICULATIONS.map((art) => (
@@ -567,10 +585,14 @@ export function ScoreSystemContextMenu({
       {/* Submenu for Melody Contour */}
       {activeSubmenu === "melody" && onApplyMelodyContour ? (
         <div
+          ref={submenuRef}
           className="melody-context-menu score-system-submenu"
           role="menu"
           aria-label="Melody contours"
-          style={{ left: submenuX, top: submenuTop }}
+          style={{
+            left: submenuX,
+            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 160)),
+          }}
           data-testid="score-system-melody-submenu"
         >
           {MELODY_CONTOURS.map((contour) => (
@@ -590,7 +612,8 @@ export function ScoreSystemContextMenu({
           ))}
         </div>
       ) : null}
-    </div>
+    </>,
+    document.body
   );
 }
 
