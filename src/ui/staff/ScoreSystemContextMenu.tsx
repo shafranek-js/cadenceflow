@@ -8,7 +8,8 @@ import {
 import { createPortal } from "react-dom";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import type { PianoArticulation } from "../../domain/progression/step";
-import type { ChordMelodyRecipe } from "../../domain/melody/types";
+import type { ChordMelodyRecipe, MelodyGrid } from "../../domain/melody/types";
+import { MELODY_GRID_LABELS } from "../melody/labels";
 
 export interface ScoreSystemMenuPosition {
   readonly x: number;
@@ -43,6 +44,8 @@ export interface ScoreSystemContextMenuProps {
   readonly onResetPerformance?: (() => void) | undefined;
   readonly onSetArticulation?: ((articulation: PianoArticulation) => void) | undefined;
   readonly onApplyMelodyContour?: ((recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onSetMelodyGrid?: ((grid: MelodyGrid) => void) | undefined;
+  readonly currentGrid?: MelodyGrid | undefined;
   readonly onClearMelody?: (() => void) | undefined;
   readonly onDelete?: (() => void) | undefined;
   readonly onClose: () => void;
@@ -61,6 +64,14 @@ const MELODY_CONTOURS: ReadonlyArray<{ id: string; label: string; recipe: ChordM
   { id: "down-8th", label: "Descending (1/8)", recipe: { pattern: "down", grid: "eighth", octaveOffset: 0 } },
   { id: "wave-8th", label: "Up & Down (1/8)", recipe: { pattern: "up-down", grid: "eighth", octaveOffset: 0 } },
   { id: "inside-out-16th", label: "Inside-Out (1/16)", recipe: { pattern: "inside-out", grid: "sixteenth", octaveOffset: 0 } },
+];
+
+const MELODY_GRIDS: ReadonlyArray<MelodyGrid> = [
+  "quarter",
+  "eighth",
+  "sixteenth",
+  "eighth-triplet",
+  "sixteenth-triplet",
 ];
 
 export function ScoreSystemContextMenu({
@@ -91,6 +102,8 @@ export function ScoreSystemContextMenu({
   onResetPerformance,
   onSetArticulation,
   onApplyMelodyContour,
+  onSetMelodyGrid,
+  currentGrid,
   onClearMelody,
   onDelete,
   onClose,
@@ -99,7 +112,7 @@ export function ScoreSystemContextMenu({
   const submenuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-  const [activeSubmenu, setActiveSubmenu] = useState<"articulation" | "melody" | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<"articulation" | "melody" | "grid" | null>(null);
   const [submenuTop, setSubmenuTop] = useState(0);
 
   useLayoutEffect(() => {
@@ -183,12 +196,12 @@ export function ScoreSystemContextMenu({
       case "ArrowRight": {
         if (activeSubmenu) return;
         const trigger = (document.activeElement as HTMLElement)?.getAttribute("data-has-submenu");
-        if (trigger === "articulation" || trigger === "melody") {
+        if (trigger === "articulation" || trigger === "melody" || trigger === "grid") {
           event.preventDefault();
           event.stopPropagation();
           const rect = (document.activeElement as HTMLElement).getBoundingClientRect();
           setSubmenuTop(rect.top);
-          setActiveSubmenu(trigger);
+          setActiveSubmenu(trigger as "articulation" | "melody" | "grid");
         }
         break;
       }
@@ -514,9 +527,34 @@ export function ScoreSystemContextMenu({
         </button>
       ) : null}
 
-      {onClearMelody ? (
+      {onSetMelodyGrid ? (
         <button
           ref={registerRef(15)}
+          type="button"
+          role="menuitem"
+          data-has-submenu="grid"
+          data-testid="score-system-open-grid"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setSubmenuTop(rect.top);
+            setActiveSubmenu("grid");
+          }}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setSubmenuTop(rect.top);
+            setActiveSubmenu((prev) => (prev === "grid" ? null : "grid"));
+          }}
+        >
+          <span className="score-system-menu-item-row">
+            <span>Set Melody Grid</span>
+            <span className="score-system-submenu-arrow">▸</span>
+          </span>
+        </button>
+      ) : null}
+
+      {onClearMelody ? (
+        <button
+          ref={registerRef(16)}
           type="button"
           role="menuitem"
           disabled={!hasMelody}
@@ -535,7 +573,7 @@ export function ScoreSystemContextMenu({
         <>
           <div className="score-system-menu-separator" role="separator" />
           <button
-            ref={registerRef(16)}
+            ref={registerRef(17)}
             type="button"
             role="menuitem"
             className="danger"
@@ -608,6 +646,40 @@ export function ScoreSystemContextMenu({
               }}
             >
               {contour.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Submenu for Melody Grid */}
+      {activeSubmenu === "grid" && onSetMelodyGrid ? (
+        <div
+          ref={submenuRef}
+          className="melody-context-menu score-system-submenu"
+          role="menu"
+          aria-label="Melody grids"
+          style={{
+            left: submenuX,
+            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 180)),
+          }}
+          data-testid="score-system-grid-submenu"
+        >
+          {MELODY_GRIDS.map((grid) => (
+            <button
+              key={grid}
+              type="button"
+              role="menuitem"
+              data-testid={`score-system-grid-${grid}`}
+              onClick={() => {
+                onSetMelodyGrid(grid);
+                setActiveSubmenu(null);
+                onClose();
+              }}
+            >
+              <span className="score-system-menu-item-row">
+                <span>{MELODY_GRID_LABELS[grid]}</span>
+                {currentGrid === grid ? <span className="score-system-menu-check">✓</span> : null}
+              </span>
             </button>
           ))}
         </div>

@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ExactPitch } from "../../domain/harmony/pitch";
 import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
-import type { ChordMelodyRecipe } from "../../domain/melody/types";
+import type { ChordMelodyRecipe, MelodyGrid } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -292,6 +292,7 @@ interface ScoreSystemCanvasProps {
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
   readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
 
@@ -334,6 +335,7 @@ function ScoreSystemCanvas({
   onResetPerformanceSystem,
   onSetArticulationSystem,
   onApplyMelodyContourSystem,
+  onSetMelodyGridSystem,
   onClearMelodySystem,
 }: ScoreSystemCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -359,7 +361,13 @@ function ScoreSystemCanvas({
       .filter((s): s is ChordStep => Boolean(s && s.kind === "chord"));
   }, [systemStepIndices, project.progression.steps]);
 
-  const systemHasMelody = chordSteps.some((s) => s.melody !== undefined);
+  const melodySteps = chordSteps.filter((s) => s.melody !== undefined);
+  const systemHasMelody = melodySteps.length > 0;
+  const currentGrid =
+    melodySteps.length > 0 &&
+    melodySteps.every((s) => s.melody?.grid === melodySteps[0]?.melody?.grid)
+      ? melodySteps[0]?.melody?.grid
+      : undefined;
   const canShiftOctaveUp = chordSteps.some(
     (s) => performanceOctaveShiftPatch(s.performance, 1) !== null,
   );
@@ -859,6 +867,12 @@ function ScoreSystemCanvas({
                 ? (recipe) => onApplyMelodyContourSystem(system, recipe)
                 : undefined
             }
+            onSetMelodyGrid={
+              onSetMelodyGridSystem
+                ? (grid) => onSetMelodyGridSystem(system, grid)
+                : undefined
+            }
+            currentGrid={currentGrid}
             onClearMelody={onClearMelodySystem ? () => onClearMelodySystem(system) : undefined}
             onDelete={onDeleteSystem ? () => onDeleteSystem(system) : undefined}
             onClose={() => setSystemMenu(null)}
@@ -910,6 +924,7 @@ export interface ScoreSystemViewProps {
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
   readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
 
@@ -951,6 +966,7 @@ export function ScoreSystemView({
   onResetPerformanceSystem,
   onSetArticulationSystem,
   onApplyMelodyContourSystem,
+  onSetMelodyGridSystem,
   onClearMelodySystem,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -1071,6 +1087,7 @@ export function ScoreSystemView({
             onResetPerformanceSystem={onResetPerformanceSystem}
             onSetArticulationSystem={onSetArticulationSystem}
             onApplyMelodyContourSystem={onApplyMelodyContourSystem}
+            onSetMelodyGridSystem={onSetMelodyGridSystem}
             onClearMelodySystem={onClearMelodySystem}
           />
         );

@@ -39,6 +39,7 @@ import { HarmonyTrackControls } from "../harmony/HarmonyTrackControls";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import type {
   ChordMelodyRecipe,
+  MelodyGrid,
   MelodyInstrument,
   MelodyTrackSettings,
 } from "../../domain/melody/types";
@@ -103,6 +104,7 @@ export function ProgressionTrack({
   onResetPerformanceSystem,
   onSetArticulationSystem,
   onApplyMelodyContourSystem,
+  onSetMelodyGridSystem,
   onClearMelodySystem,
 }: {
   readonly project: Project;
@@ -158,6 +160,7 @@ export function ProgressionTrack({
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
   readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -705,6 +708,7 @@ export function ProgressionTrack({
               {...(onResetPerformanceSystem ? { onResetPerformanceSystem } : {})}
               {...(onSetArticulationSystem ? { onSetArticulationSystem } : {})}
               {...(onApplyMelodyContourSystem ? { onApplyMelodyContourSystem } : {})}
+              {...(onSetMelodyGridSystem ? { onSetMelodyGridSystem } : {})}
               {...(onClearMelodySystem ? { onClearMelodySystem } : {})}
             />
           </>

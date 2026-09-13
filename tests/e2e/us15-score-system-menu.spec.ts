@@ -205,3 +205,66 @@ test("score system context menu pitch, performance and submenus", async ({ page 
   // Undo clear melody
   await page.keyboard.press("Control+z");
 });
+
+test("score system context menu set melody grid and checkmark", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+
+  const addChord = async (functionId: string) => {
+    await page
+      .getByTestId(`chord-card-${functionId}`)
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+  };
+
+  await addChord("I");
+  await addChord("IV");
+  await addChord("V");
+  await addChord("vi");
+
+  const globalInspector = page.getByTestId("progression-global-inspector");
+  await globalInspector.getByRole("button", { name: "Staff view" }).click();
+  await page.getByLabel("Measures Layout").selectOption("2");
+
+  const header0 = page.locator(".score-system-header").first();
+
+  // 1. Open Submenu: Set Melody Grid
+  await header0.click({ button: "right" });
+  const gridItem = page.getByRole("menuitem", { name: /Set Melody Grid/ });
+  await expect(gridItem).toBeVisible();
+  await gridItem.hover();
+
+  const gridSubmenu = page.getByTestId("score-system-grid-submenu");
+  await expect(gridSubmenu).toBeVisible();
+
+  // Check the 5 grid options are present
+  await expect(page.getByTestId("score-system-grid-quarter")).toContainText("Quarter note (1 beat)");
+  await expect(page.getByTestId("score-system-grid-eighth")).toContainText("Eighth note (1/2 beat)");
+  await expect(page.getByTestId("score-system-grid-sixteenth")).toContainText("Sixteenth note (1/4 beat)");
+  await expect(page.getByTestId("score-system-grid-eighth-triplet")).toContainText("Eighth-note triplet (1/3 beat)");
+  await expect(page.getByTestId("score-system-grid-sixteenth-triplet")).toContainText("Sixteenth-note triplet (1/6 beat)");
+
+  // Select Sixteenth note (1/4 beat)
+  await page.getByTestId("score-system-grid-sixteenth").click();
+
+  // Re-open context menu and verify checkmark appears on Sixteenth note
+  await header0.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
+  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toContainText("✓");
+
+  // Select Eighth note (1/2 beat)
+  await page.getByTestId("score-system-grid-eighth").click();
+
+  // Re-open context menu and verify checkmark moved to Eighth note
+  await header0.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
+  await expect(page.getByTestId("score-system-grid-eighth").locator(".score-system-menu-check")).toContainText("✓");
+  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toHaveCount(0);
+
+  // Close menu and test undo
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+z"); // undo to sixteenth
+  await header0.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
+  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toContainText("✓");
+});

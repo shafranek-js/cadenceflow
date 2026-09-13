@@ -218,6 +218,7 @@ import type {
 } from "../domain/project/project";
 import type {
   ChordMelodyRecipe,
+  MelodyGrid,
   MelodyInstrument,
   MelodyTrackSettings,
 } from "../domain/melody/types";
@@ -1363,6 +1364,26 @@ export function App() {
     store.dispatch(command, batchPatchSteps);
   };
 
+  const setMelodyGridSystem = (system: ScoreSystem, grid: MelodyGrid) => {
+    const stepIds = getSystemStepIds(system);
+    const updates = stepIds.flatMap((id) => {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord") {
+        const newMelody: ChordMelodyRecipe = step.melody
+          ? { ...step.melody, grid }
+          : { pattern: "up", grid, octaveOffset: 0 };
+        return [{ stepId: id, patch: { melody: newMelody } }];
+      }
+      return [];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
   const clearMelodySystem = (system: ScoreSystem) => {
     const stepIds = getSystemStepIds(system);
     const updates = stepIds.flatMap((id) => {
@@ -2324,6 +2345,7 @@ export function App() {
             onResetPerformanceSystem={resetPerformanceSystem}
             onSetArticulationSystem={setArticulationSystem}
             onApplyMelodyContourSystem={applyMelodyContourSystem}
+            onSetMelodyGridSystem={setMelodyGridSystem}
             onClearMelodySystem={clearMelodySystem}
           />
           <BranchComparison
