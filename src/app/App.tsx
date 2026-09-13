@@ -126,11 +126,13 @@ import {
   selectStep,
   repeatChordStep,
   duplicateSteps,
+  removeSteps,
   type AddRestStepCommand,
   type BatchEditStepPerformanceCommand,
   type BatchSetStepDurationCommand,
   type EditStepPerformanceCommand,
   type RemoveStepCommand,
+  type RemoveStepsCommand,
   type ReorderStepCommand,
   type ReplaceStepCommand,
   type ResetAllStepPerformanceCommand,
@@ -1080,6 +1082,24 @@ export function App() {
     store.dispatch(command, duplicateSteps);
   };
 
+  const deleteSystem = (system: ScoreSystem) => {
+    const stepIndices = new Set<number>();
+    for (const sm of system.measures) {
+      for (const frag of sm.measure.fragments) {
+        stepIndices.add(frag.stepIndex);
+      }
+    }
+    const stepIdsToRemove = Array.from(stepIndices)
+      .map((idx) => project.progression.steps[idx]?.id)
+      .filter((id): id is string => Boolean(id));
+    if (stepIdsToRemove.length === 0) return;
+    const command: RemoveStepsCommand = {
+      type: "progression/remove-steps",
+      payload: { stepIds: stepIdsToRemove, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, removeSteps);
+  };
+
   const globalView = (view: CardViewId) => {
     const command: SetGlobalCardViewCommand = {
       type: "matrix/set-global-card-view",
@@ -1950,6 +1970,7 @@ export function App() {
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
             onSetMeasuresPerSystem={changeMeasuresPerSystem}
             onDuplicateSystem={duplicateSystem}
+            onDeleteSystem={deleteSystem}
           />
           <BranchComparison
             project={project}

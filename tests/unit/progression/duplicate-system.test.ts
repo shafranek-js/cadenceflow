@@ -3,8 +3,10 @@ import { createDefaultProject } from "../../../src/domain/project/factory";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import {
   duplicateSteps,
+  removeSteps,
   restoreProgression,
   type DuplicateStepsCommand,
+  type RemoveStepsCommand,
   type RestoreProgressionCommand,
 } from "../../../src/app/commands/progressionCommands";
 import { musicalDuration } from "../../../src/domain/timing/duration";
@@ -184,5 +186,93 @@ describe("duplicateSteps command", () => {
 
     expect(updatedProjection.systems).toHaveLength(3);
     expect(updatedProjection.systems[2]!.measures).toHaveLength(2);
+  });
+
+  it("removes steps and clears selection if selected step was deleted", () => {
+    let project = createDefaultProject("p", "DeleteStepsTest", T0);
+    const chords = [
+      createMatrixChordStep(project, "I", "c1"),
+      createMatrixChordStep(project, "IV", "c2"),
+      createMatrixChordStep(project, "V", "c3"),
+    ];
+    project = Object.freeze({
+      ...project,
+      progression: Object.freeze({
+        ...project.progression,
+        steps: Object.freeze(chords),
+        selectedStepId: "c2",
+      }),
+    });
+
+    const command: RemoveStepsCommand = {
+      type: "progression/remove-steps",
+      payload: { stepIds: ["c1", "c2"], nowIso: T1 },
+    };
+    const applied = removeSteps(project, command);
+    const updated = applied.project;
+
+    expect(updated.progression.steps).toHaveLength(1);
+    expect(updated.progression.steps[0]!.id).toBe("c3");
+    expect(updated.progression.selectedStepId).toBeUndefined();
+
+    // Test Undo
+    const inverse = applied.inverse as RestoreProgressionCommand;
+    const reverted = restoreProgression(updated, inverse).project;
+    expect(reverted.progression.steps).toHaveLength(3);
+    expect(reverted.progression.selectedStepId).toBe("c2");
+  });
+
+  it("deletes all steps of a ScoreSystem reflowing remaining systems", () => {
+    let project = createDefaultProject("p", "DeleteSystemTest", T0);
+    const chords = [
+      createMatrixChordStep(project, "I", "c1"),
+      createMatrixChordStep(project, "IV", "c2"),
+      createMatrixChordStep(project, "V", "c3"),
+      createMatrixChordStep(project, "I", "c4"),
+    ];
+    project = Object.freeze({
+      ...project,
+      progression: Object.freeze({
+        ...project.progression,
+        steps: Object.freeze(chords),
+      }),
+    });
+
+    // 2 measures per system = 2 systems
+    const layout = createProgressionMeasureLayout(project.progression.steps, project.globalTiming.meter);
+    const projection = projectScoreSystems(layout, {
+      availableWidthPx: 960,
+      measuresPerSystem: 2,
+    });
+    expect(projection.systems).toHaveLength(2);
+
+    // Delete System 0
+    const system0 = projection.systems[0]!;
+    const stepIndices = new Set<number>();
+    for (const sm of system0.measures) {
+      for (const frag of sm.measure.fragments) {
+        stepIndices.add(frag.stepIndex);
+      }
+    }
+    const stepIdsToRemove = Array.from(stepIndices).map((idx) => project.progression.steps[idx]!.id);
+    expect(stepIdsToRemove).toEqual(["c1", "c2"]);
+
+    const command: RemoveStepsCommand = {
+      type: "progression/remove-steps",
+      payload: { stepIds: stepIdsToRemove, nowIso: T1 },
+    };
+    const applied = removeSteps(project, command);
+    const updated = applied.project;
+
+    expect(updated.progression.steps).toHaveLength(2);
+    expect(updated.progression.steps.map((s) => s.id)).toEqual(["c3", "c4"]);
+
+    const updatedLayout = createProgressionMeasureLayout(updated.progression.steps, updated.globalTiming.meter);
+    const updatedProjection = projectScoreSystems(updatedLayout, {
+      availableWidthPx: 960,
+      measuresPerSystem: 2,
+    });
+    expect(updatedProjection.systems).toHaveLength(1);
+    expect(updatedProjection.systems[0]!.measures).toHaveLength(2);
   });
 });

@@ -308,6 +308,26 @@ export function removeStep(project: Project, command: RemoveStepCommand): Applie
   return withInverse(project, progression, command.payload.nowIso);
 }
 
+export interface RemoveStepsPayload {
+  readonly stepIds: readonly string[];
+  readonly nowIso: string;
+}
+export type RemoveStepsCommand = ProjectCommand<RemoveStepsPayload> & {
+  readonly type: "progression/remove-steps";
+};
+/** Removes a set of steps from progression (e.g. when deleting a Score System). */
+export function removeSteps(project: Project, command: RemoveStepsCommand): AppliedCommand {
+  const idsToRemove = new Set(command.payload.stepIds);
+  const steps = project.progression.steps.filter((step) => !idsToRemove.has(step.id));
+  const { selectedStepId, ...rest } = project.progression;
+  const progression = Object.freeze({
+    ...rest,
+    steps: Object.freeze(steps),
+    ...(selectedStepId && !idsToRemove.has(selectedStepId) ? { selectedStepId } : {}),
+  });
+  return withInverse(project, progression, command.payload.nowIso);
+}
+
 export interface ReorderStepPayload {
   readonly stepId: string;
   readonly targetIndex: number;

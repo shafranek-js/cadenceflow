@@ -271,6 +271,7 @@ interface ScoreSystemCanvasProps {
   readonly onExtendFinalChord?: () => void;
   readonly onRepeatFinalChord?: () => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
+  readonly onDeleteSystem?: (system: ScoreSystem) => void;
 }
 
 function ScoreSystemCanvas({
@@ -292,6 +293,7 @@ function ScoreSystemCanvas({
   onExtendFinalChord,
   onRepeatFinalChord,
   onDuplicateSystem,
+  onDeleteSystem,
 }: ScoreSystemCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [renderedPositions, setRenderedPositions] = useState<Readonly<Record<string, number>>>({});
@@ -391,7 +393,7 @@ function ScoreSystemCanvas({
           data-testid="score-system-header"
           data-system-index={system.index}
           onContextMenu={(e) => {
-            if (!onDuplicateSystem) return;
+            if (!onDuplicateSystem && !onDeleteSystem) return;
             e.preventDefault();
             e.stopPropagation();
             setSystemMenu({
@@ -403,6 +405,22 @@ function ScoreSystemCanvas({
           <strong>{`System ${system.index + 1}`}</strong>
           <span>{`${system.measures.length} measure${system.measures.length === 1 ? "" : "s"}`}</span>
           {system.horizontallyScrollable ? <span>Dense measure scrolls locally</span> : null}
+          {onDeleteSystem ? (
+            <button
+              type="button"
+              className="score-system-remove-button"
+              data-testid={`score-system-remove-${system.index}`}
+              aria-label={`Delete System ${system.index + 1}`}
+              title={`Delete System ${system.index + 1}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteSystem(system);
+              }}
+            >
+              <Icon name="close" />
+            </button>
+          ) : null}
         </header>
         <div
           className="score-system-scroll"
@@ -704,12 +722,13 @@ function ScoreSystemCanvas({
             </div>
           </div>
         </div>
-        {systemMenu && onDuplicateSystem ? (
+        {systemMenu && (onDuplicateSystem || onDeleteSystem) ? (
           <ScoreSystemContextMenu
             system={system}
             position={systemMenu.position}
             invoker={systemMenu.anchor}
-            onDuplicate={() => onDuplicateSystem(system)}
+            onDuplicate={() => onDuplicateSystem?.(system)}
+            {...(onDeleteSystem ? { onDelete: () => onDeleteSystem(system) } : {})}
             onClose={() => setSystemMenu(null)}
           />
         ) : null}
@@ -740,6 +759,7 @@ export interface ScoreSystemViewProps {
   readonly onExtendFinalChord?: () => void;
   readonly onRepeatFinalChord?: () => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
+  readonly onDeleteSystem?: (system: ScoreSystem) => void;
 }
 
 /** Responsive multi-measure Staff projection used by My Progression. */
@@ -761,6 +781,7 @@ export function ScoreSystemView({
   onExtendFinalChord,
   onRepeatFinalChord,
   onDuplicateSystem,
+  onDeleteSystem,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [availableWidthPx, setAvailableWidthPx] = useState(0);
@@ -860,6 +881,7 @@ export function ScoreSystemView({
             {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
             {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
             {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
+            {...(onDeleteSystem ? { onDeleteSystem } : {})}
           />
         );
       })}

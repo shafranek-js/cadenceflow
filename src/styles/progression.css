@@ -213,10 +213,10 @@
 
 .score-system-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-height: 36px;
-  padding: 8px 14px;
+  padding: 6px 12px 6px 14px;
   border-bottom: 1px solid var(--score-rule);
   background: color-mix(in srgb, var(--score-paper) 94%, var(--score-rule));
   color: var(--score-muted-ink);
@@ -257,6 +257,39 @@
 
 .score-system-header span + span {
   margin-left: auto;
+}
+
+.score-system-remove-button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--score-muted-ink);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.score-system-header span + span + .score-system-remove-button {
+  margin-left: 0;
+}
+
+.score-system-remove-button:hover,
+.score-system-remove-button:focus-visible {
+  border-color: color-mix(in srgb, var(--danger, #ff4d4f) 30%, transparent);
+  background: color-mix(in srgb, var(--danger, #ff4d4f) 12%, transparent);
+  color: var(--danger, #ff4d4f);
+  outline: none;
+}
+
+.score-system-remove-button .ui-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .score-system-canvas > svg {
@@ -843,6 +876,13 @@
   border-color: var(--border-subtle);
   background: var(--surface-selected);
   outline: none;
+}
+
+.melody-context-menu button.danger:hover,
+.melody-context-menu button.danger:focus-visible {
+  color: var(--danger, #ff4d4f);
+  border-color: color-mix(in srgb, var(--danger, #ff4d4f) 30%, transparent);
+  background: color-mix(in srgb, var(--danger, #ff4d4f) 12%, transparent);
 }
 
 .melody-editor-dialog {

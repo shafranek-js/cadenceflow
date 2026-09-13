@@ -84,6 +84,7 @@ export function ProgressionTrack({
   onStopMelodyPreview,
   onSetMeasuresPerSystem,
   onDuplicateSystem,
+  onDeleteSystem,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -119,6 +120,7 @@ export function ProgressionTrack({
   readonly onStopMelodyPreview?: () => void;
   readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
+  readonly onDeleteSystem?: (system: ScoreSystem) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -646,6 +648,7 @@ export function ProgressionTrack({
               {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
               {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
               {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
+              {...(onDeleteSystem ? { onDeleteSystem } : {})}
             />
           </>
         ) : (

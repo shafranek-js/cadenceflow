@@ -17,6 +17,7 @@ export interface ScoreSystemContextMenuProps {
   readonly position: ScoreSystemMenuPosition;
   readonly invoker: HTMLElement;
   readonly onDuplicate: () => void;
+  readonly onDelete?: () => void;
   readonly onClose: () => void;
 }
 
@@ -25,6 +26,7 @@ export function ScoreSystemContextMenu({
   position,
   invoker,
   onDuplicate,
+  onDelete,
   onClose,
 }: ScoreSystemContextMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +135,22 @@ export function ScoreSystemContextMenu({
       >
         Duplicate System
       </button>
+      {onDelete ? (
+        <button
+          ref={(node) => {
+            itemRefs.current[1] = node;
+          }}
+          type="button"
+          role="menuitem"
+          className="danger"
+          onClick={() => {
+            onDelete();
+            onClose();
+          }}
+        >
+          Delete System
+        </button>
+      ) : null}
     </div>
   );
 }

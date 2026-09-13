@@ -40,11 +40,13 @@ test("duplicate system via right-click context menu on score-system-header", asy
   const header0 = page.locator(".score-system-header").first();
   await header0.click({ button: "right" });
 
-  // Context menu should appear with 'Duplicate System'
+  // Context menu should appear with 'Duplicate System' and 'Delete System'
   const menu = page.getByTestId("score-system-context-menu");
   await expect(menu).toBeVisible();
   const duplicateBtn = menu.getByRole("menuitem", { name: "Duplicate System" });
+  const deleteBtn = menu.getByRole("menuitem", { name: "Delete System" });
   await expect(duplicateBtn).toBeVisible();
+  await expect(deleteBtn).toBeVisible();
 
   // Click 'Duplicate System'
   await duplicateBtn.click();
@@ -60,6 +62,86 @@ test("duplicate system via right-click context menu on score-system-header", asy
   // Test Redo (Ctrl+Y)
   await page.keyboard.press("Control+y");
   await expect(systems).toHaveCount(3);
+});
+
+test("delete system via context menu", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+
+  const addChord = async (functionId: string) => {
+    await page
+      .getByTestId(`chord-card-${functionId}`)
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+  };
+
+  await addChord("I");
+  await addChord("IV");
+  await addChord("V");
+  await addChord("vi");
+
+  const globalInspector = page.getByTestId("progression-global-inspector");
+  await globalInspector.getByRole("button", { name: "Staff view" }).click();
+  await page.getByLabel("Measures Layout").selectOption("2");
+
+  const systems = page.locator('[data-testid="progression-score-system"]');
+  await expect(systems).toHaveCount(2);
+
+  // Right-click System 1 header and choose Delete System
+  const header0 = page.locator(".score-system-header").first();
+  await header0.click({ button: "right" });
+
+  const menu = page.getByTestId("score-system-context-menu");
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Delete System" }).click();
+  await expect(menu).toHaveCount(0);
+
+  // Should now only have 1 system remaining
+  await expect(systems).toHaveCount(1);
+
+  // Undo (Ctrl+Z) restores both systems
+  await page.keyboard.press("Control+z");
+  await expect(systems).toHaveCount(2);
+
+  // Redo (Ctrl+Y) deletes again
+  await page.keyboard.press("Control+y");
+  await expect(systems).toHaveCount(1);
+});
+
+test("delete system via [X] button in header", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+
+  const addChord = async (functionId: string) => {
+    await page
+      .getByTestId(`chord-card-${functionId}`)
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+  };
+
+  await addChord("I");
+  await addChord("IV");
+  await addChord("V");
+  await addChord("vi");
+
+  const globalInspector = page.getByTestId("progression-global-inspector");
+  await globalInspector.getByRole("button", { name: "Staff view" }).click();
+  await page.getByLabel("Measures Layout").selectOption("2");
+
+  const systems = page.locator('[data-testid="progression-score-system"]');
+  await expect(systems).toHaveCount(2);
+
+  // Click [X] button on System 1
+  const removeBtn0 = page.getByTestId("score-system-remove-0");
+  await expect(removeBtn0).toBeVisible();
+  await removeBtn0.click();
+
+  // Should now only have 1 system
+  await expect(systems).toHaveCount(1);
+
+  // Undo (Ctrl+Z) restores it
+  await page.keyboard.press("Control+z");
+  await expect(systems).toHaveCount(2);
 });
 
 test("dismiss context menu via Escape and click outside", async ({ page }) => {
