@@ -106,8 +106,6 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await page.getByLabel("Progression Card View").selectOption("piano");
     await expect(steps.first().locator(".mini-piano")).toBeVisible();
     await expect(steps.first().locator(".mini-key.is-active")).not.toHaveCount(0);
-    await page.getByLabel("Progression Card View").selectOption("staff");
-    await expect(steps.first().locator(".mini-staff")).toBeVisible();
 
     const remove = steps.first().getByTestId("progression-step-remove");
     const dragFromControl = await remove.evaluate((button) => {
@@ -122,6 +120,15 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     });
     expect(dragFromControl.defaultPrevented).toBe(true);
     expect(dragFromControl.payload).toBe("");
+
+    await page.getByLabel("Progression Card View").selectOption("staff");
+    await expect(page.getByTestId("progression-score-systems")).toBeVisible();
+    await expect(
+      page.getByTestId("progression-score-systems").locator(".measure-staff-event-select").first(),
+    ).toBeVisible();
+    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
+      0,
+    );
 
     const overflow = await readPageOverflow(page);
     expect(overflow.documentScrollWidth).toBeLessThanOrEqual(overflow.documentClientWidth);

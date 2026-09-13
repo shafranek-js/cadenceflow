@@ -1011,7 +1011,7 @@
 .progression-global-inspector {
   display: grid;
   gap: 10px;
-  padding: 16px;
+  padding: var(--panel-padding);
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 14px;
@@ -3515,6 +3515,7 @@ body {
 
 .app-shell {
   padding: var(--space-3) var(--studio-gutter);
+  overflow-x: clip;
 }
 
 .app-header {

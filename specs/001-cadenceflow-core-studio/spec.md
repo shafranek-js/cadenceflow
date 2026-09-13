@@ -473,6 +473,16 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 6. **Given** selection, playback, reorder, context-menu, Rest, or trailing-gap actions, **When** the user
    changes Progression View or the Staff system grouping, **Then** those interactions remain available
    and musical, playback, Melody, and export semantics remain unchanged.
+7. **Given** Staff mode, **When** the user clicks or keyboard-activates a chord/Rest label or a sounding
+   event region, **Then** the corresponding persisted Progression Step becomes the single selected Step
+   and the existing Selected Step inspector edits that same Step.
+8. **Given** a selected Staff event, **When** the user invokes its pointer or keyboard context menu,
+   **Then** the existing Melody create/edit/remove actions operate on that source Step and focus returns
+   to the invoking score target after the action or cancellation.
+9. **Given** all selection, Melody, reorder, removal, Rest, trailing-gap, continuation, playback, keyboard,
+   and pointer interactions are available directly from Staff, **When** Staff mode renders, **Then** no
+   duplicate Step-card strip is shown below the score; Harmonic and Piano retain their independent
+   measure sections and Step cards.
 
 ## Edge Cases
 
@@ -1070,6 +1080,18 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   measure-local adaptation or scrolling when needed. Neighboring measures MUST NOT be grouped or
   dimension-matched as a score system. All three modes MUST preserve selection, playback highlighting,
   drag/reorder, context menus, Rest representation, and trailing-gap actions.
+- **FR-215**: In Staff View, every visible chord/Rest label and sounding event region MUST expose one
+  pointer- and keyboard-operable target associated with its canonical Progression Step. Activating the
+  target MUST select that Step and drive the existing Selected Step inspector without creating a second
+  selection or musical-data model.
+- **FR-216**: Staff targets MUST expose the existing Melody create/edit/remove workflow through pointer
+  and keyboard context-menu invocation, with deterministic focus return. Step removal, reorder, Rest,
+  trailing-gap, continuation, and playback interactions MUST remain available without requiring a
+  duplicate Step-card strip.
+- **FR-217**: The duplicate Step-card strip MUST be removed only from Staff after interaction parity is
+  demonstrated. Harmonic and Piano MUST retain their independent measure sections and Step cards.
+  Removing the Staff strip MUST NOT change Project persistence, Undo/Redo, playback, MIDI, MusicXML, or
+  Matrix Card Views.
 
 ### Scope Boundaries
 
@@ -1263,6 +1285,9 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **SC-019**: Across 1280×720, 1920×1080, light/dark themes, and 200% zoom, My Progression exposes no
   `Mixed` state, Staff systems retain aligned Melody/Harmony attacks and readable reflow without
   page-level horizontal overflow, and all progression interactions remain operable by mouse and keyboard.
+- **SC-020**: In Staff View, 100% of acceptance-fixture Chord and Rest Steps can be selected, inspected,
+  reordered, removed, and reached during playback without a duplicate Step-card strip; Melody actions
+  can be opened by pointer and keyboard, and Harmonic/Piano retain their existing Step-card interactions.
 
 ## Assumptions
 

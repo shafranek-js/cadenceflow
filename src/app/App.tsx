@@ -64,13 +64,14 @@ import { MelodySoundFontProvider } from "../audio/soundfont/melodyProvider";
 import type { AudioProviderState } from "../audio/contracts";
 import { realizeStepAudioEvents } from "../audio/eventRealizer";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
-import { PlaybackSupportControls, TempoControls, TransportBar } from "../ui/transport/TransportBar";
+import { PlaybackSupportControls, TempoControls } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
 import { TransportStore, type TransportState } from "../ui/transport/transportStore";
 import {
   INITIAL_LOOP_STATE,
   revalidateLoopState,
   setLoopMode,
+  setLoopRange,
   type LoopMode,
   type LoopState,
 } from "../ui/transport/loopState";
@@ -124,6 +125,7 @@ import {
   resetStepPerformance,
   selectStep,
   repeatChordStep,
+  duplicateSteps,
   type AddRestStepCommand,
   type BatchEditStepPerformanceCommand,
   type BatchSetStepDurationCommand,
@@ -135,7 +137,9 @@ import {
   type ResetStepPerformanceCommand,
   type SelectStepCommand,
   type RepeatChordStepCommand,
+  type DuplicateStepsCommand,
 } from "./commands/progressionCommands";
+import type { ScoreSystem } from "../notation/scoreSystemProjection";
 import {
   saveCustomPreset,
   deleteCustomPreset,
@@ -1057,6 +1061,25 @@ export function App() {
     store.dispatch(command, repeatChordStep);
   };
 
+  const duplicateSystem = (system: ScoreSystem) => {
+    const stepIndices = new Set<number>();
+    for (const sm of system.measures) {
+      for (const frag of sm.measure.fragments) {
+        stepIndices.add(frag.stepIndex);
+      }
+    }
+    const stepsToDuplicate = Array.from(stepIndices)
+      .sort((a, b) => a - b)
+      .map((idx) => project.progression.steps[idx])
+      .filter((s): s is ProgressionStep => Boolean(s));
+    if (stepsToDuplicate.length === 0) return;
+    const command: DuplicateStepsCommand = {
+      type: "progression/duplicate-steps",
+      payload: { steps: stepsToDuplicate, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, duplicateSteps);
+  };
+
   const globalView = (view: CardViewId) => {
     const command: SetGlobalCardViewCommand = {
       type: "matrix/set-global-card-view",
@@ -1466,6 +1489,14 @@ export function App() {
     setLoopState((prev) => setLoopMode(prev, mode, project.progression.steps));
   };
 
+  const handleSetLoopRange = (startStepId: string, endStepId: string) => {
+    try {
+      setLoopState(setLoopRange(startStepId, endStepId, project.progression.steps));
+    } catch {
+      // Ignore invalid ranges
+    }
+  };
+
   const handleSaveCustomPreset = (name: string) => {
     const command: SaveCustomPresetCommand = {
       type: "presets/save-custom",
@@ -1725,6 +1756,26 @@ export function App() {
               )
             }
             onOpenVoicingEditor={() => setVoicingEditorOpen(true)}
+            melodyTrack={project.melodyTrack}
+            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
+            melodyAudioState={melodyAudioState}
+            melodyAudioError={melodyAudioError}
+            onRetryMelodyAudio={() => {
+              const provider = ensureMelodyProvider();
+              void provider.prepare().catch((error) => {
+                setMelodyAudioError(error instanceof Error ? error.message : String(error));
+              });
+            }}
+            hasMelodyRecipe={project.progression.steps.some(
+              (step) => step.kind === "chord" && step.melody !== undefined,
+            )}
+            onSetMeter={changeMeter}
+            groove={project.groove}
+            onSetGroove={changeGroove}
+            loopState={loopState}
+            steps={project.progression.steps}
+            onSetLoopMode={handleSetLoopMode}
+            onSetLoopRange={handleSetLoopRange}
           />
         ) : selectedProgressionStep?.kind === "rest" ? (
           <RestStepInspector
@@ -1746,6 +1797,13 @@ export function App() {
                 Math.min(project.progression.steps.length - 1, selectedStepIndex + 1),
               )
             }
+            onSetMeter={changeMeter}
+            groove={project.groove}
+            onSetGroove={changeGroove}
+            loopState={loopState}
+            steps={project.progression.steps}
+            onSetLoopMode={handleSetLoopMode}
+            onSetLoopRange={handleSetLoopRange}
           />
         ) : (
           <ProgressionGlobalInspector
@@ -1755,6 +1813,26 @@ export function App() {
             onResetAll={resetAllProgressionPerformance}
             onSetProgressionView={changeProgressionView}
             onSetMeasuresPerSystem={changeMeasuresPerSystem}
+            onSetMeter={changeMeter}
+            onSetGroove={changeGroove}
+            onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
+            harmonyAudioState={audioState}
+            onRetryHarmonyAudio={() => {
+              const provider = audioProviderRef.current;
+              if (provider) void provider.prepare();
+            }}
+            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
+            melodyAudioState={melodyAudioState}
+            melodyAudioError={melodyAudioError}
+            onRetryMelodyAudio={() => {
+              const provider = ensureMelodyProvider();
+              void provider.prepare().catch((error) => {
+                setMelodyAudioError(error instanceof Error ? error.message : String(error));
+              });
+            }}
+            loopState={loopState}
+            onSetLoopMode={handleSetLoopMode}
+            onSetLoopRange={handleSetLoopRange}
           />
         )
       }
@@ -1793,20 +1871,24 @@ export function App() {
                   onResume={handleResume}
                   onStop={handleStop}
                 />
-                <TempoControls
-                  tempoBpm={project.globalTiming.tempoBpm}
-                  onSetTempo={changeTempo}
-                  className="progression-heading-tempo"
-                />
+                <nav className="progression-playback-nav" aria-label="Playback Transport">
+                  <div className="transport-timing" role="group" aria-label="Timing Controls">
+                    <TempoControls
+                      tempoBpm={project.globalTiming.tempoBpm}
+                      onSetTempo={changeTempo}
+                      className="progression-heading-tempo"
+                    />
+                    <PlaybackSupportControls
+                      loopState={loopState}
+                      metronomeEnabled={metronomeEnabled}
+                      countInEnabled={countInEnabled}
+                      onSetLoopMode={handleSetLoopMode}
+                      onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
+                      onToggleCountIn={() => setCountInEnabled((v) => !v)}
+                    />
+                  </div>
+                </nav>
               </div>
-              <PlaybackSupportControls
-                loopState={loopState}
-                metronomeEnabled={metronomeEnabled}
-                countInEnabled={countInEnabled}
-                onSetLoopMode={handleSetLoopMode}
-                onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
-                onToggleCountIn={() => setCountInEnabled((v) => !v)}
-              />
             </div>
             <BranchControls
               project={project}
@@ -1818,12 +1900,6 @@ export function App() {
               onDiscard={discard}
             />
           </div>
-          <TransportBar
-            project={project}
-            onSetMeter={changeMeter}
-            onSetGroove={changeGroove}
-            onSetStepDuration={changeStepDuration}
-          />
           <ProgressionTrack
             project={project}
             currentPlayingStepIndex={
@@ -1873,6 +1949,7 @@ export function App() {
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
             onSetMeasuresPerSystem={changeMeasuresPerSystem}
+            onDuplicateSystem={duplicateSystem}
           />
           <BranchComparison
             project={project}

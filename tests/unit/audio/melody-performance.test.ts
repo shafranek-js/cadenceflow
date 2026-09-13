@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   realizeMelodyStepAudition,
   realizeProgressionMelodyPerformance,
+  type MelodyPerformanceEvent,
 } from "../../../src/audio/melodyPerformance";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import { realizeOrderedPianoProgression } from "../../../src/instruments/piano/progressionRealization";
+import { editStepPerformance } from "../../../src/app/commands/progressionCommands";
+import { performanceOctaveShiftPatch } from "../../../src/ui/staff/staffOctave";
+import { createDefaultProject } from "../../../src/domain/project/factory";
+import { createMelodyTimeline } from "../../../src/notation/melodyStaffProjection";
 import { groove } from "../../../src/domain/timing/swing";
 import { equalRational, rational } from "../../../src/domain/timing/rational";
 import { musicalDuration } from "../../../src/domain/timing/duration";
@@ -54,6 +59,81 @@ const baseInput = {
 };
 
 describe("T173 — live Melody performance projection", () => {
+  it("keeps a Staff octave shift local to its Step and derived Melody projections", () => {
+    const baseProject = createDefaultProject("staff-octave-independence", "Staff octave");
+    const steps = [makeChord("selected", "I"), makeChord("repeat", "I"), makeChord("later", "V")];
+    const project = Object.freeze({
+      ...baseProject,
+      progression: Object.freeze({ ...baseProject.progression, steps: Object.freeze(steps) }),
+    });
+    const shift = performanceOctaveShiftPatch(steps[0]!.performance, 1);
+    if (!shift) throw new Error("Expected automatic Staff octave shift patch");
+    const editedProject = editStepPerformance(project, {
+      type: "progression/edit-performance",
+      payload: { stepId: "selected", performance: shift, nowIso: "2026-09-13T12:00:00.000Z" },
+    }).project;
+    const editedSteps = editedProject.progression.steps as readonly ChordStep[];
+
+    expect(editedSteps.slice(1)).toEqual(steps.slice(1));
+
+    const beforeRealizations = realizeOrderedPianoProgression({
+      steps,
+      tonic: 0,
+      context: "major",
+    });
+    const afterRealizations = realizeOrderedPianoProgression({
+      steps: editedSteps,
+      tonic: 0,
+      context: "major",
+    });
+    expect(afterRealizations[0]!.upperPitches).not.toEqual(beforeRealizations[0]!.upperPitches);
+    expect(afterRealizations.slice(1)).toEqual(beforeRealizations.slice(1));
+
+    const beforePerformance = realizeProgressionMelodyPerformance({
+      ...baseInput,
+      steps,
+      groove: groove("straight"),
+      melodyTrack: DEFAULT_TRACK,
+    });
+    const afterPerformance = realizeProgressionMelodyPerformance({
+      ...baseInput,
+      steps: editedSteps,
+      groove: groove("straight"),
+      melodyTrack: DEFAULT_TRACK,
+    });
+    const eventsFor = (events: readonly MelodyPerformanceEvent[], sourceStepId: string) =>
+      events
+        .filter((event) => event.sourceStepId === sourceStepId)
+        .map((event) => ({
+          pitch: event.pitch,
+          sourcePitchMidi: event.sourcePitchMidi,
+          startBeats: event.startBeats,
+          durationBeats: event.durationBeats,
+        }));
+    expect(eventsFor(afterPerformance.events, "selected")).not.toEqual(
+      eventsFor(beforePerformance.events, "selected"),
+    );
+    for (const sourceStepId of ["repeat", "later"]) {
+      expect(eventsFor(afterPerformance.events, sourceStepId)).toEqual(
+        eventsFor(beforePerformance.events, sourceStepId),
+      );
+    }
+
+    const timelineFor = (candidate: typeof project, sourceStepId: string) =>
+      createMelodyTimeline(candidate)
+        .events.filter((event) => event.sourceStepId === sourceStepId)
+        .map((event) => ({
+          pitch: event.pitch.midiNumber,
+          sourcePitchMidi: event.sourcePitchMidi,
+          startBeats: event.startBeats,
+          durationBeats: event.durationBeats,
+        }));
+    expect(timelineFor(editedProject, "selected")).not.toEqual(timelineFor(project, "selected"));
+    for (const sourceStepId of ["repeat", "later"]) {
+      expect(timelineFor(editedProject, sourceStepId)).toEqual(timelineFor(project, sourceStepId));
+    }
+  });
+
   it("retains stable source identity, exact timing, and pre-offset source velocity", () => {
     const sourceStep = makeChord("step-1", "I");
     const sourceRealization = realizeOrderedPianoProgression({

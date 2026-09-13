@@ -905,6 +905,7 @@ export function renderStaffSystem(
   }
 
   const playingInk =
+    getComputedStyle(container).getPropertyValue("--score-playback-border").trim() ||
     getComputedStyle(container).getPropertyValue("--piano-pressed-key-border").trim() ||
     STAFF_PLAYING_INK_FALLBACK;
   const positions: StaffSystemPosition[] = [];

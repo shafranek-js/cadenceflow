@@ -3,6 +3,7 @@ import type { Progression } from "../../domain/progression/progression";
 import type {
   CardViewId,
   ChordStep,
+  ProgressionStep,
   RestStep,
   StepPerformance,
 } from "../../domain/progression/step";
@@ -400,3 +401,48 @@ export function repeatChordStep(project: Project, command: RepeatChordStepComman
     command.payload.nowIso,
   );
 }
+
+export interface DuplicateStepsPayload {
+  readonly steps: readonly ProgressionStep[];
+  readonly newStepIds?: readonly string[];
+  readonly nowIso: string;
+}
+
+export type DuplicateStepsCommand = ProjectCommand<DuplicateStepsPayload> & {
+  readonly type: "progression/duplicate-steps";
+};
+
+/** Clones an arbitrary list of steps (e.g. from a Score System) and appends them to the end of My Progression. */
+export function duplicateSteps(project: Project, command: DuplicateStepsCommand): AppliedCommand {
+  const newStepIds = command.payload.newStepIds;
+  const newSteps = command.payload.steps.map((source, index) => {
+    const id = newStepIds?.[index] ?? crypto.randomUUID();
+    if (source.kind === "rest") {
+      const rest: RestStep = Object.freeze({
+        ...source,
+        id,
+      });
+      return rest;
+    }
+    const chord: ChordStep = Object.freeze({
+      ...source,
+      id,
+      performance: snapshotStepPerformance(source.performance),
+      ...(source.melody !== undefined
+        ? { melody: snapshotChordMelodyRecipe(source.melody) }
+        : {}),
+      ...(source.explicitSpellingOverrides
+        ? { explicitSpellingOverrides: Object.freeze({ ...source.explicitSpellingOverrides }) }
+        : {}),
+    });
+    return chord;
+  });
+
+  const steps = Object.freeze([...project.progression.steps, ...newSteps]);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps }),
+    command.payload.nowIso,
+  );
+}
+

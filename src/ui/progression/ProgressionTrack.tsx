@@ -31,6 +31,7 @@ import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
 import type { MeasureStaffItem } from "../staff/MeasureStaffView";
 import { ScoreSystemView } from "../staff/ScoreSystemView";
+import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
 import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
 import { MelodyTrackControls } from "../melody/MelodyTrackControls";
@@ -42,11 +43,7 @@ import type {
   MelodyTrackSettings,
 } from "../../domain/melody/types";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
-import {
-  canShiftPerformanceOctave,
-  performanceOctaveShiftPatch,
-  type StaffOctaveDirection,
-} from "../staff/staffOctave";
+import { canShiftPerformanceOctave } from "../staff/staffOctave";
 
 function segmentStyle(
   durationBeats: MusicalDuration["beats"],
@@ -86,6 +83,7 @@ export function ProgressionTrack({
   onPlayMelodyPreview,
   onStopMelodyPreview,
   onSetMeasuresPerSystem,
+  onDuplicateSystem,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -97,7 +95,7 @@ export function ProgressionTrack({
   readonly onRemove: (stepId: string) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
   readonly onAddRest?: (duration?: MusicalDuration) => void;
-  readonly onFocusMatrix?: () => void;
+  readonly onFocusMatrix?: (measureNumber: number) => void;
   readonly onFillGapWithRest?: () => void;
   readonly onExtendFinalChord?: () => void;
   readonly onRepeatFinalChord?: () => void;
@@ -120,6 +118,7 @@ export function ProgressionTrack({
   readonly onPlayMelodyPreview?: (project: Project) => void;
   readonly onStopMelodyPreview?: () => void;
   readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
+  readonly onDuplicateSystem?: (system: ScoreSystem) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -238,15 +237,6 @@ export function ProgressionTrack({
       };
     });
 
-  const shiftStaffOctave = (stepId: string, direction: StaffOctaveDirection) => {
-    const step = project.progression.steps.find(
-      (candidate) => candidate.id === stepId && candidate.kind === "chord",
-    );
-    if (!step || step.kind !== "chord") return;
-    const patch = performanceOctaveShiftPatch(step.performance, direction);
-    if (patch) onEditPerformance(step.id, patch);
-  };
-
   const dragStart = (event: DragEvent<HTMLElement>, stepId: string) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (target?.closest("button, input, select, textarea, label, [data-no-drag]")) {
@@ -303,7 +293,7 @@ export function ProgressionTrack({
   };
 
   const focusMatrixForGap = (measureNumber: number) => {
-    onFocusMatrix?.();
+    onFocusMatrix?.(measureNumber);
     setMatrixGapHint(measureNumber);
   };
 
@@ -612,26 +602,6 @@ export function ProgressionTrack({
           </button>
         ) : null}
       </div>
-      {project.presentation.progressionView === "staff" && onHarmonyTrackSettingsChange ? (
-        <div className="track-controls-grid">
-          <HarmonyTrackControls
-            settings={project.harmonyTrack}
-            onChange={onHarmonyTrackSettingsChange}
-            {...(harmonyAudioState ? { providerState: harmonyAudioState } : {})}
-            {...(harmonyAudioError !== undefined ? { providerError: harmonyAudioError } : {})}
-            {...(onRetryHarmonyAudio ? { onRetry: onRetryHarmonyAudio } : {})}
-          />
-          {hasMelodyRecipe && onMelodyTrackSettingsChange ? (
-            <MelodyTrackControls
-              settings={project.melodyTrack}
-              onChange={onMelodyTrackSettingsChange}
-              {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
-              {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
-              {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
-            />
-          ) : null}
-        </div>
-      ) : null}
       <div
         className="progression-step-cards"
         data-view={project.presentation.progressionView}
@@ -668,16 +638,15 @@ export function ProgressionTrack({
               activeMelodyEventKey={activeMelodyEventKey}
               measureItemsForMeasure={staffItemsForMeasure}
               onSelectStep={onSelectStep}
-              onOctaveChange={shiftStaffOctave}
+              onEditPerformance={onEditPerformance}
+              onReorder={onReorder}
               {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
+              {...(onFocusMatrix ? { onFocusMatrix: focusMatrixForGap } : {})}
+              {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
+              {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
+              {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
+              {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
             />
-            <div
-              className="progression-staff-step-grids"
-              data-testid="progression-staff-step-grids"
-              style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%", maxWidth: "100%" }}
-            >
-              {layout.measures.map(renderMeasureCard)}
-            </div>
           </>
         ) : (
           layout.measures.map(renderMeasureCard)
@@ -707,7 +676,10 @@ export function ProgressionTrack({
                   onRemoveMelodyRecipe?.(step.id);
                   setMelodyMenu(null);
                 }}
-                onClose={() => setMelodyMenu(null)}
+                onClose={() => {
+                  setMelodyMenu(null);
+                  restoreSelectedStepFocus(step.id);
+                }}
               />
             );
           })()

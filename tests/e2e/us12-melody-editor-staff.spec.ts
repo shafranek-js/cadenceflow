@@ -54,7 +54,9 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(play).toBeVisible();
   });
 
-  test("creates, edits, selects, controls, removes, and undoes a melody", async ({ page }) => {
+  test("creates, edits, selects, controls, removes, and undoes a melody", async ({
+    page,
+  }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
     await addChord(page, "I");
@@ -64,34 +66,47 @@ test.describe("US12 — melody editor and derived staff", () => {
     await addChord(page, "vi");
     await expect(page.getByTestId("progression-step")).toHaveCount(3);
     await page.getByLabel("Progression Card View").selectOption("staff");
+    await expect(page.getByTestId("progression-staff-step-grids")).toHaveCount(0);
+    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
+      0,
+    );
 
     const staffEvents = page
       .getByTestId("progression-score-systems")
       .locator(".measure-staff-event");
     await expect(staffEvents).toHaveCount(3);
-    const firstStep = staffEvents.first();
-    await firstStep.locator(".measure-staff-event-select").click();
+    const stepIds = await staffEvents
+      .locator(".measure-staff-event-select")
+      .evaluateAll((targets) => [
+        ...new Set(
+          targets
+            .map((target) => target.getAttribute("data-step-id"))
+            .filter((stepId): stepId is string => Boolean(stepId)),
+        ),
+      ]);
+    expect(stepIds).toHaveLength(3);
+    const selectForStep = (stepId: string) =>
+      page.locator(`[data-progression-step-select][data-step-id="${stepId}"]`).first();
+
+    await selectForStep(stepIds[0]!).click();
     const selectedInspector = page.getByTestId("step-performance-inspector");
     await selectedInspector
       .getByRole("textbox", { name: "Duration in canonical quarter-note beats" })
       .fill("3");
     await selectedInspector.getByRole("button", { name: "Set custom duration in beats" }).click();
 
-    const secondStep = staffEvents.nth(1);
-    await secondStep.locator(".measure-staff-event-select").click();
+    await selectForStep(stepIds[1]!).click();
     await selectedInspector
       .getByRole("textbox", { name: "Duration in canonical quarter-note beats" })
       .fill("3/4");
     await selectedInspector.getByRole("button", { name: "Set custom duration in beats" }).click();
 
-    const thirdStep = staffEvents.nth(2);
-    const thirdSelect = thirdStep.locator(".measure-staff-event-select");
+    const thirdSelect = selectForStep(stepIds[2]!);
     await thirdSelect.focus();
     await page.keyboard.press("Enter");
     await selectedInspector.getByTestId("duration-preset-eighth").click();
 
-    const step = thirdStep;
-    const select = step.locator(".measure-staff-event-select");
+    const select = selectForStep(stepIds[2]!);
     await expect(select).toHaveAttribute("aria-haspopup", "menu");
 
     await select.focus();
@@ -102,7 +117,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await page.keyboard.press("Escape");
     await expect(select).toBeFocused();
 
-    await select.click({ button: "right", force: true });
+    await select.click({ button: "right" });
     await menu.getByRole("menuitem", { name: "Create Melody…" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Create Melody" });
@@ -126,7 +141,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(firstSvg).toHaveCount(1);
     await expect(firstScore.locator(".score-system-paper")).toHaveCSS(
       "background-color",
-      "rgb(255, 255, 255)",
+      "rgb(255, 253, 247)",
     );
 
     const alignedStaves = firstSvg.locator(".vf-stave");
@@ -156,8 +171,56 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(firstSvg).toHaveAttribute("data-staff-meter", "4/4");
     await expect(firstSvg.locator(".vf-clef")).toHaveCount(2);
     await expect(firstSvg.locator(".vf-timesignature")).toHaveCount(2);
-    await expect(page.locator("[data-melody-event-key]")).not.toHaveCount(0);
+    const melodyTargets = page.locator(".score-system .melody-staff-note");
+    await expect(melodyTargets).not.toHaveCount(0);
     await expect(page.locator(".melody-staff-note.is-continuation")).not.toHaveCount(0);
+    const melodyTargetTexts = await melodyTargets.evaluateAll((targets) =>
+      targets.map((target) => target.textContent?.trim() ?? ""),
+    );
+    expect(melodyTargetTexts.every((text) => text === "")).toBe(true);
+    expect(
+      await melodyTargets.evaluateAll((targets) =>
+        targets.every((target) => {
+          const label = target.getAttribute("aria-label") ?? "";
+          return /Melody .+ onset .+ duration .+ source chord/.test(label);
+        }),
+      ),
+    ).toBe(true);
+    await expect(melodyTargets.first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(melodyTargets.first()).toHaveCSS("box-shadow", "none");
+    const selectedMelodyTarget = page
+      .locator(".score-system .melody-staff-note.is-selected")
+      .first();
+    await expect(selectedMelodyTarget).toBeVisible();
+    await expect(selectedMelodyTarget).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(selectedMelodyTarget).toHaveCSS("box-shadow", "none");
+    await melodyTargets.first().focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    const focusMetrics = await melodyTargets.first().evaluate((target) => {
+      const targetBounds = target.getBoundingClientRect();
+      const notationBounds = [
+        ...target.closest(".score-system")!.querySelectorAll(".vf-stave path, .vf-stave line"),
+      ].map((notation) => notation.getBoundingClientRect());
+      return {
+        focused: document.activeElement === target,
+        width: targetBounds.width,
+        height: targetBounds.height,
+        focusRing: getComputedStyle(target).outlineStyle,
+        intersectsNotation: notationBounds.some(
+          (notation) =>
+            targetBounds.left < notation.right &&
+            targetBounds.right > notation.left &&
+            targetBounds.top < notation.bottom &&
+            targetBounds.bottom > notation.top,
+        ),
+      };
+    });
+    expect(focusMetrics.focused).toBe(true);
+    expect(focusMetrics.width).toBeGreaterThanOrEqual(24);
+    expect(focusMetrics.height).toBeGreaterThanOrEqual(24);
+    expect(focusMetrics.focusRing).toBe("solid");
+    expect(focusMetrics.intersectsNotation).toBe(false);
 
     await select.click();
     await expect
@@ -171,6 +234,10 @@ test.describe("US12 — melody editor and derived staff", () => {
         { intervals: [20, 20, 40, 60, 80] },
       )
       .toBeGreaterThan(0);
+    await page.screenshot({
+      path: testInfo.outputPath("t183-dark-1280x720.png"),
+      fullPage: true,
+    });
     await expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -189,19 +256,23 @@ test.describe("US12 — melody editor and derived staff", () => {
       "aria-pressed",
       "true",
     );
-    const selectedMelodyNote = page.locator(".melody-staff-note.is-selected").first();
-    await expect(selectedMelodyNote).toHaveCSS("background-color", "rgb(241, 228, 213)");
-    await expect(selectedMelodyNote).toHaveCSS("color", "rgb(36, 23, 14)");
     await theme.getByRole("button", { name: "Light theme" }).click();
     await expect(theme.getByRole("button", { name: "Light theme" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    await page.screenshot({
+      path: testInfo.outputPath("t183-light-1920x1080.png"),
+      fullPage: true,
+    });
 
     const melodyNote = page.locator("[data-melody-event-key]").first();
     await melodyNote.click();
-    await expect(step).toHaveClass(/is-selected/);
-    await expect(melodyNote).toHaveAttribute("aria-label", /source chord/);
+    await expect(select.locator("..")).toHaveClass(/is-selected/);
+    await expect(melodyNote).toHaveAttribute(
+      "aria-label",
+      /Melody .+ onset .+ duration .+ source chord/,
+    );
 
     await controls.getByRole("button", { name: "Mute Melody Track" }).click();
     await expect(controls.getByRole("button", { name: "Mute Melody Track" })).toHaveAttribute(

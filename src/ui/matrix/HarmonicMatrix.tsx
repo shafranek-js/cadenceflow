@@ -102,7 +102,6 @@ export function HarmonicMatrix({
         onCtrlClickAdd={() => {
           onPreview(identity.functionId);
           if (!project.temporaryBranch) onAdd(identity.functionId);
-          onTemplateOpen(identity.functionId);
         }}
         onAltClickReset={() => {
           onTemplateReset(identity.functionId);

@@ -40,13 +40,15 @@ test.describe("Global Settings visibility", () => {
 
     await page.getByTestId("chord-card-I").locator(".chord-main").click();
     await expect(page.locator("details[data-context='preview-harmony']")).toBeVisible();
-    await trigger.click();
+    await expect(panel).toHaveCount(0);
 
     const recommendation = page.locator("details.recommendation-inspector");
     await expect(recommendation).not.toHaveAttribute("open", "");
     await recommendation.locator("summary").click();
     await expect(recommendation).toHaveAttribute("open", "");
 
+    await trigger.click();
+    await expect(panel).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await expect(trigger).toBeFocused();

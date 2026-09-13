@@ -128,6 +128,7 @@ export function CardTemplateInspector({
           <RegisterControl
             value={resolved.performance.register}
             showLabel={false}
+            ariaLabelPrefix={isGlobal ? "Template octave shift: " : undefined}
             onChange={(register) => onPerformancePatch({ register })}
           />
         </div>
@@ -150,6 +151,7 @@ export function CardTemplateInspector({
           <ArticulationControl
             value={resolved.performance.articulation}
             showLabel={false}
+            ariaLabelPrefix={isGlobal ? "Template playback: " : undefined}
             onChange={(articulation) => onPerformancePatch({ articulation })}
           />
         </div>
@@ -182,6 +184,10 @@ export function CardTemplateInspector({
                   : `matrix-template-duration-${functionId}`
               }
               label=""
+              testIdPrefix={isGlobal ? "matrix-template-" : undefined}
+              buttonAriaLabelPrefix={isGlobal ? "Template " : undefined}
+              customInputAriaLabel={isGlobal ? "Template beats" : undefined}
+              setButtonAriaLabel={isGlobal ? "Set template duration in beats" : undefined}
             />
           </div>
         </div>
@@ -202,11 +208,12 @@ export function CardTemplateInspector({
         </summary>
         <div className="inspector-disclosure-body">
           <label>
-            Master Velocity
+            {isGlobal ? "Template Velocity" : "Master Velocity"}
             <input
               type="number"
               min="1"
               max="127"
+              aria-label={isGlobal ? "Template Velocity" : "Master Velocity"}
               value={resolved.performance.masterVelocity}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 onPerformancePatch({

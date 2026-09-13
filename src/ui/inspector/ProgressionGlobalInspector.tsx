@@ -14,10 +14,27 @@ import {
   velocityToMusicalDynamic,
 } from "../../instruments/piano/dynamics";
 import type { MusicalDynamicLabel } from "../../instruments/contracts";
+import type { Meter, MeterChangePolicy } from "../../domain/timing/meter";
+import type { GrooveSettings } from "../../domain/timing/swing";
+import type { AudioProviderState } from "../../audio/contracts";
+import type { HarmonyTrackSettings } from "../../domain/harmony/track";
+import type { MelodyTrackSettings } from "../../domain/melody/types";
 import { ArticulationControl } from "./ArticulationControl";
 import { RegisterControl } from "./RegisterControl";
 import { StepDurationControl } from "../timing/StepDurationControl";
+import { HarmonyTrackControls } from "../harmony/HarmonyTrackControls";
+import { MelodyTrackControls } from "../melody/MelodyTrackControls";
+import { InspectorMeterSection } from "./InspectorMeterSection";
+import { InspectorGrooveSection } from "./InspectorGrooveSection";
+import { InspectorLoopSection } from "./InspectorLoopSection";
+import type { LoopMode, LoopState } from "../transport/loopState";
 
+const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-meter-disclosure-open";
+const GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-groove-disclosure-open";
+const GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-tracks-disclosure-open";
 const GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-register-disclosure-open";
 const GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY =
@@ -75,6 +92,19 @@ export interface ProgressionGlobalInspectorProps {
   readonly onResetAll: () => void;
   readonly onSetProgressionView?: (view: ProgressionView) => void;
   readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
+  readonly onSetMeter?: (newMeter: Meter, policy: MeterChangePolicy) => void;
+  readonly onSetGroove?: (groove: GrooveSettings) => void;
+  readonly onHarmonyTrackSettingsChange?: (patch: Partial<HarmonyTrackSettings>) => void;
+  readonly harmonyAudioState?: AudioProviderState;
+  readonly harmonyAudioError?: string | null;
+  readonly onRetryHarmonyAudio?: () => void;
+  readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
+  readonly melodyAudioState?: AudioProviderState;
+  readonly melodyAudioError?: string | null;
+  readonly onRetryMelodyAudio?: () => void;
+  readonly loopState?: LoopState;
+  readonly onSetLoopMode?: (mode: LoopMode) => void;
+  readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
 }
 
 export function ProgressionGlobalInspector({
@@ -84,7 +114,23 @@ export function ProgressionGlobalInspector({
   onResetAll,
   onSetProgressionView,
   onSetMeasuresPerSystem,
+  onSetMeter,
+  onSetGroove,
+  onHarmonyTrackSettingsChange,
+  harmonyAudioState,
+  harmonyAudioError,
+  onRetryHarmonyAudio,
+  onMelodyTrackSettingsChange,
+  melodyAudioState,
+  melodyAudioError,
+  onRetryMelodyAudio,
+  loopState,
+  onSetLoopMode,
+  onSetLoopRange,
 }: ProgressionGlobalInspectorProps) {
+  const [tracksOpen, setTracksOpen] = useState(() =>
+    readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
+  );
   const [registerOpen, setRegisterOpen] = useState(() =>
     readDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, true),
   );
@@ -108,6 +154,7 @@ export function ProgressionGlobalInspector({
   );
   const [viewPreference, setViewPreference] = useState<DynamicsViewPreference>("musical");
 
+  const currentMeter = project.globalTiming.meter;
   const steps = project.progression.steps;
   const chordSteps = useMemo(
     () => steps.filter((s): s is ChordStep => s.kind === "chord"),
@@ -121,6 +168,7 @@ export function ProgressionGlobalInspector({
   const measureCount = measureLayout.measures.length;
   const stepCount = steps.length;
   const chordStepCount = chordSteps.length;
+  const hasMelodyRecipe = chordSteps.some((step) => step.melody !== undefined);
 
   // Resolve representative / common values across chord steps
   const commonRegister =
@@ -221,255 +269,334 @@ export function ProgressionGlobalInspector({
         </p>
       ) : null}
 
-      {/* Register */}
-      <details
-        className="inspector-disclosure template-register-disclosure"
-        open={registerOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setRegisterOpen(open);
-          persistDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Register</span>
-          <span className="disclosure-status">
-            {commonRegister === "auto"
-              ? "Auto"
-              : `${commonRegister > 0 ? "+" : ""}${commonRegister} oct.`}
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <RegisterControl
-            value={commonRegister}
-            disabled={chordStepCount === 0}
-            showLabel={false}
-            onChange={(register) => onBatchPerformanceChange({ register })}
-          />
-        </div>
-      </details>
+      {/* Time Signature & Meter */}
+      {onSetMeter ? (
+        <InspectorMeterSection
+          currentMeter={currentMeter}
+          onSetMeter={onSetMeter}
+          storageKey={GLOBAL_METER_DISCLOSURE_STORAGE_KEY}
+        />
+      ) : null}
 
-      {/* Articulation */}
-      <details
-        className="inspector-disclosure template-articulation-disclosure"
-        open={articulationOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setArticulationOpen(open);
-          persistDisclosureState(GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Articulation</span>
-          <span className="disclosure-status">{commonArticulation}</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <fieldset
-            disabled={chordStepCount === 0}
-            style={{ border: "none", margin: 0, padding: 0 }}
-          >
-            <ArticulationControl
-              value={commonArticulation}
-              showLabel={false}
-              onChange={(articulation) => onBatchPerformanceChange({ articulation })}
-            />
-          </fieldset>
-        </div>
-      </details>
+      {/* Groove & Swing */}
+      {onSetGroove ? (
+        <InspectorGrooveSection
+          groove={project.groove}
+          onSetGroove={onSetGroove}
+          defaultOpen={false}
+          storageKey={GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY}
+        />
+      ) : null}
 
-      {/* Duration */}
-      <details
-        className="inspector-disclosure template-duration-disclosure"
-        open={durationOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setDurationOpen(open);
-          persistDisclosureState(GLOBAL_DURATION_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Duration</span>
-          <span className="disclosure-status">{formatMusicalDuration(commonDuration)} beats</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div data-testid="progression-global-duration">
-            <StepDurationControl
-              variant="buttons"
-              value={commonDuration}
-              disabled={stepCount === 0}
-              meter={project.globalTiming.meter}
-              includeFullBar={Boolean(project.globalTiming.meter)}
-              onChange={onBatchDurationChange}
-              id="progression-global-duration-buttons"
-              label=""
-            />
-          </div>
-        </div>
-      </details>
+      {/* Loop Controls */}
+      {loopState && onSetLoopMode ? (
+        <InspectorLoopSection
+          loopState={loopState}
+          steps={project.progression.steps}
+          onSetLoopMode={onSetLoopMode}
+          onSetLoopRange={onSetLoopRange}
+          defaultOpen={false}
+          storageKey="cadenceflow.ui.progression-global-loop-disclosure-open"
+        />
+      ) : null}
 
-      {/* Dynamics & Velocity */}
-      <details
-        className="inspector-disclosure dynamics-disclosure"
-        open={dynamicsOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setDynamicsOpen(open);
-          persistDisclosureState(GLOBAL_DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Dynamics &amp; velocity</span>
-          <span className="disclosure-status">Velocity: {commonMasterVelocity}</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Dynamics controls">
-            <div
-              className="view-preference-toggle"
-              role="radiogroup"
-              aria-label="Velocity View Preference"
-            >
-              <button
-                type="button"
-                className={viewPreference === "musical" ? "is-active" : ""}
-                onClick={() => setViewPreference("musical")}
-                aria-label="Musical view"
-              >
-                Musical (pp..ff)
-              </button>
-              <button
-                type="button"
-                className={viewPreference === "midi" ? "is-active" : ""}
-                onClick={() => setViewPreference("midi")}
-                aria-label="MIDI velocity view"
-              >
-                MIDI (1..127)
-              </button>
+      {/* Tracks & Audio Mixer */}
+      {onHarmonyTrackSettingsChange ? (
+        <details
+          className="inspector-disclosure global-tracks-disclosure"
+          open={tracksOpen}
+          onToggle={(event) => {
+            const open = event.currentTarget.open;
+            setTracksOpen(open);
+            persistDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, open);
+          }}
+        >
+          <summary>
+            <span>Tracks &amp; audio mixer</span>
+            <span className="disclosure-status">
+              {project.harmonyTrack.muted ? "Muted" : "Active"}
+            </span>
+          </summary>
+          <div className="inspector-disclosure-body">
+            <div className="global-tracks-mixer">
+              <HarmonyTrackControls
+                settings={project.harmonyTrack}
+                onChange={onHarmonyTrackSettingsChange}
+                {...(harmonyAudioState ? { providerState: harmonyAudioState } : {})}
+                {...(harmonyAudioError !== undefined ? { providerError: harmonyAudioError } : {})}
+                {...(onRetryHarmonyAudio ? { onRetry: onRetryHarmonyAudio } : {})}
+              />
+              {hasMelodyRecipe && onMelodyTrackSettingsChange ? (
+                <MelodyTrackControls
+                  settings={project.melodyTrack}
+                  onChange={onMelodyTrackSettingsChange}
+                  {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+                  {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+                  {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
+                />
+              ) : null}
             </div>
+          </div>
+        </details>
+      ) : null}
 
-            {viewPreference === "musical" ? (
-              <div className="musical-dynamic-select">
-                <label htmlFor="global-musical-dynamic-picker">Dynamic Label</label>
-                <select
-                  id="global-musical-dynamic-picker"
-                  disabled={chordStepCount === 0}
-                  value={velocityToMusicalDynamic(commonMasterVelocity)}
-                  onChange={(e) =>
-                    handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)
-                  }
-                  aria-label="Musical Dynamic Label"
-                >
-                  {MUSICAL_DYNAMICS.map((label) => (
-                    <option key={label} value={label}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <span className="velocity-readout">Exact: {commonMasterVelocity}</span>
-              </div>
-            ) : (
-              <div className="midi-velocity-input">
-                <label htmlFor="global-master-velocity-input">Master Velocity</label>
-                <input
-                  id="global-master-velocity-input"
-                  type="number"
-                  disabled={chordStepCount === 0}
-                  min={1}
-                  max={127}
-                  value={commonMasterVelocity}
-                  onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
-                  aria-label="Master Velocity"
+      {stepCount > 0 ? (
+        <>
+          {/* Register */}
+          <details
+            className="inspector-disclosure template-register-disclosure"
+            open={registerOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setRegisterOpen(open);
+              persistDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>Register</span>
+              <span className="disclosure-status">
+                {commonRegister === "auto"
+                  ? "Auto"
+                  : `${commonRegister > 0 ? "+" : ""}${commonRegister} oct.`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <RegisterControl
+                value={commonRegister}
+                disabled={chordStepCount === 0}
+                showLabel={false}
+                ariaLabelPrefix="Batch octave shift: "
+                onChange={(register) => onBatchPerformanceChange({ register })}
+              />
+            </div>
+          </details>
+
+          {/* Articulation */}
+          <details
+            className="inspector-disclosure template-articulation-disclosure"
+            open={articulationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setArticulationOpen(open);
+              persistDisclosureState(GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>Articulation</span>
+              <span className="disclosure-status">{commonArticulation}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <fieldset
+                disabled={chordStepCount === 0}
+                style={{ border: "none", margin: 0, padding: 0 }}
+              >
+                <ArticulationControl
+                  value={commonArticulation}
+                  showLabel={false}
+                  onChange={(articulation) => onBatchPerformanceChange({ articulation })}
+                />
+              </fieldset>
+            </div>
+          </details>
+
+          {/* Duration */}
+          <details
+            className="inspector-disclosure template-duration-disclosure"
+            open={durationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setDurationOpen(open);
+              persistDisclosureState(GLOBAL_DURATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>Duration</span>
+              <span className="disclosure-status">
+                {formatMusicalDuration(commonDuration)} beats
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div data-testid="progression-global-duration" className="transport-step-duration">
+                <span className="transport-label">Step Duration</span>
+                <StepDurationControl
+                  variant="buttons"
+                  value={commonDuration}
+                  disabled={stepCount === 0}
+                  meter={project.globalTiming.meter}
+                  includeFullBar={Boolean(project.globalTiming.meter)}
+                  onChange={onBatchDurationChange}
+                  id="progression-global-duration-buttons"
+                  label=""
                 />
               </div>
-            )}
+            </div>
+          </details>
 
-            {totalOverridesCount > 0 ? (
-              <div className="per-note-overrides-summary" style={{ marginTop: 8 }}>
-                <span>{totalOverridesCount} note overrides active across steps</span>
-                <button
-                  type="button"
-                  onClick={handleClearAllOverrides}
-                  className="clear-overrides-btn"
-                  aria-label="Clear all note overrides across progression"
+          {/* Dynamics & Velocity */}
+          <details
+            className="inspector-disclosure dynamics-disclosure"
+            open={dynamicsOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setDynamicsOpen(open);
+              persistDisclosureState(GLOBAL_DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>Dynamics &amp; velocity</span>
+              <span className="disclosure-status">Velocity: {commonMasterVelocity}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Dynamics controls">
+                <div
+                  className="view-preference-toggle"
+                  role="radiogroup"
+                  aria-label="Velocity View Preference"
                 >
-                  Clear Overrides (Balanced)
-                </button>
+                  <button
+                    type="button"
+                    className={viewPreference === "musical" ? "is-active" : ""}
+                    onClick={() => setViewPreference("musical")}
+                    aria-label="Musical view"
+                  >
+                    Musical (pp..ff)
+                  </button>
+                  <button
+                    type="button"
+                    className={viewPreference === "midi" ? "is-active" : ""}
+                    onClick={() => setViewPreference("midi")}
+                    aria-label="MIDI velocity view"
+                  >
+                    MIDI (1..127)
+                  </button>
+                </div>
+
+                {viewPreference === "musical" ? (
+                  <div className="musical-dynamic-select">
+                    <label htmlFor="global-musical-dynamic-picker">Dynamic Label</label>
+                    <select
+                      id="global-musical-dynamic-picker"
+                      disabled={chordStepCount === 0}
+                      value={velocityToMusicalDynamic(commonMasterVelocity)}
+                      onChange={(e) =>
+                        handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)
+                      }
+                      aria-label="Musical Dynamic Label"
+                    >
+                      {MUSICAL_DYNAMICS.map((label) => (
+                        <option key={label} value={label}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="velocity-readout">Exact: {commonMasterVelocity}</span>
+                  </div>
+                ) : (
+                  <div className="midi-velocity-input">
+                    <label htmlFor="global-master-velocity-input">Master Velocity</label>
+                    <input
+                      id="global-master-velocity-input"
+                      type="number"
+                      disabled={chordStepCount === 0}
+                      min={1}
+                      max={127}
+                      value={commonMasterVelocity}
+                      onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
+                      aria-label="Master Velocity"
+                    />
+                  </div>
+                )}
+
+                {totalOverridesCount > 0 ? (
+                  <div className="per-note-overrides-summary" style={{ marginTop: 8 }}>
+                    <span>{totalOverridesCount} note overrides active across steps</span>
+                    <button
+                      type="button"
+                      onClick={handleClearAllOverrides}
+                      className="clear-overrides-btn"
+                      aria-label="Clear all note overrides across progression"
+                    >
+                      Clear Overrides (Balanced)
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
-      </details>
-
-      {/* Bass Voice */}
-      <details
-        className="inspector-disclosure bass-disclosure"
-        open={bassOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setBassOpen(open);
-          persistDisclosureState(GLOBAL_BASS_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Bass voice</span>
-          <span className="disclosure-status">
-            {commonBassChoice === "auto" ? "Auto" : `Note: ${commonBassChoice}`}
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Global bass controls">
-            <div className="subgroup">
-              <label htmlFor="global-bass-choice-select">Bass Note</label>
-              <select
-                id="global-bass-choice-select"
-                disabled={chordStepCount === 0}
-                value={commonBassChoice}
-                onChange={(e) =>
-                  onBatchPerformanceChange({
-                    bass: {
-                      choice: e.target.value as BassChoice,
-                      octaveOffset: commonBassOctave,
-                    },
-                  })
-                }
-                aria-label="Bass Note"
-              >
-                {BASS_CHOICES.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
             </div>
+          </details>
 
-            <div className="subgroup">
-              <label htmlFor="global-bass-octave-select">Bass Octave</label>
-              <select
-                id="global-bass-octave-select"
-                disabled={chordStepCount === 0}
-                value={String(commonBassOctave)}
-                onChange={(e) =>
-                  onBatchPerformanceChange({
-                    bass: {
-                      choice: commonBassChoice,
-                      octaveOffset:
-                        e.target.value === "auto"
-                          ? "auto"
-                          : (Number(e.target.value) as BassOctaveOffset),
-                    },
-                  })
-                }
-                aria-label="Bass Octave"
-              >
-                {BASS_OCTAVES.map((opt) => (
-                  <option key={String(opt.value)} value={String(opt.value)}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+          {/* Bass Voice */}
+          <details
+            className="inspector-disclosure bass-disclosure"
+            open={bassOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setBassOpen(open);
+              persistDisclosureState(GLOBAL_BASS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>Bass voice</span>
+              <span className="disclosure-status">
+                {commonBassChoice === "auto" ? "Auto" : `Note: ${commonBassChoice}`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Global bass controls">
+                <div className="subgroup">
+                  <label htmlFor="global-bass-choice-select">Bass Note</label>
+                  <select
+                    id="global-bass-choice-select"
+                    disabled={chordStepCount === 0}
+                    value={commonBassChoice}
+                    onChange={(e) =>
+                      onBatchPerformanceChange({
+                        bass: {
+                          choice: e.target.value as BassChoice,
+                          octaveOffset: commonBassOctave,
+                        },
+                      })
+                    }
+                    aria-label="Bass Note"
+                  >
+                    {BASS_CHOICES.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="subgroup">
+                  <label htmlFor="global-bass-octave-select">Bass Octave</label>
+                  <select
+                    id="global-bass-octave-select"
+                    disabled={chordStepCount === 0}
+                    value={String(commonBassOctave)}
+                    onChange={(e) =>
+                      onBatchPerformanceChange({
+                        bass: {
+                          choice: commonBassChoice,
+                          octaveOffset:
+                            e.target.value === "auto"
+                              ? "auto"
+                              : (Number(e.target.value) as BassOctaveOffset),
+                        },
+                      })
+                    }
+                    aria-label="Bass Octave"
+                  >
+                    {BASS_OCTAVES.map((opt) => (
+                      <option key={String(opt.value)} value={String(opt.value)}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </details>
+          </details>
+        </>
+      ) : null}
 
       {/* Global My Progression View */}
       {onSetProgressionView ? (

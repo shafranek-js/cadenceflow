@@ -48,8 +48,22 @@ export function realizeOrderedPianoProgression(
       upperPitches: realization.pitches,
       bassPitch: realization.bassPitch,
     });
-    previousPitches = realization.pitches;
-    previousBassPitch = realization.bassPitch;
+    // An explicit register is a Step-local performance override. It must change
+    // this Step without turning its shifted realization into the voice-leading
+    // context for later automatic Steps. Re-realize the unshifted context so
+    // later Steps retain the same context they had before this local edit.
+    const contextRealization =
+      step.performance.register === "auto"
+        ? realization
+        : pianoProfile.realizeChord({
+            context: input.context,
+            chord: { ...chord, variant: step.harmonicVariant },
+            performance: { ...step.performance, register: "auto" },
+            ...(previousPitches ? { previousPitches } : {}),
+            ...(previousBassPitch ? { previousBassPitch } : {}),
+          });
+    previousPitches = contextRealization.pitches;
+    previousBassPitch = contextRealization.bassPitch;
     return ordered;
   });
 

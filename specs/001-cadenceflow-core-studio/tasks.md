@@ -340,16 +340,16 @@ description: "Executable implementation task list for CadenceFlow v1"
 ### Tests
 
 - [x] T141 [P] [US10] Write Playwright viewport tests for 1280×720 and 1920×1080 with no page-level horizontal scroll in `tests/e2e/us10-desktop-layout.spec.ts`
-- [ ] T142 [P] [US10] Write keyboard/accessibility tests for chord cards, `+`, settings/reset, Card Views, reorder, module controls, and transport in `tests/e2e/us10-accessibility.spec.ts`
+- [x] T142 [P] [US10] Audit and update keyboard/accessibility coverage for chord cards, `+`, settings/reset, global Matrix/Progression Views, Staff score systems, reorder, module controls, and transport in `tests/e2e/us10-accessibility.spec.ts`, removing obsolete per-Step Staff DOM expectations without weakening behavior assertions
 ### Implementation
 
 - [x] T143 [US10] Implement full-width Studio shell composing Matrix, Inspector, My Progression, and Transport in `src/ui/studio/StudioWorkspace.tsx` and `src/app/App.tsx`
 - [x] T144 [US10] Implement desktop layout/responsive CSS for supported viewport range in `src/styles/studio.css`, `src/styles/matrix.css`, and `src/styles/progression.css`
-- [ ] T145 [US10] Implement dark and high-contrast light theme tokens/persistence in `src/styles/tokens.css` and `src/ui/settings/ThemeControl.tsx`
-- [ ] T146 [US10] Implement Beginner/Composer/Expert presentation-mode control without feature gating in `src/ui/settings/ExpertiseModeControl.tsx`
-- [ ] T147 [US10] Implement global keyboard focus management and accessible names/descriptions for interactive studio controls in `src/ui/studio/focusManagement.ts` and affected UI components
-- [ ] T148 [US10] Ensure recommendation state and customized/card-view states use text/icon/shape in addition to color in `src/ui/matrix/` and `src/ui/chord-card/`
-- [ ] T149 [US10] Write final Playwright studio journey covering project→compose→branch→edit→play→save→export at both supported viewport extremes in `tests/e2e/us10-studio-journey.spec.ts`
+- [x] T145 [US10] Implement dark and high-contrast light theme tokens/persistence in `src/styles/tokens.css` and `src/ui/settings/ThemeControl.tsx`
+- [x] T146 [US10] Implement Beginner/Composer/Expert presentation-mode control without feature gating in `src/ui/settings/ExpertiseModeControl.tsx`
+- [x] T147 [US10] Audit the implemented global focus-management and accessible landmark/name behavior against the current Studio/Inspector structure, update stale locators, and fix any real focus-return regressions in `src/ui/studio/focusManagement.ts`, affected UI components, and focused Chromium coverage
+- [x] T148 [US10] Ensure recommendation state and customized/card-view states use text/icon/shape in addition to color in `src/ui/matrix/` and `src/ui/chord-card/`
+- [x] T149 [US10] Audit the existing US10/US11/US12 Chromium journey coverage, then add only the missing project→compose→branch→edit→play→save→export assertions at both supported viewport extremes in `tests/e2e/us10-studio-journey.spec.ts` or the smallest equivalent focused file without duplicating already accepted scenarios
 
 **Checkpoint**: The entire composition loop is usable in one full-width desktop workspace with dark/light themes, expertise controls, accessible interaction, and no page-level horizontal scroll.
 
@@ -359,15 +359,15 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 **Purpose**: Close performance, licensing, migration, accessibility, and full-suite acceptance gaps after all selected stories are complete.
 
-- [ ] T150 Run and fix the complete deterministic fixture suite mapped to SC-001..SC-017 in `tests/fixtures/`, `tests/unit/`, and `tests/integration/`
-- [ ] T151 [P] Add performance benchmarks for recommendation refresh and ordinary Matrix actions against the <100 ms plan targets in `tests/integration/performance.test.ts`
-- [ ] T152 [P] Add long-progression timing/loop soak fixture for drift and scheduler stability in `tests/integration/transport-soak.test.ts`
-- [ ] T153 [P] Audit `.cadenceflow` migration fixtures and add at least one prior-schema migration fixture in `tests/fixtures/progressions/`
-- [ ] T154 [P] Audit HQ piano attribution/license packaging and production asset manifest in `public/licenses/piano-hq-attribution.txt` and `public/audio/piano-hq/manifest.json`
-- [ ] T155 Run production build and bundle/asset-size review; document lazy-audio behavior in `specs/001-cadenceflow-core-studio/quickstart.md`
-- [ ] T156 Run full keyboard/accessibility regression and fix critical issues across `src/ui/`
-- [ ] T157 Run `pnpm test`, `pnpm verify:fixtures`, `pnpm exec playwright test`, `pnpm build`, and offline MusicXML validation; record final acceptance notes in `specs/001-cadenceflow-core-studio/checklists/implementation-readiness.md`
-- [ ] T158 Update `specs/001-cadenceflow-core-studio/quickstart.md` with verified bootstrap/run/test/audio-bank commands from the implemented project
+- [ ] T150 Run and fix the complete deterministic fixture suite mapped to SC-001..SC-020 in `tests/fixtures/`, `tests/unit/`, and `tests/integration/`, including Melody and direct Staff interaction coverage
+- [x] T151 [P] Add performance benchmarks for recommendation refresh and ordinary Matrix actions against the <100 ms plan targets in `tests/integration/performance.test.ts`
+- [x] T152 [P] Add long-progression timing/loop soak fixture for drift and scheduler stability in `tests/integration/transport-soak.test.ts`
+- [x] T153 [P] Audit `.cadenceflow` migration coverage through current schema v3, including v1→v2→v3 and legacy progression-presentation normalization, and add durable prior-schema fixtures under `tests/fixtures/progressions/`
+- [ ] T154 [P] Audit attribution, license packaging, deterministic manifest integrity, and decode coverage for the committed 480-region HQ piano bank in `public/licenses/`, `public/audio/piano-hq/manifest.json`, and `scripts/prepare-piano-bank.ts`
+- [ ] T155 Run production build and bundle/asset-size review for the 480-region bank, document lazy decode/cache behavior and `/cadenceflow/` base-path deployment in `specs/001-cadenceflow-core-studio/quickstart.md`, and verify the manual-only GitHub Pages workflow and representative published assets
+- [ ] T156 Run a gap-only keyboard/accessibility regression across current US10–US13 UI, reuse accepted focused coverage, and fix only remaining critical issues across `src/ui/`
+- [ ] T157 Run `pnpm test`, `pnpm verify:fixtures`, `pnpm verify:melody-assets`, `pnpm verify:piano-bank`, focused-to-full Chromium, `pnpm build`, and offline MusicXML validation; close SC-001..SC-020 including independent MIDI/MusicXML interoperability evidence and record final acceptance notes in `specs/001-cadenceflow-core-studio/checklists/implementation-readiness.md`
+- [ ] T158 Update `specs/001-cadenceflow-core-studio/quickstart.md` with verified Node/pnpm bootstrap, local run, focused/full test, audio-bank verification, production build, and manual Pages deployment commands from the implemented project
 
 ## Phase 15: Measure-card composition layout
 
@@ -462,26 +462,34 @@ accessibility, interaction preservation, and unchanged musical/export data.
 
 ### Score systems
 
-- [ ] T180 [P] [US13] Add a pure `ScoreSystemProjection` over the existing measure layout with Staff-only
+- [x] T180 [P] [US13] Add a pure `ScoreSystemProjection` over the existing measure layout with Staff-only
   manual maxima 1–4, meter-aware Auto `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`,
   duration-proportional widths, attack-density expansion, greedy packing, and local-overflow rules in
   `src/notation/scoreSystemProjection.ts`, with focused unit tests.
-- [ ] T181 [US13] Render one VexFlow SVG per system with shared measure boundaries and Melody/Harmony
+- [x] T181 [US13] Render one VexFlow SVG per system with shared measure boundaries and Melody/Harmony
   attack positions, repeated clefs, first-system meter, rests, ties, tuplets, and saved bass visibility in
   `src/notation/vexflowAdapter.ts` and `src/ui/staff/ScoreSystemView.tsx`.
-- [ ] T182 [US13] Integrate Staff systems and distinct full-width Harmonic/Piano measure layouts in
+- [x] T182 [US13] Integrate Staff systems and distinct full-width Harmonic/Piano measure layouts in
   `src/ui/progression/ProgressionTrack.tsx`: apply measures-per-system only to Staff, keep Harmonic/Piano
   as independent full-width vertical measure sections with one horizontal step row per measure, and
   preserve selection, playback highlight, drag/reorder, context menus, Rest, and trailing-gap actions.
 
-### Polish and acceptance
+### Direct score interaction before final polish
 
-- [ ] T183 [US13] Polish `src/styles/progression.css` and Staff components with paper theme tokens,
+- [x] T185 [US13] Implement pointer- and keyboard-operable Staff targets for canonical Step
+  selection/inspection and Melody create/edit/remove context actions; migrate removal, reorder, Rest,
+  trailing-gap, continuation, and playback interaction parity onto the score, then remove the duplicate
+  Staff Step-card strip while keeping Harmonic/Piano cards in `src/ui/staff/ScoreSystemView.tsx`,
+  `src/ui/progression/ProgressionTrack.tsx`, and focused unit/Chromium tests per FR-215–FR-217.
+
+### Polish and acceptance after T185
+
+- [x] T183 [US13] Polish `src/styles/progression.css` and Staff components with paper theme tokens,
   compact chord labels, no persistent pitch pills/octave buttons on the score, and equivalent Inspector
-  or accessible descriptions.
-- [ ] T184 [US13] Add focused Chromium acceptance in `tests/e2e/progression-score-systems.spec.ts`, run
-  independent acceptance at 1280×720, 1920×1080, light/dark, and 200% zoom, and only then update
-  `PROJECT_STATUS.md` and Phase 17 checkbox states.
+  or accessible descriptions after direct score interaction and Staff card removal are stable.
+- [x] T184 [US13] Add focused Chromium acceptance in `tests/e2e/progression-score-systems.spec.ts`, run
+  independent acceptance for FR-208–FR-217 and SC-019–SC-020 at 1280×720, 1920×1080, light/dark, and
+  200% zoom, and only then update `PROJECT_STATUS.md` and Phase 17 checkbox states.
 
 **Checkpoint**: One global Progression View drives every measure; Staff uses responsive score systems
 with aligned Melody/Harmony time, preserved interactions, and no page-level overflow.
@@ -511,8 +519,12 @@ with aligned Melody/Harmony time, preserved interactions, and no page-level over
   persistence (US8), Staff rendering (US10/US11), and independent export projections (US9).
 - **US13** → depends on exact measure layout (US11), Melody Staff projection (US12), persisted
   presentation state (US8/US10), and existing progression interactions.
-- **Phase 14 Polish** → its final full-suite gate runs after US11 and US12; earlier completed polish tasks
-  remain valid but T150–T158 must cover the final accumulated product including US13.
+- **US13 direct interaction** → T185 follows accepted score systems T180–T182 and precedes T183 visual
+  polish and T184 final acceptance.
+- **US10 final acceptance** → T142, T147, and T149 were completed after T184 so accessibility, focus,
+  landmarks, and the desktop journey cover the final direct-Staff structure.
+- **Phase 14 Polish** → its final full-suite gate runs after T184; earlier completed polish tasks remain
+  valid but T150–T158 must audit existing coverage and close only the remaining SC-001–SC-020 gaps.
 
 ### User Story Dependency Graph
 
@@ -525,7 +537,7 @@ Setup → Foundation → US1
 Foundation ─────────────────→ US6 ──┘
 US3 + US4/US4A ─────────────→ US7
 Foundation + accumulated state ────→ US8
-All earlier product stories ───────→ US10 → US11 → US12 → US13 → Polish
+All earlier product stories ───────→ US10 → US11 → US12 → US13 systems → direct Staff interaction → Polish
 ```
 
 ### Parallel Opportunities
@@ -559,9 +571,9 @@ Complete Phases 13 and 15. Exit when the wide desktop studio and exact measure-c
 pass their focused desktop, timing, playback, and export acceptance.
 
 ### Milestone 7 — Linked Melody + Release Candidate
-Complete Phase 16 and Phase 17, then finish the remaining Phase 14 gates. Exit when linked Melody generation,
-persistence, Staff, playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC-019
-regression suite pass.
+Complete Phase 16 and Phase 17, including direct Staff interaction and removal of duplicate Staff cards,
+then finish the remaining Phase 14 gates. Exit when linked Melody generation, persistence, Staff,
+playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC-020 regression suite pass.
 
 ## MVP First
 
@@ -585,9 +597,6 @@ regression suite pass.
 
 ## Product Backlog (not scheduled)
 
-- **T185 [Backlog] [US13+] Staff direct editing**: After selection, Melody context-menu, delete,
-  reorder, Rest/trailing-gap, continuation, playback, keyboard, and touch interactions are migrated to
-  the Staff score, remove the duplicate Staff step cards while keeping Harmonic/Piano cards.
 - **T186 [Backlog] [US12+] Melody enrichment**: Separate Pitch Motion, Rhythm, and Connection; begin with
   deterministic chord-only patterns and rhythm presets, defer contextual voice-leading, and replace the
   flat select with a grouped preview gallery in a separate batch.
@@ -599,8 +608,13 @@ regression suite pass.
   FluidR3_GM assets and target the full General MIDI program range (0–127) where local realtime samples
   are feasible. Define one canonical instrument catalog for stable id, GM program, family/label, clef,
   playable range, sample asset, and availability; drive Melody validation, grouped/searchable UI,
-  lazy audio loading, MIDI, and MusicXML from that catalog. Preserve the current six instrument ids and
-  persisted projects, keep export metadata available for programs without a local sample when valid,
-  show explicit audio-unavailable state, and avoid preloading the full bank. Add catalog completeness,
-  persistence migration, program/clef/export, lazy-loader, and representative audio-availability tests;
-  the final palette and asset set remain subject to licensing, bundle-size, and browser-performance gates.
+  lazy audio loading, MIDI, and MusicXML from that catalog. Keep the Melody Track instrument as the
+  project-level default and add an optional Step-local Melody instrument override: each recipe explicitly
+  inherits `Use track instrument` or selects one catalog entry, without copying the global value into every
+  Step. The override and inheritance transition MUST be undoable, persist through autosave/portable files,
+  drive realtime playback and per-event MIDI/MusicXML instrument metadata, and remain independent between
+  repeated Chord Steps. Preserve the current six instrument ids and persisted projects, keep export metadata
+  available for programs without a local sample when valid, show explicit audio-unavailable state, and avoid
+  preloading the full bank. Add catalog completeness, inheritance/override, persistence migration,
+  program/clef/export, lazy-loader, and representative audio-availability tests; the final palette and asset
+  set remain subject to licensing, bundle-size, and browser-performance gates.

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 3,
+  "id": "fixture-v3-mixed-missing-presentation",
+  "name": "v3 Mixed Missing Presentation",
+  "createdAt": "2026-09-13T09:20:00.000Z",
+  "updatedAt": "2026-09-13T09:25:00.000Z",
+  "activeModule": "progressions",
+  "tonic": { "semitone": 7 },
+  "globalTiming": {
+    "tempoBpm": 88,
+    "meter": { "numerator": 4, "denominator": 4, "grouping": [4] }
+  },
+  "groove": { "feel": "straight", "swingAmount": 0 },
+  "presentation": {
+    "expertiseMode": "beginner",
+    "theme": "dark",
+    "globalMatrixCardView": "harmonic",
+    "measureLayoutColumns": 4
+  },
+  "harmonyTrack": { "instrument": "piano", "muted": false, "solo": false, "volume": 91 },
+  "melodyTrack": { "instrument": "flute", "muted": false, "solo": false, "volume": 100 },
+  "defaults": {},
+  "moduleTemplateStates": {},
+  "progression": {
+    "steps": [
+      {
+        "id": "v3-piano",
+        "kind": "chord",
+        "harmonicFunction": { "moduleId": "progressions", "functionId": "I", "category": "tonic" },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 1, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "piano"
+      },
+      {
+        "id": "v3-missing",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "IV",
+          "category": "subdominant"
+        },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 1, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        }
+      },
+      {
+        "id": "v3-staff",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "V",
+          "category": "dominant"
+        },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 2, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "staff"
+      }
+    ]
+  },
+  "customPresets": []
+}

@@ -173,9 +173,7 @@ export function MelodyStaffView({
                 aria-current={active ? "step" : undefined}
                 title={label}
                 onClick={() => onSelectStep(entry.sourceStepId)}
-              >
-                {entry.startsHere ? pitch : "↪"}
-              </button>
+              />
             );
           })}
         </div>

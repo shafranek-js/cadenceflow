@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 2,
+  "id": "fixture-v2-explicit-staff",
+  "name": "v2 Explicit Staff",
+  "createdAt": "2026-09-13T09:10:00.000Z",
+  "updatedAt": "2026-09-13T09:15:00.000Z",
+  "activeModule": "progressions",
+  "tonic": { "semitone": 2 },
+  "globalTiming": {
+    "tempoBpm": 112,
+    "meter": { "numerator": 4, "denominator": 4, "grouping": [4] }
+  },
+  "groove": { "feel": "swing", "swingAmount": 0.55 },
+  "presentation": {
+    "expertiseMode": "expert",
+    "theme": "light",
+    "globalMatrixCardView": "piano",
+    "progressionView": "staff",
+    "measuresPerSystem": 3,
+    "showBassInStaff": true
+  },
+  "melodyTrack": { "instrument": "violin", "muted": false, "solo": false, "volume": 96 },
+  "defaults": {
+    "piano": {
+      "duration": { "beats": { "numerator": 4, "denominator": 1 }, "displayHint": "bars:1" },
+      "performance": {
+        "articulation": "humanized",
+        "register": "auto",
+        "voicingMode": "auto",
+        "bass": { "choice": "auto", "octaveOffset": "auto" },
+        "masterVelocity": 80,
+        "perNoteVelocityOverrides": {},
+        "dynamicsViewPreference": "musical"
+      }
+    }
+  },
+  "moduleTemplateStates": {},
+  "progression": {
+    "steps": [
+      {
+        "id": "v2-piano",
+        "kind": "chord",
+        "harmonicFunction": { "moduleId": "progressions", "functionId": "I", "category": "tonic" },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 4, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "piano"
+      },
+      {
+        "id": "v2-staff",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "V",
+          "category": "dominant"
+        },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 4, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "staff"
+      }
+    ]
+  },
+  "customPresets": []
+}

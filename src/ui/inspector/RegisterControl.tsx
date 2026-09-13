@@ -19,6 +19,7 @@ export interface RegisterControlProps {
   readonly value: RegisterOffset;
   readonly disabled?: boolean;
   readonly showLabel?: boolean;
+  readonly ariaLabelPrefix?: string | undefined;
   readonly onChange: (register: RegisterOffset) => void;
 }
 
@@ -26,6 +27,7 @@ export function RegisterControl({
   value,
   disabled = false,
   showLabel = true,
+  ariaLabelPrefix = "Register offset: ",
   onChange,
 }: RegisterControlProps) {
   return (
@@ -37,7 +39,7 @@ export function RegisterControl({
             key={String(opt.value)}
             type="button"
             className="register-option"
-            aria-label={`Register offset: ${opt.label}`}
+            aria-label={`${ariaLabelPrefix}${opt.label}`}
             aria-pressed={value === opt.value}
             data-testid="register-option"
             data-register-value={String(opt.value)}

@@ -1,8 +1,28 @@
-import type { RestStep } from "../../domain/progression/step";
+import type { RestStep, ProgressionStep } from "../../domain/progression/step";
 import type { MusicalDuration } from "../../domain/timing/duration";
-import type { Meter } from "../../domain/timing/meter";
+import type { Meter, MeterChangePolicy } from "../../domain/timing/meter";
+import type { GrooveSettings } from "../../domain/timing/swing";
+import type { LoopMode, LoopState } from "../transport/loopState";
 import { Icon } from "../common/Icon";
 import { StepDurationControl } from "../progression/StepDurationControl";
+import { formatDurationBeats } from "../timing/stepDuration";
+import { InspectorProgressionSettings } from "./InspectorProgressionSettings";
+
+export interface RestStepInspectorProps {
+  readonly step: RestStep;
+  readonly meter: Meter;
+  readonly onDurationChange: (duration: MusicalDuration) => void;
+  readonly onRemove: () => void;
+  readonly onMoveLeft: () => void;
+  readonly onMoveRight: () => void;
+  readonly onSetMeter?: (meter: Meter, policy: MeterChangePolicy) => void;
+  readonly groove?: GrooveSettings;
+  readonly onSetGroove?: (groove: GrooveSettings) => void;
+  readonly loopState?: LoopState;
+  readonly steps?: readonly ProgressionStep[];
+  readonly onSetLoopMode?: (mode: LoopMode) => void;
+  readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
+}
 
 export function RestStepInspector({
   step,
@@ -11,14 +31,14 @@ export function RestStepInspector({
   onRemove,
   onMoveLeft,
   onMoveRight,
-}: {
-  readonly step: RestStep;
-  readonly meter: Meter;
-  readonly onDurationChange: (duration: MusicalDuration) => void;
-  readonly onRemove: () => void;
-  readonly onMoveLeft: () => void;
-  readonly onMoveRight: () => void;
-}) {
+  onSetMeter,
+  groove,
+  onSetGroove,
+  loopState,
+  steps,
+  onSetLoopMode,
+  onSetLoopRange,
+}: RestStepInspectorProps) {
   return (
     <section
       className="piano-performance-inspector selected-rest-inspector"
@@ -30,23 +50,9 @@ export function RestStepInspector({
         <div>
           <span className="inspector-context-kicker">Selected step</span>
           <h3>Rest</h3>
-          <span>All selected-step settings live here.</span>
+          <span>Step-specific controls live here. Progression settings are grouped below.</span>
         </div>
       </header>
-
-      <div
-        className="inspector-group selected-step-duration"
-        role="group"
-        aria-label="Step duration controls"
-      >
-        <StepDurationControl
-          variant="buttons"
-          value={step.duration}
-          meter={meter}
-          includeFullBar
-          onChange={onDurationChange}
-        />
-      </div>
 
       <div className="step-actions" aria-label="Rest step actions">
         <button type="button" onClick={onMoveLeft} aria-label="Move step left">
@@ -59,6 +65,34 @@ export function RestStepInspector({
           Remove
         </button>
       </div>
+
+      <div
+        className="transport-section transport-step-duration inspector-group selected-step-duration"
+        role="group"
+        aria-label="Step duration controls"
+      >
+        <span className="transport-label">
+          Step Duration ({formatDurationBeats(step.duration)})
+        </span>
+        <StepDurationControl
+          variant="buttons"
+          value={step.duration}
+          meter={meter}
+          includeFullBar
+          onChange={onDurationChange}
+        />
+      </div>
+
+      <InspectorProgressionSettings
+        meter={meter}
+        onSetMeter={onSetMeter}
+        groove={groove}
+        onSetGroove={onSetGroove}
+        loopState={loopState}
+        steps={steps}
+        onSetLoopMode={onSetLoopMode}
+        onSetLoopRange={onSetLoopRange}
+      />
     </section>
   );
 }

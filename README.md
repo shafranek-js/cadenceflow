@@ -12,7 +12,6 @@
   <img src="https://img.shields.io/badge/React-19.2.0-61dafb.svg" alt="React version">
   <img src="https://img.shields.io/badge/Vite-8.1.0-646cff.svg" alt="Vite version">
   <img src="https://img.shields.io/badge/VexFlow-5.0.0-00d1b2.svg" alt="VexFlow version">
-  <img src="https://img.shields.io/badge/Tests-515%20passing-brightgreen.svg" alt="Tests">
 </p>
 
 ---
@@ -28,6 +27,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 ## Key Features
 
 ### 1. Harmonic Matrix & Contextual Theory Engine
+
 - **Harmonic Modules**:
   - **Tonal Major**: Full diatonic system with secondary dominants ($V^7/V$, $V^7/ii$, etc.), diminished passing chords, and modal borrowings.
   - **Tonal Minor**: Natural, harmonic, and melodic minor systems with augmented 6th chords and chromatic color chords.
@@ -37,8 +37,9 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **Audition vs. Commit Isolation**: Clicking a chord card in the Matrix auditions it immediately in context without polluting project history or mutating the progression until explicitly added.
 
 ### 2. Continuous Score Systems & Flexible Progression Views
+
 - **VexFlow 5 Score Systems**: Renders progressions across continuous multi-measure systems (`ScoreSystemView`) with connected barlines, stave brackets, and metric pulse-aligned beam grouping.
-- **Measures-Per-System Layout**: Choose between `Auto` responsive reflow or fixed `1`, `2`, `3`, or `4` measures per system, providing an authentic manuscript / sheet-music experience.
+- **Measures-Per-System Layout**: In Staff view, choose between meter-aware `Auto` reflow or fixed `1`, `2`, `3`, or `4` measures per system, providing an authentic manuscript / sheet-music experience.
 - **Synchronized View Modes**:
   - **Lead Sheet (`harmonic`)**: Displays Roman numerals, functional analysis badges, jazz chord symbols, and musical duration tags.
   - **Piano Keyboard (`piano`)**: Interactive 88-key mini-keyboards showing exact sounding pitches for each chord step.
@@ -46,6 +47,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **Measure Gap Actions**: Visual measure cards highlight metric capacity; fill gaps with meter-aware actions (`Rest`, `Extend`, `Repeat`).
 
 ### 3. HQ Piano Engine & Realistic Audio Backend
+
 - **Multisample Grand Piano**: Built on the Salamander V3 Grand Piano library with **16 discrete velocity layers** (capturing true timbral change across dynamic ranges, not merely volume scaling).
 - **88-Key Coverage**: Nearest-sample transposition across 30 recorded roots for pristine sample fidelity.
 - **Zero-Drift WebAudio Look-Ahead Scheduler**: Decoupled from the React render loop to guarantee sample-accurate event dispatching.
@@ -53,14 +55,15 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **SoundFont Compatibility Fallback**: SF2/SF3 compatibility provider ensures playback availability on low-spec devices or offline setups.
 - **Live Status Indicator**: Real-time header badge reflecting audio provider states (`loading`, `ready`, `fallback`, `error`).
 
-### 4. Dedicated Melody Track & Visual Staff Editor
-- **Integrated Melody Layer**: Compose melodies directly over your chord progressions with synchronized transport playback.
-- **Interactive Staff Editing**: Add, adjust, and re-pitch notes directly on the musical score.
-- **Scale-Degree Guidance**: Real-time visual feedback indicating chord tones, scale degrees, and passing tensions relative to the active harmony.
-- **Sampled General MIDI Instruments**: Choose from authentic local sample maps (Grand Piano, Electric Piano, Violin, Flute, Oboe, Trumpet, Acoustic Guitar) powered by FluidR3_GM.
+### 4. Dedicated Melody Track & Derived Staff View
+
+- **Integrated Melody Layer**: Generate a monophonic melody from the chord progression using selectable patterns, rhythmic grids, and octave offsets with synchronized transport playback.
+- **Derived Staff View**: Display the progression and optional Melody layer as VexFlow grand-staff notation with clefs, chord symbols, noteheads, selection, context actions, and playback highlighting.
+- **Current Sampled Melody Instruments**: Choose from local FluidR3_GM sample maps for Flute, Violin, Clarinet, Oboe, Cello, or Synth Lead. Samples load on demand; the broader General MIDI palette remains planned.
 - **Full Track Controls**: Independent volume, mute, and solo controls for both Melody and Harmony tracks.
 
 ### 5. Exact Musical Timing & Transport Runtime
+
 - **Rational Arithmetic**: Semantic musical time is represented as exact Rational numbers (`Rational { numerator, denominator }`) with the invariant: **1 canonical beat = 1 quarter note**.
 - **Arbitrary Meter Support**: Supports simple, compound, and asymmetric time signatures (e.g., $4/4$, $3/4$, $6/8$, $7/8$ `[2+2+3]`, $5/4$).
 - **Meter Reflow Policies**:
@@ -71,6 +74,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **Metronome & Count-in**: Metric-accented metronome click with 1-bar pre-roll count-in.
 
 ### 6. Voice Leading, Voicing & Performance Controls
+
 - **Voice-Leading Automation**: Contextual algorithms minimize voice leaps, preserve common tones, and avoid awkward octave leaps.
 - **Piano Voicing Editor**: Interactive 88-key voicing editor allows composers to define custom exact-pitch voicings for any chord step.
 - **Independent Bass Control**: Configure bass behavior independently (`Auto`, `Root`, `3rd`, `5th`, or `Custom`) and shift bass octave ($-1$, $-2$).
@@ -79,15 +83,18 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **Progression Global Inspector**: Edit voicing, octave register, dynamics, and articulations globally across all steps simultaneously when no individual step is selected.
 
 ### 7. Temporary What-If Branches
+
 - **Non-Destructive Exploration**: Branch off from any chord step in your progression to audition alternative harmonic pathways.
 - **A/B Comparison**: Seamlessly switch between the original progression and the experimental branch.
 - **Selective Commit**: Merge the branch or individual steps into your progression, or discard it without affecting your project history.
 
 ### 8. Functional Presets Catalog
+
 - **Curated Built-In Library**: Neutral functional harmonic templates including classic progressions ($I\text{--}vi\text{--}IV\text{--}V$, $ii\text{--}V\text{--}I$, minor $i\text{--}iv\text{--}V\text{--}i$, Andalusian cadences, and modal formulas).
 - **Custom Presets**: Save your own progressions as reusable functional templates (harmonic functions + durations) that automatically adapt to any key or mode.
 
 ### 9. DAW & Notation Interoperability
+
 - **Standard MIDI Export**: Generates deterministic Standard MIDI Files (Type 0 and multi-track Type 1 with Conductor, Melody, Chords, and Bass tracks).
 - **MusicXML 4.0 Export**: Produces clean, standards-compliant MusicXML partwise documents validated against official W3C/MusicXML XSD schemas for import into MuseScore, Dorico, Sibelius, or Finale.
 - **Portable Project Files**: Single-file `.cadenceflow` (JSON Schema v3) format for saving, sharing, and archiving complete projects.
@@ -125,6 +132,7 @@ src/
 ## Getting Started
 
 ### Prerequisites
+
 - **Node.js**: `>= 22.0.0`
 - **pnpm**: `10.12.4` (or latest `pnpm 10`)
 
@@ -189,19 +197,19 @@ pnpm run format:check
 
 ## Keyboard Shortcuts
 
-| Shortcut | Context | Action |
-| :--- | :--- | :--- |
-| <kbd>Space</kbd> | Global | Play / Pause transport |
-| <kbd>Enter</kbd> / <kbd>Space</kbd> | Harmonic Matrix | Audition focused chord card |
-| <kbd>Escape</kbd> | Global | Dismiss selection / Close modals |
-| <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Cmd</kbd> + <kbd>Z</kbd> | Global | Undo last action |
-| <kbd>Ctrl</kbd> + <kbd>Y</kbd> / <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Global | Redo last undone action |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> | Modal Dialogs | Accessible focus navigation trap |
+| Shortcut                                                                          | Context         | Action                           |
+| :-------------------------------------------------------------------------------- | :-------------- | :------------------------------- |
+| <kbd>Space</kbd>                                                                  | Global          | Play / Pause transport           |
+| <kbd>Enter</kbd> / <kbd>Space</kbd>                                               | Harmonic Matrix | Audition focused chord card      |
+| <kbd>Escape</kbd>                                                                 | Global          | Dismiss selection / Close modals |
+| <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Cmd</kbd> + <kbd>Z</kbd>                    | Global          | Undo last action                 |
+| <kbd>Ctrl</kbd> + <kbd>Y</kbd> / <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Global          | Redo last undone action          |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd>                                | Modal Dialogs   | Accessible focus navigation trap |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This repository does not currently include a `LICENSE` file, and the package metadata does not declare a project-wide license.
 
-Salamander Grand Piano V3 samples are distributed under the Creative Commons Attribution 3.0 Unported License. FluidR3_GM soundfont assets are distributed under the CC-BY 3.0 license. See `public/licenses/` for full attribution notices.
+Bundled audio assets have their own attribution and license notices: [HQ piano attribution](public/licenses/piano-hq-attribution.txt), [FluidR3_GM attribution](public/licenses/FluidR3_GM-attribution.txt), and the included [FluidR3_GM CC BY 3.0 license](public/licenses/FluidR3_GM-CC-BY-3.0.txt).

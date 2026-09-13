@@ -1,5 +1,18 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+interface StaffAnchor {
+  readonly stepId: string;
+  readonly systemIndex: string;
+  readonly targetKey?: string;
+}
+
+function staffTargetKey(target: HTMLElement): string | undefined {
+  const harmonyEvent = target.closest<HTMLElement>(".measure-staff-event");
+  if (harmonyEvent?.dataset.staffItemKey) return `harmony:${harmonyEvent.dataset.staffItemKey}`;
+  if (target.dataset.melodyEventKey) return `melody:${target.dataset.melodyEventKey}`;
+  return undefined;
+}
+
 export interface StudioWorkspaceProps {
   readonly header: ReactNode;
   readonly transport: ReactNode;
@@ -33,11 +46,13 @@ export function StudioWorkspace({
   overlays,
 }: StudioWorkspaceProps) {
   const progressionStripRef = useRef<HTMLElement>(null);
+  const staffAnchorRef = useRef<StaffAnchor | null>(null);
   const [offsetY, setOffsetY] = useState(0);
 
   useLayoutEffect(() => {
     if (!selectedStepInspector) {
       setOffsetY(0);
+      staffAnchorRef.current = null;
       return;
     }
 
@@ -45,10 +60,86 @@ export function StudioWorkspace({
       const strip = progressionStripRef.current;
       if (!strip) return;
 
+      const staffTargets = Array.from(
+        strip.querySelectorAll<HTMLElement>(
+          ".score-system .measure-staff-event > .measure-staff-event-select, .score-system .melody-staff-note",
+        ),
+      );
+      const selectedStaffTargets = staffTargets.filter(
+        (target) =>
+          target.classList.contains("is-selected") ||
+          target.closest(".measure-staff-event")?.classList.contains("is-selected"),
+      );
+      const previousStaffAnchor = staffAnchorRef.current;
+      const selectedStaffStepId = selectedStaffTargets.find((target) => target.dataset.stepId)
+        ?.dataset.stepId;
+      const activeElement = document.activeElement;
+      const focusedStaffTarget =
+        activeElement instanceof HTMLElement
+          ? activeElement.closest<HTMLElement>(
+              ".score-system .measure-staff-event-select, .score-system .melody-staff-note",
+            )
+          : null;
+      const focusedStaffStepId = focusedStaffTarget?.dataset.stepId;
+      const staffStepId =
+        focusedStaffStepId && (!selectedStaffStepId || focusedStaffStepId === selectedStaffStepId)
+          ? focusedStaffStepId
+          : (selectedStaffStepId ??
+            (strip.querySelector(".score-system") ? previousStaffAnchor?.stepId : undefined));
+
+      let staffSystem: HTMLElement | null = null;
+      let anchorTargetKey: string | undefined;
+      if (staffStepId && focusedStaffTarget?.dataset.stepId === staffStepId) {
+        staffSystem = focusedStaffTarget.closest<HTMLElement>(".score-system");
+        anchorTargetKey = staffTargetKey(focusedStaffTarget);
+      }
+
+      if (!staffSystem && staffStepId && previousStaffAnchor?.stepId === staffStepId) {
+        const anchoredStaffTarget = previousStaffAnchor.targetKey
+          ? staffTargets.find(
+              (target) =>
+                target.dataset.stepId === staffStepId &&
+                staffTargetKey(target) === previousStaffAnchor.targetKey,
+            )
+          : undefined;
+        staffSystem = anchoredStaffTarget?.closest<HTMLElement>(".score-system") ?? null;
+        anchorTargetKey = anchoredStaffTarget ? staffTargetKey(anchoredStaffTarget) : undefined;
+
+        if (!staffSystem) {
+          staffSystem =
+            Array.from(strip.querySelectorAll<HTMLElement>(".score-system")).find(
+              (system) => system.dataset.systemIndex === previousStaffAnchor.systemIndex,
+            ) ?? null;
+        }
+      }
+
+      if (!staffSystem && staffStepId) {
+        const selectedStaffTarget = selectedStaffTargets.find(
+          (target) => target.dataset.stepId === staffStepId,
+        );
+        staffSystem = selectedStaffTarget?.closest<HTMLElement>(".score-system") ?? null;
+        anchorTargetKey = selectedStaffTarget ? staffTargetKey(selectedStaffTarget) : undefined;
+      }
+
+      if (staffSystem && staffStepId) {
+        staffAnchorRef.current = {
+          stepId: staffStepId,
+          systemIndex: staffSystem.dataset.systemIndex ?? "",
+          ...(anchorTargetKey ? { targetKey: anchorTargetKey } : {}),
+        };
+      }
+
+      /*
+       * Staff targets are rendered inside their system, unlike Harmonic/Piano
+       * cards. Keep the exact activated target as the anchor through layout
+       * mutations so a continuation cannot move the inspector to its first DOM
+       * occurrence after resize.
+       */
       const selectedMeasure = strip.querySelector<HTMLElement>(
         ".progression-measure-card[data-has-selected-step='true']",
       );
       const targetCard =
+        staffSystem ??
         selectedMeasure ??
         strip.querySelector<HTMLElement>(
           ".progression-step-card.is-selected, .progression-rest-card.is-selected",
@@ -91,11 +182,13 @@ export function StudioWorkspace({
     }
 
     window.addEventListener("resize", updateOffset);
+    strip.addEventListener("focusin", updateOffset);
 
     return () => {
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
       window.removeEventListener("resize", updateOffset);
+      strip.removeEventListener("focusin", updateOffset);
     };
   }, [selectedStepInspector, progression]);
 
@@ -128,6 +221,7 @@ export function StudioWorkspace({
         <section
           ref={progressionStripRef}
           className="progression-strip"
+          role="region"
           aria-label="My Progression"
           onClick={(event) => {
             if (event.target === event.currentTarget) onProgressionBackgroundClick?.();
@@ -139,6 +233,15 @@ export function StudioWorkspace({
           <aside
             className="selected-step-stack"
             aria-label="Selected step"
+            tabIndex={-1}
+            onMouseDown={(event) => {
+              if (
+                event.target instanceof HTMLElement &&
+                !event.target.closest("button, input, select, textarea, [tabindex]")
+              ) {
+                event.currentTarget.focus();
+              }
+            }}
             style={offsetY > 0 ? { marginTop: `${offsetY}px` } : undefined}
           >
             {selectedStepInspector}

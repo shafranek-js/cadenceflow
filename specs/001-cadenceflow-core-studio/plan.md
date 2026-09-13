@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles. US13 separates Matrix Card Views from one global My Progression view and renders Staff as responsive multi-measure score systems.
+Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles. US13 separates Matrix Card Views from one global My Progression view, renders Staff as responsive multi-measure score systems, and moves Staff interaction onto the score before removing its duplicate Step-card strip.
 
 Audio is sample-based rather than oscillator-based: the launch piano uses a high-quality multisampled acoustic grand through an `InstrumentAudioProvider`, with web-optimized lazy loading/caching; an SF2/SF3 provider can be integrated independently. MIDI and MusicXML are separate projections of the same semantic model.
 
@@ -397,10 +397,13 @@ Deliver:
 - separate full-width vertical Harmonic/Piano measure sections with one horizontal step row per measure,
   plus Staff-system interactions preserving selection,
   playback highlight, reorder, context menus, Rest, and trailing-gap actions;
+- direct pointer and keyboard Staff targets for Step selection/inspection and Melody context actions,
+  followed by migration of removal, reorder, Rest, trailing-gap, continuation, and playback interaction
+  parity before the Staff-only duplicate Step-card strip is removed;
 - visual/accessibility polish and focused Chromium acceptance at supported viewports, themes, and zoom.
 
 Exit gate:
-- FR-208–FR-214 and SC-019 pass focused unit/integration/Chromium checks, production build, scoped
+- FR-208–FR-217 and SC-019–SC-020 pass focused unit/integration/Chromium checks, production build, scoped
   formatting, and independent diff review without changing Melody, playback, Matrix Card View, or export
   semantics.
 
@@ -438,6 +441,8 @@ Exit gate:
 - [x] Progression Step independence is preserved through persistence/export.
 - [x] Acceptance criteria have corresponding implementation/test slices.
 - [x] US13 keeps score-system layout as a projection over canonical measure/music semantics.
+- [x] US13 direct score interaction reuses canonical Progression Steps and existing commands rather than
+  introducing a second editable notation model.
 
 **Gate result**: PASS.
 

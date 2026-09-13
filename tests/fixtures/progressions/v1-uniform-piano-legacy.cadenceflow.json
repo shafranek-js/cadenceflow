@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-v1-uniform-piano",
+  "name": "v1 Uniform Piano Legacy",
+  "createdAt": "2026-09-13T09:00:00.000Z",
+  "updatedAt": "2026-09-13T09:05:00.000Z",
+  "activeModule": "progressions",
+  "tonic": { "semitone": 0 },
+  "globalTiming": {
+    "tempoBpm": 100,
+    "meter": { "numerator": 4, "denominator": 4, "grouping": [4] }
+  },
+  "groove": { "feel": "straight", "swingAmount": 0 },
+  "presentation": {
+    "expertiseMode": "composer",
+    "theme": "dark",
+    "globalMatrixCardView": "harmonic",
+    "measureLayoutColumns": "2"
+  },
+  "defaults": {},
+  "moduleTemplateStates": {},
+  "progression": {
+    "selectedStepId": "v1-chord",
+    "steps": [
+      {
+        "id": "v1-chord",
+        "kind": "chord",
+        "harmonicFunction": { "moduleId": "progressions", "functionId": "I", "category": "tonic" },
+        "harmonicVariant": {},
+        "duration": { "beats": { "numerator": 2, "denominator": 1 } },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": { "choice": "auto", "octaveOffset": "auto" },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "piano"
+      },
+      {
+        "id": "v1-rest",
+        "kind": "rest",
+        "duration": { "beats": { "numerator": 2, "denominator": 1 } }
+      }
+    ]
+  },
+  "customPresets": []
+}

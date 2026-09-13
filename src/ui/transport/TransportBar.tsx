@@ -13,9 +13,12 @@ import { Icon } from "../common/Icon";
 
 export interface TransportBarProps {
   readonly project: Project;
+  readonly loopState?: LoopState;
+  readonly onSetLoopMode?: (mode: LoopMode) => void;
+  readonly onSetLoopRange?: (startStepId: string, endStepId: string) => void;
   readonly onSetMeter: (newMeter: Meter, policy: MeterChangePolicy) => void;
   readonly onSetGroove: (groove: GrooveSettings) => void;
-  readonly onSetStepDuration: (stepId: string, duration: MusicalDuration) => void;
+  readonly onSetStepDuration?: (stepId: string, duration: MusicalDuration) => void;
 }
 
 export interface TempoControlsProps {
@@ -121,6 +124,9 @@ export function PlaybackSupportControls({
 
 export function TransportBar({
   project,
+  loopState,
+  onSetLoopMode,
+  onSetLoopRange,
   onSetMeter,
   onSetGroove,
   onSetStepDuration,
@@ -341,23 +347,113 @@ export function TransportBar({
           ) : null}
         </div>
 
-        {/* 4. Selected Step Duration Editor */}
-        <div
-          className="transport-section transport-step-duration"
-          role="group"
-          aria-label="Step Duration Editor"
-        >
-          <span className="transport-label">
-            Step Duration {selectedStep ? `(${formatDurationBeats(selectedStep.duration)})` : ""}
-          </span>
-          <StepDurationControl
-            variant="buttons"
-            label=""
-            value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
-            onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
-            disabled={!selectedStepId}
-          />
-        </div>
+        {/* Step Duration Editor (rendered when onSetStepDuration is supplied) */}
+        {onSetStepDuration ? (
+          <div
+            className="transport-section transport-step-duration"
+            role="group"
+            aria-label="Step Duration Editor"
+          >
+            <span className="transport-label">
+              Step Duration {selectedStep ? `(${formatDurationBeats(selectedStep.duration)})` : ""}
+            </span>
+            <StepDurationControl
+              variant="buttons"
+              label=""
+              value={selectedStep?.duration ?? musicalDuration(rational(4, 1))}
+              onChange={(dur) => selectedStepId && onSetStepDuration(selectedStepId, dur)}
+              disabled={!selectedStepId}
+            />
+          </div>
+        ) : null}
+
+        {/* 4. Loop Controls */}
+        {loopState && onSetLoopMode && (
+          <div className="transport-section transport-loop" role="group" aria-label="Loop Controls">
+            <span className="transport-label">Loop</span>
+            <div className="loop-controls-group">
+              <div className="loop-mode-selector" role="radiogroup" aria-label="Loop Mode">
+                <button
+                  type="button"
+                  className={`loop-mode-btn ${loopState.mode === "disabled" ? "is-active" : ""}`}
+                  onClick={() => onSetLoopMode("disabled")}
+                  aria-pressed={loopState.mode === "disabled"}
+                >
+                  Off
+                </button>
+                <button
+                  type="button"
+                  className={`loop-mode-btn ${loopState.mode === "all" ? "is-active" : ""}`}
+                  onClick={() => onSetLoopMode("all")}
+                  aria-pressed={loopState.mode === "all"}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`loop-mode-btn ${loopState.mode === "range" ? "is-active" : ""}`}
+                  onClick={() => onSetLoopMode("range")}
+                  aria-pressed={loopState.mode === "range"}
+                >
+                  Range
+                </button>
+              </div>
+
+              {loopState.mode === "range" && project.progression.steps.length > 0 && (
+                <div className="loop-range-selectors">
+                  <label className="loop-range-label">
+                    From:
+                    <select
+                      value={loopState.region?.startStepId ?? project.progression.steps[0]?.id}
+                      onChange={(e) => {
+                        const startId = e.target.value;
+                        const endId =
+                          loopState.region?.endStepId ??
+                          project.progression.steps[project.progression.steps.length - 1]?.id ??
+                          startId;
+                        onSetLoopRange?.(startId, endId);
+                      }}
+                      className="loop-step-select"
+                      aria-label="Loop start step"
+                    >
+                      {project.progression.steps.map((s, idx) => (
+                        <option key={s.id} value={s.id}>
+                          {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="loop-range-label">
+                    To:
+                    <select
+                      value={
+                        loopState.region?.endStepId ??
+                        project.progression.steps[project.progression.steps.length - 1]?.id
+                      }
+                      onChange={(e) => {
+                        const endId = e.target.value;
+                        const startId =
+                          loopState.region?.startStepId ??
+                          project.progression.steps[0]?.id ??
+                          endId;
+                        onSetLoopRange?.(startId, endId);
+                      }}
+                      className="loop-step-select"
+                      aria-label="Loop end step"
+                    >
+                      {project.progression.steps.map((s, idx) => (
+                        <option key={s.id} value={s.id}>
+                          {idx + 1}: {s.kind === "chord" ? s.harmonicFunction.functionId : "Rest"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 5. Groove / Swing Controls */}
         <div

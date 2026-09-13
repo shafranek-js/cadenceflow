@@ -11,10 +11,14 @@ import type {
   BassOctaveOffset,
   ChordStep,
   DynamicsViewPreference,
+  ProgressionStep,
   StepPerformance,
 } from "../../domain/progression/step";
 import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
-import type { Meter } from "../../domain/timing/meter";
+import type { Meter, MeterChangePolicy } from "../../domain/timing/meter";
+import type { GrooveSettings } from "../../domain/timing/swing";
+import type { LoopMode, LoopState } from "../transport/loopState";
+import { InspectorProgressionSettings } from "./InspectorProgressionSettings";
 import {
   PIANO_DYNAMICS_PRESETS,
   PIANO_RANGE_MAX_MIDI,
@@ -32,6 +36,9 @@ import { RegisterControl } from "./RegisterControl";
 import { ArticulationControl } from "./ArticulationControl";
 import { StepActions } from "../progression/StepActions";
 import { StepDurationControl } from "../progression/StepDurationControl";
+import { formatDurationBeats } from "../timing/stepDuration";
+import type { MelodyTrackSettings } from "../../domain/melody/types";
+import type { AudioProviderState } from "../../audio/contracts";
 
 const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
   Object.freeze([
@@ -98,6 +105,19 @@ export interface PianoPerformanceInspectorProps {
   readonly onMoveLeft?: () => void;
   readonly onMoveRight?: () => void;
   readonly onOpenVoicingEditor: () => void;
+  readonly melodyTrack?: MelodyTrackSettings;
+  readonly onMelodyTrackSettingsChange?: (settings: Partial<MelodyTrackSettings>) => void;
+  readonly melodyAudioState?: AudioProviderState;
+  readonly melodyAudioError?: string | null;
+  readonly onRetryMelodyAudio?: () => void;
+  readonly hasMelodyRecipe?: boolean;
+  readonly onSetMeter?: (meter: Meter, policy: MeterChangePolicy) => void;
+  readonly groove?: GrooveSettings;
+  readonly onSetGroove?: (groove: GrooveSettings) => void;
+  readonly loopState?: LoopState;
+  readonly steps?: readonly ProgressionStep[];
+  readonly onSetLoopMode?: (mode: LoopMode) => void;
+  readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
 }
 
 export function PianoPerformanceInspector({
@@ -114,6 +134,19 @@ export function PianoPerformanceInspector({
   onMoveLeft,
   onMoveRight,
   onOpenVoicingEditor,
+  melodyTrack,
+  onMelodyTrackSettingsChange,
+  melodyAudioState,
+  melodyAudioError,
+  onRetryMelodyAudio,
+  hasMelodyRecipe = false,
+  onSetMeter,
+  groove,
+  onSetGroove,
+  loopState,
+  steps,
+  onSetLoopMode,
+  onSetLoopRange,
 }: PianoPerformanceInspectorProps) {
   const perf = step.performance;
   const isManual = perf.voicingMode === "manual";
@@ -285,9 +318,20 @@ export function PianoPerformanceInspector({
         <div>
           <span className="inspector-context-kicker">Selected step</span>
           <h3>Step Performance: {step.harmonicFunction.functionId}</h3>
-          <span>All selected-step settings live here.</span>
+          <span>Step-specific controls live here. Progression settings are grouped below.</span>
         </div>
       </header>
+
+      {onReplace && onReset && onRemove && onMoveLeft && onMoveRight ? (
+        <StepActions
+          canReplace={canReplace}
+          onReplace={onReplace}
+          onReset={onReset}
+          onRemove={onRemove}
+          onMoveLeft={onMoveLeft}
+          onMoveRight={onMoveRight}
+        />
+      ) : null}
 
       {/* Primary step controls */}
       <details
@@ -360,10 +404,13 @@ export function PianoPerformanceInspector({
           </summary>
           <div className="inspector-disclosure-body">
             <div
-              className="inspector-group selected-step-duration"
+              className="transport-section transport-step-duration inspector-group selected-step-duration"
               role="group"
               aria-label="Step duration controls"
             >
+              <span className="transport-label">
+                Step Duration ({formatDurationBeats(step.duration)})
+              </span>
               <StepDurationControl
                 variant="buttons"
                 label=""
@@ -712,16 +759,22 @@ export function PianoPerformanceInspector({
         </div>
       </details>
 
-      {onReplace && onReset && onRemove && onMoveLeft && onMoveRight ? (
-        <StepActions
-          canReplace={canReplace}
-          onReplace={onReplace}
-          onReset={onReset}
-          onRemove={onRemove}
-          onMoveLeft={onMoveLeft}
-          onMoveRight={onMoveRight}
-        />
-      ) : null}
+      <InspectorProgressionSettings
+        meter={meter}
+        onSetMeter={onSetMeter}
+        groove={groove}
+        onSetGroove={onSetGroove}
+        loopState={loopState}
+        steps={steps}
+        onSetLoopMode={onSetLoopMode}
+        onSetLoopRange={onSetLoopRange}
+        melodyTrack={melodyTrack}
+        onMelodyTrackSettingsChange={onMelodyTrackSettingsChange}
+        melodyAudioState={melodyAudioState}
+        melodyAudioError={melodyAudioError}
+        onRetryMelodyAudio={onRetryMelodyAudio}
+        hasMelodyRecipe={hasMelodyRecipe}
+      />
     </section>
   );
 }

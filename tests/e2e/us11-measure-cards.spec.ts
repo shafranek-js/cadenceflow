@@ -67,10 +67,10 @@ test.describe("US11 measure-card progression layout", () => {
     );
     expect(attackRatios).toHaveLength(2);
     expect(attackRatios[1]).toBeGreaterThan(attackRatios[0]!);
-    const compactStripHeight = await page
-      .getByTestId("progression-measure-grid")
-      .evaluate((element) => element.getBoundingClientRect().height);
-    expect(compactStripHeight).toBeLessThanOrEqual(74);
+    await expect(page.getByTestId("progression-staff-step-grids")).toHaveCount(0);
+    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
+      0,
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -124,6 +124,29 @@ test.describe("US11 measure-card progression layout", () => {
     await expect(page.getByTestId("progression-measure-gap")).toHaveCount(0);
   });
 
+  test("keeps trailing-gap actions reachable from the Staff score", async ({ page }) => {
+    await openStudio(page);
+    await addChord(page, "I");
+    await setFirstDuration(page, "2/1");
+    await page.getByLabel("Progression Card View").selectOption("staff");
+
+    const gap = page.getByTestId("progression-score-gap");
+    await expect(gap).toBeVisible();
+    await expect(gap.getByRole("button", { name: /Add chord/ })).toBeVisible();
+    await expect(gap.getByRole("button", { name: /Fill measure/ })).toBeVisible();
+    await expect(gap.getByRole("button", { name: /Extend chord/ })).toBeVisible();
+    await expect(gap.getByRole("button", { name: /Repeat chord/ })).toBeVisible();
+
+    await gap.getByRole("button", { name: /Repeat chord/ }).click();
+    await expect(page.getByTestId("progression-score-gap")).toHaveCount(0);
+    await expect(
+      page.getByTestId("progression-score-system").locator(".measure-staff-event"),
+    ).toHaveCount(2);
+    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
+      0,
+    );
+  });
+
   test("fills the final gap with an explicit Rest or extends one chord to Full bar", async ({
     page,
   }) => {
@@ -157,9 +180,9 @@ test.describe("US11 measure-card progression layout", () => {
     await page.getByLabel("Progression Card View").selectOption("staff");
     await expect(page.getByTestId("progression-score-system")).toHaveCount(1);
     await expect(page.locator('[data-testid="progression-step"] .mini-staff')).toHaveCount(0);
-    await expect(page.getByTestId("progression-measure")).toHaveAttribute(
-      "aria-label",
-      "Measure 1, 4/4",
+    await expect(page.getByTestId("progression-score-system")).toHaveAttribute(
+      "data-measure-count",
+      "1",
     );
   });
 });

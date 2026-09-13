@@ -72,12 +72,14 @@ test.describe("US10 Batch 4 — global UI system", () => {
     await expect(page.locator(".project-selector-button .ui-icon-disclosure")).toBeVisible();
     await expect(page.getByTestId("chord-card-I").locator(".card-settings-button")).toHaveCount(0);
 
-    const labels = (await page.locator(".transport-label").allTextContents()).map((label) =>
-      label.trim(),
-    );
-    expect(labels).toEqual(
-      expect.arrayContaining(["Tempo", "Meter", "Step Duration"]),
-    );
+    const transportLabels = (
+      await playbackTransport.locator(".transport-label").allTextContents()
+    ).map((label) => label.trim());
+    expect(transportLabels).toContain("Tempo");
+    expect(transportLabels).not.toEqual(expect.arrayContaining(["Meter", "Step Duration"]));
+    await expect(
+      page.getByTestId("progression-global-inspector").getByText("Time signature & meter"),
+    ).toBeVisible();
     expect(
       await page
         .locator(".transport-label")

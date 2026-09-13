@@ -89,6 +89,34 @@ async function contrastRatio(page: Page, locator: Locator): Promise<number> {
 }
 
 test.describe("US10 Batch B — accessible studio interaction", () => {
+  test("exposes the current Studio landmarks and Staff score surface", async ({ page }) => {
+    await waitForStudio(page);
+
+    await expect(page.getByRole("main", { name: "CadenceFlow Studio" })).toHaveCount(1);
+    await expect(
+      page.locator('header.app-header[aria-label="Project and application controls"]'),
+    ).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Studio work area" })).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Harmonic Matrix" })).toHaveCount(1);
+    await expect(page.getByRole("complementary", { name: "Inspector" })).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "My Progression" })).toHaveCount(1);
+    await expect(page.getByRole("navigation", { name: "Playback Transport" })).toHaveCount(1);
+    await expect(page.getByRole("contentinfo", { name: "Status bar" })).toHaveCount(1);
+
+    await page
+      .getByTestId("chord-card-I")
+      .locator(".chord-main")
+      .click({ modifiers: ["Control"] });
+    await page.getByLabel("Progression Card View").selectOption("staff");
+    await expect(page.getByTestId("progression-score-systems")).toHaveAttribute(
+      "aria-label",
+      /^Staff score systems; /,
+    );
+    await expect(
+      page.getByTestId("progression-score-systems").locator(".measure-staff-event-select"),
+    ).toHaveCount(1);
+  });
+
   test("supports Tab, Enter, Space, template reset, and keyboard progression reorder", async ({
     page,
   }) => {
@@ -116,7 +144,9 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await chordMain.click();
     const template = page.getByRole("region", { name: "Template settings for I" });
     await expect(template).toBeVisible();
-    await template.getByRole("combobox").first().selectOption("arp-up");
+    const articulation = template.getByRole("button", { name: "Articulation: Arp Up" });
+    await articulation.focus();
+    await page.keyboard.press("Enter");
     const resetButton = template.getByRole("button", { name: "Reset Card to Defaults" });
     await expect(resetButton).toBeEnabled();
     await resetButton.focus();
@@ -210,12 +240,11 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await expect(progressionView).toHaveValue("staff");
     await expect(progressionView).toBeFocused();
     await expect(
-      page.locator('[data-testid="progression-step"]').first().locator(".mini-staff"),
+      page.getByTestId("progression-score-systems").locator(".measure-staff-event-select").first(),
     ).toBeVisible();
-    await expect(page.locator('[data-testid="progression-step"] .card-view-switcher')).toHaveCount(
+    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
       0,
     );
-    await expect(page.getByRole("group", { name: /View for progression step/ })).toHaveCount(0);
   });
 
   test("persists theme and expertise choices while preserving progression and Matrix identity", async ({
@@ -318,7 +347,9 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     );
     await page.getByTestId("chord-card-bIII").locator(".chord-main").click();
     const template = page.getByRole("region", { name: "Template settings for bIII" });
-    await template.getByRole("combobox").first().selectOption("arp-up");
+    const articulation = template.getByRole("button", { name: "Articulation: Arp Up" });
+    await articulation.focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("img", { name: /Customized · 1 overrides/ })).toBeVisible();
     const moduleButton = page.getByRole("button", { name: /^Dark Harmony/ });
     await moduleButton.click();

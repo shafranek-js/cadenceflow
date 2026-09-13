@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   ensureHistoryControlsVisible,
   ensurePreviewHarmonyVisible,
@@ -103,7 +103,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await expect(template).toHaveAttribute("data-scope", "global");
     await expect(page.getByTestId("step-performance-inspector")).toContainText("Selected step");
     await expect(page.getByTestId("step-performance-inspector")).toContainText(
-      "All selected-step settings live here",
+      "Step-specific controls live here. Progression settings are grouped below.",
     );
 
     await page
@@ -295,7 +295,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     });
   }
 
-  test("dynamically aligns Selected Step inspector vertically with active measure", async ({
+  test("dynamically aligns Selected Step inspector with the active Harmonic measure", async ({
     page,
   }) => {
     await waitForStudio(page);
@@ -306,58 +306,147 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     const measures = page.getByTestId("progression-measure");
     await expect(measures).toHaveCount(3);
 
-    // Switch to 1-bar layout so measures are strictly stacked vertically for this alignment test
-    await page.getByLabel("Measures Layout", { exact: true }).selectOption("1");
-
     const steps = page.getByTestId("progression-step");
     await expect(steps).toHaveCount(3);
 
-    const getAlignment = async (measureIndex: number) => {
-      return page.evaluate((mIdx) => {
+    const getAlignment = async (measureIndex: number) =>
+      page.evaluate((index) => {
         const selectedStack = document.querySelector<HTMLElement>(".selected-step-stack");
-        const targetMeasure = document.querySelectorAll<HTMLElement>(".progression-measure-card")[mIdx];
+        const targetMeasure = document.querySelectorAll<HTMLElement>(".progression-measure-card")[
+          index
+        ];
         const strip = document.querySelector<HTMLElement>(".progression-strip");
         if (!selectedStack || !targetMeasure || !strip) throw new Error("Elements missing");
         const stackRect = selectedStack.getBoundingClientRect();
         const measureRect = targetMeasure.getBoundingClientRect();
         const stripRect = strip.getBoundingClientRect();
-        const computed = window.getComputedStyle(selectedStack);
         return {
           diffTop: Math.abs(stackRect.top - measureRect.top),
           stripOffset: stackRect.top - stripRect.top,
-          marginTopNumber: parseFloat(computed.marginTop) || 0,
         };
       }, measureIndex);
-    };
 
-    // 1. Select step in Measure 1 -> inspector aligns with Measure 1
-    await steps.nth(0).getByRole("button", { name: /Select progression step/ }).click();
+    await steps
+      .nth(0)
+      .getByRole("button", { name: /Select progression step/ })
+      .click();
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
-    await page.waitForTimeout(300);
-    const align1 = await getAlignment(0);
-    expect(align1.diffTop).toBeLessThanOrEqual(2);
+    const first = await getAlignment(0);
+    expect(first.diffTop).toBeLessThanOrEqual(2);
 
-    // 2. Select step in Measure 2 -> inspector tracks down to Measure 2
-    await steps.nth(1).getByRole("button", { name: /Select progression step/ }).click();
-    await page.waitForTimeout(300);
-    const align2 = await getAlignment(1);
-    expect(align2.diffTop).toBeLessThanOrEqual(2);
-    expect(align2.stripOffset).toBeGreaterThan(align1.stripOffset + 40);
+    await steps
+      .nth(1)
+      .getByRole("button", { name: /Select progression step/ })
+      .click();
+    const second = await getAlignment(1);
+    expect(second.diffTop).toBeLessThanOrEqual(2);
+    expect(second.stripOffset).toBeGreaterThan(first.stripOffset + 40);
 
-    // 3. Select step in Measure 3 -> inspector tracks down to Measure 3
-    await steps.nth(2).getByRole("button", { name: /Select progression step/ }).click();
-    await page.waitForTimeout(300);
-    const align3 = await getAlignment(2);
-    expect(align3.diffTop).toBeLessThanOrEqual(2);
-    expect(align3.stripOffset).toBeGreaterThan(align2.stripOffset + 40);
+    await steps
+      .nth(2)
+      .getByRole("button", { name: /Select progression step/ })
+      .click();
+    const third = await getAlignment(2);
+    expect(third.diffTop).toBeLessThanOrEqual(2);
+    expect(third.stripOffset).toBeGreaterThan(second.stripOffset + 40);
 
-    // 4. Select step back in Measure 1 -> inspector returns up to Measure 1
-    await steps.nth(0).getByRole("button", { name: /Select progression step/ }).click();
-    await page.waitForTimeout(300);
-    const align1Return = await getAlignment(0);
-    expect(align1Return.diffTop).toBeLessThanOrEqual(2);
-    expect(Math.abs(align1Return.stripOffset - align1.stripOffset)).toBeLessThanOrEqual(2);
+    await steps
+      .nth(0)
+      .getByRole("button", { name: /Select progression step/ })
+      .click();
+    const firstReturn = await getAlignment(0);
+    expect(firstReturn.diffTop).toBeLessThanOrEqual(2);
+    expect(Math.abs(firstReturn.stripOffset - first.stripOffset)).toBeLessThanOrEqual(2);
   });
+
+  for (const viewport of [
+    { name: "1280x720", width: 1280, height: 720 },
+    { name: "1920x1080", width: 1920, height: 1080 },
+  ]) {
+    test(`aligns Selected Step with the active Staff system at ${viewport.name}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await waitForStudio(page);
+      await addChord(page, "I");
+      await addChord(page, "IV");
+      await addChord(page, "V");
+      await expect(page.getByTestId("progression-measure")).toHaveCount(3);
+      await page.getByLabel("Progression Card View").selectOption("staff");
+      await page.getByLabel("Measures Layout", { exact: true }).selectOption("1");
+
+      const score = page.getByTestId("progression-score-systems");
+      await expect(score.locator(".score-system")).toHaveCount(3);
+      const selectedStack = page.getByRole("complementary", { name: "Selected step" });
+      await expect(selectedStack).toBeVisible();
+
+      const readStaffAlignment = async (target: Locator) =>
+        target.evaluate((element) => {
+          const selectedStack = document.querySelector<HTMLElement>(".selected-step-stack");
+          const system = element.closest<HTMLElement>(".score-system");
+          if (!selectedStack || !system)
+            throw new Error("Selected Staff target or inspector missing");
+          const selectedStackRect = selectedStack.getBoundingClientRect();
+          const systemRect = system.getBoundingClientRect();
+          return {
+            diffTop: Math.abs(selectedStackRect.top - systemRect.top),
+            systemIndex: system.dataset.systemIndex,
+            selectedStackTop: selectedStackRect.top,
+          };
+        });
+
+      for (let systemIndex = 0; systemIndex < 3; systemIndex += 1) {
+        const target = score
+          .locator(`.score-system[data-system-index="${systemIndex}"] .measure-staff-event-select`)
+          .first();
+        await expect(target).toBeVisible();
+        await target.click();
+        await expect(target).toHaveAttribute("aria-pressed", "true");
+        await expect(selectedStack.getByTestId("step-performance-inspector")).toBeVisible();
+        const alignment = await readStaffAlignment(target);
+        expect(alignment.systemIndex).toBe(String(systemIndex));
+        expect(alignment.diffTop).toBeLessThanOrEqual(2);
+      }
+
+      const continuationTarget = score.locator(
+        ".score-system .measure-staff-event.is-continuation .measure-staff-event-select",
+      );
+      if (await continuationTarget.count()) {
+        const target = continuationTarget.last();
+        await target.click();
+        await expect(target).toHaveAttribute("aria-pressed", "true");
+        const alignment = await readStaffAlignment(target);
+        expect(alignment.diffTop).toBeLessThanOrEqual(2);
+        await selectedStack.focus();
+        await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+        const afterResize = await readStaffAlignment(target);
+        expect(afterResize.diffTop).toBeLessThanOrEqual(2);
+      }
+
+      const melodyTarget = score.locator(".score-system .melody-staff-note").last();
+      if (await melodyTarget.count()) {
+        await melodyTarget.click();
+        await expect(melodyTarget).toHaveAttribute("aria-pressed", "true");
+        const alignment = await readStaffAlignment(melodyTarget);
+        expect(alignment.diffTop).toBeLessThanOrEqual(2);
+      }
+
+      const firstTarget = score
+        .locator('.score-system[data-system-index="0"] .measure-staff-event-select')
+        .first();
+      await firstTarget.click();
+      const firstReturn = await readStaffAlignment(firstTarget);
+      expect(firstReturn.systemIndex).toBe("0");
+      expect(firstReturn.diffTop).toBeLessThanOrEqual(2);
+
+      const pageOverflow = await readPageOverflow(page);
+      expect(pageOverflow.documentScrollWidth).toBeLessThanOrEqual(
+        pageOverflow.documentClientWidth,
+      );
+      expect(pageOverflow.bodyScrollWidth).toBeLessThanOrEqual(pageOverflow.innerWidth);
+      expect(pageOverflow.scrollX).toBe(0);
+    });
+  }
 
   test("displays Global Matrix Template when unselected and switches to Card Template when selected", async ({
     page,
@@ -443,4 +532,3 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await expect(step3).toContainText("4");
   });
 });
-

@@ -498,7 +498,7 @@ test.describe("US8 Batch C — project actions", () => {
     const exportedEnvelope = JSON.parse(await readFile(downloadPath!, "utf8")) as {
       schemaVersion: number;
     };
-    expect(exportedEnvelope.schemaVersion).toBe(1);
+    expect(exportedEnvelope.schemaVersion).toBe(3);
     const sourceSnapshotForPortableRoundTrip = await captureUs8AcceptanceSnapshot(page);
 
     // Fresh browser context: no IndexedDB from the source context can satisfy this import.

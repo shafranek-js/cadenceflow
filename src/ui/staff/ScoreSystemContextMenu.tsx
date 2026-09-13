@@ -4,50 +4,32 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type RefObject,
 } from "react";
-import type { ChordStep } from "../../domain/progression/step";
-import { formatChordSymbol } from "../../domain/harmony/chord";
-import { realizeChord } from "../../domain/harmony/realization";
-import type { PitchClassIdentity } from "../../domain/harmony/pitch";
+import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 
-export interface MelodyMenuPosition {
+export interface ScoreSystemMenuPosition {
   readonly x: number;
   readonly y: number;
 }
 
-export interface MelodyContextMenuProps {
-  readonly step: ChordStep;
-  readonly position: MelodyMenuPosition;
+export interface ScoreSystemContextMenuProps {
+  readonly system: ScoreSystem;
+  readonly position: ScoreSystemMenuPosition;
   readonly invoker: HTMLElement;
-  readonly tonic?: PitchClassIdentity;
-  readonly onCreate: () => void;
-  readonly onEdit: () => void;
-  readonly onRemove: () => void;
+  readonly onDuplicate: () => void;
   readonly onClose: () => void;
 }
 
-function sourceLabel(step: ChordStep, tonic: PitchClassIdentity): string {
-  return formatChordSymbol({
-    ...realizeChord(step.harmonicFunction, tonic),
-    variant: step.harmonicVariant,
-  });
-}
-
-export function MelodyContextMenu({
-  step,
+export function ScoreSystemContextMenu({
+  system,
   position,
   invoker,
-  tonic = 0,
-  onCreate,
-  onEdit,
-  onRemove,
+  onDuplicate,
   onClose,
-}: MelodyContextMenuProps) {
+}: ScoreSystemContextMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-  const hasRecipe = step.melody !== undefined;
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -127,39 +109,30 @@ export function MelodyContextMenu({
     }
   };
 
-  const menuItems = hasRecipe
-    ? [
-        { label: "Edit Melody…", action: onEdit },
-        { label: "Remove Melody", action: onRemove },
-      ]
-    : [{ label: "Create Melody…", action: onCreate }];
-
   return (
     <div
       ref={menuRef}
-      className="melody-context-menu"
+      className="melody-context-menu score-system-context-menu"
       role="menu"
-      aria-label={`Melody actions for ${sourceLabel(step, tonic)}`}
+      aria-label={`Actions for System ${system.index + 1}`}
       tabIndex={-1}
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
       onKeyDownCapture={handleKeyDown}
-      data-testid="melody-context-menu"
+      data-testid="score-system-context-menu"
     >
-      {menuItems.map((item, index) => (
-        <button
-          key={item.label}
-          ref={(node) => {
-            itemRefs.current[index] = node;
-          }}
-          type="button"
-          role="menuitem"
-          onClick={item.action}
-        >
-          {item.label}
-        </button>
-      ))}
+      <button
+        ref={(node) => {
+          itemRefs.current[0] = node;
+        }}
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          onDuplicate();
+          onClose();
+        }}
+      >
+        Duplicate System
+      </button>
     </div>
   );
 }
-
-export type MelodyContextMenuInvokerRef = RefObject<HTMLElement | null>;

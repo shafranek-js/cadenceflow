@@ -16,15 +16,19 @@ const ARTICULATIONS: readonly {
   Object.freeze({ value: "humanized", label: "Humanized", symbol: "✦" }),
 ]);
 
+export interface ArticulationControlProps {
+  readonly value: PianoArticulation;
+  readonly showLabel?: boolean;
+  readonly ariaLabelPrefix?: string | undefined;
+  readonly onChange: (value: PianoArticulation) => void;
+}
+
 export function ArticulationControl({
   value,
   showLabel = true,
+  ariaLabelPrefix = "Articulation: ",
   onChange,
-}: {
-  readonly value: PianoArticulation;
-  readonly showLabel?: boolean;
-  readonly onChange: (value: PianoArticulation) => void;
-}) {
+}: ArticulationControlProps) {
   return (
     <div className="articulation-control" role="group" aria-label="Articulation controls">
       {showLabel ? <span className="articulation-label">Articulation</span> : null}
@@ -34,7 +38,7 @@ export function ArticulationControl({
             key={articulation.value}
             type="button"
             className="articulation-option"
-            aria-label={`Articulation: ${articulation.label}`}
+            aria-label={`${ariaLabelPrefix}${articulation.label}`}
             aria-pressed={value === articulation.value}
             data-articulation-value={articulation.value}
             title={articulation.label}

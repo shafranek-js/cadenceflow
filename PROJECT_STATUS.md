@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-11
-**Current implementation stage:** Phase 16 / User Story 12 accepted and complete through T176; US10 Batch B is the next proposed controlled batch
-**Task progress:** 161 accepted tasks, 161 / 176 total tasks
+**Handoff date:** 2026-09-13
+**Current implementation stage:** Phase 14 robustness T151–T153 is accepted; the asset, deployment, and quickstart audit is the next proposed controlled batch
+**Task progress:** 179 accepted tasks, 179 / 185 scheduled tasks; T186–T188 remain unscheduled product backlog
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** — Work in one focused wide desktop studio — has Batch A (**T141, T143, T144**) accepted; Batch B and Phase 14 remain pending in the task ledger. **Phase 15: User Story 11** — Measure-card composition layout — is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**: contracts, generator, Project schema v2 persistence, undoable commands, accessible Melody editor/track controls, deterministic Melody Staff, verified local sampled instruments, isolated preview, separate live Melody routing, exact active-note highlighting, deterministic MIDI/MusicXML export, and final cross-layer/desktop acceptance are complete. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified; that external gate must be closed no later than T150/T157. Heavy external applications are not installed as part of this assignment.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** is **ACCEPTED / COMPLETE** for **T141–T149**, including current Staff accessibility expectations, focus/landmark behavior, and the final desktop journey. **Phase 15: User Story 11** is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**. **Phase 17: User Story 13** is **ACCEPTED / COMPLETE** for **T177–T185**, including direct Staff interaction, visual polish, and final responsive Chromium acceptance. Phase 14 remains the release-candidate gate and now covers SC-001–SC-020. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified.
 
 ## 2. Sources of truth
 
@@ -24,9 +24,9 @@ Use the following precedence when requirements appear ambiguous:
 
 Current spec verification:
 
-- 1217 physical lines / 1084 non-empty lines.
-- FR-001 through FR-207: 207 unique functional requirements.
-- SC-001 through SC-018: 18 unique success criteria.
+- 1314 physical lines / 1175 non-empty lines.
+- FR-001 through FR-217: 217 unique functional requirements.
+- SC-001 through SC-020: 20 unique success criteria.
 - No `TODO`, `TBD`, or `NEEDS CLARIFICATION` placeholders.
 
 ## 3. Completed work
@@ -120,7 +120,7 @@ Implemented:
 - 16 discrete velocity layers aligned with upstream Salamander V3 `Data/notes.txt` (`370497372ece1603d1ca7b9892c82c1da566565e`), key-region bounds covering 88 keys (`Data/region.txt`), nearest-sample pitch transposition, and LRU decoded sample cache with 128 MB PCM byte budget and non-poisoning retryability (`T091`, `T092`).
 - Lazy-loaded `HqSamplePianoProvider` with cancelable tokens, observable `fallback` / `error` states, and promise lifecycle (`T092`).
 - SF2/SF3 SoundFont compatibility provider using `spessasynth_lib@4.3.14` proving interchangeable audio provider contracts (`T093`).
-- Reproducible bank preparation pipeline `scripts/prepare-piano-bank.ts`, full 480-region manifest, attribution license, and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) for deterministic clean-checkout real browser smoke (`T094`).
+- Reproducible bank preparation pipeline `scripts/prepare-piano-bank.ts`, full 480-region manifest, attribution license, and the complete committed OGG bank for deterministic clean-checkout verification and real browser playback (`T094`, with final release audit retained in T154–T155).
 
 ### US5 Batch D — canonical projection consistency and final acceptance — T095–T096
 
@@ -483,7 +483,7 @@ Batch A verification: focused US10 Chromium `2 / 2` PASS, repeat-each `6 / 6` PA
 - Architecture supports a lazy-loaded HQ multisample piano provider plus a separate SF2/SF3-compatible provider behind `InstrumentAudioProvider`.
 - Velocity affects actual timbral sample selection across 16 discrete velocity layers, not only amplitude.
 - Upstream source revision is pinned to `370497372ece1603d1ca7b9892c82c1da566565e`.
-- Full 480-region sustain manifest is generated; 3 test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) are committed for zero-setup clean-checkout test execution. Full bank can be prepared via `scripts/prepare-piano-bank.ts`.
+- The full 480-region sustain manifest and all 480 referenced OGG files are committed. `scripts/prepare-piano-bank.ts` remains the reproducible preparation and decode-verification path.
 - Known limitation: sustain samples implemented; release/resonance/hammer/pedal noise deferred.
 
 ### Persistence/export direction
@@ -493,7 +493,7 @@ Batch A verification: focused US10 Chromium `2 / 2` PASS, repeat-each `6 / 6` PA
 
 ## 5. Main files implemented/changed in the completed stage
 
-The working folder has no Git metadata, so this is a verified list of the main current files associated with completed tasks, **not a Git diff**.
+The working folder is an active Git checkout. Treat this section as a historical inventory; use current `git status`, `git diff`, and `git log` as the authoritative change boundary for every batch.
 
 ### Domain / timing / transport / audio
 
@@ -574,10 +574,10 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 ## 7. Known issues / environment limitations
 
-1. **Active Git Repository**: T176 was reviewed in a clean detached worktree; the main `master` checkout currently contains separately owned parallel-task changes that were excluded from this acceptance.
+1. **Active Git Repository**: development is on `master`; every batch must preserve the current untracked QA/source materials and isolate only its intended tracked diff.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
-3. **HQ piano assets**: Prepared sample bank manifest and committed test fixtures (`C4v2.ogg`, `C4v10.ogg`, `C4v14.ogg`) verified in real Chromium WebAudio; full bank preparation pipeline verified in `scripts/prepare-piano-bank.ts`.
-4. **US8 T129**: Final end-to-end composition acceptance is accepted and complete; US9 T130–T140 and US10 Batch A T141/T143/T144 are accepted, with SC-013/SC-014 external interoperability still open.
+3. **HQ piano assets**: the complete 480-region OGG bank is committed and currently verifies 480/480 decoded files. Phase 14 T154–T155 still owns the final attribution, bundle-size, lazy-decode/cache, and deployment audit.
+4. **Release acceptance**: T150–T158 remain open as gap-only/final release work; SC-013/SC-014 external interoperability is still open.
 
 ## 8. Phase 16 / US12 — accepted and complete through T176
 
@@ -627,3 +627,64 @@ See `DEVELOPMENT_WORKFLOW.md` and `NEXT_DEVELOPER_TASK.md` for the exact next as
 T159–T165 are implemented and verified. `My Progression` remains a flat authored `ChordStep`/`RestStep` sequence; measure cards, fragments, continuation markers, and the final virtual gap are derived from the current meter with exact Rational arithmetic. Gap actions are undoable (`Rest`, `Extend`, `Repeat`), `Full bar` is meter-aware, playback runs through the aligned final silence, and MIDI/MusicXML preserve the barline-aligned duration without phantom notes. Staff view uses one shared staff for multiple onsets in a measure.
 
 Verification: full Vitest **69 files / 571 tests**, full Chromium **98 / 98** with `--workers=1 --retries=0`, TypeScript, build, ESLint, Prettier, and `git diff --check` all pass. Build retains the known large-chunk warning only. No schema migration, commit, or push was performed; existing visual-polish worktree changes were preserved.
+
+## 11. Phase 17 / User Story 13 — accepted and complete
+
+T177–T185 are accepted. My Progression has one persisted global `harmonic | piano | staff` view with no
+`Mixed` state. Staff uses a pure meter-aware score-system projection and one VexFlow SVG per system;
+Melody/Harmony share measure boundaries and attack positions, while Harmonic/Piano remain independent
+full-width measure sections. Legacy per-Step `cardView` remains load-compatible but is not used by My
+Progression. Staff itself now owns Step selection, keyboard octave/reorder actions, Inspector linkage,
+Melody context actions, Rest/continuation/gap interaction, and playback highlighting; the duplicate Staff
+card strip is gone. Harmonic/Piano retain their independent Step cards.
+
+Independent final acceptance confirmed focused notation/Melody Vitest **41 / 41**, focused Chromium
+**14 / 14**, production build, scoped ESLint/Prettier, and `git diff --check`. The acceptance covers one SVG
+per system, representative 4/4, 3/4, 6/8, and 7/8 reflow, light/dark at 1280×720 and 1920×1080, 200% zoom,
+keyboard focus/interaction, local over-dense score scrolling, and no page-level horizontal overflow. A
+review repair removed duplicate bubbling/capture handling from the Melody menu while retaining Escape and
+Arrow-key behavior. The accepted result remains uncommitted in the protected dirty worktree.
+
+## 12. Phase 13 / User Story 10 — accepted and complete
+
+T142, T147, and T149 are accepted, completing T141–T149. The batch replaced stale per-Step Staff
+locators with current score-system interactions, verified current landmarks and Global Settings focus
+dismissal, and added the missing project→compose→branch→edit→play→save→export journey at
+1280×720 and 1920×1080. Review restored the independent Harmonic Selected Step Inspector alignment
+assertion while retaining separate Staff availability coverage.
+
+A defect found during acceptance was fixed in ordered piano realization: an explicit octave override now
+changes only the selected Step's harmony and derived Melody. It no longer becomes the voice-leading context
+for subsequent automatic Steps. Independent live browser verification confirmed that the selected Step
+changed while two later Steps, including a repeated chord, remained unchanged.
+
+Independent verification passed focused Vitest **5 / 5** and **21 / 21**, focused Chromium **30 / 30**, a
+post-review Inspector rerun **11 / 11**, production build, scoped ESLint/Prettier, and `git diff --check`.
+The build retains only the known large-chunk warning. The accepted result remains uncommitted in the
+protected dirty worktree.
+
+Phase 14 robustness T151–T153 is accepted in the next section. T186–T188 remain separately prioritized
+product backlog; T188 includes a global Melody Track instrument default plus optional Step-local instrument
+overrides with inheritance.
+
+## 13. Phase 14 robustness — T151–T153 accepted
+
+T151 adds warm-up-separated p50/p95/max benchmarks for recommendation refresh and ordinary Matrix actions
+against the <100 ms target. Independent review repaired the acceptance assertion so a p95 regression now
+fails the test instead of being reported only in console output. The accepted run measured p95 between
+0.000 ms and 0.007 ms across the five covered operations.
+
+T152 adds deterministic virtual-clock soak coverage. Independent verification scheduled 1024 events over
+135.208 virtual seconds with zero target-time drift and exercised 240 loops of 1.75 seconds without
+cumulative drift; the maximum boundary variance was one 25 ms virtual scheduler tick.
+
+T153 adds durable v1, v2, and v3 `.cadenceflow` fixtures covering sequential migration, uniform/mixed/missing
+legacy `cardView`, the `measureLayoutColumns` alias, current track defaults, canonical schema-v3 encoding,
+and round-trip stability. Focused Vitest passed **3 files / 16 tests**. Production build, scoped ESLint,
+scoped Prettier, and `git diff --check` passed; Chromium was correctly skipped because production UI was
+not changed. The build retains only the known large-chunk warning. The accepted result remains uncommitted
+in the protected dirty worktree.
+
+The next proposed controlled batch is **T154, T155, and T158**: audit the committed piano-bank assets and
+attribution, verify production build/base-path/manual Pages evidence, and bring Quickstart commands in line
+with the verified repository. It must not start until explicitly approved.

@@ -374,9 +374,6 @@ for (const viewport of VIEWPORTS) {
       await ensureHistoryControlsVisible(page);
       await addChord(page, "I");
       await createMelody(page, { preview: true, instrument: "cello" });
-      await addChord(page, "V");
-      await addChord(page, "vi");
-      await page.getByLabel("Progression Card View").selectOption("staff");
 
       const progression = page.getByRole("region", { name: "My Progression" });
       const controls = progression.getByRole("region", { name: "Melody Track controls" });
@@ -395,6 +392,9 @@ for (const viewport of VIEWPORTS) {
       );
       await redo.click();
       await expect(controls).toBeVisible();
+
+      await addChord(page, "V");
+      await addChord(page, "vi");
 
       await controls.getByRole("button", { name: "Mute Melody Track" }).click();
       await expect(controls.getByRole("button", { name: "Mute Melody Track" })).toHaveAttribute(

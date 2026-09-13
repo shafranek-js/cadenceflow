@@ -35,6 +35,10 @@ export interface StepDurationControlProps {
   readonly label?: string;
   readonly meter?: Meter | undefined;
   readonly includeFullBar?: boolean;
+  readonly testIdPrefix?: string | undefined;
+  readonly buttonAriaLabelPrefix?: string | undefined;
+  readonly customInputAriaLabel?: string | undefined;
+  readonly setButtonAriaLabel?: string | undefined;
 }
 
 export function StepDurationControl({
@@ -47,6 +51,10 @@ export function StepDurationControl({
   label = "Duration",
   meter,
   includeFullBar = false,
+  testIdPrefix,
+  buttonAriaLabelPrefix,
+  customInputAriaLabel,
+  setButtonAriaLabel,
 }: StepDurationControlProps) {
   const generatedId = useId();
   const selectId =
@@ -114,6 +122,8 @@ export function StepDurationControl({
           <div className="duration-preset-row">
             {QUICK_DURATION_BUTTON_PRESETS.map((preset) => {
               const isSelected = !isFullBar && matchedPreset?.id === preset.id;
+              const testId = testIdPrefix ? `${testIdPrefix}${preset.testId}` : preset.testId;
+              const ariaLabel = `${buttonAriaLabelPrefix ?? ""}${preset.shortLabel} note (${formatMusicalDuration(musicalDuration(preset.beats))} canonical beat${preset.beatsNumerator === 1 && preset.beatsDenominator === 1 ? "" : "s"})`;
               return (
                 <button
                   key={preset.id}
@@ -122,9 +132,9 @@ export function StepDurationControl({
                   onClick={() => handlePresetSelect(preset)}
                   disabled={disabled}
                   title={preset.label}
-                  aria-label={`${preset.shortLabel} note (${formatMusicalDuration(musicalDuration(preset.beats))} canonical beat${preset.beatsNumerator === 1 && preset.beatsDenominator === 1 ? "" : "s"})`}
+                  aria-label={ariaLabel}
                   aria-pressed={isSelected}
-                  data-testid={preset.testId}
+                  data-testid={testId}
                   data-duration-value={preset.id}
                 >
                   <span className="duration-symbol" aria-hidden="true">
@@ -152,9 +162,11 @@ export function StepDurationControl({
                 }
                 disabled={disabled}
                 title={`Full bar — ${formatMusicalDuration(fullBar)} beats`}
-                aria-label={`Full bar (${formatMusicalDuration(fullBar)} beats)`}
+                aria-label={`${buttonAriaLabelPrefix ?? ""}Full bar (${formatMusicalDuration(fullBar)} beats)`}
                 aria-pressed={isFullBar}
-                data-testid="duration-preset-full-bar"
+                data-testid={
+                  testIdPrefix ? `${testIdPrefix}duration-preset-full-bar` : "duration-preset-full-bar"
+                }
                 data-duration-value="full-bar"
               >
                 <span className="duration-symbol" aria-hidden="true">
@@ -168,8 +180,10 @@ export function StepDurationControl({
               onClick={handleDotted}
               disabled={disabled}
               title="Dotted (× 1.5)"
-              aria-label="Dotted (× 1.5 beats)"
-              data-testid="duration-preset-dotted"
+              aria-label={`${buttonAriaLabelPrefix ?? ""}Dotted (× 1.5 beats)`}
+              data-testid={
+                testIdPrefix ? `${testIdPrefix}duration-preset-dotted` : "duration-preset-dotted"
+              }
             >
               <span className="duration-symbol" aria-hidden="true">
                 ♩·
@@ -181,8 +195,10 @@ export function StepDurationControl({
               onClick={handleTriplet}
               disabled={disabled}
               title="Triplet (× 2/3)"
-              aria-label="Triplet (× 2/3 beat)"
-              data-testid="duration-preset-triplet"
+              aria-label={`${buttonAriaLabelPrefix ?? ""}Triplet (× 2/3 beat)`}
+              data-testid={
+                testIdPrefix ? `${testIdPrefix}duration-preset-triplet` : "duration-preset-triplet"
+              }
             >
               <span className="duration-symbol" aria-hidden="true">
                 ♩³
@@ -211,7 +227,7 @@ export function StepDurationControl({
               placeholder="e.g. 3/4"
               className={`custom-duration-input ${customError ? "has-error" : ""}`}
               disabled={disabled}
-              aria-label="Duration in canonical quarter-note beats"
+              aria-label={customInputAriaLabel ?? "Duration in canonical quarter-note beats"}
               title="Duration in canonical quarter-note beats (e.g. 3/4, 2, 1/2)"
             />
             <button
@@ -219,7 +235,7 @@ export function StepDurationControl({
               className="custom-duration-apply-btn"
               onClick={handleApplyCustom}
               disabled={disabled}
-              aria-label="Set custom duration in beats"
+              aria-label={setButtonAriaLabel ?? "Set custom duration in beats"}
             >
               Set
             </button>

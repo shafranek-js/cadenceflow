@@ -224,7 +224,9 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     await expect(projectToggle).toBeFocused();
 
     await projectToggle.click();
-    await page.getByRole("region", { name: "Inspector" }).click({ position: { x: 8, y: 8 } });
+    await page
+      .getByRole("complementary", { name: "Inspector" })
+      .click({ position: { x: 8, y: 8 } });
     await expect(page.getByRole("menu", { name: "Project actions" })).not.toBeVisible();
 
     const resetSummary = page.locator(".matrix-reset-menu summary");
