@@ -885,6 +885,79 @@
   background: color-mix(in srgb, var(--danger, #ff4d4f) 12%, transparent);
 }
 
+.melody-context-menu button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.score-system-context-menu {
+  min-width: 220px;
+}
+
+.score-system-menu-separator {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 3px 0;
+}
+
+.score-system-menu-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.score-system-menu-check {
+  font-size: 13px;
+  color: var(--accent, #4dabf7);
+  font-weight: 700;
+}
+
+.score-system-submenu-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.score-system-submenu {
+  position: fixed;
+  z-index: 85;
+  min-width: 190px;
+}
+
+.progression-score-system.is-muted {
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.score-system-status-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-left: 6px;
+}
+
+.score-system-status-tag.muted {
+  background: color-mix(in srgb, var(--danger, #ff4d4f) 18%, transparent);
+  color: var(--danger, #ff4d4f);
+  border: 1px solid color-mix(in srgb, var(--danger, #ff4d4f) 35%, transparent);
+}
+
+.score-system-status-tag.solo {
+  background: color-mix(in srgb, var(--accent, #4dabf7) 18%, transparent);
+  color: var(--accent, #4dabf7);
+  border: 1px solid color-mix(in srgb, var(--accent, #4dabf7) 35%, transparent);
+}
+
+.score-system-status-tag.loop {
+  background: color-mix(in srgb, #51cf66 18%, transparent);
+  color: #51cf66;
+  border: 1px solid color-mix(in srgb, #51cf66 35%, transparent);
+}
+
 .melody-editor-dialog {
   width: min(760px, 96vw);
   max-height: 92vh;

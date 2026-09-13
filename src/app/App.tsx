@@ -27,7 +27,7 @@ import {
   type SetBranchRejoinCommand,
   type StartBranchCommand,
 } from "./commands/branchCommands";
-import { createDefaultProject } from "../domain/project/factory";
+import { createDefaultProject, DEFAULT_PIANO_PERFORMANCE } from "../domain/project/factory";
 import { recommend } from "../domain/recommendations/engine";
 import {
   baselineFunctionIdentities,
@@ -38,11 +38,14 @@ import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/modul
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
 import { realizeChord } from "../domain/harmony/realization";
 import { branchRecommendationPath, type CompositionIntent } from "../domain/progression/branch";
-import type {
-  CardViewId,
-  ChordStep,
-  ProgressionStep,
-  StepPerformance,
+import {
+  snapshotStepPerformance,
+  type CardViewId,
+  type ChordStep,
+  type PianoArticulation,
+  type ProgressionStep,
+  type RestStep,
+  type StepPerformance,
 } from "../domain/progression/step";
 import { HarmonicMatrix } from "../ui/matrix/HarmonicMatrix";
 import { ModuleSwitchDialog } from "../ui/matrix/ModuleSwitchDialog";
@@ -127,6 +130,9 @@ import {
   repeatChordStep,
   duplicateSteps,
   removeSteps,
+  reorderSteps,
+  insertStepsAfter,
+  batchPatchSteps,
   type AddRestStepCommand,
   type BatchEditStepPerformanceCommand,
   type BatchSetStepDurationCommand,
@@ -140,8 +146,14 @@ import {
   type SelectStepCommand,
   type RepeatChordStepCommand,
   type DuplicateStepsCommand,
+  type ReorderStepsCommand,
+  type InsertStepsAfterCommand,
+  type BatchPatchStepsCommand,
+  type StepPatch,
 } from "./commands/progressionCommands";
-import type { ScoreSystem } from "../notation/scoreSystemProjection";
+import { projectScoreSystems, type ScoreSystem } from "../notation/scoreSystemProjection";
+import { durationBars } from "../domain/timing/duration";
+import { snapshotChordMelodyRecipe } from "../domain/melody/types";
 import {
   saveCustomPreset,
   deleteCustomPreset,
@@ -157,6 +169,7 @@ import { SavePresetDialog } from "../ui/progression/SavePresetDialog";
 import type { StepPerformanceOverrides } from "../domain/project/defaults";
 import {
   nextRegisterOffset,
+  performanceOctaveShiftPatch,
   shiftPitchesByOctave,
   type StaffOctaveDirection,
 } from "../ui/staff/staffOctave";
@@ -256,6 +269,9 @@ export function App() {
   const [loopState, setLoopState] = useState<LoopState>(INITIAL_LOOP_STATE);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [countInEnabled, setCountInEnabled] = useState(false);
+  const [mutedSystemIndices, setMutedSystemIndices] = useState<ReadonlySet<number>>(new Set());
+  const [soloSystemIndex, setSoloSystemIndex] = useState<number | null>(null);
+  const [copiedSystemSteps, setCopiedSystemSteps] = useState<readonly ProgressionStep[] | null>(null);
   const playbackControllerRef = useRef<PlaybackController | null>(null);
   const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
   const melodyPreviewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
@@ -1100,6 +1116,289 @@ export function App() {
     store.dispatch(command, removeSteps);
   };
 
+  const getSystemStepIds = (system: ScoreSystem): string[] => {
+    const stepIndices = new Set<number>();
+    for (const sm of system.measures) {
+      for (const frag of sm.measure.fragments) {
+        stepIndices.add(frag.stepIndex);
+      }
+    }
+    return Array.from(stepIndices)
+      .sort((a, b) => a - b)
+      .map((idx) => project.progression.steps[idx]?.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const playFromSystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    if (stepIds.length === 0) return;
+    handlePlayFromHere(stepIds[0]!);
+  };
+
+  const toggleLoopSystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    if (stepIds.length === 0) return;
+    const firstId = stepIds[0]!;
+    const lastId = stepIds[stepIds.length - 1]!;
+    if (
+      loopState.enabled &&
+      loopState.mode === "range" &&
+      loopState.region?.startStepId === firstId &&
+      loopState.region?.endStepId === lastId
+    ) {
+      handleSetLoopMode("disabled");
+    } else {
+      handleSetLoopRange(firstId, lastId);
+    }
+  };
+
+  const toggleMuteSystem = (system: ScoreSystem) => {
+    setMutedSystemIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(system.index)) next.delete(system.index);
+      else next.add(system.index);
+      return next;
+    });
+  };
+
+  const toggleSoloSystem = (system: ScoreSystem) => {
+    setSoloSystemIndex((prev) => (prev === system.index ? null : system.index));
+  };
+
+  const moveSystem = (system: ScoreSystem, direction: -1 | 1) => {
+    const targetIndex = system.index + direction;
+    const layout = createProgressionMeasureLayout(
+      project.progression.steps,
+      project.globalTiming.meter,
+    );
+    const projection = projectScoreSystems(layout, {
+      availableWidthPx: 960,
+      measuresPerSystem: project.presentation.measuresPerSystem,
+    });
+    if (targetIndex < 0 || targetIndex >= projection.systems.length) return;
+
+    const currentSystem = projection.systems[system.index]!;
+    const targetSystem = projection.systems[targetIndex]!;
+    const currentStepIds = new Set(getSystemStepIds(currentSystem));
+    const targetStepIds = new Set(getSystemStepIds(targetSystem));
+
+    const currentSteps = project.progression.steps.filter((s) => currentStepIds.has(s.id));
+    const targetSteps = project.progression.steps.filter((s) => targetStepIds.has(s.id));
+
+    let newSteps: ProgressionStep[];
+    if (direction === -1) {
+      const targetFirstIndex = project.progression.steps.findIndex((s) => targetStepIds.has(s.id));
+      const before = project.progression.steps
+        .slice(0, targetFirstIndex)
+        .filter((s) => !currentStepIds.has(s.id));
+      const after = project.progression.steps
+        .slice(targetFirstIndex)
+        .filter((s) => !targetStepIds.has(s.id) && !currentStepIds.has(s.id));
+      newSteps = [...before, ...currentSteps, ...targetSteps, ...after];
+    } else {
+      const currentFirstIndex = project.progression.steps.findIndex((s) => currentStepIds.has(s.id));
+      const before = project.progression.steps
+        .slice(0, currentFirstIndex)
+        .filter((s) => !targetStepIds.has(s.id));
+      const after = project.progression.steps
+        .slice(currentFirstIndex)
+        .filter((s) => !currentStepIds.has(s.id) && !targetStepIds.has(s.id));
+      newSteps = [...before, ...targetSteps, ...currentSteps, ...after];
+    }
+
+    const command: ReorderStepsCommand = {
+      type: "progression/reorder-steps",
+      payload: { steps: newSteps, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, reorderSteps);
+  };
+
+  const copySystem = (system: ScoreSystem) => {
+    const stepIds = new Set(getSystemStepIds(system));
+    const stepsToCopy = project.progression.steps
+      .filter((s) => stepIds.has(s.id))
+      .map((source) => {
+        if (source.kind === "rest") return { ...source };
+        return {
+          ...source,
+          performance: snapshotStepPerformance(source.performance),
+          ...(source.melody ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+        };
+      });
+    setCopiedSystemSteps(stepsToCopy);
+  };
+
+  const pasteSystemAfter = (system: ScoreSystem) => {
+    if (!copiedSystemSteps || copiedSystemSteps.length === 0) return;
+    const stepIds = getSystemStepIds(system);
+    const afterStepId =
+      stepIds[stepIds.length - 1] ??
+      project.progression.steps[project.progression.steps.length - 1]?.id;
+    if (!afterStepId) return;
+
+    const clonedSteps: ProgressionStep[] = copiedSystemSteps.map((source) => {
+      const id = crypto.randomUUID();
+      if (source.kind === "rest") {
+        return Object.freeze({ ...source, id });
+      }
+      return Object.freeze({
+        ...source,
+        id,
+        performance: snapshotStepPerformance(source.performance),
+        ...(source.melody ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+      });
+    });
+
+    const command: InsertStepsAfterCommand = {
+      type: "progression/insert-steps-after",
+      payload: { afterStepId, steps: clonedSteps, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, insertStepsAfter);
+  };
+
+  const insertEmptySystemAfter = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    const afterStepId =
+      stepIds[stepIds.length - 1] ??
+      project.progression.steps[project.progression.steps.length - 1]?.id;
+    if (!afterStepId) return;
+
+    const measureCount = Math.max(1, system.measures.length);
+    const restDuration = durationBars(1, project.globalTiming.meter);
+    const restSteps: RestStep[] = Array.from({ length: measureCount }, () =>
+      Object.freeze({
+        id: crypto.randomUUID(),
+        kind: "rest",
+        duration: restDuration,
+      }),
+    );
+
+    const command: InsertStepsAfterCommand = {
+      type: "progression/insert-steps-after",
+      payload: { afterStepId, steps: restSteps, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, insertStepsAfter);
+  };
+
+  const shiftOctaveSystem = (system: ScoreSystem, direction: StaffOctaveDirection) => {
+    const stepIds = getSystemStepIds(system);
+    const updates: Array<{ stepId: string; patch: StepPatch }> = [];
+    for (const id of stepIds) {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord") {
+        const patch = performanceOctaveShiftPatch(step.performance, direction);
+        if (patch) {
+          updates.push({ stepId: id, patch: { performance: patch } });
+        }
+      }
+    }
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const resetPerformanceSystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    const updates: Array<{ stepId: string; patch: StepPatch }> = [];
+    for (const id of stepIds) {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord") {
+        updates.push({
+          stepId: id,
+          patch: {
+            performance: {
+              articulation: DEFAULT_PIANO_PERFORMANCE.articulation,
+              register: DEFAULT_PIANO_PERFORMANCE.register,
+              voicingMode: DEFAULT_PIANO_PERFORMANCE.voicingMode,
+              bass: DEFAULT_PIANO_PERFORMANCE.bass,
+              masterVelocity: DEFAULT_PIANO_PERFORMANCE.masterVelocity,
+              perNoteVelocityOverrides: DEFAULT_PIANO_PERFORMANCE.perNoteVelocityOverrides,
+            },
+          },
+        });
+      }
+    }
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const setArticulationSystem = (system: ScoreSystem, articulation: PianoArticulation) => {
+    const stepIds = getSystemStepIds(system);
+    const updates = stepIds.flatMap((id) => {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord") {
+        return [{ stepId: id, patch: { performance: { articulation } } }];
+      }
+      return [];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const applyMelodyContourSystem = (system: ScoreSystem, recipe: ChordMelodyRecipe) => {
+    const stepIds = getSystemStepIds(system);
+    const updates = stepIds.flatMap((id) => {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord") {
+        return [{ stepId: id, patch: { melody: recipe } }];
+      }
+      return [];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const clearMelodySystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    const updates = stepIds.flatMap((id) => {
+      const step = project.progression.steps.find((s) => s.id === id);
+      if (step && step.kind === "chord" && step.melody !== undefined) {
+        return [{ stepId: id, patch: { melody: null } }];
+      }
+      return [];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const isSystemLooping = (system: ScoreSystem): boolean => {
+    if (!loopState.enabled || loopState.mode !== "range" || !loopState.region) return false;
+    const stepIds = getSystemStepIds(system);
+    if (stepIds.length === 0) return false;
+    return (
+      loopState.region.startStepId === stepIds[0] &&
+      loopState.region.endStepId === stepIds[stepIds.length - 1]
+    );
+  };
+
+  const isSystemMuted = (system: ScoreSystem): boolean => {
+    if (soloSystemIndex !== null) return system.index !== soloSystemIndex;
+    return mutedSystemIndices.has(system.index);
+  };
+
+  const isSystemSolo = (system: ScoreSystem): boolean => {
+    return soloSystemIndex === system.index;
+  };
+
   const globalView = (view: CardViewId) => {
     const command: SetGlobalCardViewCommand = {
       type: "matrix/set-global-card-view",
@@ -1314,6 +1613,40 @@ export function App() {
     [ensureMelodyProvider, getMelodyPreviewAuditionController],
   );
 
+  const mutedStepIds = useMemo<ReadonlySet<string>>(() => {
+    if (mutedSystemIndices.size === 0 && soloSystemIndex === null) {
+      return new Set();
+    }
+    const layout = createProgressionMeasureLayout(
+      project.progression.steps,
+      project.globalTiming.meter,
+    );
+    const projection = projectScoreSystems(layout, {
+      availableWidthPx: 960,
+      measuresPerSystem: project.presentation.measuresPerSystem,
+    });
+    const ids = new Set<string>();
+    projection.systems.forEach((sys) => {
+      const isMuted =
+        soloSystemIndex !== null ? sys.index !== soloSystemIndex : mutedSystemIndices.has(sys.index);
+      if (isMuted) {
+        for (const sm of sys.measures) {
+          for (const frag of sm.measure.fragments) {
+            const step = project.progression.steps[frag.stepIndex];
+            if (step) ids.add(step.id);
+          }
+        }
+      }
+    });
+    return ids;
+  }, [
+    mutedSystemIndices,
+    soloSystemIndex,
+    project.progression.steps,
+    project.globalTiming.meter,
+    project.presentation.measuresPerSystem,
+  ]);
+
   const handlePlay = () => {
     clearStepPreviewHighlights();
     previewAuditionControllerRef.current?.stop();
@@ -1340,6 +1673,7 @@ export function App() {
       countInEnabled,
       harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
+      mutedStepIds,
     });
   };
 
@@ -1369,6 +1703,7 @@ export function App() {
       countInEnabled,
       harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
+      mutedStepIds,
     });
   };
 
@@ -1971,6 +2306,25 @@ export function App() {
             onSetMeasuresPerSystem={changeMeasuresPerSystem}
             onDuplicateSystem={duplicateSystem}
             onDeleteSystem={deleteSystem}
+            isSystemLooping={isSystemLooping}
+            isSystemMuted={isSystemMuted}
+            isSystemSolo={isSystemSolo}
+            canPasteSystem={Boolean(copiedSystemSteps && copiedSystemSteps.length > 0)}
+            onPlayFromSystem={playFromSystem}
+            onToggleLoopSystem={toggleLoopSystem}
+            onToggleMuteSystem={toggleMuteSystem}
+            onToggleSoloSystem={toggleSoloSystem}
+            onMoveSystemUp={(sys) => moveSystem(sys, -1)}
+            onMoveSystemDown={(sys) => moveSystem(sys, 1)}
+            onCopySystem={copySystem}
+            onPasteSystemAfter={pasteSystemAfter}
+            onInsertEmptySystemAfter={insertEmptySystemAfter}
+            onOctaveUpSystem={(sys) => shiftOctaveSystem(sys, 1)}
+            onOctaveDownSystem={(sys) => shiftOctaveSystem(sys, -1)}
+            onResetPerformanceSystem={resetPerformanceSystem}
+            onSetArticulationSystem={setArticulationSystem}
+            onApplyMelodyContourSystem={applyMelodyContourSystem}
+            onClearMelodySystem={clearMelodySystem}
           />
           <BranchComparison
             project={project}

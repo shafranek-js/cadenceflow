@@ -7,7 +7,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { ExactPitch } from "../../domain/harmony/pitch";
-import type { StepPerformance } from "../../domain/progression/step";
+import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
+import type { ChordMelodyRecipe } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -272,6 +273,26 @@ interface ScoreSystemCanvasProps {
   readonly onRepeatFinalChord?: () => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
   readonly onDeleteSystem?: (system: ScoreSystem) => void;
+  readonly totalSystems?: number | undefined;
+  readonly isSystemLooping?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemMuted?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemSolo?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly canPasteSystem?: boolean | undefined;
+  readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
 
 function ScoreSystemCanvas({
@@ -294,6 +315,26 @@ function ScoreSystemCanvas({
   onRepeatFinalChord,
   onDuplicateSystem,
   onDeleteSystem,
+  totalSystems = 1,
+  isSystemLooping,
+  isSystemMuted,
+  isSystemSolo,
+  canPasteSystem = false,
+  onPlayFromSystem,
+  onToggleLoopSystem,
+  onToggleMuteSystem,
+  onToggleSoloSystem,
+  onMoveSystemUp,
+  onMoveSystemDown,
+  onCopySystem,
+  onPasteSystemAfter,
+  onInsertEmptySystemAfter,
+  onOctaveUpSystem,
+  onOctaveDownSystem,
+  onResetPerformanceSystem,
+  onSetArticulationSystem,
+  onApplyMelodyContourSystem,
+  onClearMelodySystem,
 }: ScoreSystemCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [renderedPositions, setRenderedPositions] = useState<Readonly<Record<string, number>>>({});
@@ -301,6 +342,35 @@ function ScoreSystemCanvas({
     readonly anchor: HTMLElement;
     readonly position: ScoreSystemMenuPosition;
   } | null>(null);
+
+  const systemStepIndices = useMemo(() => {
+    const indices = new Set<number>();
+    for (const sm of system.measures) {
+      for (const frag of sm.measure.fragments) {
+        indices.add(frag.stepIndex);
+      }
+    }
+    return indices;
+  }, [system.measures]);
+
+  const chordSteps = useMemo<readonly ChordStep[]>(() => {
+    return Array.from(systemStepIndices)
+      .map((idx) => project.progression.steps[idx])
+      .filter((s): s is ChordStep => Boolean(s && s.kind === "chord"));
+  }, [systemStepIndices, project.progression.steps]);
+
+  const systemHasMelody = chordSteps.some((s) => s.melody !== undefined);
+  const canShiftOctaveUp = chordSteps.some(
+    (s) => performanceOctaveShiftPatch(s.performance, 1) !== null,
+  );
+  const canShiftOctaveDown = chordSteps.some(
+    (s) => performanceOctaveShiftPatch(s.performance, -1) !== null,
+  );
+
+  const isLooping = isSystemLooping ? isSystemLooping(system) : false;
+  const isMuted = isSystemMuted ? isSystemMuted(system) : false;
+  const isSolo = isSystemSolo ? isSystemSolo(system) : false;
+
   const hasMelody = melodyTimeline !== null;
   const melodyClef = melodyTimeline?.clef;
   const showBass = project.presentation.showBassInStaff;
@@ -381,11 +451,14 @@ function ScoreSystemCanvas({
       data-testid="progression-measure-score"
     >
       <section
-        className="score-system"
+        className={`score-system ${isMuted ? "is-muted" : ""}`.trim()}
         data-testid="progression-score-system"
         data-system-index={system.index}
         data-measure-count={system.measures.length}
         data-horizontally-scrollable={system.horizontallyScrollable ? "true" : undefined}
+        data-is-muted={isMuted ? "true" : undefined}
+        data-is-solo={isSolo ? "true" : undefined}
+        data-is-looping={isLooping ? "true" : undefined}
         aria-label={`Score system ${system.index + 1}, measures ${system.measures[0]?.measure.number} through ${system.measures.at(-1)?.measure.number}`}
       >
         <header
@@ -393,7 +466,6 @@ function ScoreSystemCanvas({
           data-testid="score-system-header"
           data-system-index={system.index}
           onContextMenu={(e) => {
-            if (!onDuplicateSystem && !onDeleteSystem) return;
             e.preventDefault();
             e.stopPropagation();
             setSystemMenu({
@@ -404,6 +476,30 @@ function ScoreSystemCanvas({
         >
           <strong>{`System ${system.index + 1}`}</strong>
           <span>{`${system.measures.length} measure${system.measures.length === 1 ? "" : "s"}`}</span>
+          {isMuted ? (
+            <span
+              className="score-system-status-tag muted"
+              data-testid={`score-system-status-muted-${system.index}`}
+            >
+              Muted
+            </span>
+          ) : null}
+          {isSolo ? (
+            <span
+              className="score-system-status-tag solo"
+              data-testid={`score-system-status-solo-${system.index}`}
+            >
+              Solo
+            </span>
+          ) : null}
+          {isLooping ? (
+            <span
+              className="score-system-status-tag loop"
+              data-testid={`score-system-status-loop-${system.index}`}
+            >
+              Loop
+            </span>
+          ) : null}
           {system.horizontallyScrollable ? <span>Dense measure scrolls locally</span> : null}
           {onDeleteSystem ? (
             <button
@@ -722,13 +818,49 @@ function ScoreSystemCanvas({
             </div>
           </div>
         </div>
-        {systemMenu && (onDuplicateSystem || onDeleteSystem) ? (
+        {systemMenu ? (
           <ScoreSystemContextMenu
             system={system}
             position={systemMenu.position}
             invoker={systemMenu.anchor}
+            isLooping={isLooping}
+            isMuted={isMuted}
+            isSolo={isSolo}
+            canMoveUp={system.index > 0}
+            canMoveDown={system.index < totalSystems - 1}
+            canPaste={canPasteSystem}
+            canShiftOctaveUp={canShiftOctaveUp}
+            canShiftOctaveDown={canShiftOctaveDown}
+            hasMelody={systemHasMelody}
+            onPlayFromHere={onPlayFromSystem ? () => onPlayFromSystem(system) : undefined}
+            onToggleLoop={onToggleLoopSystem ? () => onToggleLoopSystem(system) : undefined}
+            onToggleMute={onToggleMuteSystem ? () => onToggleMuteSystem(system) : undefined}
+            onToggleSolo={onToggleSoloSystem ? () => onToggleSoloSystem(system) : undefined}
+            onMoveUp={onMoveSystemUp ? () => onMoveSystemUp(system) : undefined}
+            onMoveDown={onMoveSystemDown ? () => onMoveSystemDown(system) : undefined}
             onDuplicate={() => onDuplicateSystem?.(system)}
-            {...(onDeleteSystem ? { onDelete: () => onDeleteSystem(system) } : {})}
+            onCopy={onCopySystem ? () => onCopySystem(system) : undefined}
+            onPasteAfter={onPasteSystemAfter ? () => onPasteSystemAfter(system) : undefined}
+            onInsertEmptyAfter={
+              onInsertEmptySystemAfter ? () => onInsertEmptySystemAfter(system) : undefined
+            }
+            onOctaveUp={onOctaveUpSystem ? () => onOctaveUpSystem(system) : undefined}
+            onOctaveDown={onOctaveDownSystem ? () => onOctaveDownSystem(system) : undefined}
+            onResetPerformance={
+              onResetPerformanceSystem ? () => onResetPerformanceSystem(system) : undefined
+            }
+            onSetArticulation={
+              onSetArticulationSystem
+                ? (art) => onSetArticulationSystem(system, art)
+                : undefined
+            }
+            onApplyMelodyContour={
+              onApplyMelodyContourSystem
+                ? (recipe) => onApplyMelodyContourSystem(system, recipe)
+                : undefined
+            }
+            onClearMelody={onClearMelodySystem ? () => onClearMelodySystem(system) : undefined}
+            onDelete={onDeleteSystem ? () => onDeleteSystem(system) : undefined}
             onClose={() => setSystemMenu(null)}
           />
         ) : null}
@@ -760,6 +892,25 @@ export interface ScoreSystemViewProps {
   readonly onRepeatFinalChord?: () => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
   readonly onDeleteSystem?: (system: ScoreSystem) => void;
+  readonly isSystemLooping?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemMuted?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemSolo?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly canPasteSystem?: boolean | undefined;
+  readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
 
 /** Responsive multi-measure Staff projection used by My Progression. */
@@ -782,6 +933,25 @@ export function ScoreSystemView({
   onRepeatFinalChord,
   onDuplicateSystem,
   onDeleteSystem,
+  isSystemLooping,
+  isSystemMuted,
+  isSystemSolo,
+  canPasteSystem,
+  onPlayFromSystem,
+  onToggleLoopSystem,
+  onToggleMuteSystem,
+  onToggleSoloSystem,
+  onMoveSystemUp,
+  onMoveSystemDown,
+  onCopySystem,
+  onPasteSystemAfter,
+  onInsertEmptySystemAfter,
+  onOctaveUpSystem,
+  onOctaveDownSystem,
+  onResetPerformanceSystem,
+  onSetArticulationSystem,
+  onApplyMelodyContourSystem,
+  onClearMelodySystem,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [availableWidthPx, setAvailableWidthPx] = useState(0);
@@ -882,6 +1052,26 @@ export function ScoreSystemView({
             {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
             {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
             {...(onDeleteSystem ? { onDeleteSystem } : {})}
+            totalSystems={projection.systems.length}
+            isSystemLooping={isSystemLooping}
+            isSystemMuted={isSystemMuted}
+            isSystemSolo={isSystemSolo}
+            canPasteSystem={canPasteSystem}
+            onPlayFromSystem={onPlayFromSystem}
+            onToggleLoopSystem={onToggleLoopSystem}
+            onToggleMuteSystem={onToggleMuteSystem}
+            onToggleSoloSystem={onToggleSoloSystem}
+            onMoveSystemUp={onMoveSystemUp}
+            onMoveSystemDown={onMoveSystemDown}
+            onCopySystem={onCopySystem}
+            onPasteSystemAfter={onPasteSystemAfter}
+            onInsertEmptySystemAfter={onInsertEmptySystemAfter}
+            onOctaveUpSystem={onOctaveUpSystem}
+            onOctaveDownSystem={onOctaveDownSystem}
+            onResetPerformanceSystem={onResetPerformanceSystem}
+            onSetArticulationSystem={onSetArticulationSystem}
+            onApplyMelodyContourSystem={onApplyMelodyContourSystem}
+            onClearMelodySystem={onClearMelodySystem}
           />
         );
       })}

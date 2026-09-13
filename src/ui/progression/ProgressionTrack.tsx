@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/project/project";
 import type { AudioProviderState } from "../../audio/contracts";
-import type { StepPerformance } from "../../domain/progression/step";
+import type { PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
@@ -85,6 +85,25 @@ export function ProgressionTrack({
   onSetMeasuresPerSystem,
   onDuplicateSystem,
   onDeleteSystem,
+  isSystemLooping,
+  isSystemMuted,
+  isSystemSolo,
+  canPasteSystem,
+  onPlayFromSystem,
+  onToggleLoopSystem,
+  onToggleMuteSystem,
+  onToggleSoloSystem,
+  onMoveSystemUp,
+  onMoveSystemDown,
+  onCopySystem,
+  onPasteSystemAfter,
+  onInsertEmptySystemAfter,
+  onOctaveUpSystem,
+  onOctaveDownSystem,
+  onResetPerformanceSystem,
+  onSetArticulationSystem,
+  onApplyMelodyContourSystem,
+  onClearMelodySystem,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -121,6 +140,25 @@ export function ProgressionTrack({
   readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
   readonly onDuplicateSystem?: (system: ScoreSystem) => void;
   readonly onDeleteSystem?: (system: ScoreSystem) => void;
+  readonly isSystemLooping?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemMuted?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly isSystemSolo?: ((system: ScoreSystem) => boolean) | undefined;
+  readonly canPasteSystem?: boolean | undefined;
+  readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -649,6 +687,25 @@ export function ProgressionTrack({
               {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
               {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
               {...(onDeleteSystem ? { onDeleteSystem } : {})}
+              {...(isSystemLooping ? { isSystemLooping } : {})}
+              {...(isSystemMuted ? { isSystemMuted } : {})}
+              {...(isSystemSolo ? { isSystemSolo } : {})}
+              {...(canPasteSystem !== undefined ? { canPasteSystem } : {})}
+              {...(onPlayFromSystem ? { onPlayFromSystem } : {})}
+              {...(onToggleLoopSystem ? { onToggleLoopSystem } : {})}
+              {...(onToggleMuteSystem ? { onToggleMuteSystem } : {})}
+              {...(onToggleSoloSystem ? { onToggleSoloSystem } : {})}
+              {...(onMoveSystemUp ? { onMoveSystemUp } : {})}
+              {...(onMoveSystemDown ? { onMoveSystemDown } : {})}
+              {...(onCopySystem ? { onCopySystem } : {})}
+              {...(onPasteSystemAfter ? { onPasteSystemAfter } : {})}
+              {...(onInsertEmptySystemAfter ? { onInsertEmptySystemAfter } : {})}
+              {...(onOctaveUpSystem ? { onOctaveUpSystem } : {})}
+              {...(onOctaveDownSystem ? { onOctaveDownSystem } : {})}
+              {...(onResetPerformanceSystem ? { onResetPerformanceSystem } : {})}
+              {...(onSetArticulationSystem ? { onSetArticulationSystem } : {})}
+              {...(onApplyMelodyContourSystem ? { onApplyMelodyContourSystem } : {})}
+              {...(onClearMelodySystem ? { onClearMelodySystem } : {})}
             />
           </>
         ) : (

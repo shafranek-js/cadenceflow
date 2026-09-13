@@ -52,6 +52,7 @@ export interface PlaybackSessionParams {
   readonly startingStepIndex?: number | undefined;
   readonly harmonyTrack?: HarmonyTrackSettings | undefined;
   readonly melodyTrack?: MelodyTrackSettings | undefined;
+  readonly mutedStepIds?: ReadonlySet<string> | undefined;
 }
 
 interface StepTimeBoundary {
@@ -364,10 +365,23 @@ export class PlaybackController {
     const harmonySolo = params.harmonyTrack?.solo === true;
     const melodySolo = params.melodyTrack?.solo === true;
     const hasSoloTrack = harmonySolo || melodySolo;
-    const audioEvents: AudioNoteEvent[] = [
+    const rawAudioEvents: AudioNoteEvent[] = [
       ...(harmonyEnabled && (!hasSoloTrack || harmonySolo) ? activePianoEvents : []),
       ...(melodyEnabled && (!hasSoloTrack || melodySolo) ? activeMelodyEvents : []),
     ];
+    const audioEvents =
+      params.mutedStepIds && params.mutedStepIds.size > 0
+        ? rawAudioEvents.filter((event) => {
+            if (event.sourceStepId) {
+              return !params.mutedStepIds!.has(event.sourceStepId);
+            }
+            if (typeof event.stepIndex === "number") {
+              const step = activeSteps[event.stepIndex - sliceStart];
+              return !step || !params.mutedStepIds!.has(step.id);
+            }
+            return true;
+          })
+        : rawAudioEvents;
     const boundaries: StepTimeBoundary[] = [];
 
     for (let i = 0; i < activeSteps.length; i++) {

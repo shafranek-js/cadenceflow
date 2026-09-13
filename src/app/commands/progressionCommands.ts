@@ -12,7 +12,7 @@ import { musicalDuration, type MusicalDuration } from "../../domain/timing/durat
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
-import { snapshotChordMelodyRecipe } from "../../domain/melody/types";
+import { snapshotChordMelodyRecipe, type ChordMelodyRecipe } from "../../domain/melody/types";
 import type { AppliedCommand, ProjectCommand } from ".";
 
 function updateProgression(project: Project, progression: Progression, nowIso: string): Project {
@@ -462,6 +462,126 @@ export function duplicateSteps(project: Project, command: DuplicateStepsCommand)
   return withInverse(
     project,
     Object.freeze({ ...project.progression, steps }),
+    command.payload.nowIso,
+  );
+}
+
+export interface ReorderStepsPayload {
+  readonly steps: readonly ProgressionStep[];
+  readonly nowIso: string;
+}
+export type ReorderStepsCommand = ProjectCommand<ReorderStepsPayload> & {
+  readonly type: "progression/reorder-steps";
+};
+/** Replaces the full step order in My Progression with a reordered sequence. */
+export function reorderSteps(project: Project, command: ReorderStepsCommand): AppliedCommand {
+  if (command.payload.steps.length !== project.progression.steps.length) {
+    throw new Error(
+      `Reordered step count (${command.payload.steps.length}) must match current step count (${project.progression.steps.length})`,
+    );
+  }
+  const currentIds = new Set(project.progression.steps.map((s) => s.id));
+  for (const s of command.payload.steps) {
+    if (!currentIds.has(s.id)) {
+      throw new Error(`Step ${s.id} does not exist in current progression`);
+    }
+  }
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze([...command.payload.steps]) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface InsertStepsAfterPayload {
+  readonly afterStepId: string;
+  readonly steps: readonly ProgressionStep[];
+  readonly nowIso: string;
+}
+export type InsertStepsAfterCommand = ProjectCommand<InsertStepsAfterPayload> & {
+  readonly type: "progression/insert-steps-after";
+};
+/** Inserts arbitrary steps immediately after a given step ID. */
+export function insertStepsAfter(
+  project: Project,
+  command: InsertStepsAfterCommand,
+): AppliedCommand {
+  const index = project.progression.steps.findIndex(
+    (step) => step.id === command.payload.afterStepId,
+  );
+  if (index === -1) {
+    throw new Error(`Step ${command.payload.afterStepId} not found in progression`);
+  }
+  const current = [...project.progression.steps];
+  current.splice(index + 1, 0, ...command.payload.steps);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(current) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface StepPatch {
+  readonly performance?: Partial<StepPerformance>;
+  readonly melody?: ChordMelodyRecipe | null;
+}
+
+export interface BatchPatchStepsPayload {
+  readonly updates: ReadonlyArray<{
+    readonly stepId: string;
+    readonly patch: StepPatch;
+  }>;
+  readonly nowIso: string;
+}
+export type BatchPatchStepsCommand = ProjectCommand<BatchPatchStepsPayload> & {
+  readonly type: "progression/batch-patch-steps";
+};
+/** Applies performance and/or melody patches across an arbitrary set of steps. */
+export function batchPatchSteps(
+  project: Project,
+  command: BatchPatchStepsCommand,
+): AppliedCommand {
+  const patchMap = new Map(command.payload.updates.map((u) => [u.stepId, u.patch]));
+  const steps = project.progression.steps.map((step) => {
+    const patch = patchMap.get(step.id);
+    if (!patch || step.kind !== "chord") return step;
+
+    let updatedPerformance = step.performance;
+    if (patch.performance) {
+      updatedPerformance = Object.freeze({
+        ...step.performance,
+        ...patch.performance,
+        bass: patch.performance.bass
+          ? Object.freeze({ ...patch.performance.bass })
+          : step.performance.bass,
+        perNoteVelocityOverrides: patch.performance.perNoteVelocityOverrides
+          ? Object.freeze({ ...patch.performance.perNoteVelocityOverrides })
+          : step.performance.perNoteVelocityOverrides,
+        ...(patch.performance.manualVoicing
+          ? { manualVoicing: Object.freeze([...patch.performance.manualVoicing]) }
+          : {}),
+      });
+    }
+
+    let updatedMelody = step.melody;
+    if (patch.melody === null) {
+      updatedMelody = undefined;
+    } else if (patch.melody !== undefined) {
+      updatedMelody = snapshotChordMelodyRecipe(patch.melody);
+    }
+
+    const { melody: _prevMelody, ...rest } = step;
+    const updatedChord: ChordStep = Object.freeze({
+      ...rest,
+      performance: updatedPerformance,
+      ...(updatedMelody !== undefined ? { melody: updatedMelody } : {}),
+    });
+    return updatedChord;
+  });
+
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
     command.payload.nowIso,
   );
 }
