@@ -56,6 +56,7 @@ import { BranchComparison } from "../ui/progression/BranchComparison";
 import { BranchControls } from "../ui/progression/BranchControls";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
+import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
 import { RestStepInspector } from "../ui/inspector/RestStepInspector";
@@ -70,6 +71,7 @@ import { realizeProgressionStepPitches } from "../instruments/piano/profile";
 import { PlaybackSupportControls, TempoControls } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
 import { TransportStore, type TransportState } from "../ui/transport/transportStore";
+import { isAppShortcutProtectedTarget } from "../ui/studio/focusManagement";
 import {
   INITIAL_LOOP_STATE,
   revalidateLoopState,
@@ -153,7 +155,7 @@ import {
 } from "./commands/progressionCommands";
 import { projectScoreSystems, type ScoreSystem } from "../notation/scoreSystemProjection";
 import { durationBars } from "../domain/timing/duration";
-import { snapshotChordMelodyRecipe } from "../domain/melody/types";
+import { snapshotChordMelodyRecipe, validateChordMelodyRecipe } from "../domain/melody/types";
 import {
   saveCustomPreset,
   deleteCustomPreset,
@@ -220,6 +222,7 @@ import type {
   ChordMelodyRecipe,
   MelodyGrid,
   MelodyInstrument,
+  MelodyPitchMotion,
   MelodyTrackSettings,
 } from "../domain/melody/types";
 import type { HarmonyTrackSettings } from "../domain/harmony/track";
@@ -1281,6 +1284,33 @@ export function App() {
     store.dispatch(command, insertStepsAfter);
   };
 
+  const insertRestAfterSystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    const afterStepId =
+      stepIds[stepIds.length - 1] ??
+      project.progression.steps[project.progression.steps.length - 1]?.id;
+    if (!afterStepId) {
+      addRest();
+      return;
+    }
+    const restStep: RestStep = Object.freeze({
+      id: crypto.randomUUID(),
+      kind: "rest",
+      duration: durationBars(1, project.globalTiming.meter),
+    });
+    const command: InsertStepsAfterCommand = {
+      type: "progression/insert-steps-after",
+      payload: { afterStepId, steps: [restStep], nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, insertStepsAfter);
+  };
+
+  const exploreAlternativeFromSystem = (system: ScoreSystem) => {
+    const stepIds = getSystemStepIds(system);
+    const lastStepId = stepIds[stepIds.length - 1];
+    startExploration(lastStepId);
+  };
+
   const shiftOctaveSystem = (system: ScoreSystem, direction: StaffOctaveDirection) => {
     const stepIds = getSystemStepIds(system);
     const updates: Array<{ stepId: string; patch: StepPatch }> = [];
@@ -1347,12 +1377,28 @@ export function App() {
     store.dispatch(command, batchPatchSteps);
   };
 
-  const applyMelodyContourSystem = (system: ScoreSystem, recipe: ChordMelodyRecipe) => {
+  const applyMelodyContourSystem = (system: ScoreSystem, motion: MelodyPitchMotion) => {
     const stepIds = getSystemStepIds(system);
+    const existingStepWithMelody = stepIds
+      .map((id) => project.progression.steps.find((s) => s.id === id))
+      .find((s): s is ChordStep => Boolean(s && s.kind === "chord" && s.melody !== undefined));
+    const fallbackGrid = existingStepWithMelody?.melody
+      ? validateChordMelodyRecipe(existingStepWithMelody.melody).grid
+      : "eighth";
+
     const updates = stepIds.flatMap((id) => {
       const step = project.progression.steps.find((s) => s.id === id);
       if (step && step.kind === "chord") {
-        return [{ stepId: id, patch: { melody: recipe } }];
+        const newMelody: ChordMelodyRecipe = step.melody
+          ? { ...validateChordMelodyRecipe(step.melody), pitchMotion: motion }
+          : {
+              pitchMotion: motion,
+              rhythm: "even",
+              connection: "retrigger",
+              grid: fallbackGrid,
+              octaveOffset: 0,
+            };
+        return [{ stepId: id, patch: { melody: newMelody } }];
       }
       return [];
     });
@@ -1370,8 +1416,14 @@ export function App() {
       const step = project.progression.steps.find((s) => s.id === id);
       if (step && step.kind === "chord") {
         const newMelody: ChordMelodyRecipe = step.melody
-          ? { ...step.melody, grid }
-          : { pattern: "up", grid, octaveOffset: 0 };
+          ? { ...validateChordMelodyRecipe(step.melody), grid }
+          : {
+              pitchMotion: "up",
+              rhythm: "even",
+              connection: "retrigger",
+              grid,
+              octaveOffset: 0,
+            };
         return [{ stepId: id, patch: { melody: newMelody } }];
       }
       return [];
@@ -1399,6 +1451,164 @@ export function App() {
       payload: { updates, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, batchPatchSteps);
+  };
+
+  const [progressionMenu, setProgressionMenu] = useState<{
+    anchor?: HTMLElement | undefined;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleProgressionHeadingContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, select, input, textarea, a")) {
+      return;
+    }
+    event.preventDefault();
+    setProgressionMenu({
+      anchor: event.currentTarget,
+      position: { x: event.clientX, y: event.clientY },
+    });
+  };
+
+  const shiftOctaveAll = (direction: StaffOctaveDirection) => {
+    const updates: Array<{ stepId: string; patch: StepPatch }> = [];
+    for (const step of project.progression.steps) {
+      if (step.kind === "chord") {
+        const patch = performanceOctaveShiftPatch(step.performance, direction);
+        if (patch) {
+          updates.push({ stepId: step.id, patch: { performance: patch } });
+        }
+      }
+    }
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const applyMelodyContourAll = (motion: MelodyPitchMotion) => {
+    const existingStepWithMelody = project.progression.steps.find(
+      (s): s is ChordStep => Boolean(s && s.kind === "chord" && s.melody !== undefined),
+    );
+    const fallbackGrid = existingStepWithMelody?.melody
+      ? validateChordMelodyRecipe(existingStepWithMelody.melody).grid
+      : "eighth";
+
+    const updates = project.progression.steps.flatMap((step) => {
+      if (step.kind === "chord") {
+        const newMelody: ChordMelodyRecipe = step.melody
+          ? { ...validateChordMelodyRecipe(step.melody), pitchMotion: motion }
+          : {
+              pitchMotion: motion,
+              rhythm: "even",
+              connection: "retrigger",
+              grid: fallbackGrid,
+              octaveOffset: 0,
+            };
+        return [{ stepId: step.id, patch: { melody: newMelody } }];
+      }
+      return [];
+    });
+
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const setMelodyGridAll = (grid: MelodyGrid) => {
+    const existingStepWithMelody = project.progression.steps.find(
+      (s): s is ChordStep => Boolean(s && s.kind === "chord" && s.melody !== undefined),
+    );
+    const fallbackMotion = existingStepWithMelody?.melody
+      ? validateChordMelodyRecipe(existingStepWithMelody.melody).pitchMotion
+      : "up";
+
+    const updates = project.progression.steps.flatMap((step) => {
+      if (step.kind === "chord") {
+        const newMelody: ChordMelodyRecipe = step.melody
+          ? { ...validateChordMelodyRecipe(step.melody), grid }
+          : {
+              pitchMotion: fallbackMotion,
+              rhythm: "even",
+              connection: "retrigger",
+              grid,
+              octaveOffset: 0,
+            };
+        return [{ stepId: step.id, patch: { melody: newMelody } }];
+      }
+      return [];
+    });
+
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const clearMelodyAll = () => {
+    const updates = project.progression.steps.flatMap((step) => {
+      if (step.kind === "chord" && step.melody !== undefined) {
+        return [{ stepId: step.id, patch: { melody: null } }];
+      }
+      return [];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const setArticulationAll = (articulation: PianoArticulation) => {
+    batchEditProgressionPerformance({ articulation });
+  };
+
+  const duplicateAllSteps = () => {
+    if (project.progression.steps.length === 0) return;
+    const command: DuplicateStepsCommand = {
+      type: "progression/duplicate-steps",
+      payload: {
+        steps: project.progression.steps,
+        nowIso: new Date().toISOString(),
+      },
+    };
+    store.dispatch(command, duplicateSteps);
+  };
+
+  const clearAllProgressionSteps = () => {
+    if (project.progression.steps.length === 0) return;
+    const command: RemoveStepsCommand = {
+      type: "progression/remove-steps",
+      payload: {
+        stepIds: project.progression.steps.map((s) => s.id),
+        nowIso: new Date().toISOString(),
+      },
+    };
+    store.dispatch(command, removeSteps);
+  };
+
+  const unmuteAllSystems = () => {
+    setMutedSystemIndices(new Set());
+  };
+
+  const clearAllSolos = () => {
+    setSoloSystemIndex(null);
+  };
+
+  const toggleLoopProgression = () => {
+    if (loopState.enabled && loopState.mode === "all") {
+      handleSetLoopMode("disabled");
+    } else {
+      handleSetLoopMode("all");
+    }
   };
 
   const isSystemLooping = (system: ScoreSystem): boolean => {
@@ -1742,7 +1952,8 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.repeat && !e.defaultPrevented) {
+      const shortcutProtected = isAppShortcutProtectedTarget(e.target);
+      if (e.key === "Escape" && !shortcutProtected && !e.repeat && !e.defaultPrevented) {
         if (
           voicingEditorOpen ||
           presetsPanelOpen ||
@@ -1765,6 +1976,8 @@ export function App() {
           return;
         }
       }
+
+      if (shortcutProtected) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
         if (store.canUndo) {
@@ -1944,6 +2157,52 @@ export function App() {
       if (fallbackId) void handleOpenProject(fallbackId);
     }
   };
+
+  const chordStepsAll = project.progression.steps.filter(
+    (s): s is ChordStep => s.kind === "chord",
+  );
+  const canShiftOctaveUpAll = chordStepsAll.some(
+    (s) => performanceOctaveShiftPatch(s.performance, 1) !== null,
+  );
+  const canShiftOctaveDownAll = chordStepsAll.some(
+    (s) => performanceOctaveShiftPatch(s.performance, -1) !== null,
+  );
+  const currentArticulationAll =
+    chordStepsAll.length > 0 &&
+    chordStepsAll.every(
+      (s) => s.performance.articulation === chordStepsAll[0]?.performance.articulation,
+    )
+      ? chordStepsAll[0]?.performance.articulation
+      : undefined;
+
+  const melodyStepsAll = chordStepsAll.filter((s) => s.melody !== undefined);
+  const hasMelodyAll = melodyStepsAll.length > 0;
+  const currentPitchMotionAll =
+    hasMelodyAll &&
+    melodyStepsAll.every((s) => {
+      const motion =
+        s.melody?.pitchMotion ??
+        (s.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      const firstMotion =
+        melodyStepsAll[0]?.melody?.pitchMotion ??
+        (melodyStepsAll[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      return motion === firstMotion;
+    })
+      ? (melodyStepsAll[0]?.melody?.pitchMotion ??
+        (melodyStepsAll[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern)
+      : undefined;
+
+  const currentGridAll =
+    hasMelodyAll &&
+    melodyStepsAll.every((s) => s.melody?.grid === melodyStepsAll[0]?.melody?.grid)
+      ? melodyStepsAll[0]?.melody?.grid
+      : undefined;
+
+  const progressionMeasureLayout = createProgressionMeasureLayout(
+    project.progression.steps,
+    project.globalTiming.meter,
+  );
+  const progressionMeasureCount = progressionMeasureLayout.measures.length;
 
   if (!projectReady) {
     return (
@@ -2216,7 +2475,11 @@ export function App() {
       onMatrixBackgroundClick={clearMatrixSelection}
       progression={
         <>
-          <div className="progression-heading">
+          <div
+            className="progression-heading"
+            data-testid="progression-heading"
+            onContextMenu={handleProgressionHeadingContextMenu}
+          >
             <div className="progression-title-group">
               <h2>My Progression</h2>
               <div className="progression-preset-actions">
@@ -2340,6 +2603,8 @@ export function App() {
             onCopySystem={copySystem}
             onPasteSystemAfter={pasteSystemAfter}
             onInsertEmptySystemAfter={insertEmptySystemAfter}
+            onInsertRestAfterSystem={insertRestAfterSystem}
+            onExploreAlternativeFromSystem={exploreAlternativeFromSystem}
             onOctaveUpSystem={(sys) => shiftOctaveSystem(sys, 1)}
             onOctaveDownSystem={(sys) => shiftOctaveSystem(sys, -1)}
             onResetPerformanceSystem={resetPerformanceSystem}
@@ -2347,6 +2612,9 @@ export function App() {
             onApplyMelodyContourSystem={applyMelodyContourSystem}
             onSetMelodyGridSystem={setMelodyGridSystem}
             onClearMelodySystem={clearMelodySystem}
+            onOpenProgressionMenu={(anchor, pos) =>
+              setProgressionMenu({ anchor, position: pos })
+            }
           />
           <BranchComparison
             project={project}
@@ -2416,6 +2684,50 @@ export function App() {
             onClose={() => setSavePresetDialogOpen(false)}
             onSave={handleSaveCustomPreset}
           />
+          {progressionMenu ? (
+            <ProgressionContextMenu
+              position={progressionMenu.position}
+              invoker={progressionMenu.anchor}
+              measureCount={progressionMeasureCount}
+              stepCount={project.progression.steps.length}
+              chordStepCount={chordStepsAll.length}
+              isLooping={loopState.enabled && loopState.mode === "all"}
+              hasMutedSystems={mutedSystemIndices.size > 0}
+              hasSoloSystems={soloSystemIndex !== null}
+              canShiftOctaveUp={canShiftOctaveUpAll}
+              canShiftOctaveDown={canShiftOctaveDownAll}
+              currentArticulation={currentArticulationAll}
+              currentPitchMotion={currentPitchMotionAll}
+              currentGrid={currentGridAll}
+              hasMelody={hasMelodyAll}
+              measuresPerSystem={
+                project.presentation.progressionView === "staff"
+                  ? project.presentation.measuresPerSystem
+                  : undefined
+              }
+              steps={project.progression.steps}
+              onStartBranch={startExploration}
+              isBranchActive={Boolean(project.temporaryBranch)}
+              onCommitBranch={commitWhole}
+              onDiscardBranch={discard}
+              onPlayFromBeginning={handlePlay}
+              onToggleLoop={toggleLoopProgression}
+              onUnmuteAll={unmuteAllSystems}
+              onClearSolos={clearAllSolos}
+              onOctaveUp={() => shiftOctaveAll(1)}
+              onOctaveDown={() => shiftOctaveAll(-1)}
+              onResetPerformance={resetAllProgressionPerformance}
+              onSetArticulation={setArticulationAll}
+              onApplyMelodyContour={applyMelodyContourAll}
+              onSetMelodyGrid={setMelodyGridAll}
+              onClearMelody={clearMelodyAll}
+              onSetMeasuresPerSystem={changeMeasuresPerSystem}
+              onDuplicateAllSteps={duplicateAllSteps}
+              onAddRest={() => addRest()}
+              onClearAllSteps={clearAllProgressionSteps}
+              onClose={() => setProgressionMenu(null)}
+            />
+          ) : null}
         </>
       }
     />

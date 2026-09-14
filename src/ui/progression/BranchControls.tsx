@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import type { ChangeEvent } from "react";
 import type { Project } from "../../domain/project/project";
 import { Icon } from "../common/Icon";
 
@@ -9,7 +9,7 @@ function stepLabel(step: Project["progression"]["steps"][number], index: number)
 export function BranchControls({
   project,
   selectedBranchStepIds,
-  onStart,
+  onStart: _onStart,
   onRejoin,
   onCommitWhole,
   onCommitSelected,
@@ -17,34 +17,15 @@ export function BranchControls({
 }: {
   readonly project: Project;
   readonly selectedBranchStepIds: readonly string[];
-  readonly onStart: (originStepId?: string) => void;
+  readonly onStart?: ((originStepId?: string) => void) | undefined;
   readonly onRejoin: (rejoinStepId?: string) => void;
   readonly onCommitWhole: () => void;
   readonly onCommitSelected: () => void;
   readonly onDiscard: () => void;
 }) {
-  const [origin, setOrigin] = useState("end");
   const branch = project.temporaryBranch;
   if (!branch) {
-    return (
-      <div className="branch-controls">
-        <select
-          aria-label="Branch origin"
-          value={origin}
-          onChange={(event: ChangeEvent<HTMLSelectElement>) => setOrigin(event.target.value)}
-        >
-          <option value="end">At progression end</option>
-          {project.progression.steps.map((step, index) => (
-            <option key={step.id} value={step.id}>
-              After {stepLabel(step, index)}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={() => onStart(origin === "end" ? undefined : origin)}>
-          Explore Alternative
-        </button>
-      </div>
-    );
+    return null;
   }
   const originIndex = branch.originAtEnd
     ? project.progression.steps.length - 1

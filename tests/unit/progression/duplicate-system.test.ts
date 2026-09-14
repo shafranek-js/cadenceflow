@@ -80,7 +80,9 @@ describe("duplicateSteps command", () => {
     const chord: ChordStep = {
       ...createMatrixChordStep(project, "V", "chord-1"),
       melody: {
-        pattern: "up",
+        pitchMotion: "up",
+        rhythm: "even",
+        connection: "retrigger",
         grid: "eighth",
         octaveOffset: 1,
       },

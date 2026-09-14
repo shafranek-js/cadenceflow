@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -8,7 +9,7 @@ import {
 import { createPortal } from "react-dom";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import type { PianoArticulation } from "../../domain/progression/step";
-import type { ChordMelodyRecipe, MelodyGrid } from "../../domain/melody/types";
+import type { ChordMelodyRecipe, MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { MELODY_GRID_LABELS } from "../melody/labels";
 
 export interface ScoreSystemMenuPosition {
@@ -39,11 +40,14 @@ export interface ScoreSystemContextMenuProps {
   readonly onCopy?: (() => void) | undefined;
   readonly onPasteAfter?: (() => void) | undefined;
   readonly onInsertEmptyAfter?: (() => void) | undefined;
+  readonly onInsertRestAfter?: (() => void) | undefined;
+  readonly onExploreAlternative?: (() => void) | undefined;
   readonly onOctaveUp?: (() => void) | undefined;
   readonly onOctaveDown?: (() => void) | undefined;
   readonly onResetPerformance?: (() => void) | undefined;
   readonly onSetArticulation?: ((articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContour?: ((recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onApplyMelodyContour?: ((motion: MelodyPitchMotion) => void) | undefined;
+  readonly currentPitchMotion?: MelodyPitchMotion | undefined;
   readonly onSetMelodyGrid?: ((grid: MelodyGrid) => void) | undefined;
   readonly currentGrid?: MelodyGrid | undefined;
   readonly onClearMelody?: (() => void) | undefined;
@@ -59,11 +63,46 @@ const ARTICULATIONS: ReadonlyArray<{ id: PianoArticulation; label: string }> = [
   { id: "broken-chord", label: "Broken Chord" },
 ];
 
-const MELODY_CONTOURS: ReadonlyArray<{ id: string; label: string; recipe: ChordMelodyRecipe }> = [
-  { id: "up-8th", label: "Ascending (1/8)", recipe: { pattern: "up", grid: "eighth", octaveOffset: 0 } },
-  { id: "down-8th", label: "Descending (1/8)", recipe: { pattern: "down", grid: "eighth", octaveOffset: 0 } },
-  { id: "wave-8th", label: "Up & Down (1/8)", recipe: { pattern: "up-down", grid: "eighth", octaveOffset: 0 } },
-  { id: "inside-out-16th", label: "Inside-Out (1/16)", recipe: { pattern: "inside-out", grid: "sixteenth", octaveOffset: 0 } },
+export interface MelodyContourItem {
+  readonly id: MelodyPitchMotion;
+  readonly label: string;
+}
+
+export interface MelodyContourGroup {
+  readonly id: string;
+  readonly label: string;
+  readonly items: readonly MelodyContourItem[];
+}
+
+export const MELODY_CONTOUR_GROUPS: readonly MelodyContourGroup[] = [
+  {
+    id: "directional",
+    label: "Directional",
+    items: [
+      { id: "up", label: "Ascending (Up)" },
+      { id: "down", label: "Descending (Down)" },
+      { id: "up-down", label: "Up & Down" },
+      { id: "down-up", label: "Down & Up" },
+    ],
+  },
+  {
+    id: "shapes",
+    label: "Shapes",
+    items: [
+      { id: "outside-in", label: "Outside In" },
+      { id: "inside-out", label: "Inside Out" },
+    ],
+  },
+  {
+    id: "pedal-and-alternating",
+    label: "Pedal & Alternating",
+    items: [
+      { id: "repeat-root", label: "Repeat Root" },
+      { id: "repeat-top", label: "Repeat Top" },
+      { id: "alternate-root-up", label: "Alternate Root / Up" },
+      { id: "alternate-top-down", label: "Alternate Top / Down" },
+    ],
+  },
 ];
 
 const MELODY_GRIDS: ReadonlyArray<MelodyGrid> = [
@@ -97,11 +136,14 @@ export function ScoreSystemContextMenu({
   onCopy,
   onPasteAfter,
   onInsertEmptyAfter,
+  onInsertRestAfter,
+  onExploreAlternative,
   onOctaveUp,
   onOctaveDown,
   onResetPerformance,
   onSetArticulation,
   onApplyMelodyContour,
+  currentPitchMotion,
   onSetMelodyGrid,
   currentGrid,
   onClearMelody,
@@ -158,6 +200,41 @@ export function ScoreSystemContextMenu({
       invoker.focus();
     };
   }, [invoker, onClose, activeSubmenu]);
+
+  useEffect(() => {
+    if (activeSubmenu && submenuRef.current) {
+      const firstBtn = submenuRef.current.querySelector<HTMLButtonElement>("button:not(:disabled)");
+      firstBtn?.focus();
+    }
+  }, [activeSubmenu]);
+
+  const handleSubmenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!submenuRef.current) return;
+    const items = Array.from(
+      submenuRef.current.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+    );
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      event.stopPropagation();
+      const next = items[(currentIndex + 1) % items.length];
+      next?.focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      event.stopPropagation();
+      const prev = items[(currentIndex - 1 + items.length) % items.length];
+      prev?.focus();
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      event.stopPropagation();
+      const currentSubmenu = activeSubmenu;
+      setActiveSubmenu(null);
+      const triggerBtn = itemRefs.current.find(
+        (btn) => btn?.getAttribute("data-has-submenu") === currentSubmenu,
+      );
+      triggerBtn?.focus();
+    }
+  };
 
   const focusItem = (index: number) => {
     const enabledItems = itemRefs.current.filter(
@@ -245,6 +322,8 @@ export function ScoreSystemContextMenu({
     return null;
   }
 
+  let btnIndex = 0;
+
   return createPortal(
     <>
       <div
@@ -260,7 +339,7 @@ export function ScoreSystemContextMenu({
       {/* 1. Playback & Rehearsal */}
       {onPlayFromHere ? (
         <button
-          ref={registerRef(0)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-play-from-here"
@@ -278,7 +357,7 @@ export function ScoreSystemContextMenu({
 
       {onToggleLoop ? (
         <button
-          ref={registerRef(1)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-toggle-loop"
@@ -296,7 +375,7 @@ export function ScoreSystemContextMenu({
 
       {onToggleMute ? (
         <button
-          ref={registerRef(2)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-toggle-mute"
@@ -314,7 +393,7 @@ export function ScoreSystemContextMenu({
 
       {onToggleSolo ? (
         <button
-          ref={registerRef(3)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-toggle-solo"
@@ -335,7 +414,7 @@ export function ScoreSystemContextMenu({
       {/* 2. Structure & Arrangement */}
       {onMoveUp ? (
         <button
-          ref={registerRef(4)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!canMoveUp}
@@ -351,7 +430,7 @@ export function ScoreSystemContextMenu({
 
       {onMoveDown ? (
         <button
-          ref={registerRef(5)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!canMoveDown}
@@ -366,7 +445,7 @@ export function ScoreSystemContextMenu({
       ) : null}
 
       <button
-        ref={registerRef(6)}
+        ref={registerRef(btnIndex++)}
         type="button"
         role="menuitem"
         data-testid="score-system-duplicate"
@@ -380,7 +459,7 @@ export function ScoreSystemContextMenu({
 
       {onCopy ? (
         <button
-          ref={registerRef(7)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-copy"
@@ -395,7 +474,7 @@ export function ScoreSystemContextMenu({
 
       {onPasteAfter ? (
         <button
-          ref={registerRef(8)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!canPaste}
@@ -411,7 +490,7 @@ export function ScoreSystemContextMenu({
 
       {onInsertEmptyAfter ? (
         <button
-          ref={registerRef(9)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-insert-empty-after"
@@ -424,12 +503,42 @@ export function ScoreSystemContextMenu({
         </button>
       ) : null}
 
+      {onInsertRestAfter ? (
+        <button
+          ref={registerRef(btnIndex++)}
+          type="button"
+          role="menuitem"
+          data-testid="score-system-insert-rest"
+          onClick={() => {
+            onInsertRestAfter();
+            onClose();
+          }}
+        >
+          Insert Rest After System
+        </button>
+      ) : null}
+
+      {onExploreAlternative ? (
+        <button
+          ref={registerRef(btnIndex++)}
+          type="button"
+          role="menuitem"
+          data-testid="score-system-explore-alternative"
+          onClick={() => {
+            onExploreAlternative();
+            onClose();
+          }}
+        >
+          Explore Alternative from System
+        </button>
+      ) : null}
+
       <div className="score-system-menu-separator" role="separator" />
 
       {/* 3. Pitch, Voicing & Articulation */}
       {onOctaveUp ? (
         <button
-          ref={registerRef(10)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!canShiftOctaveUp}
@@ -445,7 +554,7 @@ export function ScoreSystemContextMenu({
 
       {onOctaveDown ? (
         <button
-          ref={registerRef(11)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!canShiftOctaveDown}
@@ -461,7 +570,7 @@ export function ScoreSystemContextMenu({
 
       {onResetPerformance ? (
         <button
-          ref={registerRef(12)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-testid="score-system-reset-performance"
@@ -476,7 +585,7 @@ export function ScoreSystemContextMenu({
 
       {onSetArticulation ? (
         <button
-          ref={registerRef(13)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-has-submenu="articulation"
@@ -504,7 +613,7 @@ export function ScoreSystemContextMenu({
       {/* 4. Melody Layer */}
       {onApplyMelodyContour ? (
         <button
-          ref={registerRef(14)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-has-submenu="melody"
@@ -529,7 +638,7 @@ export function ScoreSystemContextMenu({
 
       {onSetMelodyGrid ? (
         <button
-          ref={registerRef(15)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           data-has-submenu="grid"
@@ -554,7 +663,7 @@ export function ScoreSystemContextMenu({
 
       {onClearMelody ? (
         <button
-          ref={registerRef(16)}
+          ref={registerRef(btnIndex++)}
           type="button"
           role="menuitem"
           disabled={!hasMelody}
@@ -573,7 +682,7 @@ export function ScoreSystemContextMenu({
         <>
           <div className="score-system-menu-separator" role="separator" />
           <button
-            ref={registerRef(17)}
+            ref={registerRef(btnIndex++)}
             type="button"
             role="menuitem"
             className="danger"
@@ -596,6 +705,7 @@ export function ScoreSystemContextMenu({
           className="melody-context-menu score-system-submenu"
           role="menu"
           aria-label="Articulation styles"
+          onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
             top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 190)),
@@ -627,26 +737,38 @@ export function ScoreSystemContextMenu({
           className="melody-context-menu score-system-submenu"
           role="menu"
           aria-label="Melody contours"
+          onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
-            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 160)),
+            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)),
           }}
           data-testid="score-system-melody-submenu"
         >
-          {MELODY_CONTOURS.map((contour) => (
-            <button
-              key={contour.id}
-              type="button"
-              role="menuitem"
-              data-testid={`score-system-melody-${contour.id}`}
-              onClick={() => {
-                onApplyMelodyContour(contour.recipe);
-                setActiveSubmenu(null);
-                onClose();
-              }}
-            >
-              {contour.label}
-            </button>
+          {MELODY_CONTOUR_GROUPS.map((group, groupIdx) => (
+            <Fragment key={group.id}>
+              {groupIdx > 0 ? <div className="score-system-menu-separator" role="separator" /> : null}
+              <div className="score-system-menu-group-header" role="presentation">{group.label}</div>
+              {group.items.map((contour) => (
+                <button
+                  key={contour.id}
+                  type="button"
+                  role="menuitem"
+                  data-testid={`score-system-melody-${contour.id}`}
+                  onClick={() => {
+                    onApplyMelodyContour(contour.id);
+                    setActiveSubmenu(null);
+                    onClose();
+                  }}
+                >
+                  <span className="score-system-menu-item-row">
+                    <span>{contour.label}</span>
+                    {currentPitchMotion === contour.id ? (
+                      <span className="score-system-menu-check">✓</span>
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </Fragment>
           ))}
         </div>
       ) : null}
@@ -658,6 +780,7 @@ export function ScoreSystemContextMenu({
           className="melody-context-menu score-system-submenu"
           role="menu"
           aria-label="Melody grids"
+          onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
             top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 180)),

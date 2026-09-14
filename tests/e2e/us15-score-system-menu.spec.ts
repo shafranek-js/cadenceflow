@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -28,7 +30,7 @@ test("score system context menu playback, loop, mute, solo actions", async ({ pa
   // Switch to Staff view and 2 measures per system
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const systems = page.locator('[data-testid="progression-score-system"]');
   await expect(systems).toHaveCount(2);
@@ -42,6 +44,8 @@ test("score system context menu playback, loop, mute, solo actions", async ({ pa
 
   await expect(menu.getByRole("menuitem", { name: "Loop System" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Play from this System" })).toBeVisible();
+  await expect(page.getByTestId("score-system-insert-rest")).toBeVisible();
+  await expect(page.getByTestId("score-system-explore-alternative")).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Mute System" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Solo System" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Move System Down" })).toBeEnabled();
@@ -83,7 +87,9 @@ test("score system context menu playback, loop, mute, solo actions", async ({ pa
   await expect(header0.locator(".score-system-status-tag.loop")).toBeVisible();
 });
 
-test("score system context menu structure actions: move, copy/paste, insert empty", async ({ page }) => {
+test("score system context menu structure actions: move, copy/paste, insert empty", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
 
@@ -101,7 +107,7 @@ test("score system context menu structure actions: move, copy/paste, insert empt
 
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const systems = page.locator('[data-testid="progression-score-system"]');
   await expect(systems).toHaveCount(2);
@@ -146,6 +152,21 @@ test("score system context menu structure actions: move, copy/paste, insert empt
   // Undo paste
   await page.keyboard.press("Control+z");
   await expect(systems).toHaveCount(2);
+
+  // 4. Insert Rest After System
+  await header0.click({ button: "right" });
+  await page.getByTestId("score-system-insert-rest").click();
+  await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(1);
+  await expect(systems).toHaveCount(3);
+  await page.keyboard.press("Control+z");
+  await expect(systems).toHaveCount(2);
+
+  // 5. Explore Alternative from System
+  await header0.click({ button: "right" });
+  await page.getByTestId("score-system-explore-alternative").click();
+  await expect(page.getByTestId("branch-controls-active")).toBeVisible();
+  await page.getByRole("button", { name: "Discard" }).click();
+  await expect(page.getByTestId("branch-controls-active")).toHaveCount(0);
 });
 
 test("score system context menu pitch, performance and submenus", async ({ page }) => {
@@ -166,7 +187,7 @@ test("score system context menu pitch, performance and submenus", async ({ page 
 
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const header0 = page.locator(".score-system-header").first();
 
@@ -188,13 +209,21 @@ test("score system context menu pitch, performance and submenus", async ({ page 
   // Undo articulation
   await page.keyboard.press("Control+z");
 
-  // 3. Open Submenu: Apply Melody Contour -> Ascending (1/8)
+  // 3. Open Submenu: Apply Melody Contour -> Ascending (Up)
   await header0.click({ button: "right" });
   const melodyItem = page.getByRole("menuitem", { name: /Apply Melody Contour/ });
   await melodyItem.hover();
-  const asc8th = page.getByRole("menuitem", { name: "Ascending (1/8)" });
-  await expect(asc8th).toBeVisible();
-  await asc8th.click();
+  const ascUp = page.getByRole("menuitem", { name: /Ascending \(Up\)/ });
+  await expect(ascUp).toBeVisible();
+  await ascUp.click();
+
+  // Re-open to verify active checkmark on Ascending (Up)
+  await header0.click({ button: "right" });
+  const melodyItem2 = page.getByRole("menuitem", { name: /Apply Melody Contour/ });
+  await melodyItem2.hover();
+  const ascUpChecked = page.getByRole("menuitem", { name: /Ascending \(Up\)/ });
+  await expect(ascUpChecked.locator(".score-system-menu-check")).toContainText("✓");
+  await page.keyboard.press("Escape");
 
   // Now Clear Melody should be enabled
   await header0.click({ button: "right" });
@@ -224,7 +253,7 @@ test("score system context menu set melody grid and checkmark", async ({ page })
 
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const header0 = page.locator(".score-system-header").first();
 
@@ -238,11 +267,21 @@ test("score system context menu set melody grid and checkmark", async ({ page })
   await expect(gridSubmenu).toBeVisible();
 
   // Check the 5 grid options are present
-  await expect(page.getByTestId("score-system-grid-quarter")).toContainText("Quarter note (1 beat)");
-  await expect(page.getByTestId("score-system-grid-eighth")).toContainText("Eighth note (1/2 beat)");
-  await expect(page.getByTestId("score-system-grid-sixteenth")).toContainText("Sixteenth note (1/4 beat)");
-  await expect(page.getByTestId("score-system-grid-eighth-triplet")).toContainText("Eighth-note triplet (1/3 beat)");
-  await expect(page.getByTestId("score-system-grid-sixteenth-triplet")).toContainText("Sixteenth-note triplet (1/6 beat)");
+  await expect(page.getByTestId("score-system-grid-quarter")).toContainText(
+    "Quarter note (1 beat)",
+  );
+  await expect(page.getByTestId("score-system-grid-eighth")).toContainText(
+    "Eighth note (1/2 beat)",
+  );
+  await expect(page.getByTestId("score-system-grid-sixteenth")).toContainText(
+    "Sixteenth note (1/4 beat)",
+  );
+  await expect(page.getByTestId("score-system-grid-eighth-triplet")).toContainText(
+    "Eighth-note triplet (1/3 beat)",
+  );
+  await expect(page.getByTestId("score-system-grid-sixteenth-triplet")).toContainText(
+    "Sixteenth-note triplet (1/6 beat)",
+  );
 
   // Select Sixteenth note (1/4 beat)
   await page.getByTestId("score-system-grid-sixteenth").click();
@@ -250,7 +289,9 @@ test("score system context menu set melody grid and checkmark", async ({ page })
   // Re-open context menu and verify checkmark appears on Sixteenth note
   await header0.click({ button: "right" });
   await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
-  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toContainText("✓");
+  await expect(
+    page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check"),
+  ).toContainText("✓");
 
   // Select Eighth note (1/2 beat)
   await page.getByTestId("score-system-grid-eighth").click();
@@ -258,13 +299,20 @@ test("score system context menu set melody grid and checkmark", async ({ page })
   // Re-open context menu and verify checkmark moved to Eighth note
   await header0.click({ button: "right" });
   await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
-  await expect(page.getByTestId("score-system-grid-eighth").locator(".score-system-menu-check")).toContainText("✓");
-  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toHaveCount(0);
+  await expect(
+    page.getByTestId("score-system-grid-eighth").locator(".score-system-menu-check"),
+  ).toContainText("✓");
+  await expect(
+    page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check"),
+  ).toHaveCount(0);
 
   // Close menu and test undo
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Control+z"); // undo to sixteenth
+  await ensureHistoryControlsVisible(page);
+  await page.getByRole("button", { name: "Undo", exact: true }).click(); // undo to sixteenth
   await header0.click({ button: "right" });
   await page.getByRole("menuitem", { name: /Set Melody Grid/ }).hover();
-  await expect(page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check")).toContainText("✓");
+  await expect(
+    page.getByTestId("score-system-grid-sixteenth").locator(".score-system-menu-check"),
+  ).toContainText("✓");
 });

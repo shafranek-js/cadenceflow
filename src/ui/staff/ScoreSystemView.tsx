@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ExactPitch } from "../../domain/harmony/pitch";
 import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
-import type { ChordMelodyRecipe, MelodyGrid } from "../../domain/melody/types";
+import type { ChordMelodyRecipe, MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -287,11 +287,13 @@ interface ScoreSystemCanvasProps {
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertRestAfterSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onExploreAlternativeFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
@@ -330,6 +332,8 @@ function ScoreSystemCanvas({
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
+  onInsertRestAfterSystem,
+  onExploreAlternativeFromSystem,
   onOctaveUpSystem,
   onOctaveDownSystem,
   onResetPerformanceSystem,
@@ -367,6 +371,15 @@ function ScoreSystemCanvas({
     melodySteps.length > 0 &&
     melodySteps.every((s) => s.melody?.grid === melodySteps[0]?.melody?.grid)
       ? melodySteps[0]?.melody?.grid
+      : undefined;
+  const currentPitchMotion =
+    melodySteps.length > 0 &&
+    melodySteps.every((s) => {
+      const motion = s.melody?.pitchMotion ?? (s.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      const firstMotion = melodySteps[0]?.melody?.pitchMotion ?? (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      return motion === firstMotion;
+    })
+      ? (melodySteps[0]?.melody?.pitchMotion ?? (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern)
       : undefined;
   const canShiftOctaveUp = chordSteps.some(
     (s) => performanceOctaveShiftPatch(s.performance, 1) !== null,
@@ -852,6 +865,14 @@ function ScoreSystemCanvas({
             onInsertEmptyAfter={
               onInsertEmptySystemAfter ? () => onInsertEmptySystemAfter(system) : undefined
             }
+            onInsertRestAfter={
+              onInsertRestAfterSystem ? () => onInsertRestAfterSystem(system) : undefined
+            }
+            onExploreAlternative={
+              onExploreAlternativeFromSystem
+                ? () => onExploreAlternativeFromSystem(system)
+                : undefined
+            }
             onOctaveUp={onOctaveUpSystem ? () => onOctaveUpSystem(system) : undefined}
             onOctaveDown={onOctaveDownSystem ? () => onOctaveDownSystem(system) : undefined}
             onResetPerformance={
@@ -864,9 +885,10 @@ function ScoreSystemCanvas({
             }
             onApplyMelodyContour={
               onApplyMelodyContourSystem
-                ? (recipe) => onApplyMelodyContourSystem(system, recipe)
+                ? (motion) => onApplyMelodyContourSystem(system, motion)
                 : undefined
             }
+            currentPitchMotion={currentPitchMotion}
             onSetMelodyGrid={
               onSetMelodyGridSystem
                 ? (grid) => onSetMelodyGridSystem(system, grid)
@@ -919,11 +941,13 @@ export interface ScoreSystemViewProps {
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertRestAfterSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onExploreAlternativeFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
@@ -961,6 +985,8 @@ export function ScoreSystemView({
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
+  onInsertRestAfterSystem,
+  onExploreAlternativeFromSystem,
   onOctaveUpSystem,
   onOctaveDownSystem,
   onResetPerformanceSystem,
@@ -975,8 +1001,7 @@ export function ScoreSystemView({
     const root = rootRef.current;
     if (!root) return;
     const update = () => {
-      const width = root.clientWidth;
-      if (width > 0) setAvailableWidthPx((current) => (current === width ? current : width));
+      setAvailableWidthPx(root.getBoundingClientRect().width);
     };
     update();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
@@ -1036,12 +1061,6 @@ export function ScoreSystemView({
       aria-label={`Staff score systems; ${measuresPerSystem === "auto" ? `Auto currently allows up to ${projection.maximumMeasuresPerSystem} measures per system` : `up to ${projection.maximumMeasuresPerSystem} measures per system`}`}
       style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%", maxWidth: "100%" }}
     >
-      {measuresPerSystem === "auto" ? (
-        <p id="progression-measures-layout-description" className="score-system-layout-description">
-          Staff Auto: up to {projection.maximumMeasuresPerSystem} measures per system for the
-          current meter; available width and notation density may reduce this count.
-        </p>
-      ) : null}
       {projection.systems.map((system) => {
         const displayWidthPx = system.horizontallyScrollable
           ? system.requiredWidthPx
@@ -1082,6 +1101,8 @@ export function ScoreSystemView({
             onCopySystem={onCopySystem}
             onPasteSystemAfter={onPasteSystemAfter}
             onInsertEmptySystemAfter={onInsertEmptySystemAfter}
+            onInsertRestAfterSystem={onInsertRestAfterSystem}
+            onExploreAlternativeFromSystem={onExploreAlternativeFromSystem}
             onOctaveUpSystem={onOctaveUpSystem}
             onOctaveDownSystem={onOctaveDownSystem}
             onResetPerformanceSystem={onResetPerformanceSystem}

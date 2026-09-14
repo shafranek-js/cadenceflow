@@ -37,10 +37,12 @@ import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
 import { MelodyTrackControls } from "../melody/MelodyTrackControls";
 import { HarmonyTrackControls } from "../harmony/HarmonyTrackControls";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
+import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 import type {
   ChordMelodyRecipe,
   MelodyGrid,
   MelodyInstrument,
+  MelodyPitchMotion,
   MelodyTrackSettings,
 } from "../../domain/melody/types";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
@@ -99,6 +101,8 @@ export function ProgressionTrack({
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
+  onInsertRestAfterSystem,
+  onExploreAlternativeFromSystem,
   onOctaveUpSystem,
   onOctaveDownSystem,
   onResetPerformanceSystem,
@@ -106,6 +110,7 @@ export function ProgressionTrack({
   onApplyMelodyContourSystem,
   onSetMelodyGridSystem,
   onClearMelodySystem,
+  onOpenProgressionMenu,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -155,13 +160,16 @@ export function ProgressionTrack({
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
+  readonly onInsertRestAfterSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onExploreAlternativeFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, recipe: ChordMelodyRecipe) => void) | undefined;
+  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onOpenProgressionMenu?: ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -316,7 +324,13 @@ export function ProgressionTrack({
     else focus();
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape" || !selectedStepId || !onClearSelection) return;
+    if (
+      isAppShortcutProtectedTarget(event.target) ||
+      event.key !== "Escape" ||
+      !selectedStepId ||
+      !onClearSelection
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
     onClearSelection();
@@ -586,12 +600,23 @@ export function ProgressionTrack({
     );
   };
 
+  const handleContextMenu = (e: MouseEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, select, input, textarea, a")) {
+      return;
+    }
+    e.preventDefault();
+    onOpenProgressionMenu?.(e.currentTarget, { x: e.clientX, y: e.clientY });
+  };
+
   return (
     <div
       ref={trackRef}
       className="progression-track"
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
     >
       <div className="progression-view-control">
         <label>
@@ -608,42 +633,6 @@ export function ProgressionTrack({
             <option value="staff">Staff</option>
           </select>
         </label>
-        {usesStaffSystems && onSetMeasuresPerSystem ? (
-          <label>
-            Measures / system
-            <select
-              aria-label="Measures Layout"
-              aria-describedby={
-                project.presentation.measuresPerSystem === "auto"
-                  ? "progression-measures-layout-description"
-                  : undefined
-              }
-              value={String(project.presentation.measuresPerSystem)}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                const value = event.target.value;
-                onSetMeasuresPerSystem(
-                  value === "auto" ? "auto" : (Number(value) as MeasuresPerSystem),
-                );
-              }}
-            >
-              <option value="auto">Auto (Responsive)</option>
-              <option value="4">4 Measures / System</option>
-              <option value="3">3 Measures / System</option>
-              <option value="2">2 Measures / System</option>
-              <option value="1">1 Measure / System (Full)</option>
-            </select>
-          </label>
-        ) : null}
-        {onAddRest ? (
-          <button
-            type="button"
-            className="add-rest-btn"
-            onClick={() => onAddRest()}
-            aria-label="Add Rest to progression"
-          >
-            <Icon name="add" /> Rest
-          </button>
-        ) : null}
       </div>
       <div
         className="progression-step-cards"
@@ -703,6 +692,8 @@ export function ProgressionTrack({
               {...(onCopySystem ? { onCopySystem } : {})}
               {...(onPasteSystemAfter ? { onPasteSystemAfter } : {})}
               {...(onInsertEmptySystemAfter ? { onInsertEmptySystemAfter } : {})}
+              {...(onInsertRestAfterSystem ? { onInsertRestAfterSystem } : {})}
+              {...(onExploreAlternativeFromSystem ? { onExploreAlternativeFromSystem } : {})}
               {...(onOctaveUpSystem ? { onOctaveUpSystem } : {})}
               {...(onOctaveDownSystem ? { onOctaveDownSystem } : {})}
               {...(onResetPerformanceSystem ? { onResetPerformanceSystem } : {})}

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { addRestToProgression, setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
 type JsonRecord = Record<string, unknown>;
 interface PortableDocument extends JsonRecord {
@@ -119,7 +120,7 @@ async function setMeter(page: Page, numerator: number, denominator: number, grou
   await page.getByLabel("Reflow").check();
   await page.getByRole("button", { name: "Apply Meter Change" }).click();
   await expect(
-    page.getByTestId("progression-score-systems").locator("svg").first(),
+    page.getByTestId("progression-score-systems").locator(".score-system-canvas > svg").first(),
   ).toHaveAttribute("data-staff-meter", `${numerator}/${denominator}`);
 }
 
@@ -158,7 +159,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await ensureHistoryControlsVisible(page);
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
 
     const progressionView = page.getByLabel("Progression Card View");
     await expect(progressionView.locator("option")).toHaveCount(3);
@@ -181,7 +182,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
       0,
     );
 
-    await page.getByLabel("Measures Layout").selectOption("2");
+    await setLayoutMeasuresPerSystem(page, 2);
     await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "2");
     const saved = await exportProject(page);
     const savedSteps = saved.progression.steps;
@@ -195,7 +196,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
 
     await importProject(page, saved, "Presentation reopen");
     await expect(page.getByLabel("Progression Card View")).toHaveValue("staff");
-    await expect(page.getByLabel("Measures Layout")).toHaveValue("2");
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "2");
     const reopened = await exportProject(page);
     expect(reopened.progression.steps).toEqual(savedSteps);
     expect(reopened.presentation.progressionView).toBe("staff");
@@ -272,13 +273,11 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await expect(normalScore.locator(".score-system")).toHaveCount(1);
     await expect(normalScore.locator(".score-system")).toHaveAttribute("data-measure-count", "4");
     await expect(normalScore.locator(".score-system-canvas > svg")).toHaveCount(1);
-    await expect(normalScore.locator("svg")).toHaveAttribute(
-      "data-staff-system-measure-count",
-      "4",
-    );
-    await expect(normalScore.locator("svg")).toHaveAttribute("data-staff-meter", "4/4");
-    await expect(normalScore.locator("svg")).toHaveAttribute("data-staff-system-clefs", "treble");
-    await expect(normalScore.locator("svg")).toHaveAttribute("data-staff-bass-entries", "");
+    const normalSvg = normalScore.locator(".score-system-canvas > svg");
+    await expect(normalSvg).toHaveAttribute("data-staff-system-measure-count", "4");
+    await expect(normalSvg).toHaveAttribute("data-staff-meter", "4/4");
+    await expect(normalSvg).toHaveAttribute("data-staff-system-clefs", "treble");
+    await expect(normalSvg).toHaveAttribute("data-staff-bass-entries", "");
     const staveLefts = await normalScore
       .locator("svg .vf-stave")
       .evaluateAll((staves) => staves.map((stave) => stave.getBoundingClientRect().left));
@@ -290,11 +289,8 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await page.getByTestId("view-menu-toggle").click();
     await expect(page.getByTestId("show-bass-in-staff")).toHaveAttribute("aria-checked", "false");
     await page.getByTestId("show-bass-in-staff").click();
-    await expect(normalScore.locator("svg")).toHaveAttribute(
-      "data-staff-system-clefs",
-      "treble,bass",
-    );
-    await expect(normalScore.locator("svg")).toHaveAttribute("data-staff-bass-entries", /dense/);
+    await expect(normalSvg).toHaveAttribute("data-staff-system-clefs", "treble,bass");
+    await expect(normalSvg).toHaveAttribute("data-staff-bass-entries", /dense/);
     await page.getByTestId("view-menu-toggle").click();
     await expect(page.getByTestId("show-bass-in-staff")).toHaveAttribute("aria-checked", "true");
 
@@ -337,7 +333,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await openStudio(page);
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     await page.getByLabel("Progression Card View").selectOption("staff");
 
     const scoreRoot = score(page);
@@ -457,7 +453,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
 
     await page.getByLabel("Progression Card View").selectOption("harmonic");
     await page.getByLabel("Progression Card View").selectOption("staff");
-    await page.getByLabel("Measures Layout").selectOption("1");
+    await setLayoutMeasuresPerSystem(page, 1);
     await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "1");
     await page.getByLabel("Progression Card View").selectOption("harmonic");
     await expect(page.getByTestId("progression-measure")).not.toHaveCount(0);
