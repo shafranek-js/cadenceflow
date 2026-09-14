@@ -181,8 +181,12 @@
 
 .score-system-view {
   display: grid;
-  gap: 16px;
-  overflow-x: clip;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--score-border);
+  border-radius: 8px;
+  background: var(--score-paper);
+  box-shadow: 0 1px 3px var(--score-shadow);
 }
 
 .progression-measure-score.score-system-card {
@@ -194,14 +198,18 @@
   color: var(--score-ink);
 }
 
+.progression-measure-score.score-system-card + .progression-measure-score.score-system-card .score-system-header {
+  border-top: 1px solid var(--score-rule);
+}
+
 .score-system {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--score-border);
-  border-radius: 12px;
+  border: 0;
+  border-radius: 0;
   background: var(--score-paper);
   color: var(--score-ink);
-  box-shadow: 0 1px 0 var(--score-shadow);
+  box-shadow: none;
 }
 
 .score-system-header {
