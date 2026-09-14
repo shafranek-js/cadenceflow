@@ -2351,7 +2351,6 @@ export function App() {
             onPerformancePatch={patchTemplatePerformance}
             onDurationChange={patchTemplateDuration}
             onReset={resetTemplate}
-            onResetCurrentModule={() => resetMatrix("current-module")}
           />
         </>
       }

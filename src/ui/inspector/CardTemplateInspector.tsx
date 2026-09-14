@@ -43,14 +43,12 @@ export function CardTemplateInspector({
   onPerformancePatch,
   onDurationChange,
   onReset,
-  onResetCurrentModule,
 }: {
   readonly project: Project;
   readonly functionId: string | null;
   readonly onPerformancePatch: (overrides: StepPerformanceOverrides) => void;
   readonly onDurationChange: (duration: MusicalDuration) => void;
   readonly onReset: () => void;
-  readonly onResetCurrentModule?: () => void;
 }) {
   const [registerOpen, setRegisterOpen] = useState(() =>
     readDisclosureState(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, true),
@@ -105,16 +103,9 @@ export function CardTemplateInspector({
                 : "Inheriting defaults · Inherited"}
           </span>
         </div>
-        <div className="inspector-header-actions">
-          {isGlobal && onResetCurrentModule ? (
-            <button type="button" onClick={onResetCurrentModule}>
-              Reset Current Module
-            </button>
-          ) : null}
-          <button type="button" disabled={isGlobal ? false : count === 0} onClick={onReset}>
-            {isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
-          </button>
-        </div>
+        <button type="button" disabled={isGlobal ? false : count === 0} onClick={onReset}>
+          {isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+        </button>
       </header>
       <details
         className="inspector-disclosure template-register-disclosure"

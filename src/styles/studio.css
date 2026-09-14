@@ -3408,13 +3408,6 @@ summary:focus-visible,
   min-width: 0;
 }
 
-.inspector-header-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
-}
-
 .card-template-inspector .inspector-context-kicker,
 .progression-global-inspector .inspector-context-kicker {
   margin-bottom: 3px;
