@@ -214,11 +214,13 @@ import {
   setStaffBassVisibility,
   setProgressionView,
   setMeasuresPerSystem,
+  setSuzukiColors,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetProgressionViewCommand,
   type SetMeasuresPerSystemCommand,
+  type SetSuzukiColorsCommand,
 } from "./commands/presentationCommands";
 import type {
   MeasuresPerSystem,
@@ -1785,6 +1787,14 @@ export function App() {
     };
     store.dispatch(command, setMeasuresPerSystem);
   };
+  const changeSuzukiColors = (enabled: boolean) => {
+    if (enabled === (project.presentation.suzukiColors ?? false)) return;
+    const command: SetSuzukiColorsCommand = {
+      type: "presentation/set-suzuki-colors",
+      payload: { enabled, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setSuzukiColors);
+  };
   const applyModuleSwitch = (
     destinationModule: HarmonicModuleId,
     resolutions: Readonly<Record<string, HarmonicFunctionIdentity | "keep-original">>,
@@ -2404,6 +2414,8 @@ export function App() {
                 onProgressionViewChange={changeProgressionView}
                 showBassInStaff={project.presentation.showBassInStaff}
                 onShowBassInStaffChange={changeStaffBassVisibility}
+                suzukiColors={project.presentation.suzukiColors ?? false}
+                onSuzukiColorsChange={changeSuzukiColors}
               />
               {globalSettingsVisibility.showThemeControl ? (
                 <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
@@ -2589,6 +2601,7 @@ export function App() {
             onSetLoopRange={handleSetLoopRange}
             onOpenPresets={() => setPresetsPanelOpen(true)}
             onSaveAsPreset={() => setSavePresetDialogOpen(true)}
+            onToggleSuzukiColors={changeSuzukiColors}
           />
         )
       }
@@ -2724,6 +2737,7 @@ export function App() {
             onSetMelodyGridSystem={setMelodyGridSystem}
             onClearMelodySystem={clearMelodySystem}
             onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
+            onToggleSuzukiColors={() => changeSuzukiColors(!(project.presentation.suzukiColors ?? false))}
           />
           <BranchComparison
             project={project}
@@ -2862,6 +2876,10 @@ export function App() {
               onSetView={globalView}
               onToggleBassInStaff={() =>
                 changeStaffBassVisibility(!project.presentation.showBassInStaff)
+              }
+              suzukiColors={project.presentation.suzukiColors ?? false}
+              onToggleSuzukiColors={() =>
+                changeSuzukiColors(!(project.presentation.suzukiColors ?? false))
               }
               onSetArticulation={(articulation) => patchTemplatePerformance({ articulation })}
               onSetRegister={(register) => patchTemplatePerformance({ register })}

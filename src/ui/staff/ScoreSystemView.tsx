@@ -300,6 +300,7 @@ interface ScoreSystemCanvasProps {
     ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleSuzukiColors?: (() => void) | undefined;
 }
 
 function ScoreSystemCanvas({
@@ -345,6 +346,7 @@ function ScoreSystemCanvas({
   onApplyMelodyContourSystem,
   onSetMelodyGridSystem,
   onClearMelodySystem,
+  onToggleSuzukiColors,
 }: ScoreSystemCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [renderedPositions, setRenderedPositions] = useState<Readonly<Record<string, number>>>({});
@@ -411,6 +413,7 @@ function ScoreSystemCanvas({
     [melodyTimeline, system.measures],
   );
   const showBass = project.presentation.showBassInStaff;
+  const suzukiColors = project.presentation.suzukiColors ?? false;
   const inputs = useMemo<readonly StaffSystemMeasureInput[]>(
     () =>
       system.measures.map((measure) => {
@@ -452,12 +455,13 @@ function ScoreSystemCanvas({
         widthPx: displayWidthPx,
         showBass,
         showTimeSignature: system.index === 0,
+        suzukiColors,
       },
     );
     return () => {
       cleanup();
     };
-  }, [inputs, project.globalTiming.meter, showBass, system.index, displayWidthPx]);
+  }, [inputs, project.globalTiming.meter, showBass, suzukiColors, system.index, displayWidthPx]);
 
   const barLengthBeats = rationalToNumber(layout.barLengthBeats);
   const systemHeight = scoreSystemHeight(systemMelodyLanes.length, showBass);
@@ -930,6 +934,8 @@ function ScoreSystemCanvas({
             }
             currentGrid={currentGrid}
             onClearMelody={onClearMelodySystem ? () => onClearMelodySystem(system) : undefined}
+            suzukiColors={suzukiColors}
+            onToggleSuzukiColors={onToggleSuzukiColors}
             onDelete={onDeleteSystem ? () => onDeleteSystem(system) : undefined}
             onClose={() => setSystemMenu(null)}
           />
@@ -986,6 +992,7 @@ export interface ScoreSystemViewProps {
     ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onToggleSuzukiColors?: (() => void) | undefined;
 }
 
 /** Responsive multi-measure Staff projection used by My Progression. */
@@ -1030,6 +1037,7 @@ export function ScoreSystemView({
   onApplyMelodyContourSystem,
   onSetMelodyGridSystem,
   onClearMelodySystem,
+  onToggleSuzukiColors,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [availableWidthPx, setAvailableWidthPx] = useState(0);
@@ -1146,6 +1154,7 @@ export function ScoreSystemView({
             onApplyMelodyContourSystem={onApplyMelodyContourSystem}
             onSetMelodyGridSystem={onSetMelodyGridSystem}
             onClearMelodySystem={onClearMelodySystem}
+            {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
           />
         );
       })}

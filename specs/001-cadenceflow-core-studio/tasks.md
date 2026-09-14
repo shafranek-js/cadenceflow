@@ -618,7 +618,7 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
 
 ## Product Backlog (not scheduled)
 
-- **T187 [Backlog] [US13+] Suzuki note colors**: Add a persisted global presentation toggle, default off,
+- [x] **T187 [Backlog] [US13+] Suzuki note colors**: Add a persisted global presentation toggle, default off,
   that decoratively colors visible noteheads using the confirmed Suzuki pitch-color mapping without
   changing musical data, playback, MIDI, or MusicXML. Colors MUST NOT be the sole accessibility cue;
   light/dark/print contrast and the exact palette plus preview/export scope MUST be fixed before work starts.

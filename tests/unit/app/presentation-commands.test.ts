@@ -4,9 +4,11 @@ import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
 import {
   setExpertiseMode,
   setStaffBassVisibility,
+  setSuzukiColors,
   setTheme,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
+  type SetSuzukiColorsCommand,
   type SetThemeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
@@ -77,6 +79,31 @@ describe("US10 presentation commands", () => {
     expect(store.project.presentation.showBassInStaff).toBe(false);
     expect(store.redo()).toBe(true);
     expect(store.project.presentation.showBassInStaff).toBe(true);
+  });
+
+  it("keeps Suzuki note colors disabled by default and supports undo/redo and inverse", () => {
+    const initial = createDefaultProject("presentation-suzuki", "Suzuki Project");
+    const store = new AppStore(initial);
+    const command: SetSuzukiColorsCommand = {
+      type: "presentation/set-suzuki-colors",
+      payload: { enabled: true, nowIso },
+    };
+
+    expect(initial.presentation.suzukiColors).toBe(false);
+    store.dispatch(command, setSuzukiColors);
+    expect(store.project.presentation.suzukiColors).toBe(true);
+    expect(store.project.progression).toBe(initial.progression);
+    expect(store.project.defaults).toBe(initial.defaults);
+    expect(store.project.tonic).toBe(initial.tonic);
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.suzukiColors).toBe(false);
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.suzukiColors).toBe(true);
+
+    const inverseResult = setSuzukiColors(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.suzukiColors).toBe(false);
   });
 
   it("provides three distinct explanation representations without changing recommendation data", () => {

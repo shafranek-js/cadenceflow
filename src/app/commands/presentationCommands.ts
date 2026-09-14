@@ -153,3 +153,34 @@ export function setMeasuresPerSystem(
     },
   };
 }
+
+export interface SetSuzukiColorsPayload {
+  readonly enabled: boolean;
+  readonly nowIso: string;
+}
+
+export type SetSuzukiColorsCommand = ProjectCommand<SetSuzukiColorsPayload> & {
+  readonly type: "presentation/set-suzuki-colors";
+};
+
+export function setSuzukiColors(
+  project: Project,
+  command: SetSuzukiColorsCommand,
+): AppliedCommand {
+  const previous = project.presentation.suzukiColors ?? false;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        suzukiColors: command.payload.enabled,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-suzuki-colors",
+      payload: { enabled: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+

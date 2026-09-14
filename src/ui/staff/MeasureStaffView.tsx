@@ -64,6 +64,7 @@ export function MeasureStaffView({
   barLengthBeats,
   selectedStepId,
   playingStepId,
+  suzukiColors,
   onSelect,
   onOctaveChange,
   onOpenMelodyMenu,
@@ -73,6 +74,7 @@ export function MeasureStaffView({
   readonly barLengthBeats: Rational;
   readonly selectedStepId: string | undefined;
   readonly playingStepId: string | undefined;
+  readonly suzukiColors?: boolean;
   readonly onSelect: (stepId: string) => void;
   readonly onOctaveChange: (stepId: string, direction: StaffOctaveDirection) => void;
   readonly onOpenMelodyMenu?: (
@@ -131,12 +133,18 @@ export function MeasureStaffView({
     let cleanup: () => void = () => undefined;
     const draw = () => {
       cleanup();
-      cleanup = renderStaffSequence(container, sequence, meter, (positions) => {
-        const next = positionRecord(positions);
-        setRenderedPositions((current) =>
-          JSON.stringify(current) === JSON.stringify(next) ? current : next,
-        );
-      });
+      cleanup = renderStaffSequence(
+        container,
+        sequence,
+        meter,
+        (positions) => {
+          const next = positionRecord(positions);
+          setRenderedPositions((current) =>
+            JSON.stringify(current) === JSON.stringify(next) ? current : next,
+          );
+        },
+        { ...(suzukiColors !== undefined ? { suzukiColors } : {}) },
+      );
     };
     draw();
     const observer =
@@ -155,7 +163,7 @@ export function MeasureStaffView({
       observer?.disconnect();
       cleanup();
     };
-  }, [hasVisibleBass, meter, sequence]);
+  }, [hasVisibleBass, meter, sequence, suzukiColors]);
 
   const visibleItems = items.filter((item) => item.kind !== "gap");
   const noteSummary = visibleItems

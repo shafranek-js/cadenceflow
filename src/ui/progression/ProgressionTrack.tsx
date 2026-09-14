@@ -105,6 +105,7 @@ export function ProgressionTrack({
   onSetMelodyGridSystem,
   onClearMelodySystem,
   onOpenProgressionMenu,
+  onToggleSuzukiColors,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -172,6 +173,7 @@ export function ProgressionTrack({
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOpenProgressionMenu?:
     ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
+  readonly onToggleSuzukiColors?: (() => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -488,6 +490,7 @@ export function ProgressionTrack({
           playing={isPlaying}
           inLoop={isInLoop}
           showBassInStaff={project.presentation.showBassInStaff}
+          suzukiColors={project.presentation.suzukiColors ?? false}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
           onRemove={() => onRemove(step.id)}
@@ -683,6 +686,7 @@ export function ProgressionTrack({
               {...(onApplyMelodyContourSystem ? { onApplyMelodyContourSystem } : {})}
               {...(onSetMelodyGridSystem ? { onSetMelodyGridSystem } : {})}
               {...(onClearMelodySystem ? { onClearMelodySystem } : {})}
+              {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
             />
           </>
         ) : (

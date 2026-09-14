@@ -14,6 +14,7 @@ export function ChordCard({
   selected,
   customizedCount,
   showBassInStaff = false,
+  suzukiColors = false,
   onSelect,
   onCtrlClickAdd,
   onAltClickReset,
@@ -24,6 +25,7 @@ export function ChordCard({
   readonly selected: boolean;
   readonly customizedCount: number;
   readonly showBassInStaff?: boolean;
+  readonly suzukiColors?: boolean;
   readonly onSelect: () => void;
   readonly onCtrlClickAdd: () => void;
   readonly onAltClickReset: () => void;
@@ -80,6 +82,7 @@ export function ChordCard({
           {...(describedBy ? { selectionDescribedBy: describedBy } : {})}
           canShiftUp={model.canRaiseStaffOctave}
           canShiftDown={model.canLowerStaffOctave}
+          suzukiColors={suzukiColors}
           onSelect={select}
           onOctaveChange={onStaffOctaveChange}
         />

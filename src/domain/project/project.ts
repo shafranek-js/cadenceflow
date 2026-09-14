@@ -30,6 +30,8 @@ export interface PresentationState {
   readonly measuresPerSystem: MeasuresPerSystem;
   /** Whether Staff View includes the independently voiced bass note. */
   readonly showBassInStaff: boolean;
+  /** Whether notation surfaces display decorative pitch-colored Suzuki noteheads. */
+  readonly suzukiColors?: boolean;
 }
 
 export interface MatrixCardTemplateState {

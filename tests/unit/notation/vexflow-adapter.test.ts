@@ -169,6 +169,33 @@ describe("renderStaffProjection", () => {
       ).toBe(notation);
     }
   });
+
+  it("colors noteheads with Suzuki palette when suzukiColors option is enabled", () => {
+    const pitches = [
+      exactPitch(60, { step: "C", alter: 0 }),
+      exactPitch(64, { step: "E", alter: 0 }),
+      exactPitch(67, { step: "G", alter: 0 }),
+    ];
+    const containerWithColors = document.createElement("div");
+    renderStaffProjection(containerWithColors, projectionFor(pitches), musicalDuration(rational(4)), {
+      suzukiColors: true,
+    });
+    const svgWithColors = containerWithColors.querySelector("svg");
+    expect(svgWithColors).not.toBeNull();
+    const htmlWithColors = svgWithColors!.outerHTML;
+    expect(htmlWithColors).toContain("#dc2626"); // C = Red
+    expect(htmlWithColors).toContain("#b45309"); // E = Gold
+    expect(htmlWithColors).toContain("#0369a1"); // G = Blue
+
+    const containerDefault = document.createElement("div");
+    renderStaffProjection(containerDefault, projectionFor(pitches), musicalDuration(rational(4)));
+    const svgDefault = containerDefault.querySelector("svg");
+    expect(svgDefault).not.toBeNull();
+    const htmlDefault = svgDefault!.outerHTML;
+    expect(htmlDefault).not.toContain("#dc2626");
+    expect(htmlDefault).not.toContain("#b45309");
+    expect(htmlDefault).not.toContain("#0369a1");
+  });
 });
 
 describe("renderStaffSequence", () => {

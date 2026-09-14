@@ -28,6 +28,7 @@ export interface MatrixContextMenuProps {
   readonly tonic: number;
   readonly globalView: CardViewId;
   readonly showBassInStaff: boolean;
+  readonly suzukiColors?: boolean | undefined;
   readonly currentArticulation?: PianoArticulation | undefined;
   readonly currentRegister?: RegisterOffset | undefined;
   readonly hasPreviewSelection?: boolean | undefined;
@@ -42,6 +43,7 @@ export interface MatrixContextMenuProps {
   readonly onSetTonic?: ((tonic: number) => void) | undefined;
   readonly onSetView?: ((view: CardViewId) => void) | undefined;
   readonly onToggleBassInStaff?: (() => void) | undefined;
+  readonly onToggleSuzukiColors?: (() => void) | undefined;
   readonly onSetArticulation?: ((articulation: PianoArticulation) => void) | undefined;
   readonly onSetRegister?: ((register: RegisterOffset) => void) | undefined;
   readonly onToggleRecommendations?: (() => void) | undefined;
@@ -80,6 +82,7 @@ export function MatrixContextMenu({
   tonic,
   globalView,
   showBassInStaff,
+  suzukiColors = false,
   currentArticulation = "humanized",
   currentRegister = "auto",
   hasPreviewSelection = false,
@@ -92,6 +95,7 @@ export function MatrixContextMenu({
   onSetTonic,
   onSetView,
   onToggleBassInStaff,
+  onToggleSuzukiColors,
   onSetArticulation,
   onSetRegister,
   onToggleRecommendations,
@@ -413,6 +417,22 @@ export function MatrixContextMenu({
           <span className="score-system-menu-item-row">
             <span>Show Bass in Staff</span>
             {showBassInStaff ? <span className="score-system-menu-check">✓</span> : null}
+          </span>
+        </button>
+        <button
+          ref={registerRef(btnIndex++)}
+          type="button"
+          role="menuitem"
+          className="score-system-menu-item"
+          data-testid="matrix-menu-toggle-suzuki-colors"
+          onClick={() => {
+            onToggleSuzukiColors?.();
+            onClose();
+          }}
+        >
+          <span className="score-system-menu-item-row">
+            <span>Suzuki Note Colors</span>
+            {suzukiColors ? <span className="score-system-menu-check">✓</span> : null}
           </span>
         </button>
 

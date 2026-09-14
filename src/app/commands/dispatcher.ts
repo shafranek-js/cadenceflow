@@ -40,11 +40,13 @@ import {
   setStaffBassVisibility,
   setProgressionView,
   setMeasuresPerSystem,
+  setSuzukiColors,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetProgressionViewCommand,
   type SetMeasuresPerSystemCommand,
+  type SetSuzukiColorsCommand,
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
@@ -92,6 +94,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setProgressionView(project, command as SetProgressionViewCommand).project;
     case "presentation/set-measures-per-system":
       return setMeasuresPerSystem(project, command as SetMeasuresPerSystemCommand).project;
+    case "presentation/set-suzuki-colors":
+      return setSuzukiColors(project, command as SetSuzukiColorsCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
     case "harmony/restore-state":

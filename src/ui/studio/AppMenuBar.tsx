@@ -23,6 +23,8 @@ export interface AppMenuBarProps {
   readonly onProgressionViewChange: (view: ProgressionView) => void;
   readonly showBassInStaff: boolean;
   readonly onShowBassInStaffChange: (visible: boolean) => void;
+  readonly suzukiColors?: boolean;
+  readonly onSuzukiColorsChange?: (enabled: boolean) => void;
 }
 
 export function AppMenuBar({
@@ -38,6 +40,8 @@ export function AppMenuBar({
   onProgressionViewChange,
   showBassInStaff,
   onShowBassInStaffChange,
+  suzukiColors = false,
+  onSuzukiColorsChange,
 }: AppMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
@@ -268,6 +272,19 @@ export function AppMenuBar({
             >
               <span>Show bass note</span>
               {showBassInStaff ? <span aria-hidden="true">✓</span> : null}
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={suzukiColors}
+              data-testid="toggle-suzuki-colors"
+              onClick={() => {
+                onSuzukiColorsChange?.(!suzukiColors);
+                closeMenu("view");
+              }}
+            >
+              <span>Suzuki note colors</span>
+              {suzukiColors ? <span aria-hidden="true">✓</span> : null}
             </button>
           </div>
         ) : null}

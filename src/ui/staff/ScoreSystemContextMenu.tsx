@@ -51,6 +51,8 @@ export interface ScoreSystemContextMenuProps {
   readonly onSetMelodyGrid?: ((grid: MelodyGrid) => void) | undefined;
   readonly currentGrid?: MelodyGrid | undefined;
   readonly onClearMelody?: (() => void) | undefined;
+  readonly suzukiColors?: boolean | undefined;
+  readonly onToggleSuzukiColors?: (() => void) | undefined;
   readonly onDelete?: (() => void) | undefined;
   readonly onClose: () => void;
 }
@@ -147,6 +149,8 @@ export function ScoreSystemContextMenu({
   onSetMelodyGrid,
   currentGrid,
   onClearMelody,
+  suzukiColors = false,
+  onToggleSuzukiColors,
   onDelete,
   onClose,
 }: ScoreSystemContextMenuProps) {
@@ -675,6 +679,28 @@ export function ScoreSystemContextMenu({
         >
           Clear Melody
         </button>
+      ) : null}
+
+      {onToggleSuzukiColors ? (
+        <>
+          <div className="score-system-menu-separator" role="separator" />
+          <div className="score-system-menu-group-header" role="presentation">View Options</div>
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-toggle-suzuki-colors"
+            onClick={() => {
+              onToggleSuzukiColors();
+              onClose();
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>Suzuki Note Colors</span>
+              {suzukiColors ? <span className="score-system-menu-check">✓</span> : null}
+            </span>
+          </button>
+        </>
       ) : null}
 
       {/* 5. Destruction */}

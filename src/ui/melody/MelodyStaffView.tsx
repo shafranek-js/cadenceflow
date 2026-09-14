@@ -107,7 +107,10 @@ export function MelodyStaffView({
             JSON.stringify(current) === JSON.stringify(next) ? current : next,
           );
         },
-        { clef: lane?.clef ?? timeline.clef },
+        {
+          clef: lane?.clef ?? timeline.clef,
+          suzukiColors: project.presentation.suzukiColors ?? false,
+        },
       );
     };
     draw();
@@ -117,7 +120,7 @@ export function MelodyStaffView({
       observer?.disconnect();
       cleanup();
     };
-  }, [lane?.clef, project.globalTiming.meter, sequence, timeline.clef]);
+  }, [lane?.clef, project.globalTiming.meter, project.presentation.suzukiColors, sequence, timeline.clef]);
 
   const barLength = rationalToNumber(
     rational(project.globalTiming.meter.numerator * 4, project.globalTiming.meter.denominator),

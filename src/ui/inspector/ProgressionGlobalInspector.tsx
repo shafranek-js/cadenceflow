@@ -133,6 +133,7 @@ export interface ProgressionGlobalInspectorProps {
   readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
   readonly onOpenPresets?: (() => void) | undefined;
   readonly onSaveAsPreset?: (() => void) | undefined;
+  readonly onToggleSuzukiColors?: ((enabled: boolean) => void) | undefined;
 }
 
 export function ProgressionGlobalInspector({
@@ -157,6 +158,7 @@ export function ProgressionGlobalInspector({
   onSetLoopRange,
   onOpenPresets,
   onSaveAsPreset,
+  onToggleSuzukiColors,
 }: ProgressionGlobalInspectorProps) {
   const [tracksOpen, setTracksOpen] = useState(() =>
     readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
@@ -747,7 +749,7 @@ export function ProgressionGlobalInspector({
         ) : null;
 
       case "view":
-        return onSetProgressionView ? (
+        return onSetProgressionView || onToggleSuzukiColors ? (
           <details
             className="inspector-disclosure progression-view-disclosure"
             open={progressionViewOpen}
@@ -767,39 +769,59 @@ export function ProgressionGlobalInspector({
                 </span>
                 Progression view
               </span>
-              <span className="disclosure-status">{project.presentation.progressionView}</span>
+              <span className="disclosure-status">
+                {project.presentation.progressionView}
+                {project.presentation.suzukiColors ? " · Suzuki" : ""}
+              </span>
             </summary>
-            <div className="inspector-disclosure-body">
-              <div
-                className="view-preference-toggle"
-                role="radiogroup"
-                aria-label="Progression View Selection"
-              >
-                <button
-                  type="button"
-                  className={project.presentation.progressionView === "harmonic" ? "is-active" : ""}
-                  onClick={() => onSetProgressionView("harmonic")}
-                  aria-label="Harmonic view"
+            <div className="inspector-disclosure-body" style={{ display: "grid", gap: "10px" }}>
+              {onSetProgressionView ? (
+                <div
+                  className="view-preference-toggle"
+                  role="radiogroup"
+                  aria-label="Progression View Selection"
                 >
-                  Harmonic
-                </button>
-                <button
-                  type="button"
-                  className={project.presentation.progressionView === "piano" ? "is-active" : ""}
-                  onClick={() => onSetProgressionView("piano")}
-                  aria-label="Piano view"
-                >
-                  Piano
-                </button>
-                <button
-                  type="button"
-                  className={project.presentation.progressionView === "staff" ? "is-active" : ""}
-                  onClick={() => onSetProgressionView("staff")}
-                  aria-label="Staff view"
-                >
-                  Staff
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    className={project.presentation.progressionView === "harmonic" ? "is-active" : ""}
+                    onClick={() => onSetProgressionView("harmonic")}
+                    aria-label="Harmonic view"
+                  >
+                    Harmonic
+                  </button>
+                  <button
+                    type="button"
+                    className={project.presentation.progressionView === "piano" ? "is-active" : ""}
+                    onClick={() => onSetProgressionView("piano")}
+                    aria-label="Piano view"
+                  >
+                    Piano
+                  </button>
+                  <button
+                    type="button"
+                    className={project.presentation.progressionView === "staff" ? "is-active" : ""}
+                    onClick={() => onSetProgressionView("staff")}
+                    aria-label="Staff view"
+                  >
+                    Staff
+                  </button>
+                </div>
+              ) : null}
+              {onToggleSuzukiColors ? (
+                <label className="global-setting-option" style={{ marginTop: "2px" }}>
+                  <input
+                    type="checkbox"
+                    checked={project.presentation.suzukiColors ?? false}
+                    aria-label="Suzuki note colors"
+                    data-testid="toggle-suzuki-colors"
+                    onChange={(event) => onToggleSuzukiColors(event.target.checked)}
+                  />
+                  <span>
+                    <strong>Suzuki note colors</strong>
+                    <small>Color noteheads by pitch (C=Red, D=Orange, etc.)</small>
+                  </span>
+                </label>
+              ) : null}
             </div>
           </details>
         ) : null;

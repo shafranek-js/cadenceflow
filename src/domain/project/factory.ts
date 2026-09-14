@@ -49,6 +49,7 @@ export function createDefaultProject(
       progressionView: "harmonic",
       measuresPerSystem: "auto",
       showBassInStaff: false,
+      suzukiColors: false,
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,

@@ -26,6 +26,7 @@ export function ProgressionStepCard({
   playing = false,
   inLoop = false,
   showBassInStaff = false,
+  suzukiColors = false,
   onSelect,
   onPerformanceChange,
   onRemove,
@@ -41,6 +42,7 @@ export function ProgressionStepCard({
   readonly playing?: boolean;
   readonly inLoop?: boolean;
   readonly showBassInStaff?: boolean;
+  readonly suzukiColors?: boolean;
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onRemove: () => void;
@@ -131,6 +133,7 @@ export function ProgressionStepCard({
             onSelect();
           }}
           hasContextMenu={Boolean(onOpenMelodyMenu)}
+          suzukiColors={suzukiColors}
           onOctaveChange={changeStaffOctave}
         />
       ) : (

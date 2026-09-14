@@ -95,6 +95,7 @@ export function HarmonicMatrix({
         }}
         view={view}
         showBassInStaff={project.presentation.showBassInStaff}
+        suzukiColors={project.presentation.suzukiColors ?? false}
         selected={previewFunctionId === identity.functionId}
         customizedCount={matrixCardOverrideCount(template)}
         onSelect={() => {

@@ -28,6 +28,7 @@ export function StaffCardView({
   onSelect,
   onOctaveChange,
   hasContextMenu = false,
+  suzukiColors = false,
 }: {
   readonly pitches: readonly ExactPitch[];
   readonly chordPitches?: readonly ExactPitch[];
@@ -45,6 +46,7 @@ export function StaffCardView({
   readonly onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
   readonly onOctaveChange: (direction: StaffOctaveDirection) => void;
   readonly hasContextMenu?: boolean;
+  readonly suzukiColors?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const projection = useMemo(() => projectPitchesToStaff(pitches), [pitches]);
@@ -60,8 +62,8 @@ export function StaffCardView({
 
   useEffect(() => {
     if (!ref.current) return;
-    return renderStaffProjection(ref.current, projection, duration);
-  }, [duration, projection]);
+    return renderStaffProjection(ref.current, projection, duration, { suzukiColors });
+  }, [duration, projection, suzukiColors]);
 
   const shift = (direction: StaffOctaveDirection) => (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();

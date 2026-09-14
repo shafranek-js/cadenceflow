@@ -16,6 +16,7 @@ import type { MusicalDuration } from "../domain/timing/duration";
 import type { Meter } from "../domain/timing/meter";
 import { rationalToNumber, type Rational } from "../domain/timing/rational";
 import type { StaffProjectionDto } from "./staffProjection";
+import { getSuzukiNoteColor } from "./suzukiColors";
 
 const STAFF_INK = "#000";
 const STAFF_PLAYING_INK_FALLBACK = "#8a5732";
@@ -86,6 +87,7 @@ function createStaffNote(
   centerAligned = true,
   ink = STAFF_INK,
   clef = "treble",
+  suzukiColors = false,
 ): StaveNote {
   const note = new StaveNote({
     keys: projection.notes.map((item) => item.vexKey),
@@ -109,6 +111,16 @@ function createStaffNote(
   note.setCenterAlignment(centerAligned);
   note.setStyle({ fillStyle: ink, strokeStyle: ink });
   note.setLedgerLineStyle({ fillStyle: ink, strokeStyle: ink });
+
+  if (suzukiColors) {
+    projection.notes.forEach((item, index) => {
+      const color = getSuzukiNoteColor(item.step);
+      if (color) {
+        note.setKeyStyle(index, { fillStyle: color, strokeStyle: color });
+      }
+    });
+  }
+
   note.preFormat();
   return note;
 }
@@ -151,6 +163,11 @@ export type StaffClef = "treble" | "bass";
 
 export interface StaffSequenceRenderOptions {
   readonly clef?: StaffClef;
+  readonly suzukiColors?: boolean;
+}
+
+export interface StaffProjectionRenderOptions {
+  readonly suzukiColors?: boolean;
 }
 
 export interface StaffSequencePosition {
@@ -185,6 +202,7 @@ export interface StaffSystemRenderOptions {
   readonly showTimeSignature?: boolean;
   readonly showBass?: boolean;
   readonly melodyClef?: StaffClef;
+  readonly suzukiColors?: boolean;
 }
 
 interface RenderedSequenceTickable {
@@ -406,6 +424,7 @@ export function renderStaffProjection(
   container: HTMLDivElement,
   projection: StaffProjectionDto,
   duration: MusicalDuration,
+  options?: StaffProjectionRenderOptions,
 ): () => void {
   container.replaceChildren();
   if (projection.notes.length === 0) return () => container.replaceChildren();
@@ -425,7 +444,16 @@ export function renderStaffProjection(
   stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
   stave.setContext(context).draw();
 
-  const note = createStaffNote(projection, stave, rhythm, duration);
+  const note = createStaffNote(
+    projection,
+    stave,
+    rhythm,
+    duration,
+    true,
+    STAFF_INK,
+    "treble",
+    options?.suzukiColors ?? false,
+  );
   const voice = new Voice({ numBeats: 4, beatValue: 4 }).setMode(Voice.Mode.SOFT);
   let tuplet: Tuplet | undefined;
   if (rhythm.tuplet) {
@@ -493,6 +521,7 @@ export function renderStaffSequence(
   const playingInk =
     getComputedStyle(container).getPropertyValue("--piano-pressed-key-border").trim() ||
     STAFF_PLAYING_INK_FALLBACK;
+  const suzukiColors = options.suzukiColors ?? false;
 
   const notes = entries.map((entry) => {
     const rhythm = staffRhythmForDuration(entry.duration);
@@ -509,6 +538,7 @@ export function renderStaffSequence(
               false,
               entry.highlighted ? playingInk : STAFF_INK,
               clef,
+              suzukiColors,
             );
     note.setAttribute("data-staff-entry", entry.key);
     if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
@@ -538,6 +568,7 @@ export function renderStaffSequence(
             false,
             entry.highlighted ? playingInk : STAFF_INK,
             "bass",
+            suzukiColors,
           );
         }
         note.setAttribute("data-bass-staff-entry", entry.key);
@@ -927,6 +958,7 @@ export function renderStaffSystem(
     getComputedStyle(container).getPropertyValue("--score-playback-border").trim() ||
     getComputedStyle(container).getPropertyValue("--piano-pressed-key-border").trim() ||
     STAFF_PLAYING_INK_FALLBACK;
+  const suzukiColors = options.suzukiColors ?? false;
   const positions: StaffSystemPosition[] = [];
   let tupletCount = 0;
   let beamCount = 0;
@@ -952,6 +984,7 @@ export function renderStaffSystem(
                   false,
                   entry.highlighted ? playingInk : STAFF_INK,
                   rowLayout.row.clef,
+                  suzukiColors,
                 );
         note.setAttribute("data-staff-entry", entry.key);
         if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
