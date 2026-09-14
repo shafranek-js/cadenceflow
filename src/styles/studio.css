@@ -3400,12 +3400,54 @@ summary:focus-visible,
 .card-template-inspector header,
 .progression-global-inspector header {
   align-items: flex-start;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .card-template-inspector header > div,
 .progression-global-inspector header > div {
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.card-template-inspector header .inspector-header-icon-btn,
+.progression-global-inspector header .inspector-header-icon-btn,
+.inspector-header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  padding: 0;
+  border-radius: var(--radius-control, 3px);
+  border: 1px solid var(--border-control, #2a2e36);
+  background: var(--surface-control, #1e222b);
+  color: var(--text-muted, #9aa2b2);
+  cursor: pointer;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  transition: all 0.15s ease;
+}
+
+.inspector-header-icon-btn:hover:not(:disabled) {
+  color: var(--text, #f0f3f8);
+  background: var(--surface-hover, #2a303c);
+  border-color: var(--border-hover, #3d4657);
+}
+
+.inspector-header-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.inspector-header-icon-btn .ui-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
 }
 
 .card-template-inspector .inspector-context-kicker,

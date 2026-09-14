@@ -11,6 +11,7 @@ import type { MusicalDuration } from "../../domain/timing/duration";
 import { ArticulationControl } from "./ArticulationControl";
 import { RegisterControl } from "./RegisterControl";
 import { StepDurationControl } from "../timing/StepDurationControl";
+import { Icon } from "../common/Icon";
 
 const TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.template-register-disclosure-open";
 const TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY =
@@ -103,8 +104,15 @@ export function CardTemplateInspector({
                 : "Inheriting defaults · Inherited"}
           </span>
         </div>
-        <button type="button" disabled={isGlobal ? false : count === 0} onClick={onReset}>
-          {isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+        <button
+          type="button"
+          className="inspector-header-icon-btn"
+          disabled={isGlobal ? false : count === 0}
+          onClick={onReset}
+          aria-label={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+          title={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+        >
+          <Icon name="reset" />
         </button>
       </header>
       <details

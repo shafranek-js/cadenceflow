@@ -28,6 +28,7 @@ import { InspectorMeterSection } from "./InspectorMeterSection";
 import { InspectorGrooveSection } from "./InspectorGrooveSection";
 import { InspectorLoopSection } from "./InspectorLoopSection";
 import type { LoopMode, LoopState } from "../transport/loopState";
+import { Icon } from "../common/Icon";
 
 const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
@@ -255,10 +256,11 @@ export function ProgressionGlobalInspector({
           type="button"
           disabled={chordStepCount === 0}
           onClick={onResetAll}
-          className="reset-all-steps-btn"
+          className="inspector-header-icon-btn reset-all-steps-btn"
           aria-label="Reset all progression steps to defaults"
+          title="Reset all progression steps to defaults"
         >
-          Reset All to Defaults
+          <Icon name="reset" />
         </button>
       </header>
 

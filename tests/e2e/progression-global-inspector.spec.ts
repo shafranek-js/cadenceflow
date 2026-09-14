@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -91,13 +92,8 @@ test.describe("Progression Global Inspector", () => {
     const fourBarsBtn = globalInspector.getByRole("button", { name: "4 measures per system" });
     await fourBarsBtn.click();
     await expect(stepCards).toHaveAttribute("data-layout", "4");
-    const layoutSelect = page.locator(
-      '.progression-view-control select[aria-label="Measures Layout"]',
-    );
-    await expect(layoutSelect).toHaveValue("4");
-
-    // Toggle to 2 Bars from toolbar
-    await layoutSelect.selectOption("2");
+    // Toggle to 2 Bars
+    await setLayoutMeasuresPerSystem(page, 2);
     await expect(stepCards).toHaveAttribute("data-layout", "2");
     await expect(
       globalInspector.locator(".measures-per-system-disclosure .disclosure-status"),
