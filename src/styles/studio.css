@@ -20,7 +20,7 @@
 }
 .app-header strong {
   color: inherit;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
 }
 .project-manager {
   position: relative;
@@ -1940,7 +1940,7 @@
 
 .presets-panel-header h2 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.05rem;
 }
 
 .presets-panel-subtitle {
@@ -2194,7 +2194,7 @@
 
 .dialog-header h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
 }
 
 .dialog-body {
