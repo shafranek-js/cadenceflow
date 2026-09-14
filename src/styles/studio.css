@@ -3478,20 +3478,25 @@ summary:focus-visible,
 }
 
 .card-template-inspector header,
-.progression-global-inspector header {
+.progression-global-inspector header,
+.performance-inspector-header {
+  display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   flex-wrap: nowrap;
   gap: 8px;
 }
 
 .card-template-inspector header > div,
-.progression-global-inspector header > div {
+.progression-global-inspector header > div,
+.performance-inspector-header > div {
   min-width: 0;
   flex: 1 1 auto;
 }
 
 .card-template-inspector header .inspector-header-icon-btn,
 .progression-global-inspector header .inspector-header-icon-btn,
+.performance-inspector-header .inspector-header-icon-btn,
 .inspector-header-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -3531,7 +3536,8 @@ summary:focus-visible,
 }
 
 .card-template-inspector .inspector-context-kicker,
-.progression-global-inspector .inspector-context-kicker {
+.progression-global-inspector .inspector-context-kicker,
+.performance-inspector-header .inspector-context-kicker {
   margin-bottom: 2px;
 }
 

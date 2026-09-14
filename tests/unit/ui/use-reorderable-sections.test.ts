@@ -169,4 +169,22 @@ describe("useReorderableSections", () => {
 
     unmount();
   });
+
+  it("exports valid default sections for Selected Step Inspector", async () => {
+    const { DEFAULT_SELECTED_STEP_SECTIONS, SELECTED_STEP_SECTION_ORDER_STORAGE_KEY } = await import(
+      "../../../src/ui/inspector/PianoPerformanceInspector"
+    );
+    expect(SELECTED_STEP_SECTION_ORDER_STORAGE_KEY).toBe(
+      "cadenceflow:inspector:selected_step:sections_order",
+    );
+    expect(DEFAULT_SELECTED_STEP_SECTIONS).toEqual([
+      "register",
+      "articulation",
+      "duration",
+      "voicing",
+      "bass",
+      "dynamics",
+      "progression",
+    ]);
+  });
 });

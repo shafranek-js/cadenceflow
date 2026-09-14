@@ -38,6 +38,7 @@ export interface InspectorProgressionSettingsProps {
   readonly melodyAudioError?: string | null | undefined;
   readonly onRetryMelodyAudio?: (() => void) | undefined;
   readonly hasMelodyRecipe?: boolean | undefined;
+  readonly dragHandle?: React.ReactNode | undefined;
 }
 
 export function InspectorProgressionSettings({
@@ -55,6 +56,7 @@ export function InspectorProgressionSettings({
   melodyAudioError,
   onRetryMelodyAudio,
   hasMelodyRecipe = false,
+  dragHandle,
 }: InspectorProgressionSettingsProps) {
   const [isOpen, setIsOpen] = useState(() => readDisclosureState(false));
 
@@ -76,7 +78,10 @@ export function InspectorProgressionSettings({
       }}
     >
       <summary>
-        <span>Progression settings</span>
+        <span>
+          {dragHandle}
+          Progression settings
+        </span>
         <span className="disclosure-status">Global</span>
       </summary>
       <div className="inspector-disclosure-body">

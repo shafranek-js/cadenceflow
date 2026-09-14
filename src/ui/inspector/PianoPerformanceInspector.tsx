@@ -39,6 +39,8 @@ import { StepDurationControl } from "../progression/StepDurationControl";
 import { formatDurationBeats } from "../timing/stepDuration";
 import type { MelodyTrackSettings } from "../../domain/melody/types";
 import type { AudioProviderState } from "../../audio/contracts";
+import { Icon } from "../common/Icon";
+import { useReorderableSections } from "./useReorderableSections";
 
 const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
   Object.freeze([
@@ -57,6 +59,28 @@ const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label:
   ]);
 
 const MUSICAL_DYNAMICS: readonly MusicalDynamicLabel[] = ["pp", "p", "mp", "mf", "f", "ff"];
+
+export type SelectedStepSectionId =
+  | "register"
+  | "articulation"
+  | "duration"
+  | "voicing"
+  | "bass"
+  | "dynamics"
+  | "progression";
+
+export const DEFAULT_SELECTED_STEP_SECTIONS: readonly SelectedStepSectionId[] = Object.freeze([
+  "register",
+  "articulation",
+  "duration",
+  "voicing",
+  "bass",
+  "dynamics",
+  "progression",
+]);
+
+export const SELECTED_STEP_SECTION_ORDER_STORAGE_KEY =
+  "cadenceflow:inspector:selected_step:sections_order";
 
 const DYNAMICS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.dynamics-disclosure-open";
 const PER_NOTE_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.per-note-disclosure-open";
@@ -307,6 +331,538 @@ export function PianoPerformanceInspector({
     });
   }
 
+  const {
+    order: sectionOrder,
+    isCustomOrder,
+    resetOrder,
+    getSectionItemProps,
+    getDragHandleProps,
+  } = useReorderableSections<SelectedStepSectionId>({
+    storageKey: SELECTED_STEP_SECTION_ORDER_STORAGE_KEY,
+    defaultOrder: DEFAULT_SELECTED_STEP_SECTIONS,
+  });
+
+  const renderSectionContent = (sectionId: SelectedStepSectionId) => {
+    switch (sectionId) {
+      case "register":
+        return (
+          <details
+            className="inspector-disclosure register-disclosure"
+            open={registerOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setRegisterOpen(open);
+              persistDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("register", "Register")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Register
+              </span>
+              <span className="disclosure-status">
+                {perf.register === "auto"
+                  ? "Auto"
+                  : `${perf.register > 0 ? "+" : ""}${perf.register} oct.`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Register controls">
+                <RegisterControl
+                  value={perf.register}
+                  disabled={isManual}
+                  showLabel={false}
+                  onChange={(register) => onPerformanceChange({ register })}
+                />
+                {isManual && (
+                  <p className="hint-text">Register offset does not shift manual exact voicings.</p>
+                )}
+              </div>
+            </div>
+          </details>
+        );
+
+      case "articulation":
+        return (
+          <details
+            className="inspector-disclosure articulation-disclosure"
+            open={articulationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setArticulationOpen(open);
+              persistDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("articulation", "Articulation")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Articulation
+              </span>
+              <span className="disclosure-status">{perf.articulation}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <ArticulationControl
+                value={perf.articulation}
+                showLabel={false}
+                onChange={(articulation) => onPerformanceChange({ articulation })}
+              />
+            </div>
+          </details>
+        );
+
+      case "duration":
+        return onDurationChange ? (
+          <details
+            className="inspector-disclosure duration-disclosure"
+            open={durationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setDurationOpen(open);
+              persistDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("duration", "Duration")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Duration
+              </span>
+              <span className="disclosure-status">{formatMusicalDuration(step.duration)} beats</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div
+                className="transport-section transport-step-duration inspector-group selected-step-duration"
+                role="group"
+                aria-label="Step duration controls"
+              >
+                <span className="transport-label">
+                  Step Duration ({formatDurationBeats(step.duration)})
+                </span>
+                <StepDurationControl
+                  variant="buttons"
+                  label=""
+                  value={step.duration}
+                  meter={meter}
+                  includeFullBar={Boolean(meter)}
+                  onChange={onDurationChange}
+                />
+              </div>
+            </div>
+          </details>
+        ) : null;
+
+      case "voicing":
+        return (
+          <details
+            className="inspector-disclosure voicing-disclosure"
+            open={voicingOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setVoicingOpen(open);
+              persistDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("voicing", "Voicing mode")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Voicing mode
+              </span>
+              <span className="disclosure-status">
+                {perf.voicingMode === "manual" ? "Manual" : "Auto"}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Voicing mode controls">
+                <label htmlFor="voicing-mode-select">Voicing Mode</label>
+                <select
+                  id="voicing-mode-select"
+                  value={perf.voicingMode}
+                  onChange={handleVoicingModeChange}
+                  aria-label="Voicing Mode"
+                >
+                  <option value="auto">Auto Voicing</option>
+                  <option value="manual">Manual Exact Voicing</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={onOpenVoicingEditor}
+                  className="open-voicing-editor-btn"
+                  aria-label="Open Piano Voicing Editor"
+                >
+                  {isManual
+                    ? `Edit Manual Voicing (${perf.manualVoicing?.length ?? 0} notes)`
+                    : "Customize Exact Voicing..."}
+                </button>
+              </div>
+            </div>
+          </details>
+        );
+
+      case "bass":
+        return (
+          <details
+            className="inspector-disclosure bass-disclosure"
+            open={bassOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setBassOpen(open);
+              persistDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("bass", "Bass")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Bass
+              </span>
+              <span className="disclosure-status">Independent voice</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Bass voice controls">
+                <h4>Independent Bass</h4>
+                <div className="subgroup">
+                  <label htmlFor="bass-choice-select">Bass Note</label>
+                  <select
+                    id="bass-choice-select"
+                    value={perf.bass.choice}
+                    onChange={handleBassChoiceChange}
+                    aria-label="Bass Note"
+                  >
+                    {BASS_CHOICES.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {perf.bass.choice === "custom" ? (
+                  <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
+                    <label htmlFor="custom-bass-midi-input">
+                      Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
+                    </label>
+                    <input
+                      id="custom-bass-midi-input"
+                      type="number"
+                      min={PIANO_RANGE_MIN_MIDI}
+                      max={PIANO_RANGE_MAX_MIDI}
+                      value={perf.bass.customPitch?.midiNumber ?? 36}
+                      onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
+                      aria-label="Custom Bass MIDI Number"
+                    />
+                    {perf.bass.customPitch && (
+                      <span className="custom-bass-readout">
+                        Pitch: {perf.bass.customPitch.spelling.step}
+                        {perf.bass.customPitch.spelling.alter === 1
+                          ? "#"
+                          : perf.bass.customPitch.spelling.alter === -1
+                            ? "b"
+                            : ""}
+                        {perf.bass.customPitch.octave}
+                      </span>
+                    )}
+                    {customBassError && (
+                      <p className="error-text" role="alert">
+                        {customBassError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="subgroup">
+                    <label htmlFor="bass-octave-select">Bass Octave</label>
+                    <select
+                      id="bass-octave-select"
+                      value={String(perf.bass.octaveOffset)}
+                      onChange={handleBassOctaveChange}
+                      aria-label="Bass Octave"
+                    >
+                      {BASS_OCTAVES.map((opt) => (
+                        <option key={String(opt.value)} value={String(opt.value)}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          </details>
+        );
+
+      case "dynamics":
+        return (
+          <details
+            className="inspector-disclosure dynamics-disclosure"
+            open={dynamicsOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setDynamicsOpen(open);
+              persistDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("dynamics", "Dynamics & velocity")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Dynamics &amp; velocity
+              </span>
+              <span className="disclosure-status">Master + per-note</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
+                <div
+                  className="view-preference-toggle"
+                  role="radiogroup"
+                  aria-label="Velocity View Preference"
+                >
+                  <button
+                    type="button"
+                    className={perf.dynamicsViewPreference === "musical" ? "is-active" : ""}
+                    onClick={() => handleViewPreferenceToggle("musical")}
+                    aria-label="Musical view"
+                  >
+                    Musical (pp..ff)
+                  </button>
+                  <button
+                    type="button"
+                    className={perf.dynamicsViewPreference === "midi" ? "is-active" : ""}
+                    onClick={() => handleViewPreferenceToggle("midi")}
+                    aria-label="MIDI velocity view"
+                  >
+                    MIDI (1..127)
+                  </button>
+                </div>
+
+                {perf.dynamicsViewPreference === "musical" ? (
+                  <div className="musical-dynamic-select">
+                    <label htmlFor="musical-dynamic-picker">Dynamic Label</label>
+                    <select
+                      id="musical-dynamic-picker"
+                      value={velocityToMusicalDynamic(perf.masterVelocity)}
+                      onChange={(e) =>
+                        handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)
+                      }
+                      aria-label="Musical Dynamic Label"
+                    >
+                      {MUSICAL_DYNAMICS.map((label) => (
+                        <option key={label} value={label}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="velocity-readout">Exact: {perf.masterVelocity}</span>
+                  </div>
+                ) : (
+                  <div className="midi-velocity-input">
+                    <label htmlFor="master-velocity-input">Master Velocity</label>
+                    <input
+                      id="master-velocity-input"
+                      type="number"
+                      min={1}
+                      max={127}
+                      value={perf.masterVelocity}
+                      onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
+                      aria-label="Master Velocity"
+                    />
+                  </div>
+                )}
+
+                {/* Dynamics Presets */}
+                <div className="dynamics-presets" role="group" aria-label="Dynamics presets">
+                  <label htmlFor="dynamics-preset-select">Apply Dynamics Preset</label>
+                  <select
+                    id="dynamics-preset-select"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleApplyPreset(e.target.value as DynamicsPresetId);
+                        e.target.value = "";
+                      }
+                    }}
+                    aria-label="Apply Dynamics Preset"
+                  >
+                    <option value="" disabled>
+                      Select Preset...
+                    </option>
+                    {PIANO_DYNAMICS_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label} — {p.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Per-note Overrides summary & Clear */}
+                <div className="per-note-overrides-summary">
+                  <span>
+                    {overrideCount === 0
+                      ? "All notes inheriting Master Velocity"
+                      : `${overrideCount} note velocity override${overrideCount > 1 ? "s" : ""} active`}
+                  </span>
+                  {overrideCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearOverrides}
+                      className="clear-overrides-btn"
+                      aria-label="Clear per-note overrides"
+                    >
+                      Clear Overrides (Balanced)
+                    </button>
+                  )}
+                </div>
+
+                {/* Per-Note Velocity Editor */}
+                <details
+                  className="inspector-disclosure per-note-disclosure"
+                  open={perNoteOpen}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setPerNoteOpen(open);
+                    persistDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, open);
+                  }}
+                >
+                  <summary>
+                    <span>Per-note velocity overrides</span>
+                    <span className="disclosure-status">
+                      {overrideCount === 0 ? "Inherited" : `${overrideCount} customized`}
+                    </span>
+                  </summary>
+                  <div
+                    className="per-note-velocity-editor"
+                    role="group"
+                    aria-label="Per-note velocity editor"
+                  >
+                    <p className="inspector-helper">
+                      Each row keeps the exact MIDI velocity or inherits Master.
+                    </p>
+                    <div className="per-note-list">
+                      {notesToDisplay.map((note) => {
+                        const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
+                        const currentVel = isOverridden
+                          ? perf.perNoteVelocityOverrides[note.noteKey]!
+                          : perf.masterVelocity;
+
+                        return (
+                          <div key={`${note.role}-${note.noteKey}`} className="per-note-velocity-row">
+                            <div className="note-info">
+                              <span className="note-label">{note.label}</span>
+                              <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
+                              <span className={`note-role-badge role-${note.role}`}>
+                                {note.role === "bass" ? "Independent Bass" : "Upper"}
+                              </span>
+                            </div>
+                            <div className="note-velocity-controls">
+                              {isOverridden ? (
+                                <div className="override-active-controls">
+                                  <span className="status-badge override">Override: {currentVel}</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={127}
+                                    value={currentVel}
+                                    onChange={(e) =>
+                                      handleSetNoteOverride(note.noteKey, Number(e.target.value))
+                                    }
+                                    aria-label={`Velocity override for ${note.label}`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResetNoteToInherit(note.noteKey)}
+                                    className="reset-inherit-btn"
+                                    aria-label={`Reset ${note.label} to inherit master velocity`}
+                                  >
+                                    Reset to Inherit
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="inherit-active-controls">
+                                  <span className="status-badge inherit">
+                                    Inherits Master ({perf.masterVelocity})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleSetNoteOverride(note.noteKey, perf.masterVelocity)
+                                    }
+                                    className="set-override-btn"
+                                    aria-label={`Override velocity for ${note.label}`}
+                                  >
+                                    Override...
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </details>
+        );
+
+      case "progression":
+        return (
+          <InspectorProgressionSettings
+            dragHandle={
+              <span
+                {...getDragHandleProps("progression", "Progression settings")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                ⋮⋮
+              </span>
+            }
+            meter={meter}
+            onSetMeter={onSetMeter}
+            groove={groove}
+            onSetGroove={onSetGroove}
+            loopState={loopState}
+            steps={steps}
+            onSetLoopMode={onSetLoopMode}
+            onSetLoopRange={onSetLoopRange}
+            melodyTrack={melodyTrack}
+            onMelodyTrackSettingsChange={onMelodyTrackSettingsChange}
+            melodyAudioState={melodyAudioState}
+            melodyAudioError={melodyAudioError}
+            onRetryMelodyAudio={onRetryMelodyAudio}
+            hasMelodyRecipe={hasMelodyRecipe}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <section
       className="piano-performance-inspector"
@@ -320,6 +876,19 @@ export function PianoPerformanceInspector({
           <h3>Step Performance: {step.harmonicFunction.functionId}</h3>
           <span>Step-specific controls live here. Progression settings are grouped below.</span>
         </div>
+        {isCustomOrder ? (
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button
+              type="button"
+              onClick={resetOrder}
+              className="inspector-header-icon-btn reset-sections-order-btn"
+              aria-label="Reset sections order to default"
+              title="Reset sections order to default"
+            >
+              <Icon name="undo" />
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {onReplace && onReset && onRemove && onMoveLeft && onMoveRight ? (
@@ -333,448 +902,15 @@ export function PianoPerformanceInspector({
         />
       ) : null}
 
-      {/* Primary step controls */}
-      <details
-        className="inspector-disclosure register-disclosure"
-        open={registerOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setRegisterOpen(open);
-          persistDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Register</span>
-          <span className="disclosure-status">
-            {perf.register === "auto"
-              ? "Auto"
-              : `${perf.register > 0 ? "+" : ""}${perf.register} oct.`}
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Register controls">
-            <RegisterControl
-              value={perf.register}
-              disabled={isManual}
-              showLabel={false}
-              onChange={(register) => onPerformanceChange({ register })}
-            />
-            {isManual && (
-              <p className="hint-text">Register offset does not shift manual exact voicings.</p>
-            )}
+      {sectionOrder.map((sectionId) => {
+        const content = renderSectionContent(sectionId);
+        if (!content) return null;
+        return (
+          <div key={sectionId} {...getSectionItemProps(sectionId)}>
+            {content}
           </div>
-        </div>
-      </details>
-
-      <details
-        className="inspector-disclosure articulation-disclosure"
-        open={articulationOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setArticulationOpen(open);
-          persistDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Articulation</span>
-          <span className="disclosure-status">{perf.articulation}</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <ArticulationControl
-            value={perf.articulation}
-            showLabel={false}
-            onChange={(articulation) => onPerformanceChange({ articulation })}
-          />
-        </div>
-      </details>
-
-      {onDurationChange ? (
-        <details
-          className="inspector-disclosure duration-disclosure"
-          open={durationOpen}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            setDurationOpen(open);
-            persistDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, open);
-          }}
-        >
-          <summary>
-            <span>Duration</span>
-            <span className="disclosure-status">{formatMusicalDuration(step.duration)} beats</span>
-          </summary>
-          <div className="inspector-disclosure-body">
-            <div
-              className="transport-section transport-step-duration inspector-group selected-step-duration"
-              role="group"
-              aria-label="Step duration controls"
-            >
-              <span className="transport-label">
-                Step Duration ({formatDurationBeats(step.duration)})
-              </span>
-              <StepDurationControl
-                variant="buttons"
-                label=""
-                value={step.duration}
-                meter={meter}
-                includeFullBar={Boolean(meter)}
-                onChange={onDurationChange}
-              />
-            </div>
-          </div>
-        </details>
-      ) : null}
-
-      {/* Voicing Mode & Manual Voicing Editor */}
-      <details
-        className="inspector-disclosure voicing-disclosure"
-        open={voicingOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setVoicingOpen(open);
-          persistDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Voicing mode</span>
-          <span className="disclosure-status">
-            {perf.voicingMode === "manual" ? "Manual" : "Auto"}
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Voicing mode controls">
-            <label htmlFor="voicing-mode-select">Voicing Mode</label>
-            <select
-              id="voicing-mode-select"
-              value={perf.voicingMode}
-              onChange={handleVoicingModeChange}
-              aria-label="Voicing Mode"
-            >
-              <option value="auto">Auto Voicing</option>
-              <option value="manual">Manual Exact Voicing</option>
-            </select>
-            <button
-              type="button"
-              onClick={onOpenVoicingEditor}
-              className="open-voicing-editor-btn"
-              aria-label="Open Piano Voicing Editor"
-            >
-              {isManual
-                ? `Edit Manual Voicing (${perf.manualVoicing?.length ?? 0} notes)`
-                : "Customize Exact Voicing..."}
-            </button>
-          </div>
-        </div>
-      </details>
-
-      {/* Independent Bass Controls */}
-      <details
-        className="inspector-disclosure bass-disclosure"
-        open={bassOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setBassOpen(open);
-          persistDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Bass</span>
-          <span className="disclosure-status">Independent voice</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Bass voice controls">
-            <h4>Independent Bass</h4>
-            <div className="subgroup">
-              <label htmlFor="bass-choice-select">Bass Note</label>
-              <select
-                id="bass-choice-select"
-                value={perf.bass.choice}
-                onChange={handleBassChoiceChange}
-                aria-label="Bass Note"
-              >
-                {BASS_CHOICES.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {perf.bass.choice === "custom" ? (
-              <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
-                <label htmlFor="custom-bass-midi-input">
-                  Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
-                </label>
-                <input
-                  id="custom-bass-midi-input"
-                  type="number"
-                  min={PIANO_RANGE_MIN_MIDI}
-                  max={PIANO_RANGE_MAX_MIDI}
-                  value={perf.bass.customPitch?.midiNumber ?? 36}
-                  onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
-                  aria-label="Custom Bass MIDI Number"
-                />
-                {perf.bass.customPitch && (
-                  <span className="custom-bass-readout">
-                    Pitch: {perf.bass.customPitch.spelling.step}
-                    {perf.bass.customPitch.spelling.alter === 1
-                      ? "#"
-                      : perf.bass.customPitch.spelling.alter === -1
-                        ? "b"
-                        : ""}
-                    {perf.bass.customPitch.octave}
-                  </span>
-                )}
-                {customBassError && (
-                  <p className="error-text" role="alert">
-                    {customBassError}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="subgroup">
-                <label htmlFor="bass-octave-select">Bass Octave</label>
-                <select
-                  id="bass-octave-select"
-                  value={String(perf.bass.octaveOffset)}
-                  onChange={handleBassOctaveChange}
-                  aria-label="Bass Octave"
-                >
-                  {BASS_OCTAVES.map((opt) => (
-                    <option key={String(opt.value)} value={String(opt.value)}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-      </details>
-
-      {/* Dynamics & Velocity Controls */}
-      <details
-        className="inspector-disclosure dynamics-disclosure"
-        open={dynamicsOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setDynamicsOpen(open);
-          persistDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Dynamics &amp; velocity</span>
-          <span className="disclosure-status">Master + per-note</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
-            <div
-              className="view-preference-toggle"
-              role="radiogroup"
-              aria-label="Velocity View Preference"
-            >
-              <button
-                type="button"
-                className={perf.dynamicsViewPreference === "musical" ? "is-active" : ""}
-                onClick={() => handleViewPreferenceToggle("musical")}
-                aria-label="Musical view"
-              >
-                Musical (pp..ff)
-              </button>
-              <button
-                type="button"
-                className={perf.dynamicsViewPreference === "midi" ? "is-active" : ""}
-                onClick={() => handleViewPreferenceToggle("midi")}
-                aria-label="MIDI velocity view"
-              >
-                MIDI (1..127)
-              </button>
-            </div>
-
-            {perf.dynamicsViewPreference === "musical" ? (
-              <div className="musical-dynamic-select">
-                <label htmlFor="musical-dynamic-picker">Dynamic Label</label>
-                <select
-                  id="musical-dynamic-picker"
-                  value={velocityToMusicalDynamic(perf.masterVelocity)}
-                  onChange={(e) =>
-                    handleMusicalDynamicSelect(e.target.value as MusicalDynamicLabel)
-                  }
-                  aria-label="Musical Dynamic Label"
-                >
-                  {MUSICAL_DYNAMICS.map((label) => (
-                    <option key={label} value={label}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <span className="velocity-readout">Exact: {perf.masterVelocity}</span>
-              </div>
-            ) : (
-              <div className="midi-velocity-input">
-                <label htmlFor="master-velocity-input">Master Velocity</label>
-                <input
-                  id="master-velocity-input"
-                  type="number"
-                  min={1}
-                  max={127}
-                  value={perf.masterVelocity}
-                  onChange={(e) => handleMasterVelocityChange(Number(e.target.value))}
-                  aria-label="Master Velocity"
-                />
-              </div>
-            )}
-
-            {/* Dynamics Presets */}
-            <div className="dynamics-presets" role="group" aria-label="Dynamics presets">
-              <label htmlFor="dynamics-preset-select">Apply Dynamics Preset</label>
-              <select
-                id="dynamics-preset-select"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleApplyPreset(e.target.value as DynamicsPresetId);
-                    e.target.value = "";
-                  }
-                }}
-                aria-label="Apply Dynamics Preset"
-              >
-                <option value="" disabled>
-                  Select Preset...
-                </option>
-                {PIANO_DYNAMICS_PRESETS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label} — {p.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Per-note Overrides summary & Clear */}
-            <div className="per-note-overrides-summary">
-              <span>
-                {overrideCount === 0
-                  ? "All notes inheriting Master Velocity"
-                  : `${overrideCount} note velocity override${overrideCount > 1 ? "s" : ""} active`}
-              </span>
-              {overrideCount > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearOverrides}
-                  className="clear-overrides-btn"
-                  aria-label="Clear per-note overrides"
-                >
-                  Clear Overrides (Balanced)
-                </button>
-              )}
-            </div>
-
-            {/* Per-Note Velocity Editor */}
-            <details
-              className="inspector-disclosure per-note-disclosure"
-              open={perNoteOpen}
-              onToggle={(event) => {
-                const open = event.currentTarget.open;
-                setPerNoteOpen(open);
-                persistDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, open);
-              }}
-            >
-              <summary>
-                <span>Per-note velocity overrides</span>
-                <span className="disclosure-status">
-                  {overrideCount === 0 ? "Inherited" : `${overrideCount} customized`}
-                </span>
-              </summary>
-              <div
-                className="per-note-velocity-editor"
-                role="group"
-                aria-label="Per-note velocity editor"
-              >
-                <p className="inspector-helper">
-                  Each row keeps the exact MIDI velocity or inherits Master.
-                </p>
-                <div className="per-note-list">
-                  {notesToDisplay.map((note) => {
-                    const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
-                    const currentVel = isOverridden
-                      ? perf.perNoteVelocityOverrides[note.noteKey]!
-                      : perf.masterVelocity;
-
-                    return (
-                      <div key={`${note.role}-${note.noteKey}`} className="per-note-velocity-row">
-                        <div className="note-info">
-                          <span className="note-label">{note.label}</span>
-                          <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
-                          <span className={`note-role-badge role-${note.role}`}>
-                            {note.role === "bass" ? "Independent Bass" : "Upper"}
-                          </span>
-                        </div>
-                        <div className="note-velocity-controls">
-                          {isOverridden ? (
-                            <div className="override-active-controls">
-                              <span className="status-badge override">Override: {currentVel}</span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={127}
-                                value={currentVel}
-                                onChange={(e) =>
-                                  handleSetNoteOverride(note.noteKey, Number(e.target.value))
-                                }
-                                aria-label={`Velocity override for ${note.label}`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleResetNoteToInherit(note.noteKey)}
-                                className="reset-inherit-btn"
-                                aria-label={`Reset ${note.label} to inherit master velocity`}
-                              >
-                                Reset to Inherit
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="inherit-active-controls">
-                              <span className="status-badge inherit">
-                                Inherits Master ({perf.masterVelocity})
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleSetNoteOverride(note.noteKey, perf.masterVelocity)
-                                }
-                                className="set-override-btn"
-                                aria-label={`Override velocity for ${note.label}`}
-                              >
-                                Override...
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </details>
-          </div>
-        </div>
-      </details>
-
-      <InspectorProgressionSettings
-        meter={meter}
-        onSetMeter={onSetMeter}
-        groove={groove}
-        onSetGroove={onSetGroove}
-        loopState={loopState}
-        steps={steps}
-        onSetLoopMode={onSetLoopMode}
-        onSetLoopRange={onSetLoopRange}
-        melodyTrack={melodyTrack}
-        onMelodyTrackSettingsChange={onMelodyTrackSettingsChange}
-        melodyAudioState={melodyAudioState}
-        melodyAudioError={melodyAudioError}
-        onRetryMelodyAudio={onRetryMelodyAudio}
-        hasMelodyRecipe={hasMelodyRecipe}
-      />
+        );
+      })}
     </section>
   );
 }
