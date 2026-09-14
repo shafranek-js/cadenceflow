@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { addRestToProgression } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -10,7 +11,7 @@ async function waitForStudio(page: Page): Promise<void> {
 test.describe("Progression step dismissal", () => {
   test("keeps Rest settings in Selected step and restores focus after Escape", async ({ page }) => {
     await waitForStudio(page);
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
 
     const restSelect = page.getByRole("button", {
       name: "Select progression step 1: Rest",
@@ -103,7 +104,8 @@ test.describe("Progression step dismissal", () => {
     await expect(first).toHaveAttribute("data-selected", "true");
 
     // A modal receives Escape first; the underlying progression stays selected.
-    await page.getByTestId("progression-presets-btn").click();
+    await page.getByTestId("progression-heading").getByRole("heading", { name: "My Progression" }).click({ button: "right" });
+    await page.getByTestId("progression-menu-presets").click();
     await expect(page.getByRole("dialog", { name: "Presets" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Presets" })).toHaveCount(0);

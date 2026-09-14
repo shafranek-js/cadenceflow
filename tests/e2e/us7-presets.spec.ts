@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { addRestToProgression } from "./test-helpers/progression-settings";
+
+async function openPresetsFromHeader(page: import("@playwright/test").Page) {
+  const heading = page.getByTestId("progression-heading");
+  await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
+  await page.getByTestId("progression-menu-presets").click();
+}
+
+async function openSaveAsPresetFromHeader(page: import("@playwright/test").Page) {
+  const heading = page.getByTestId("progression-heading");
+  await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
+  await page.getByTestId("progression-menu-save-as-preset").click();
+}
 
 test.describe("US7 — Functional Presets Acceptance (T118)", () => {
   test.beforeEach(async ({ page }) => {
@@ -280,7 +293,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await expect(steps.nth(0)).toHaveClass(/is-selected/);
 
     // Open Presets and Apply Major ii–V–I
-    await page.getByTestId("progression-presets-btn").click();
+    await openPresetsFromHeader(page);
     await page.getByTestId("apply-preset-builtin-major-ii-v-i").click();
 
     // Select Append to End
@@ -327,7 +340,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await expect(steps.nth(1)).toHaveClass(/is-selected/);
 
     // Open Presets and Apply Major ii–V–I
-    await page.getByTestId("progression-presets-btn").click();
+    await openPresetsFromHeader(page);
     await page.getByTestId("apply-preset-builtin-major-ii-v-i").click();
 
     const applyDialog = page.locator(".preset-apply-dialog");
@@ -424,7 +437,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     // Create Chord -> Rest -> Chord
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
@@ -503,12 +516,12 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await page.getByLabel("Musical Dynamic Label").selectOption("ff");
 
     // Save as Custom Preset
-    await page.getByTestId("progression-save-preset-btn").click();
+    await openSaveAsPresetFromHeader(page);
     await page.locator("#preset-name-input").fill("Performance Test Preset");
     await page.getByTestId("save-preset-confirm-btn").click();
 
     // Now apply the preset using Replace
-    await page.getByTestId("progression-presets-btn").click();
+    await openPresetsFromHeader(page);
     const customSection = page.locator(".presets-section").filter({ hasText: "Custom Presets" });
     await customSection.getByRole("button", { name: "Apply", exact: true }).click();
     await page.click('input[name="preset-apply-mode"][value="replace"]');

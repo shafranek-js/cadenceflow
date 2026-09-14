@@ -2587,6 +2587,8 @@ export function App() {
             loopState={loopState}
             onSetLoopMode={handleSetLoopMode}
             onSetLoopRange={handleSetLoopRange}
+            onOpenPresets={() => setPresetsPanelOpen(true)}
+            onSaveAsPreset={() => setSavePresetDialogOpen(true)}
           />
         )
       }
@@ -2601,24 +2603,6 @@ export function App() {
           >
             <div className="progression-title-group">
               <h2>My Progression</h2>
-              <div className="progression-preset-actions">
-                <button
-                  type="button"
-                  className="secondary-btn presets-trigger-btn"
-                  onClick={() => setPresetsPanelOpen(true)}
-                  data-testid="progression-presets-btn"
-                >
-                  Presets
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn save-preset-trigger-btn"
-                  onClick={() => setSavePresetDialogOpen(true)}
-                  data-testid="progression-save-preset-btn"
-                >
-                  Save as Preset
-                </button>
-              </div>
               <div className="progression-heading-transport-cluster">
                 <ProgressionTransportControls
                   selectedStepId={project.progression.selectedStepId}
@@ -2849,6 +2833,8 @@ export function App() {
               onSetMeasuresPerSystem={changeMeasuresPerSystem}
               onDuplicateAllSteps={duplicateAllSteps}
               onAddRest={() => addRest()}
+              onOpenPresets={() => setPresetsPanelOpen(true)}
+              onSaveAsPreset={() => setSavePresetDialogOpen(true)}
               onClearAllSteps={clearAllProgressionSteps}
               onClose={() => setProgressionMenu(null)}
             />

@@ -53,6 +53,8 @@ export interface ProgressionContextMenuProps {
   readonly onSetMeasuresPerSystem?: ((measures: MeasuresPerSystem | "auto") => void) | undefined;
   readonly onDuplicateAllSteps?: (() => void) | undefined;
   readonly onAddRest?: (() => void) | undefined;
+  readonly onOpenPresets?: (() => void) | undefined;
+  readonly onSaveAsPreset?: (() => void) | undefined;
   readonly onClearAllSteps?: (() => void) | undefined;
   readonly onClose: () => void;
 }
@@ -119,6 +121,8 @@ export function ProgressionContextMenu({
   onSetMeasuresPerSystem,
   onDuplicateAllSteps,
   onAddRest,
+  onOpenPresets,
+  onSaveAsPreset,
   onClearAllSteps,
   onClose,
 }: ProgressionContextMenuProps) {
@@ -647,6 +651,41 @@ export function ProgressionContextMenu({
               <span className="score-system-submenu-arrow">▸</span>
             </span>
           </button>
+        ) : null}
+
+        {/* Presets */}
+        {onOpenPresets || onSaveAsPreset ? (
+          <>
+            <div className="score-system-menu-separator" role="separator" />
+            {onOpenPresets ? (
+              <button
+                ref={registerRef(btnIndex++)}
+                type="button"
+                role="menuitem"
+                data-testid="progression-menu-presets"
+                onClick={() => {
+                  onOpenPresets();
+                  onClose();
+                }}
+              >
+                Presets...
+              </button>
+            ) : null}
+            {onSaveAsPreset ? (
+              <button
+                ref={registerRef(btnIndex++)}
+                type="button"
+                role="menuitem"
+                data-testid="progression-menu-save-as-preset"
+                onClick={() => {
+                  onSaveAsPreset();
+                  onClose();
+                }}
+              >
+                Save as Preset...
+              </button>
+            ) : null}
+          </>
         ) : null}
 
         {/* 5. Clear All */}

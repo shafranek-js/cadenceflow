@@ -1984,6 +1984,13 @@
   color: var(--accent, #58a6ff);
 }
 
+.presets-trigger-btn:disabled,
+.save-preset-trigger-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .presets-panel {
   width: min(880px, 95vw);
   max-height: 85vh;

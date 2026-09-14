@@ -39,6 +39,7 @@ export const DEFAULT_GLOBAL_INSPECTOR_SECTIONS = [
   "groove",
   "loop",
   "tracks",
+  "presets",
   "register",
   "articulation",
   "duration",
@@ -54,8 +55,12 @@ const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
 const GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-groove-disclosure-open";
+const GLOBAL_LOOP_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-loop-disclosure-open";
 const GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-tracks-disclosure-open";
+const GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-presets-disclosure-open";
 const GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-register-disclosure-open";
 const GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY =
@@ -126,6 +131,8 @@ export interface ProgressionGlobalInspectorProps {
   readonly loopState?: LoopState;
   readonly onSetLoopMode?: (mode: LoopMode) => void;
   readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
+  readonly onOpenPresets?: (() => void) | undefined;
+  readonly onSaveAsPreset?: (() => void) | undefined;
 }
 
 export function ProgressionGlobalInspector({
@@ -148,9 +155,14 @@ export function ProgressionGlobalInspector({
   loopState,
   onSetLoopMode,
   onSetLoopRange,
+  onOpenPresets,
+  onSaveAsPreset,
 }: ProgressionGlobalInspectorProps) {
   const [tracksOpen, setTracksOpen] = useState(() =>
     readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
+  );
+  const [presetsOpen, setPresetsOpen] = useState(() =>
+    readDisclosureState(GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY, true),
   );
   const [registerOpen, setRegisterOpen] = useState(() =>
     readDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, true),
@@ -366,6 +378,65 @@ export function ProgressionGlobalInspector({
                     {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
                   />
                 ) : null}
+              </div>
+            </div>
+          </details>
+        ) : null;
+
+      case "presets":
+        return onOpenPresets || onSaveAsPreset ? (
+          <details
+            className="inspector-disclosure global-presets-disclosure presets-disclosure"
+            data-testid="global-presets-disclosure"
+            open={presetsOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setPresetsOpen(open);
+              persistDisclosureState(GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("presets", "Presets")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Presets
+              </span>
+              <span className="disclosure-status">
+                {stepCount === 0 ? "Empty" : `${stepCount} steps`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="inspector-group" role="group" aria-label="Progression presets">
+                <p className="inspector-helper" style={{ margin: "0 0 8px" }}>
+                  Load built-in and custom harmonic progressions, or save the current sequence.
+                </p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {onOpenPresets ? (
+                    <button
+                      type="button"
+                      className="secondary-btn presets-trigger-btn"
+                      onClick={onOpenPresets}
+                      data-testid="progression-presets-btn"
+                    >
+                      Presets
+                    </button>
+                  ) : null}
+                  {onSaveAsPreset ? (
+                    <button
+                      type="button"
+                      className="secondary-btn save-preset-trigger-btn"
+                      onClick={onSaveAsPreset}
+                      data-testid="progression-save-preset-btn"
+                      title="Save current progression as a custom preset"
+                    >
+                      Save as Preset
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </details>
