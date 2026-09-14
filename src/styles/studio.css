@@ -1117,7 +1117,7 @@
 .progression-track {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  padding-top: 24px;
 }
 .progression-view-control {
   display: flex;

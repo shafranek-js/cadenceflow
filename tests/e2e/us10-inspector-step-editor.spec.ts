@@ -4,6 +4,7 @@ import {
   ensurePreviewHarmonyVisible,
   ensureRecommendationContextVisible,
 } from "./test-helpers/global-settings";
+import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -373,7 +374,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       await addChord(page, "V");
       await expect(page.getByTestId("progression-measure")).toHaveCount(3);
       await page.getByLabel("Progression Card View").selectOption("staff");
-      await page.getByLabel("Measures Layout", { exact: true }).selectOption("1");
+      await setLayoutMeasuresPerSystem(page, 1);
 
       const score = page.getByTestId("progression-score-systems");
       await expect(score.locator(".score-system")).toHaveCount(3);

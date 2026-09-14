@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { startBranchAlternative } from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -131,8 +132,7 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
     await page.getByRole("button", { name: "Stop", exact: true }).click();
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
 
-    await page.getByLabel("Branch origin").selectOption({ label: "After 1: bIII" });
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page, 0);
     await expect(page.getByTestId("branch-controls-active")).toContainText("Temporary branch");
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
     expect(await readProgression(page)).toEqual(progressionBeforePlayback);

@@ -18,7 +18,6 @@ export function ViewModeToggle({
     <div
       className="view-mode-toggle"
       role="group"
-      aria-label={selectAriaLabel}
       data-testid={`${testIdPrefix}-toggle`}
     >
       <button

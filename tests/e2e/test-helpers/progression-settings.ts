@@ -55,3 +55,15 @@ export async function addRestToProgression(page: Page): Promise<void> {
   await page.getByTestId("progression-menu-add-rest").click();
 }
 
+/** Starts a branch alternative via the My Progression context menu. */
+export async function startBranchAlternative(page: Page, stepIndex?: number): Promise<void> {
+  const heading = page.getByTestId("progression-heading");
+  await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
+  await page.getByTestId("progression-menu-open-explore-alternative").hover();
+  if (stepIndex !== undefined) {
+    await page.getByTestId(`progression-menu-branch-step-${stepIndex}`).click();
+  } else {
+    await page.getByTestId("progression-menu-branch-end").click();
+  }
+}
+
