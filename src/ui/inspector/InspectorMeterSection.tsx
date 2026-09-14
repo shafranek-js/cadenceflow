@@ -7,6 +7,7 @@ export interface InspectorMeterSectionProps {
   readonly onSetMeter: (newMeter: Meter, policy: MeterChangePolicy) => void;
   readonly defaultOpen?: boolean;
   readonly storageKey?: string;
+  readonly dragHandle?: React.ReactNode;
 }
 
 function readDisclosureState(key?: string, fallback: boolean = true): boolean {
@@ -24,6 +25,7 @@ export function InspectorMeterSection({
   onSetMeter,
   defaultOpen = true,
   storageKey,
+  dragHandle,
 }: InspectorMeterSectionProps) {
   const [isOpen, setIsOpen] = useState(() => readDisclosureState(storageKey, defaultOpen));
 
@@ -125,7 +127,10 @@ export function InspectorMeterSection({
       }}
     >
       <summary>
-        <span>Time signature &amp; meter</span>
+        <span>
+          {dragHandle}
+          Time signature &amp; meter
+        </span>
         <span className="disclosure-status">
           {currentMeter.numerator}/{currentMeter.denominator} ({currentMeter.grouping.join("+")})
         </span>

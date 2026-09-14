@@ -9,6 +9,7 @@ export interface InspectorLoopSectionProps {
   readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
   readonly defaultOpen?: boolean | undefined;
   readonly storageKey?: string | undefined;
+  readonly dragHandle?: React.ReactNode;
 }
 
 function readDisclosureState(key?: string | undefined, fallback: boolean = true): boolean {
@@ -28,6 +29,7 @@ export function InspectorLoopSection({
   onSetLoopRange,
   defaultOpen = true,
   storageKey,
+  dragHandle,
 }: InspectorLoopSectionProps) {
   const [isOpen, setIsOpen] = useState(() => readDisclosureState(storageKey, defaultOpen));
 
@@ -48,7 +50,10 @@ export function InspectorLoopSection({
       }}
     >
       <summary>
-        <span>Loop Settings</span>
+        <span>
+          {dragHandle}
+          Loop Settings
+        </span>
         <span className="disclosure-status">
           {loopState.mode === "disabled" ? "Off" : loopState.mode === "all" ? "All" : "Range"}
         </span>

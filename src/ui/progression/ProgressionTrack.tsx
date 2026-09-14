@@ -2,7 +2,6 @@ import {
   useRef,
   useMemo,
   useState,
-  type ChangeEvent,
   type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
@@ -34,8 +33,6 @@ import { ScoreSystemView } from "../staff/ScoreSystemView";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
 import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
-import { MelodyTrackControls } from "../melody/MelodyTrackControls";
-import { HarmonyTrackControls } from "../harmony/HarmonyTrackControls";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 import type {
@@ -63,29 +60,26 @@ export function ProgressionTrack({
   onSelectStep,
   onClearSelection,
   onEditPerformance,
-  onSetProgressionView,
   onRemove,
+  onDuplicateStep,
+  onInsertStepBefore,
+  onInsertStepAfter,
+  activeMatrixFunctionId,
+  selectedMatrixChordName,
   onReorder,
-  onAddRest,
   onFocusMatrix,
   onFillGapWithRest,
   onExtendFinalChord,
   onRepeatFinalChord,
   onSetMelodyRecipe,
   onRemoveMelodyRecipe,
-  onMelodyTrackSettingsChange,
-  onHarmonyTrackSettingsChange,
   activeMelodyEventKey,
   melodyAudioState,
   melodyAudioError,
   onRetryMelodyAudio,
-  harmonyAudioState,
-  harmonyAudioError,
-  onRetryHarmonyAudio,
   isMelodyPreviewPlaying,
   onPlayMelodyPreview,
   onStopMelodyPreview,
-  onSetMeasuresPerSystem,
   onDuplicateSystem,
   onDeleteSystem,
   isSystemLooping,
@@ -120,6 +114,11 @@ export function ProgressionTrack({
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onSetProgressionView: (view: ProgressionView) => void;
   readonly onRemove: (stepId: string) => void;
+  readonly onDuplicateStep?: ((stepId: string) => void) | undefined;
+  readonly onInsertStepBefore?: ((targetStepId: string, functionId: string) => void) | undefined;
+  readonly onInsertStepAfter?: ((targetStepId: string, functionId: string) => void) | undefined;
+  readonly activeMatrixFunctionId?: string | undefined;
+  readonly selectedMatrixChordName?: string | undefined;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
   readonly onAddRest?: (duration?: MusicalDuration) => void;
   readonly onFocusMatrix?: (measureNumber: number) => void;
@@ -129,7 +128,7 @@ export function ProgressionTrack({
   readonly onSetMelodyRecipe?: (
     stepId: string,
     recipe: ChordMelodyRecipe,
-    instrument: MelodyInstrument,
+    instrumentOverride?: MelodyInstrument,
   ) => void;
   readonly onRemoveMelodyRecipe?: (stepId: string) => void;
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
@@ -165,11 +164,14 @@ export function ProgressionTrack({
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
+  readonly onSetArticulationSystem?:
+    ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?:
+    ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onOpenProgressionMenu?: ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
+  readonly onOpenProgressionMenu?:
+    ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -209,10 +211,8 @@ export function ProgressionTrack({
   );
 
   const openMelodyMenu = (stepId: string, anchor: HTMLElement, position?: MelodyMenuPosition) => {
-    const step = project.progression.steps.find(
-      (candidate) => candidate.id === stepId && candidate.kind === "chord",
-    );
-    if (!step || step.kind !== "chord") return;
+    const step = project.progression.steps.find((candidate) => candidate.id === stepId);
+    if (!step) return;
     const rect = anchor.getBoundingClientRect();
     melodyInvokerRef.current = anchor;
     if (project.progression.selectedStepId !== stepId) onSelectStep(stepId);
@@ -354,7 +354,6 @@ export function ProgressionTrack({
     setMatrixGapHint(measureNumber);
   };
 
-
   const renderRest = (fragment: ProgressionMeasureFragment) => {
     const step = fragment.step;
     const index = fragment.stepIndex;
@@ -380,6 +379,7 @@ export function ProgressionTrack({
           data-playing={isPlaying ? "true" : undefined}
           data-in-loop={isInLoop ? "true" : undefined}
           onClick={() => onSelectStep(step.id)}
+          onContextMenu={(event) => openMelodyMenuFromEvent(step.id, event)}
         >
           <span
             className="progression-step-number"
@@ -401,6 +401,7 @@ export function ProgressionTrack({
               event.stopPropagation();
               onSelectStep(step.id);
             }}
+            onContextMenu={(event) => openMelodyMenuFromEvent(step.id, event)}
             aria-label={`Select progression step ${index + 1}: Rest${isPlaying ? ", Playing" : ""}`}
             aria-pressed={isSelected}
             aria-current={isPlaying ? "step" : undefined}
@@ -691,9 +692,9 @@ export function ProgressionTrack({
       {melodyMenu
         ? (() => {
             const step = project.progression.steps.find(
-              (candidate) => candidate.id === melodyMenu.stepId && candidate.kind === "chord",
+              (candidate) => candidate.id === melodyMenu.stepId,
             );
-            if (!step || step.kind !== "chord") return null;
+            if (!step) return null;
             return (
               <MelodyContextMenu
                 step={step}
@@ -710,6 +711,39 @@ export function ProgressionTrack({
                 }}
                 onRemove={() => {
                   onRemoveMelodyRecipe?.(step.id);
+                  setMelodyMenu(null);
+                }}
+                onDuplicate={
+                  onDuplicateStep
+                    ? () => {
+                        onDuplicateStep(step.id);
+                        setMelodyMenu(null);
+                      }
+                    : undefined
+                }
+                onInsertSelectedBefore={
+                  onInsertStepBefore
+                    ? activeMatrixFunctionId
+                      ? () => {
+                          onInsertStepBefore(step.id, activeMatrixFunctionId);
+                          setMelodyMenu(null);
+                        }
+                      : null
+                    : undefined
+                }
+                onInsertSelectedAfter={
+                  onInsertStepAfter
+                    ? activeMatrixFunctionId
+                      ? () => {
+                          onInsertStepAfter(step.id, activeMatrixFunctionId);
+                          setMelodyMenu(null);
+                        }
+                      : null
+                    : undefined
+                }
+                selectedMatrixChordName={selectedMatrixChordName}
+                onDeleteStep={() => {
+                  onRemove(step.id);
                   setMelodyMenu(null);
                 }}
                 onClose={() => {
@@ -734,8 +768,8 @@ export function ProgressionTrack({
                 project={project}
                 restoreFocusRef={melodyInvokerRef}
                 onClose={() => setMelodyEditorStepId(null)}
-                onApply={(recipe, instrument) => {
-                  onSetMelodyRecipe(step.id, recipe, instrument);
+                onApply={(recipe, instrumentOverride) => {
+                  onSetMelodyRecipe(step.id, recipe, instrumentOverride);
                   setMelodyEditorStepId(null);
                 }}
                 {...(onPlayMelodyPreview ? { onPlayPreview: onPlayMelodyPreview } : {})}

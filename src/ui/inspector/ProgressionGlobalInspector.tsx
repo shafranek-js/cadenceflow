@@ -29,6 +29,26 @@ import { InspectorGrooveSection } from "./InspectorGrooveSection";
 import { InspectorLoopSection } from "./InspectorLoopSection";
 import type { LoopMode, LoopState } from "../transport/loopState";
 import { Icon } from "../common/Icon";
+import { useReorderableSections } from "./useReorderableSections";
+
+export const GLOBAL_INSPECTOR_SECTION_ORDER_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-inspector-section-order";
+
+export const DEFAULT_GLOBAL_INSPECTOR_SECTIONS = [
+  "meter",
+  "groove",
+  "loop",
+  "tracks",
+  "register",
+  "articulation",
+  "duration",
+  "dynamics",
+  "bass",
+  "view",
+  "measures",
+] as const;
+
+export type GlobalInspectorSectionId = (typeof DEFAULT_GLOBAL_INSPECTOR_SECTIONS)[number];
 
 const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
@@ -235,116 +255,124 @@ export function ProgressionGlobalInspector({
     onBatchPerformanceChange({ perNoteVelocityOverrides: {} });
   };
 
-  return (
-    <section
-      className="progression-global-inspector inspector"
-      aria-label="Progression Global Settings"
-      data-scope="global"
-      data-testid="progression-global-inspector"
-    >
-      <header className="progression-global-header">
-        <div>
-          <span className="inspector-context-kicker">My Progression</span>
-          <h3>All Steps &amp; Measures</h3>
-          <span className="template-status is-inherited">
-            {stepCount === 0
-              ? "0 steps · Empty progression"
-              : `${measureCount} measure${measureCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
-          </span>
-        </div>
-        <button
-          type="button"
-          disabled={chordStepCount === 0}
-          onClick={onResetAll}
-          className="inspector-header-icon-btn reset-all-steps-btn"
-          aria-label="Reset all progression steps to defaults"
-          title="Reset all progression steps to defaults"
-        >
-          <Icon name="reset" />
-        </button>
-      </header>
+  const {
+    order: sectionOrder,
+    isCustomOrder,
+    resetOrder,
+    getSectionItemProps,
+    getDragHandleProps,
+  } = useReorderableSections<GlobalInspectorSectionId>({
+    storageKey: GLOBAL_INSPECTOR_SECTION_ORDER_STORAGE_KEY,
+    defaultOrder: DEFAULT_GLOBAL_INSPECTOR_SECTIONS,
+  });
 
-      {stepCount === 0 ? (
-        <p className="hint-text" style={{ padding: "12px 16px" }}>
-          No steps in progression. Add chords from the Harmonic Matrix to apply global progression
-          settings.
-        </p>
-      ) : null}
+  const renderSectionContent = (sectionId: GlobalInspectorSectionId) => {
+    switch (sectionId) {
+      case "meter":
+        return onSetMeter ? (
+          <InspectorMeterSection
+            currentMeter={currentMeter}
+            onSetMeter={onSetMeter}
+            storageKey={GLOBAL_METER_DISCLOSURE_STORAGE_KEY}
+            dragHandle={
+              <span
+                {...getDragHandleProps("meter", "Time signature & meter")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                ⋮⋮
+              </span>
+            }
+          />
+        ) : null;
 
-      {/* Time Signature & Meter */}
-      {onSetMeter ? (
-        <InspectorMeterSection
-          currentMeter={currentMeter}
-          onSetMeter={onSetMeter}
-          storageKey={GLOBAL_METER_DISCLOSURE_STORAGE_KEY}
-        />
-      ) : null}
+      case "groove":
+        return onSetGroove ? (
+          <InspectorGrooveSection
+            groove={project.groove}
+            onSetGroove={onSetGroove}
+            defaultOpen={false}
+            storageKey={GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY}
+            dragHandle={
+              <span
+                {...getDragHandleProps("groove", "Groove & swing")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                ⋮⋮
+              </span>
+            }
+          />
+        ) : null;
 
-      {/* Groove & Swing */}
-      {onSetGroove ? (
-        <InspectorGrooveSection
-          groove={project.groove}
-          onSetGroove={onSetGroove}
-          defaultOpen={false}
-          storageKey={GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY}
-        />
-      ) : null}
+      case "loop":
+        return loopState && onSetLoopMode ? (
+          <InspectorLoopSection
+            loopState={loopState}
+            steps={project.progression.steps}
+            onSetLoopMode={onSetLoopMode}
+            onSetLoopRange={onSetLoopRange}
+            defaultOpen={false}
+            storageKey="cadenceflow.ui.progression-global-loop-disclosure-open"
+            dragHandle={
+              <span
+                {...getDragHandleProps("loop", "Loop Settings")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                ⋮⋮
+              </span>
+            }
+          />
+        ) : null;
 
-      {/* Loop Controls */}
-      {loopState && onSetLoopMode ? (
-        <InspectorLoopSection
-          loopState={loopState}
-          steps={project.progression.steps}
-          onSetLoopMode={onSetLoopMode}
-          onSetLoopRange={onSetLoopRange}
-          defaultOpen={false}
-          storageKey="cadenceflow.ui.progression-global-loop-disclosure-open"
-        />
-      ) : null}
-
-      {/* Tracks & Audio Mixer */}
-      {onHarmonyTrackSettingsChange ? (
-        <details
-          className="inspector-disclosure global-tracks-disclosure"
-          open={tracksOpen}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            setTracksOpen(open);
-            persistDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, open);
-          }}
-        >
-          <summary>
-            <span>Tracks &amp; audio mixer</span>
-            <span className="disclosure-status">
-              {project.harmonyTrack.muted ? "Muted" : "Active"}
-            </span>
-          </summary>
-          <div className="inspector-disclosure-body">
-            <div className="global-tracks-mixer">
-              <HarmonyTrackControls
-                settings={project.harmonyTrack}
-                onChange={onHarmonyTrackSettingsChange}
-                {...(harmonyAudioState ? { providerState: harmonyAudioState } : {})}
-                {...(harmonyAudioError !== undefined ? { providerError: harmonyAudioError } : {})}
-                {...(onRetryHarmonyAudio ? { onRetry: onRetryHarmonyAudio } : {})}
-              />
-              {hasMelodyRecipe && onMelodyTrackSettingsChange ? (
-                <MelodyTrackControls
-                  settings={project.melodyTrack}
-                  onChange={onMelodyTrackSettingsChange}
-                  {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
-                  {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
-                  {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
+      case "tracks":
+        return onHarmonyTrackSettingsChange ? (
+          <details
+            className="inspector-disclosure global-tracks-disclosure"
+            open={tracksOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setTracksOpen(open);
+              persistDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("tracks", "Tracks & audio mixer")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Tracks &amp; audio mixer
+              </span>
+              <span className="disclosure-status">
+                {project.harmonyTrack.muted ? "Muted" : "Active"}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div className="global-tracks-mixer">
+                <HarmonyTrackControls
+                  settings={project.harmonyTrack}
+                  onChange={onHarmonyTrackSettingsChange}
+                  {...(harmonyAudioState ? { providerState: harmonyAudioState } : {})}
+                  {...(harmonyAudioError !== undefined ? { providerError: harmonyAudioError } : {})}
+                  {...(onRetryHarmonyAudio ? { onRetry: onRetryHarmonyAudio } : {})}
                 />
-              ) : null}
+                {hasMelodyRecipe && onMelodyTrackSettingsChange ? (
+                  <MelodyTrackControls
+                    settings={project.melodyTrack}
+                    onChange={onMelodyTrackSettingsChange}
+                    {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+                    {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+                    {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
+                  />
+                ) : null}
+              </div>
             </div>
-          </div>
-        </details>
-      ) : null}
+          </details>
+        ) : null;
 
-      {stepCount > 0 ? (
-        <>
-          {/* Register */}
+      case "register":
+        return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-register-disclosure"
             open={registerOpen}
@@ -355,7 +383,15 @@ export function ProgressionGlobalInspector({
             }}
           >
             <summary>
-              <span>Register</span>
+              <span>
+                <span
+                  {...getDragHandleProps("register", "Register")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Register
+              </span>
               <span className="disclosure-status">
                 {commonRegister === "auto"
                   ? "Auto"
@@ -372,8 +408,10 @@ export function ProgressionGlobalInspector({
               />
             </div>
           </details>
+        ) : null;
 
-          {/* Articulation */}
+      case "articulation":
+        return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-articulation-disclosure"
             open={articulationOpen}
@@ -384,7 +422,15 @@ export function ProgressionGlobalInspector({
             }}
           >
             <summary>
-              <span>Articulation</span>
+              <span>
+                <span
+                  {...getDragHandleProps("articulation", "Articulation")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Articulation
+              </span>
               <span className="disclosure-status">{commonArticulation}</span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -400,8 +446,10 @@ export function ProgressionGlobalInspector({
               </fieldset>
             </div>
           </details>
+        ) : null;
 
-          {/* Duration */}
+      case "duration":
+        return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-duration-disclosure"
             open={durationOpen}
@@ -412,7 +460,15 @@ export function ProgressionGlobalInspector({
             }}
           >
             <summary>
-              <span>Duration</span>
+              <span>
+                <span
+                  {...getDragHandleProps("duration", "Duration")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Duration
+              </span>
               <span className="disclosure-status">
                 {formatMusicalDuration(commonDuration)} beats
               </span>
@@ -433,8 +489,10 @@ export function ProgressionGlobalInspector({
               </div>
             </div>
           </details>
+        ) : null;
 
-          {/* Dynamics & Velocity */}
+      case "dynamics":
+        return stepCount > 0 ? (
           <details
             className="inspector-disclosure dynamics-disclosure"
             open={dynamicsOpen}
@@ -445,7 +503,15 @@ export function ProgressionGlobalInspector({
             }}
           >
             <summary>
-              <span>Dynamics &amp; velocity</span>
+              <span>
+                <span
+                  {...getDragHandleProps("dynamics", "Dynamics & velocity")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Dynamics &amp; velocity
+              </span>
               <span className="disclosure-status">Velocity: {commonMasterVelocity}</span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -525,8 +591,10 @@ export function ProgressionGlobalInspector({
               </div>
             </div>
           </details>
+        ) : null;
 
-          {/* Bass Voice */}
+      case "bass":
+        return stepCount > 0 ? (
           <details
             className="inspector-disclosure bass-disclosure"
             open={bassOpen}
@@ -537,7 +605,15 @@ export function ProgressionGlobalInspector({
             }}
           >
             <summary>
-              <span>Bass voice</span>
+              <span>
+                <span
+                  {...getDragHandleProps("bass", "Bass voice")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Bass voice
+              </span>
               <span className="disclosure-status">
                 {commonBassChoice === "auto" ? "Auto" : `Note: ${commonBassChoice}`}
               </span>
@@ -597,128 +673,206 @@ export function ProgressionGlobalInspector({
               </div>
             </div>
           </details>
-        </>
+        ) : null;
+
+      case "view":
+        return onSetProgressionView ? (
+          <details
+            className="inspector-disclosure progression-view-disclosure"
+            open={progressionViewOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setProgressionViewOpen(open);
+              persistDisclosureState(GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("view", "Progression view")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Progression view
+              </span>
+              <span className="disclosure-status">{project.presentation.progressionView}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div
+                className="view-preference-toggle"
+                role="radiogroup"
+                aria-label="Progression View Selection"
+              >
+                <button
+                  type="button"
+                  className={project.presentation.progressionView === "harmonic" ? "is-active" : ""}
+                  onClick={() => onSetProgressionView("harmonic")}
+                  aria-label="Harmonic view"
+                >
+                  Harmonic
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.progressionView === "piano" ? "is-active" : ""}
+                  onClick={() => onSetProgressionView("piano")}
+                  aria-label="Piano view"
+                >
+                  Piano
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.progressionView === "staff" ? "is-active" : ""}
+                  onClick={() => onSetProgressionView("staff")}
+                  aria-label="Staff view"
+                >
+                  Staff
+                </button>
+              </div>
+            </div>
+          </details>
+        ) : null;
+
+      case "measures":
+        return onSetMeasuresPerSystem && project.presentation.progressionView === "staff" ? (
+          <details
+            className="inspector-disclosure measures-per-system-disclosure"
+            open={measuresLayoutOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setMeasuresLayoutOpen(open);
+              persistDisclosureState(GLOBAL_MEASURES_LAYOUT_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("measures", "Measures per system")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Measures per system
+              </span>
+              <span className="disclosure-status">
+                {project.presentation.measuresPerSystem === "auto"
+                  ? "Auto"
+                  : `${project.presentation.measuresPerSystem} / system`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div
+                className="view-preference-toggle"
+                role="radiogroup"
+                aria-label="Measures per system selection"
+              >
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === "auto" ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem("auto")}
+                  aria-label="Auto responsive layout"
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 4 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(4)}
+                  aria-label="4 measures per system"
+                >
+                  4 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 3 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(3)}
+                  aria-label="3 measures per system"
+                >
+                  3 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 2 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(2)}
+                  aria-label="2 measures per system"
+                >
+                  2 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 1 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(1)}
+                  aria-label="1 measure per system"
+                >
+                  1 Bar
+                </button>
+              </div>
+            </div>
+          </details>
+        ) : null;
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <section
+      className="progression-global-inspector inspector"
+      aria-label="Progression Global Settings"
+      data-scope="global"
+      data-testid="progression-global-inspector"
+    >
+      <header className="progression-global-header">
+        <div>
+          <h3>All Steps &amp; Measures</h3>
+          <span className="template-status is-inherited">
+            {stepCount === 0
+              ? "0 steps · Empty progression"
+              : `${measureCount} measure${measureCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: "4px" }}>
+          {isCustomOrder ? (
+            <button
+              type="button"
+              onClick={resetOrder}
+              className="inspector-header-icon-btn reset-sections-order-btn"
+              aria-label="Reset inspector sections order to default"
+              title="Reset inspector sections order to default"
+            >
+              <Icon name="undo" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={chordStepCount === 0}
+            onClick={onResetAll}
+            className="inspector-header-icon-btn reset-all-steps-btn"
+            aria-label="Reset all progression steps to defaults"
+            title="Reset all progression steps to defaults"
+          >
+            <Icon name="reset" />
+          </button>
+        </div>
+      </header>
+
+      {stepCount === 0 ? (
+        <p className="hint-text" style={{ padding: "12px 16px" }}>
+          No steps in progression. Add chords from the Harmonic Matrix to apply global progression
+          settings.
+        </p>
       ) : null}
 
-      {/* Global My Progression View */}
-      {onSetProgressionView ? (
-        <details
-          className="inspector-disclosure progression-view-disclosure"
-          open={progressionViewOpen}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            setProgressionViewOpen(open);
-            persistDisclosureState(GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY, open);
-          }}
-        >
-          <summary>
-            <span>Progression view</span>
-            <span className="disclosure-status">{project.presentation.progressionView}</span>
-          </summary>
-          <div className="inspector-disclosure-body">
-            <div
-              className="view-preference-toggle"
-              role="radiogroup"
-              aria-label="Progression View Selection"
-            >
-              <button
-                type="button"
-                className={project.presentation.progressionView === "harmonic" ? "is-active" : ""}
-                onClick={() => onSetProgressionView("harmonic")}
-                aria-label="Harmonic view"
-              >
-                Harmonic
-              </button>
-              <button
-                type="button"
-                className={project.presentation.progressionView === "piano" ? "is-active" : ""}
-                onClick={() => onSetProgressionView("piano")}
-                aria-label="Piano view"
-              >
-                Piano
-              </button>
-              <button
-                type="button"
-                className={project.presentation.progressionView === "staff" ? "is-active" : ""}
-                onClick={() => onSetProgressionView("staff")}
-                aria-label="Staff view"
-              >
-                Staff
-              </button>
-            </div>
+      {sectionOrder.map((sectionId) => {
+        const content = renderSectionContent(sectionId);
+        if (!content) return null;
+        return (
+          <div key={sectionId} {...getSectionItemProps(sectionId)}>
+            {content}
           </div>
-        </details>
-      ) : null}
-
-      {/* Measures per system */}
-      {onSetMeasuresPerSystem && project.presentation.progressionView === "staff" ? (
-        <details
-          className="inspector-disclosure measures-per-system-disclosure"
-          open={measuresLayoutOpen}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            setMeasuresLayoutOpen(open);
-            persistDisclosureState(GLOBAL_MEASURES_LAYOUT_STORAGE_KEY, open);
-          }}
-        >
-          <summary>
-            <span>Measures per system</span>
-            <span className="disclosure-status">
-              {project.presentation.measuresPerSystem === "auto"
-                ? "Auto"
-                : `${project.presentation.measuresPerSystem} / system`}
-            </span>
-          </summary>
-          <div className="inspector-disclosure-body">
-            <div
-              className="view-preference-toggle"
-              role="radiogroup"
-              aria-label="Measures per system selection"
-            >
-              <button
-                type="button"
-                className={project.presentation.measuresPerSystem === "auto" ? "is-active" : ""}
-                onClick={() => onSetMeasuresPerSystem("auto")}
-                aria-label="Auto responsive layout"
-              >
-                Auto
-              </button>
-              <button
-                type="button"
-                className={project.presentation.measuresPerSystem === 4 ? "is-active" : ""}
-                onClick={() => onSetMeasuresPerSystem(4)}
-                aria-label="4 measures per system"
-              >
-                4 Bars
-              </button>
-              <button
-                type="button"
-                className={project.presentation.measuresPerSystem === 3 ? "is-active" : ""}
-                onClick={() => onSetMeasuresPerSystem(3)}
-                aria-label="3 measures per system"
-              >
-                3 Bars
-              </button>
-              <button
-                type="button"
-                className={project.presentation.measuresPerSystem === 2 ? "is-active" : ""}
-                onClick={() => onSetMeasuresPerSystem(2)}
-                aria-label="2 measures per system"
-              >
-                2 Bars
-              </button>
-              <button
-                type="button"
-                className={project.presentation.measuresPerSystem === 1 ? "is-active" : ""}
-                onClick={() => onSetMeasuresPerSystem(1)}
-                aria-label="1 measure per system"
-              >
-                1 Bar
-              </button>
-            </div>
-          </div>
-        </details>
-      ) : null}
+        );
+      })}
 
       <p className="hint-text" style={{ padding: "12px 16px 4px" }}>
         These settings apply globally to all cards in all measures of My Progression.

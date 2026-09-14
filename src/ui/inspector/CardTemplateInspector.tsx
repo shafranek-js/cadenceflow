@@ -12,6 +12,19 @@ import { ArticulationControl } from "./ArticulationControl";
 import { RegisterControl } from "./RegisterControl";
 import { StepDurationControl } from "../timing/StepDurationControl";
 import { Icon } from "../common/Icon";
+import { useReorderableSections } from "./useReorderableSections";
+
+export const CARD_TEMPLATE_SECTION_ORDER_STORAGE_KEY =
+  "cadenceflow.ui.card-template-section-order";
+
+export const DEFAULT_CARD_TEMPLATE_SECTIONS = [
+  "register",
+  "articulation",
+  "duration",
+  "velocity",
+] as const;
+
+export type CardTemplateSectionId = (typeof DEFAULT_CARD_TEMPLATE_SECTIONS)[number];
 
 const TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.template-register-disclosure-open";
 const TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY =
@@ -72,6 +85,186 @@ export function CardTemplateInspector({
     : resolveStepCreationDefaults(project.defaults.piano, card?.explicitOverrides);
   const keys = isGlobal ? Object.freeze([]) : matrixCardOverrideKeys(card);
   const count = isGlobal ? 0 : matrixCardOverrideCount(card);
+  const {
+    order: sectionOrder,
+    isCustomOrder,
+    resetOrder,
+    getSectionItemProps,
+    getDragHandleProps,
+  } = useReorderableSections<CardTemplateSectionId>({
+    storageKey: CARD_TEMPLATE_SECTION_ORDER_STORAGE_KEY,
+    defaultOrder: DEFAULT_CARD_TEMPLATE_SECTIONS,
+  });
+
+  const renderSectionContent = (sectionId: CardTemplateSectionId) => {
+    switch (sectionId) {
+      case "register":
+        return (
+          <details
+            className="inspector-disclosure template-register-disclosure"
+            open={registerOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setRegisterOpen(open);
+              persistDisclosureState(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("register", "Register")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Register
+              </span>
+              <span className="disclosure-status">
+                {resolved.performance.register === "auto"
+                  ? "Auto"
+                  : `${resolved.performance.register > 0 ? "+" : ""}${resolved.performance.register} oct.`}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <RegisterControl
+                value={resolved.performance.register}
+                showLabel={false}
+                ariaLabelPrefix={isGlobal ? "Template octave shift: " : undefined}
+                onChange={(register) => onPerformancePatch({ register })}
+              />
+            </div>
+          </details>
+        );
+
+      case "articulation":
+        return (
+          <details
+            className="inspector-disclosure template-articulation-disclosure"
+            open={articulationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setArticulationOpen(open);
+              persistDisclosureState(TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("articulation", "Articulation")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Articulation
+              </span>
+              <span className="disclosure-status">{resolved.performance.articulation}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <ArticulationControl
+                value={resolved.performance.articulation}
+                showLabel={false}
+                ariaLabelPrefix={isGlobal ? "Template playback: " : undefined}
+                onChange={(articulation) => onPerformancePatch({ articulation })}
+              />
+            </div>
+          </details>
+        );
+
+      case "duration":
+        return (
+          <details
+            className="inspector-disclosure template-duration-disclosure"
+            open={durationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setDurationOpen(open);
+              persistDisclosureState(TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("duration", "Duration")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Duration
+              </span>
+              <span className="disclosure-status">
+                {resolved.duration.beats.numerator}/{resolved.duration.beats.denominator} beats
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div data-testid="matrix-template-duration">
+                <StepDurationControl
+                  variant="buttons"
+                  value={resolved.duration}
+                  onChange={onDurationChange}
+                  id={
+                    isGlobal
+                      ? "matrix-template-duration-global"
+                      : `matrix-template-duration-${functionId}`
+                  }
+                  label=""
+                  testIdPrefix={isGlobal ? "matrix-template-" : undefined}
+                  buttonAriaLabelPrefix={isGlobal ? "Template " : undefined}
+                  customInputAriaLabel={isGlobal ? "Template beats" : undefined}
+                  setButtonAriaLabel={isGlobal ? "Set template duration in beats" : undefined}
+                />
+              </div>
+            </div>
+          </details>
+        );
+
+      case "velocity":
+        return (
+          <details
+            className="inspector-disclosure template-velocity-disclosure"
+            open={velocityOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setVelocityOpen(open);
+              persistDisclosureState(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("velocity", "Master velocity")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Master velocity
+              </span>
+              <span className="disclosure-status">{resolved.performance.masterVelocity}</span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <label>
+                {isGlobal ? "Template Velocity" : "Master Velocity"}
+                <input
+                  type="number"
+                  min="1"
+                  max="127"
+                  aria-label={isGlobal ? "Template Velocity" : "Master Velocity"}
+                  value={resolved.performance.masterVelocity}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    onPerformancePatch({
+                      masterVelocity: Math.max(1, Math.min(127, Number(event.target.value))),
+                    })
+                  }
+                />
+              </label>
+            </div>
+          </details>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <section
       className="card-template-inspector"
@@ -104,134 +297,41 @@ export function CardTemplateInspector({
                 : "Inheriting defaults · Inherited"}
           </span>
         </div>
-        <button
-          type="button"
-          className="inspector-header-icon-btn"
-          disabled={isGlobal ? false : count === 0}
-          onClick={onReset}
-          aria-label={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
-          title={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
-        >
-          <Icon name="reset" />
-        </button>
+        <div style={{ display: "flex", gap: "4px" }}>
+          {isCustomOrder ? (
+            <button
+              type="button"
+              onClick={resetOrder}
+              className="inspector-header-icon-btn reset-sections-order-btn"
+              aria-label="Reset sections order to default"
+              title="Reset sections order to default"
+            >
+              <Icon name="undo" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="inspector-header-icon-btn"
+            disabled={isGlobal ? false : count === 0}
+            onClick={onReset}
+            aria-label={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+            title={isGlobal ? "Reset All Cards to Defaults" : "Reset Card to Defaults"}
+          >
+            <Icon name="reset" />
+          </button>
+        </div>
       </header>
-      <details
-        className="inspector-disclosure template-register-disclosure"
-        open={registerOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setRegisterOpen(open);
-          persistDisclosureState(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Register</span>
-          <span className="disclosure-status">
-            {resolved.performance.register === "auto"
-              ? "Auto"
-              : `${resolved.performance.register > 0 ? "+" : ""}${resolved.performance.register} oct.`}
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <RegisterControl
-            value={resolved.performance.register}
-            showLabel={false}
-            ariaLabelPrefix={isGlobal ? "Template octave shift: " : undefined}
-            onChange={(register) => onPerformancePatch({ register })}
-          />
-        </div>
-      </details>
 
-      <details
-        className="inspector-disclosure template-articulation-disclosure"
-        open={articulationOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setArticulationOpen(open);
-          persistDisclosureState(TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Articulation</span>
-          <span className="disclosure-status">{resolved.performance.articulation}</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <ArticulationControl
-            value={resolved.performance.articulation}
-            showLabel={false}
-            ariaLabelPrefix={isGlobal ? "Template playback: " : undefined}
-            onChange={(articulation) => onPerformancePatch({ articulation })}
-          />
-        </div>
-      </details>
-
-      <details
-        className="inspector-disclosure template-duration-disclosure"
-        open={durationOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setDurationOpen(open);
-          persistDisclosureState(TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Duration</span>
-          <span className="disclosure-status">
-            {resolved.duration.beats.numerator}/{resolved.duration.beats.denominator} beats
-          </span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <div data-testid="matrix-template-duration">
-            <StepDurationControl
-              variant="buttons"
-              value={resolved.duration}
-              onChange={onDurationChange}
-              id={
-                isGlobal
-                  ? "matrix-template-duration-global"
-                  : `matrix-template-duration-${functionId}`
-              }
-              label=""
-              testIdPrefix={isGlobal ? "matrix-template-" : undefined}
-              buttonAriaLabelPrefix={isGlobal ? "Template " : undefined}
-              customInputAriaLabel={isGlobal ? "Template beats" : undefined}
-              setButtonAriaLabel={isGlobal ? "Set template duration in beats" : undefined}
-            />
+      {sectionOrder.map((sectionId) => {
+        const content = renderSectionContent(sectionId);
+        if (!content) return null;
+        return (
+          <div key={sectionId} {...getSectionItemProps(sectionId)}>
+            {content}
           </div>
-        </div>
-      </details>
+        );
+      })}
 
-      <details
-        className="inspector-disclosure template-velocity-disclosure"
-        open={velocityOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          setVelocityOpen(open);
-          persistDisclosureState(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, open);
-        }}
-      >
-        <summary>
-          <span>Master velocity</span>
-          <span className="disclosure-status">{resolved.performance.masterVelocity}</span>
-        </summary>
-        <div className="inspector-disclosure-body">
-          <label>
-            {isGlobal ? "Template Velocity" : "Master Velocity"}
-            <input
-              type="number"
-              min="1"
-              max="127"
-              aria-label={isGlobal ? "Template Velocity" : "Master Velocity"}
-              value={resolved.performance.masterVelocity}
-              onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                onPerformancePatch({
-                  masterVelocity: Math.max(1, Math.min(127, Number(event.target.value))),
-                })
-              }
-            />
-          </label>
-        </div>
-      </details>
       {isGlobal ? (
         <p>These settings apply globally to all cards in the Harmonic Matrix.</p>
       ) : keys.length ? (

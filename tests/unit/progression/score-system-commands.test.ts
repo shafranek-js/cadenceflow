@@ -4,10 +4,12 @@ import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands"
 import {
   reorderSteps,
   insertStepsAfter,
+  insertStepsBefore,
   batchPatchSteps,
   restoreProgression,
   type ReorderStepsCommand,
   type InsertStepsAfterCommand,
+  type InsertStepsBeforeCommand,
   type BatchPatchStepsCommand,
   type RestoreProgressionCommand,
   type StepPatch,
@@ -146,6 +148,46 @@ describe("Score System Commands & Playback", () => {
     });
   });
 
+  describe("insertStepsBefore", () => {
+    it("inserts steps before a given step with undo", () => {
+      const base = createDefaultProject("p-insert-before", "Test Insert Before", T0);
+      const s1 = createMatrixChordStep(base, "I", "step-1");
+      const s2 = createMatrixChordStep(base, "V", "step-2");
+      const initial = withSteps(base, [s1, s2]);
+
+      const restStep: RestStep = Object.freeze({
+        id: "rest-0",
+        kind: "rest",
+        duration: musicalDuration(rational(4, 1)),
+      });
+
+      const command: InsertStepsBeforeCommand = {
+        type: "progression/insert-steps-before",
+        payload: { beforeStepId: "step-2", steps: [restStep], nowIso: T1 },
+      };
+
+      const result = insertStepsBefore(initial, command);
+      expect(result.project.progression.steps.map((s) => s.id)).toEqual(["step-1", "rest-0", "step-2"]);
+      expect(result.inverse.type).toBe("progression/restore");
+
+      // Undo
+      const restored = restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project;
+      expect(restored.progression.steps.map((s) => s.id)).toEqual(["step-1", "step-2"]);
+    });
+
+    it("throws if beforeStepId is not found", () => {
+      const base = createDefaultProject("p-insert-err2", "Test Insert Err 2", T0);
+      const s1 = createMatrixChordStep(base, "I", "step-1");
+      const initial = withSteps(base, [s1]);
+
+      const command: InsertStepsBeforeCommand = {
+        type: "progression/insert-steps-before",
+        payload: { beforeStepId: "nonexistent", steps: [], nowIso: T1 },
+      };
+      expect(() => insertStepsBefore(initial, command)).toThrow(/not found/);
+    });
+  });
+
   describe("batchPatchSteps", () => {
     it("patches performance (octave, articulation) across specific steps with undo", () => {
       const base = createDefaultProject("p-patch", "Test Patch", T0);
@@ -227,15 +269,43 @@ describe("Score System Commands & Playback", () => {
         type: "progression/batch-patch-steps",
         payload: {
           updates: [
-            { stepId: "step-1", patch: { melody: { pattern: "up", grid: "eighth", octaveOffset: 0 } } },
-            { stepId: "step-2", patch: { melody: { pattern: "up", grid: "eighth", octaveOffset: 0 } } },
+            {
+              stepId: "step-1",
+              patch: {
+                melody: {
+                  pitchMotion: "up",
+                  rhythm: "even",
+                  connection: "retrigger",
+                  grid: "eighth",
+                  octaveOffset: 0,
+                },
+              },
+            },
+            {
+              stepId: "step-2",
+              patch: {
+                melody: {
+                  pitchMotion: "up",
+                  rhythm: "even",
+                  connection: "retrigger",
+                  grid: "eighth",
+                  octaveOffset: 0,
+                },
+              },
+            },
           ],
           nowIso: T1,
         },
       };
       const withMelody = batchPatchSteps(initial, applyCmd);
       const step1 = withMelody.project.progression.steps[0] as ChordStep;
-      expect(step1.melody).toEqual({ pattern: "up", grid: "eighth", octaveOffset: 0 });
+      expect(step1.melody).toEqual({
+        pitchMotion: "up",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "eighth",
+        octaveOffset: 0,
+      });
 
       // Clear melody contour
       const clearCmd: BatchPatchStepsCommand = {

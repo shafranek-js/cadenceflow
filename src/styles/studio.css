@@ -3219,6 +3219,78 @@ summary:focus-visible,
   padding: 0 9px 10px;
 }
 
+/* Reorderable Inspector Sections */
+.inspector-reorderable-section {
+  position: relative;
+  transition: opacity 0.15s ease;
+}
+
+.inspector-reorderable-section.is-dragging {
+  opacity: 0.35;
+}
+
+.inspector-reorderable-section.drag-over-before::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--accent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.inspector-reorderable-section.drag-over-after::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--accent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.inspector-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0.4;
+  user-select: none;
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: -1px;
+  vertical-align: middle;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.inspector-drag-handle:hover,
+.inspector-drag-handle:focus-visible {
+  opacity: 1;
+  color: var(--accent);
+  outline: none;
+}
+
+.inspector-drag-handle:active {
+  cursor: grabbing;
+}
+
+.inspector-disclosure > summary:hover .inspector-drag-handle {
+  opacity: 0.75;
+}
+
+
 .inspector-helper {
   margin: 0;
   color: var(--text-muted);

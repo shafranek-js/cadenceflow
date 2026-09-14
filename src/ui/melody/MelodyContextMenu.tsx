@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import type { ChordStep } from "../../domain/progression/step";
+import type { ProgressionStep } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
@@ -17,17 +17,23 @@ export interface MelodyMenuPosition {
 }
 
 export interface MelodyContextMenuProps {
-  readonly step: ChordStep;
+  readonly step: ProgressionStep;
   readonly position: MelodyMenuPosition;
   readonly invoker: HTMLElement;
-  readonly tonic?: PitchClassIdentity;
-  readonly onCreate: () => void;
-  readonly onEdit: () => void;
-  readonly onRemove: () => void;
+  readonly tonic?: PitchClassIdentity | undefined;
+  readonly onCreate?: (() => void) | undefined;
+  readonly onEdit?: (() => void) | undefined;
+  readonly onRemove?: (() => void) | undefined;
+  readonly onDuplicate?: (() => void) | undefined;
+  readonly onInsertSelectedBefore?: (() => void) | null | undefined;
+  readonly onInsertSelectedAfter?: (() => void) | null | undefined;
+  readonly selectedMatrixChordName?: string | undefined;
+  readonly onDeleteStep?: (() => void) | undefined;
   readonly onClose: () => void;
 }
 
-function sourceLabel(step: ChordStep, tonic: PitchClassIdentity): string {
+function sourceLabel(step: ProgressionStep, tonic: PitchClassIdentity): string {
+  if (step.kind === "rest") return "Rest";
   return formatChordSymbol({
     ...realizeChord(step.harmonicFunction, tonic),
     variant: step.harmonicVariant,
@@ -42,12 +48,18 @@ export function MelodyContextMenu({
   onCreate,
   onEdit,
   onRemove,
+  onDuplicate,
+  onInsertSelectedBefore,
+  onInsertSelectedAfter,
+  selectedMatrixChordName,
+  onDeleteStep,
   onClose,
 }: MelodyContextMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-  const hasRecipe = step.melody !== undefined;
+  const isChord = step.kind === "chord";
+  const hasRecipe = isChord && step.melody !== undefined;
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -62,7 +74,10 @@ export function MelodyContextMenu({
   }, [position]);
 
   useEffect(() => {
-    const frameId = requestAnimationFrame(() => itemRefs.current[0]?.focus());
+    const frameId = requestAnimationFrame(() => {
+      const firstEnabled = itemRefs.current.find((btn) => btn && !btn.disabled);
+      firstEnabled?.focus();
+    });
     const handleOutsidePointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !menuRef.current?.contains(event.target)) onClose();
     };
@@ -84,9 +99,9 @@ export function MelodyContextMenu({
   }, [invoker, onClose]);
 
   const focusItem = (index: number) => {
-    const count = itemRefs.current.length;
-    if (!count) return;
-    itemRefs.current[(index + count) % count]?.focus();
+    const items = itemRefs.current.filter((item): item is HTMLButtonElement => item !== null);
+    if (!items.length) return;
+    items[(index + items.length) % items.length]?.focus();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -117,7 +132,9 @@ export function MelodyContextMenu({
       case " ":
         event.preventDefault();
         event.stopPropagation();
-        if (document.activeElement instanceof HTMLButtonElement) document.activeElement.click();
+        if (document.activeElement instanceof HTMLButtonElement && !document.activeElement.disabled) {
+          document.activeElement.click();
+        }
         break;
       case "Escape":
         event.preventDefault();
@@ -127,12 +144,21 @@ export function MelodyContextMenu({
     }
   };
 
-  const menuItems = hasRecipe
-    ? [
-        { label: "Edit Melody…", action: onEdit },
-        { label: "Remove Melody", action: onRemove },
-      ]
-    : [{ label: "Create Melody…", action: onCreate }];
+  const melodyItems: Array<{ label: string; action?: () => void }> = isChord
+    ? hasRecipe
+      ? [
+          ...(onEdit ? [{ label: "Edit Melody…", action: onEdit }] : []),
+          ...(onRemove ? [{ label: "Remove Melody", action: onRemove }] : []),
+        ]
+      : [...(onCreate ? [{ label: "Create Melody…", action: onCreate }] : [])]
+    : [];
+
+  const deleteLabel = isChord ? "Delete Chord" : "Delete Rest";
+  const insertChordLabel = selectedMatrixChordName
+    ? `${selectedMatrixChordName}`
+    : "Selected Chord (None Selected)";
+
+  let btnIndex = 0;
 
   return (
     <div
@@ -145,19 +171,104 @@ export function MelodyContextMenu({
       onKeyDownCapture={handleKeyDown}
       data-testid="melody-context-menu"
     >
-      {menuItems.map((item, index) => (
-        <button
-          key={item.label}
-          ref={(node) => {
-            itemRefs.current[index] = node;
-          }}
-          type="button"
-          role="menuitem"
-          onClick={item.action}
-        >
-          {item.label}
-        </button>
-      ))}
+      {/* 1. Melody items */}
+      {melodyItems.map((item) => {
+        const index = btnIndex++;
+        return (
+          <button
+            key={item.label}
+            ref={(node) => {
+              itemRefs.current[index] = node;
+            }}
+            type="button"
+            role="menuitem"
+            onClick={item.action}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+
+      {/* 2. Chord / Step Operations */}
+      {isChord && onDuplicate ? (
+        <>
+          {melodyItems.length > 0 ? (
+            <div className="melody-context-menu-separator" role="separator" />
+          ) : null}
+          <button
+            ref={(node) => {
+              itemRefs.current[btnIndex++] = node;
+            }}
+            type="button"
+            role="menuitem"
+            data-testid="step-menu-duplicate"
+            onClick={onDuplicate}
+          >
+            Duplicate Chord
+          </button>
+        </>
+      ) : null}
+
+      {onInsertSelectedBefore !== undefined || onInsertSelectedAfter !== undefined ? (
+        <>
+          {melodyItems.length > 0 && !onDuplicate ? (
+            <div className="melody-context-menu-separator" role="separator" />
+          ) : null}
+          <button
+            ref={(node) => {
+              itemRefs.current[btnIndex++] = node;
+            }}
+            type="button"
+            role="menuitem"
+            disabled={!onInsertSelectedBefore}
+            data-testid="step-menu-insert-before"
+            title={
+              onInsertSelectedBefore
+                ? undefined
+                : "Select a chord in the Harmonic Matrix to insert"
+            }
+            onClick={onInsertSelectedBefore ?? undefined}
+          >
+            Insert {insertChordLabel} Before
+          </button>
+          <button
+            ref={(node) => {
+              itemRefs.current[btnIndex++] = node;
+            }}
+            type="button"
+            role="menuitem"
+            disabled={!onInsertSelectedAfter}
+            data-testid="step-menu-insert-after"
+            title={
+              onInsertSelectedAfter
+                ? undefined
+                : "Select a chord in the Harmonic Matrix to insert"
+            }
+            onClick={onInsertSelectedAfter ?? undefined}
+          >
+            Insert {insertChordLabel} After
+          </button>
+        </>
+      ) : null}
+
+      {/* 3. Delete Action */}
+      {onDeleteStep ? (
+        <>
+          <div className="melody-context-menu-separator" role="separator" />
+          <button
+            ref={(node) => {
+              itemRefs.current[btnIndex++] = node;
+            }}
+            type="button"
+            role="menuitem"
+            className="danger"
+            data-testid="step-menu-delete"
+            onClick={onDeleteStep}
+          >
+            {deleteLabel}
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

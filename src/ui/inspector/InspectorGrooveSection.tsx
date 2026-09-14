@@ -6,6 +6,7 @@ export interface InspectorGrooveSectionProps {
   readonly onSetGroove: (groove: GrooveSettings) => void;
   readonly defaultOpen?: boolean;
   readonly storageKey?: string;
+  readonly dragHandle?: React.ReactNode;
 }
 
 function readDisclosureState(key?: string, fallback: boolean = true): boolean {
@@ -23,6 +24,7 @@ export function InspectorGrooveSection({
   onSetGroove,
   defaultOpen = true,
   storageKey,
+  dragHandle,
 }: InspectorGrooveSectionProps) {
   const [isOpen, setIsOpen] = useState(() => readDisclosureState(storageKey, defaultOpen));
   const swingSliderId = useId();
@@ -73,7 +75,10 @@ export function InspectorGrooveSection({
       }}
     >
       <summary>
-        <span>Groove &amp; swing</span>
+        <span>
+          {dragHandle}
+          Groove &amp; swing
+        </span>
         <span className="disclosure-status">
           {groove.feel === "swing" ? `Swing ${Math.round(groove.swingAmount * 100)}%` : "Straight"}
         </span>

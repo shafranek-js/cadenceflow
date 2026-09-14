@@ -448,9 +448,7 @@ export function duplicateSteps(project: Project, command: DuplicateStepsCommand)
       ...source,
       id,
       performance: snapshotStepPerformance(source.performance),
-      ...(source.melody !== undefined
-        ? { melody: snapshotChordMelodyRecipe(source.melody) }
-        : {}),
+      ...(source.melody !== undefined ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
       ...(source.explicitSpellingOverrides
         ? { explicitSpellingOverrides: Object.freeze({ ...source.explicitSpellingOverrides }) }
         : {}),
@@ -521,6 +519,34 @@ export function insertStepsAfter(
   );
 }
 
+export interface InsertStepsBeforePayload {
+  readonly beforeStepId: string;
+  readonly steps: readonly ProgressionStep[];
+  readonly nowIso: string;
+}
+export type InsertStepsBeforeCommand = ProjectCommand<InsertStepsBeforePayload> & {
+  readonly type: "progression/insert-steps-before";
+};
+/** Inserts arbitrary steps immediately before a given step ID. */
+export function insertStepsBefore(
+  project: Project,
+  command: InsertStepsBeforeCommand,
+): AppliedCommand {
+  const index = project.progression.steps.findIndex(
+    (step) => step.id === command.payload.beforeStepId,
+  );
+  if (index === -1) {
+    throw new Error(`Step ${command.payload.beforeStepId} not found in progression`);
+  }
+  const current = [...project.progression.steps];
+  current.splice(index, 0, ...command.payload.steps);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(current) }),
+    command.payload.nowIso,
+  );
+}
+
 export interface StepPatch {
   readonly performance?: Partial<StepPerformance>;
   readonly melody?: ChordMelodyRecipe | null;
@@ -537,10 +563,7 @@ export type BatchPatchStepsCommand = ProjectCommand<BatchPatchStepsPayload> & {
   readonly type: "progression/batch-patch-steps";
 };
 /** Applies performance and/or melody patches across an arbitrary set of steps. */
-export function batchPatchSteps(
-  project: Project,
-  command: BatchPatchStepsCommand,
-): AppliedCommand {
+export function batchPatchSteps(project: Project, command: BatchPatchStepsCommand): AppliedCommand {
   const patchMap = new Map(command.payload.updates.map((u) => [u.stepId, u.patch]));
   const steps = project.progression.steps.map((step) => {
     const patch = patchMap.get(step.id);
@@ -570,11 +593,18 @@ export function batchPatchSteps(
       updatedMelody = snapshotChordMelodyRecipe(patch.melody);
     }
 
-    const { melody: _prevMelody, ...rest } = step;
+    const {
+      melody: _prevMelody,
+      melodyInstrumentOverride: _prevMelodyInstrumentOverride,
+      ...rest
+    } = step;
     const updatedChord: ChordStep = Object.freeze({
       ...rest,
       performance: updatedPerformance,
       ...(updatedMelody !== undefined ? { melody: updatedMelody } : {}),
+      ...(patch.melody !== null && step.melodyInstrumentOverride !== undefined
+        ? { melodyInstrumentOverride: step.melodyInstrumentOverride }
+        : {}),
     });
     return updatedChord;
   });
@@ -585,4 +615,3 @@ export function batchPatchSteps(
     command.payload.nowIso,
   );
 }
-
