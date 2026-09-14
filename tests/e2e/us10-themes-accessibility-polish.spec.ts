@@ -229,14 +229,12 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
       .click({ position: { x: 8, y: 8 } });
     await expect(page.getByRole("menu", { name: "Project actions" })).not.toBeVisible();
 
-    const resetSummary = page.locator(".matrix-reset-menu summary");
-    await resetSummary.click();
-    await expect(page.getByRole("button", { name: "Reset Current Module" })).toBeVisible();
-    await resetSummary.focus();
+    const settingsToggle = page.getByTestId("global-settings-toggle");
+    await settingsToggle.click();
+    await expect(page.getByTestId("global-settings-panel")).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.locator(".matrix-reset-menu")).not.toHaveAttribute("open", "");
-    await expect(page.getByRole("button", { name: "Reset Current Module" })).not.toBeVisible();
-    await expect(resetSummary).toBeFocused();
+    await expect(page.getByTestId("global-settings-panel")).not.toBeVisible();
+    await expect(settingsToggle).toBeFocused();
 
     await projectToggle.click();
     await page.getByTestId("rename-project-btn").click();

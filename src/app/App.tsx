@@ -57,6 +57,7 @@ import { BranchControls } from "../ui/progression/BranchControls";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
+import { ViewModeToggle } from "../ui/common/ViewModeToggle";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
 import { RestStepInspector } from "../ui/inspector/RestStepInspector";
@@ -2323,8 +2324,6 @@ export function App() {
           onTonicChange={changeTonic}
           onTemplateOpen={(functionId) => setSettingsFunctionId(functionId)}
           onTemplateReset={resetCard}
-          onResetCurrentModule={() => resetMatrix("current-module")}
-          onResetAllModules={() => resetMatrix("all-modules")}
           onStaffOctaveChange={changeMatrixStaffOctave}
           onClearSelection={clearMatrixSelection}
         />
@@ -2352,6 +2351,7 @@ export function App() {
             onPerformancePatch={patchTemplatePerformance}
             onDurationChange={patchTemplateDuration}
             onReset={resetTemplate}
+            onResetCurrentModule={() => resetMatrix("current-module")}
           />
         </>
       }
@@ -2529,15 +2529,23 @@ export function App() {
                 </nav>
               </div>
             </div>
-            <BranchControls
-              project={project}
-              selectedBranchStepIds={selectedBranchStepIds}
-              onStart={startExploration}
-              onRejoin={setRejoin}
-              onCommitWhole={commitWhole}
-              onCommitSelected={commitSelected}
-              onDiscard={discard}
-            />
+            <div className="progression-heading-actions">
+              <BranchControls
+                project={project}
+                selectedBranchStepIds={selectedBranchStepIds}
+                onStart={startExploration}
+                onRejoin={setRejoin}
+                onCommitWhole={commitWhole}
+                onCommitSelected={commitSelected}
+                onDiscard={discard}
+              />
+              <ViewModeToggle
+                currentView={project.presentation.progressionView}
+                onChangeView={changeProgressionView}
+                selectAriaLabel="Progression Card View"
+                testIdPrefix="progression-view"
+              />
+            </div>
           </div>
           <ProgressionTrack
             project={project}

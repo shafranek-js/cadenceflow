@@ -182,7 +182,7 @@ describe("Progression step selection dismissal", () => {
 
     act(() => first.click());
     expect(container.querySelector(".card-view-switcher")).toBeNull();
-    expect(container.querySelector('[aria-label="Progression Card View"]')).not.toBeNull();
+    expect(container.querySelector(".progression-track")).not.toBeNull();
     act(() => root.unmount());
   });
 

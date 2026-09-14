@@ -905,6 +905,75 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius-card);
 }
+.progression-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height, 26px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control, 3px);
+  background: var(--surface-2, #1e222a);
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+  flex-shrink: 0;
+}
+.view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 100%;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.view-mode-btn:last-of-type {
+  border-right: none;
+}
+.view-mode-btn:hover {
+  background: var(--surface-hover, #262c37);
+  color: var(--text);
+}
+.view-mode-btn.is-active,
+.view-mode-btn[aria-pressed="true"] {
+  background: var(--surface-selected, #2c3544);
+  color: var(--accent, #8fd0ff);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--accent, #8fd0ff);
+}
+.view-mode-btn:focus-visible {
+  outline: 2px solid var(--focus, #8fd0ff);
+  outline-offset: -1px;
+  z-index: 1;
+}
+.view-mode-hidden-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .branch-comparison {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3337,6 +3406,13 @@ summary:focus-visible,
 .card-template-inspector header > div,
 .progression-global-inspector header > div {
   min-width: 0;
+}
+
+.inspector-header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
 }
 
 .card-template-inspector .inspector-context-kicker,

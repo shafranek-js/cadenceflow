@@ -14,8 +14,9 @@ import { ChordCard } from "../chord-card/ChordCard";
 import { FunctionalLayer } from "./FunctionalLayer";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
-import { MatrixResetMenu } from "../settings/MatrixResetMenu";
+import { ViewModeToggle } from "../common/ViewModeToggle";
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
+import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 
 function cardKey(identity: HarmonicFunctionIdentity): string {
   return identity.functionId;
@@ -33,8 +34,8 @@ export function HarmonicMatrix({
   onTonicChange,
   onTemplateOpen,
   onTemplateReset,
-  onResetCurrentModule,
-  onResetAllModules,
+  onResetCurrentModule: _onResetCurrentModule,
+  onResetAllModules: _onResetAllModules,
   onStaffOctaveChange,
   onClearSelection,
 }: {
@@ -49,8 +50,8 @@ export function HarmonicMatrix({
   readonly onTonicChange: (tonic: number) => void;
   readonly onTemplateOpen: (functionId: string) => void;
   readonly onTemplateReset: (functionId: string) => void;
-  readonly onResetCurrentModule: () => void;
-  readonly onResetAllModules: () => void;
+  readonly onResetCurrentModule?: () => void;
+  readonly onResetAllModules?: () => void;
   readonly onStaffOctaveChange: (functionId: string, direction: StaffOctaveDirection) => void;
   readonly onClearSelection?: () => void;
 }) {
@@ -123,7 +124,13 @@ export function HarmonicMatrix({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (event.key !== "Escape" || !previewFunctionId || !onClearSelection) return;
+    if (
+      isAppShortcutProtectedTarget(event.target) ||
+      event.key !== "Escape" ||
+      !previewFunctionId ||
+      !onClearSelection
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
     onClearSelection();
@@ -144,20 +151,11 @@ export function HarmonicMatrix({
           onChange={onTonicChange}
         />
         <div className="matrix-toolbar-actions">
-          <select
-            value={project.presentation.globalMatrixCardView}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              onGlobalView(event.target.value as CardViewId)
-            }
-            aria-label="Global Card View"
-          >
-            <option value="harmonic">Harmonic</option>
-            <option value="piano">Piano</option>
-            <option value="staff">Staff</option>
-          </select>
-          <MatrixResetMenu
-            onResetCurrentModule={onResetCurrentModule}
-            onResetAllModules={onResetAllModules}
+          <ViewModeToggle
+            currentView={project.presentation.globalMatrixCardView}
+            onChangeView={onGlobalView}
+            selectAriaLabel="Global Card View"
+            testIdPrefix="matrix-view"
           />
         </div>
       </header>

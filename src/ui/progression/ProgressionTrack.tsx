@@ -354,9 +354,6 @@ export function ProgressionTrack({
     setMatrixGapHint(measureNumber);
   };
 
-  const handleProgressionViewChange = (view: ProgressionView) => {
-    onSetProgressionView(view);
-  };
 
   const renderRest = (fragment: ProgressionMeasureFragment) => {
     const step = fragment.step;
@@ -618,22 +615,6 @@ export function ProgressionTrack({
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
     >
-      <div className="progression-view-control">
-        <label>
-          Progression View
-          <select
-            aria-label="Progression Card View"
-            value={project.presentation.progressionView}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              handleProgressionViewChange(event.target.value as ProgressionView)
-            }
-          >
-            <option value="harmonic">Harmonic</option>
-            <option value="piano">Piano</option>
-            <option value="staff">Staff</option>
-          </select>
-        </label>
-      </div>
       <div
         className="progression-step-cards"
         data-view={project.presentation.progressionView}
