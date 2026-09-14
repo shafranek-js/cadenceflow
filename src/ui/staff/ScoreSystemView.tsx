@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ExactPitch } from "../../domain/harmony/pitch";
 import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
-import type { ChordMelodyRecipe, MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
+import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -32,18 +32,17 @@ import {
   type StaffSystemPosition,
 } from "../../notation/vexflowAdapter";
 import type {
+  MelodyInstrumentLane,
   MelodyStaffEntry,
   MelodyStaffMeasure,
   MelodyTimeline,
 } from "../../notation/melodyStaffProjection";
 import { Icon } from "../common/Icon";
 import type { MelodyMenuPosition } from "../melody/MelodyContextMenu";
+import { melodyInstrumentLabel } from "../melody/labels";
 import type { MeasureStaffItem } from "./MeasureStaffView";
 import { performanceOctaveShiftPatch } from "./staffOctave";
-import {
-  ScoreSystemContextMenu,
-  type ScoreSystemMenuPosition,
-} from "./ScoreSystemContextMenu";
+import { ScoreSystemContextMenu, type ScoreSystemMenuPosition } from "./ScoreSystemContextMenu";
 
 const DEFAULT_SCORE_WIDTH_PX = 960;
 const SCORE_STAFF_HEIGHT_PX = 160;
@@ -142,8 +141,8 @@ function melodySequenceEntry(
   };
 }
 
-function scoreSystemHeight(hasMelody: boolean, showBass: boolean): number {
-  const rows = Number(hasMelody) + 1 + Number(showBass);
+function scoreSystemHeight(melodyLaneCount: number, showBass: boolean): number {
+  const rows = melodyLaneCount + 1 + Number(showBass);
   return rows * SCORE_STAFF_HEIGHT_PX + Math.max(0, rows - 1) * SCORE_STAFF_GAP_PX;
 }
 
@@ -194,12 +193,13 @@ function melodyEventRatio(
   displayWidthPx: number,
   projectedMeasure: ScoreSystem["measures"][number],
   entry: MelodyStaffEntry,
+  laneId: string,
   renderedPositions: Readonly<Record<string, number>>,
   barLengthBeats: number,
   showBass: boolean,
 ): number {
   return (
-    renderedPositions[positionKey("melody", entry.key)] ??
+    renderedPositions[positionKey(`melody:${laneId}`, entry.key)] ??
     systemMeasureRatio(
       system,
       displayWidthPx,
@@ -213,37 +213,39 @@ function melodyEventRatio(
 
 function melodyAnnotationRows(
   system: ScoreSystem,
-  melodyTimeline: MelodyTimeline | null,
+  melodyLanes: readonly MelodyInstrumentLane[],
   displayWidthPx: number,
   renderedPositions: Readonly<Record<string, number>>,
   barLengthBeats: number,
   showBass: boolean,
 ): Readonly<Record<string, number>> {
-  if (!melodyTimeline) return {};
   const lastXByRow: number[] = [];
   const rows: Record<string, number> = {};
-  system.measures.forEach((projectedMeasure) => {
-    const measure = melodyTimeline.measures[projectedMeasure.measureIndex];
-    measure?.entries.forEach((entry) => {
-      if (entry.kind !== "note") return;
-      const xRatio = melodyEventRatio(
-        system,
-        displayWidthPx,
-        projectedMeasure,
-        entry,
-        renderedPositions,
-        barLengthBeats,
-        showBass,
-      );
-      const x = Math.min(Math.max(xRatio, 0), 1) * displayWidthPx;
-      let row = lastXByRow.findIndex((lastX) => x - lastX >= MELODY_NOTE_ANNOTATION_MIN_GAP_PX);
-      if (row < 0) {
-        row = lastXByRow.length;
-        lastXByRow.push(x);
-      } else {
-        lastXByRow[row] = x;
-      }
-      rows[`${projectedMeasure.measureIndex}-${entry.key}`] = row;
+  melodyLanes.forEach((lane) => {
+    system.measures.forEach((projectedMeasure) => {
+      const measure = lane.measures[projectedMeasure.measureIndex];
+      measure?.entries.forEach((entry) => {
+        if (entry.kind !== "note") return;
+        const xRatio = melodyEventRatio(
+          system,
+          displayWidthPx,
+          projectedMeasure,
+          entry,
+          lane.instrumentId,
+          renderedPositions,
+          barLengthBeats,
+          showBass,
+        );
+        const x = Math.min(Math.max(xRatio, 0), 1) * displayWidthPx;
+        let row = lastXByRow.findIndex((lastX) => x - lastX >= MELODY_NOTE_ANNOTATION_MIN_GAP_PX);
+        if (row < 0) {
+          row = lastXByRow.length;
+          lastXByRow.push(x);
+        } else {
+          lastXByRow[row] = x;
+        }
+        rows[`${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`] = row;
+      });
     });
   });
   return Object.freeze(rows);
@@ -292,8 +294,10 @@ interface ScoreSystemCanvasProps {
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
+  readonly onSetArticulationSystem?:
+    ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?:
+    ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }
@@ -375,11 +379,16 @@ function ScoreSystemCanvas({
   const currentPitchMotion =
     melodySteps.length > 0 &&
     melodySteps.every((s) => {
-      const motion = s.melody?.pitchMotion ?? (s.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
-      const firstMotion = melodySteps[0]?.melody?.pitchMotion ?? (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      const motion =
+        s.melody?.pitchMotion ??
+        (s.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      const firstMotion =
+        melodySteps[0]?.melody?.pitchMotion ??
+        (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
       return motion === firstMotion;
     })
-      ? (melodySteps[0]?.melody?.pitchMotion ?? (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern)
+      ? (melodySteps[0]?.melody?.pitchMotion ??
+        (melodySteps[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern)
       : undefined;
   const canShiftOctaveUp = chordSteps.some(
     (s) => performanceOctaveShiftPatch(s.performance, 1) !== null,
@@ -392,8 +401,15 @@ function ScoreSystemCanvas({
   const isMuted = isSystemMuted ? isSystemMuted(system) : false;
   const isSolo = isSystemSolo ? isSystemSolo(system) : false;
 
-  const hasMelody = melodyTimeline !== null;
-  const melodyClef = melodyTimeline?.clef;
+  const systemMelodyLanes = useMemo(
+    () =>
+      melodyTimeline?.lanes.filter((lane) =>
+        system.measures.some((measure) =>
+          lane.measures[measure.measureIndex]?.entries.some((entry) => entry.kind === "note"),
+        ),
+      ) ?? [],
+    [melodyTimeline, system.measures],
+  );
   const showBass = project.presentation.showBassInStaff;
   const inputs = useMemo<readonly StaffSystemMeasureInput[]>(
     () =>
@@ -401,21 +417,21 @@ function ScoreSystemCanvas({
         const harmonyEntries = (measureItems[measure.measureIndex] ?? []).map((item) =>
           harmonySequenceEntry(item, playingStepId),
         );
-        const melodyMeasure = melodyTimeline?.measures[measure.measureIndex];
+        const melodyLanes = systemMelodyLanes.map((lane) => ({
+          id: lane.instrumentId,
+          clef: lane.clef,
+          entries: (lane.measures[measure.measureIndex]?.entries ?? []).map((entry) =>
+            melodySequenceEntry(entry, activeMelodyEventKey),
+          ),
+        }));
         return {
           measureIndex: measure.measureIndex,
           widthPx: measure.requiredWidthPx,
           harmonyEntries,
-          ...(melodyMeasure
-            ? {
-                melodyEntries: melodyMeasure.entries.map((entry) =>
-                  melodySequenceEntry(entry, activeMelodyEventKey),
-                ),
-              }
-            : {}),
+          ...(melodyLanes.length > 0 ? { melodyLanes } : {}),
         };
       }),
-    [activeMelodyEventKey, measureItems, melodyTimeline, playingStepId, system.measures],
+    [activeMelodyEventKey, measureItems, playingStepId, system.measures, systemMelodyLanes],
   );
 
   useEffect(() => {
@@ -436,19 +452,18 @@ function ScoreSystemCanvas({
         widthPx: displayWidthPx,
         showBass,
         showTimeSignature: system.index === 0,
-        ...(melodyClef ? { melodyClef } : {}),
       },
     );
     return () => {
       cleanup();
     };
-  }, [inputs, melodyClef, project.globalTiming.meter, showBass, system.index, displayWidthPx]);
+  }, [inputs, project.globalTiming.meter, showBass, system.index, displayWidthPx]);
 
   const barLengthBeats = rationalToNumber(layout.barLengthBeats);
-  const systemHeight = scoreSystemHeight(hasMelody, showBass);
+  const systemHeight = scoreSystemHeight(systemMelodyLanes.length, showBass);
   const melodyRows = melodyAnnotationRows(
     system,
-    melodyTimeline,
+    systemMelodyLanes,
     displayWidthPx,
     renderedPositions,
     barLengthBeats,
@@ -574,6 +589,26 @@ function ScoreSystemCanvas({
               className="score-system-annotations"
               style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
             >
+              {systemMelodyLanes.map((lane, laneIndex) => {
+                const laneLabel = melodyInstrumentLabel(lane.instrumentId);
+                return (
+                  <span
+                    key={`lane-label-${lane.instrumentId}`}
+                    className="score-system-melody-lane-label"
+                    data-testid={`score-system-melody-lane-label-${lane.instrumentId}`}
+                    data-melody-instrument={lane.instrumentId}
+                    role="img"
+                    aria-label={`Melody lane ${laneLabel}`}
+                    style={
+                      {
+                        top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 2}px`,
+                      } as CSSProperties
+                    }
+                  >
+                    {laneLabel}
+                  </span>
+                );
+              })}
               {harmonyAnnotations.map(({ projectedMeasure, item }) => {
                 const xRatio =
                   renderedPositions[positionKey("harmony", item.key)] ??
@@ -603,7 +638,8 @@ function ScoreSystemCanvas({
                   item.kind === "rest"
                     ? "Arrow Left or Arrow Right reorders this step."
                     : "Arrow Up or Arrow Down changes octave; Arrow Left or Arrow Right reorders this step.";
-                const harmonyRowTop = hasMelody ? SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX : 0;
+                const harmonyRowTop =
+                  systemMelodyLanes.length * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX);
                 const style = {
                   "--measure-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
                   "--measure-staff-event-span": `${systemMeasureSpan(system, displayWidthPx, projectedMeasure.measureIndex, Math.max(durationRatio, 0), showBass) * 100}%`,
@@ -626,7 +662,7 @@ function ScoreSystemCanvas({
                       aria-label={`Select ${label}`}
                       aria-pressed={selected}
                       aria-current={playing ? "step" : undefined}
-                      aria-haspopup={chord && onOpenMelodyMenu ? "menu" : undefined}
+                      aria-haspopup={onOpenMelodyMenu ? "menu" : undefined}
                       aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
                       title={`${label}. ${keyboardDescription}`}
                       onClick={(event) => {
@@ -634,10 +670,10 @@ function ScoreSystemCanvas({
                         onSelectStep(item.stepId);
                       }}
                       onContextMenu={(event) => {
-                        if (!chord || !onOpenMelodyMenu) return;
+                        if (!onOpenMelodyMenu) return;
                         event.preventDefault();
                         event.stopPropagation();
-                        onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                        onOpenMelodyMenu(item.stepId, event.currentTarget, {
                           x: event.clientX,
                           y: event.clientY,
                         });
@@ -693,7 +729,6 @@ function ScoreSystemCanvas({
                           }
                         }
                         if (
-                          !chord ||
                           !onOpenMelodyMenu ||
                           (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey))
                         ) {
@@ -702,7 +737,7 @@ function ScoreSystemCanvas({
                         event.preventDefault();
                         event.stopPropagation();
                         const rect = event.currentTarget.getBoundingClientRect();
-                        onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                        onOpenMelodyMenu(item.stepId, event.currentTarget, {
                           x: rect.left,
                           y: rect.bottom,
                         });
@@ -723,7 +758,8 @@ function ScoreSystemCanvas({
                   showBass,
                 );
                 const durationRatio = rationalToNumber(item.duration.beats) / barLengthBeats;
-                const harmonyRowTop = hasMelody ? SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX : 0;
+                const harmonyRowTop =
+                  systemMelodyLanes.length * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX);
                 const gapStyle = {
                   "--measure-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
                   "--measure-staff-event-span": `${systemMeasureSpan(system, displayWidthPx, projectedMeasure.measureIndex, Math.max(durationRatio, 0), showBass) * 100}%`,
@@ -794,48 +830,50 @@ function ScoreSystemCanvas({
                   </div>
                 );
               })}
-              {melodyTimeline
-                ? system.measures.flatMap((projectedMeasure) => {
-                    const measure: MelodyStaffMeasure | undefined =
-                      melodyTimeline.measures[projectedMeasure.measureIndex];
-                    if (!measure) return [];
-                    return measure.entries.flatMap((entry) => {
-                      if (entry.kind !== "note") return [];
-                      const annotationKey = `${projectedMeasure.measureIndex}-${entry.key}`;
-                      const xRatio = melodyEventRatio(
-                        system,
-                        displayWidthPx,
-                        projectedMeasure,
-                        entry,
-                        renderedPositions,
-                        barLengthBeats,
-                        showBass,
-                      );
-                      const selected = selectedStepId === entry.sourceStepId;
-                      const active = activeMelodyEventKey === entry.eventKey;
-                      const label = `Melody ${formatPitch(entry.pitch)}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${sourceChordLabel(project, entry.sourceStepId)}`;
-                      const style = {
-                        "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
-                        top: `${SCORE_LABEL_BAND_PX + 4 + (melodyRows[annotationKey] ?? 0) * MELODY_NOTE_ANNOTATION_ROW_GAP_PX}px`,
-                      } as CSSProperties;
-                      return (
-                        <button
-                          key={`${projectedMeasure.measureIndex}-${entry.key}`}
-                          type="button"
-                          className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"}`.trim()}
-                          style={style}
-                          data-melody-event-key={entry.eventKey}
-                          data-step-id={entry.sourceStepId}
-                          aria-label={label}
-                          aria-pressed={selected}
-                          aria-current={active ? "step" : undefined}
-                          title={label}
-                          onClick={() => onSelectStep(entry.sourceStepId)}
-                        />
-                      );
-                    });
-                  })
-                : null}
+              {systemMelodyLanes.flatMap((lane, laneIndex) =>
+                system.measures.flatMap((projectedMeasure) => {
+                  const measure: MelodyStaffMeasure | undefined =
+                    lane.measures[projectedMeasure.measureIndex];
+                  if (!measure) return [];
+                  return measure.entries.flatMap((entry) => {
+                    if (entry.kind !== "note") return [];
+                    const annotationKey = `${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`;
+                    const xRatio = melodyEventRatio(
+                      system,
+                      displayWidthPx,
+                      projectedMeasure,
+                      entry,
+                      lane.instrumentId,
+                      renderedPositions,
+                      barLengthBeats,
+                      showBass,
+                    );
+                    const selected = selectedStepId === entry.sourceStepId;
+                    const active = activeMelodyEventKey === entry.eventKey;
+                    const label = `Melody ${melodyInstrumentLabel(lane.instrumentId)}, ${formatPitch(entry.pitch)}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${sourceChordLabel(project, entry.sourceStepId)}`;
+                    const style = {
+                      "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
+                      top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 4 + (melodyRows[annotationKey] ?? 0) * MELODY_NOTE_ANNOTATION_ROW_GAP_PX}px`,
+                    } as CSSProperties;
+                    return (
+                      <button
+                        key={`${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`}
+                        type="button"
+                        className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"}`.trim()}
+                        style={style}
+                        data-melody-event-key={entry.eventKey}
+                        data-step-id={entry.sourceStepId}
+                        data-melody-instrument={lane.instrumentId}
+                        aria-label={label}
+                        aria-pressed={selected}
+                        aria-current={active ? "step" : undefined}
+                        title={label}
+                        onClick={() => onSelectStep(entry.sourceStepId)}
+                      />
+                    );
+                  });
+                }),
+              )}
             </div>
           </div>
         </div>
@@ -879,9 +917,7 @@ function ScoreSystemCanvas({
               onResetPerformanceSystem ? () => onResetPerformanceSystem(system) : undefined
             }
             onSetArticulation={
-              onSetArticulationSystem
-                ? (art) => onSetArticulationSystem(system, art)
-                : undefined
+              onSetArticulationSystem ? (art) => onSetArticulationSystem(system, art) : undefined
             }
             onApplyMelodyContour={
               onApplyMelodyContourSystem
@@ -890,9 +926,7 @@ function ScoreSystemCanvas({
             }
             currentPitchMotion={currentPitchMotion}
             onSetMelodyGrid={
-              onSetMelodyGridSystem
-                ? (grid) => onSetMelodyGridSystem(system, grid)
-                : undefined
+              onSetMelodyGridSystem ? (grid) => onSetMelodyGridSystem(system, grid) : undefined
             }
             currentGrid={currentGrid}
             onClearMelody={onClearMelodySystem ? () => onClearMelodySystem(system) : undefined}
@@ -946,8 +980,10 @@ export interface ScoreSystemViewProps {
   readonly onOctaveUpSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOctaveDownSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onResetPerformanceSystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onSetArticulationSystem?: ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
-  readonly onApplyMelodyContourSystem?: ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
+  readonly onSetArticulationSystem?:
+    ((system: ScoreSystem, articulation: PianoArticulation) => void) | undefined;
+  readonly onApplyMelodyContourSystem?:
+    ((system: ScoreSystem, motion: MelodyPitchMotion) => void) | undefined;
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
 }

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
 
 const ACCEPTANCE_PROJECT_NAME = "US8 Acceptance";
 
@@ -91,6 +92,7 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 
 async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnapshot> {
   await ensureHistoryControlsVisible(page);
+  await ensureSelectedProgressionSettingsVisible(page);
   const progression = await page.locator('[data-testid="progression-step"]').evaluateAll((nodes) =>
     nodes.map((node) => {
       const isRest = node.classList.contains("progression-rest-card");
@@ -411,6 +413,8 @@ test.describe("US8 Batch C — project actions", () => {
     await expect(templateInspector).toContainText(/Customized/);
     await page.getByLabel("Global Card View").selectOption("piano");
 
+    await ensureSelectedProgressionSettingsVisible(page);
+
     // Exact timing fixture: tempo, custom 7/8 grouping, and non-default Swing.
     await page.getByLabel("Tempo in BPM").fill("140");
     await page.getByLabel("Meter numerator").fill("7");
@@ -498,7 +502,7 @@ test.describe("US8 Batch C — project actions", () => {
     const exportedEnvelope = JSON.parse(await readFile(downloadPath!, "utf8")) as {
       schemaVersion: number;
     };
-    expect(exportedEnvelope.schemaVersion).toBe(3);
+    expect(exportedEnvelope.schemaVersion).toBe(4);
     const sourceSnapshotForPortableRoundTrip = await captureUs8AcceptanceSnapshot(page);
 
     // Fresh browser context: no IndexedDB from the source context can satisfy this import.

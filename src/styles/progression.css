@@ -198,7 +198,9 @@
   color: var(--score-ink);
 }
 
-.progression-measure-score.score-system-card + .progression-measure-score.score-system-card .score-system-header {
+.progression-measure-score.score-system-card
+  + .progression-measure-score.score-system-card
+  .score-system-header {
   border-top: 1px solid var(--score-rule);
 }
 
@@ -434,6 +436,25 @@
 
 .score-system .score-system-annotations {
   z-index: 2;
+}
+
+.score-system .score-system-melody-lane-label {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  z-index: 4;
+  max-width: calc(100% - 52px);
+  overflow: hidden;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgb(255 253 247 / 92%);
+  color: var(--score-ink);
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1.1;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .score-system .measure-staff-event-select:hover,
@@ -819,6 +840,24 @@
   max-width: 150px;
 }
 
+.melody-instrument-picker {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.melody-instrument-picker input,
+.melody-instrument-picker select {
+  min-width: 0;
+  max-width: 190px;
+}
+
+.melody-instrument-picker-status {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  line-height: 1.2;
+}
+
 .track-controls-toggle,
 .melody-track-toggle {
   min-height: 28px;
@@ -884,6 +923,10 @@
   outline: none;
 }
 
+.melody-context-menu button.danger {
+  color: var(--danger, #ff6b6b);
+}
+
 .melody-context-menu button.danger:hover,
 .melody-context-menu button.danger:focus-visible {
   color: var(--danger, #ff4d4f);
@@ -925,7 +968,8 @@
   color: var(--text-muted);
 }
 
-.score-system-menu-separator {
+.score-system-menu-separator,
+.melody-context-menu-separator {
   height: 1px;
   background: var(--border-subtle);
   margin: 2px 0;

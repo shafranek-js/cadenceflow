@@ -87,21 +87,21 @@ describe("US13 progression presentation persistence", () => {
   });
 
   it.each([
-    ["v1 -> v2 -> v3", v1Fixture, "piano", 2, 100],
-    ["v2 -> v3", v2Fixture, "staff", 3, 100],
-    ["v3 legacy presentation", v3Fixture, "harmonic", 4, 91],
+    ["v1 -> v2 -> v3 -> v4", v1Fixture, "piano", 2, 100],
+    ["v2 -> v3 -> v4", v2Fixture, "staff", 3, 100],
+    ["v3 -> v4 legacy presentation", v3Fixture, "harmonic", 4, 91],
   ] as const)(
-    "migrates durable %s fixture and re-encodes canonical schema v3",
+    "migrates durable %s fixture and re-encodes canonical schema v5",
     (_label, fixture, expectedView, expectedMeasures, expectedHarmonyVolume) => {
       const raw = structuredClone(fixture) as Record<string, unknown>;
       const sourceBeforeMigration = JSON.stringify(raw);
       const migrated = migrateProjectData(raw);
 
-      expect(migrated.schemaVersion).toBe(3);
+      expect(migrated.schemaVersion).toBe(5);
       expect(JSON.stringify(raw)).toBe(sourceBeforeMigration);
 
       const restored = decodePortableProject(JSON.stringify(raw));
-      expect(restored.schemaVersion).toBe(3);
+      expect(restored.schemaVersion).toBe(5);
       expect(restored.presentation.progressionView).toBe(expectedView);
       expect(restored.presentation.measuresPerSystem).toBe(expectedMeasures);
       expect(restored.harmonyTrack.volume).toBe(expectedHarmonyVolume);
@@ -110,7 +110,7 @@ describe("US13 progression presentation persistence", () => {
       const canonicalJson = encodePortableProject(restored);
       const canonical = JSON.parse(canonicalJson) as Record<string, unknown>;
       const canonicalPresentation = canonical.presentation as Record<string, unknown>;
-      expect(canonical.schemaVersion).toBe(3);
+      expect(canonical.schemaVersion).toBe(5);
       expect(canonical.harmonyTrack).toEqual(
         expect.objectContaining({ instrument: "piano", volume: expectedHarmonyVolume }),
       );

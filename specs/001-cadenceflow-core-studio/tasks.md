@@ -359,15 +359,15 @@ description: "Executable implementation task list for CadenceFlow v1"
 
 **Purpose**: Close performance, licensing, migration, accessibility, and full-suite acceptance gaps after all selected stories are complete.
 
-- [ ] T150 Run and fix the complete deterministic fixture suite mapped to SC-001..SC-020 in `tests/fixtures/`, `tests/unit/`, and `tests/integration/`, including Melody and direct Staff interaction coverage
+- [x] T150 Run and fix the complete deterministic fixture suite mapped to SC-001..SC-020 in `tests/fixtures/`, `tests/unit/`, and `tests/integration/`, including Melody and direct Staff interaction coverage
 - [x] T151 [P] Add performance benchmarks for recommendation refresh and ordinary Matrix actions against the <100 ms plan targets in `tests/integration/performance.test.ts`
 - [x] T152 [P] Add long-progression timing/loop soak fixture for drift and scheduler stability in `tests/integration/transport-soak.test.ts`
 - [x] T153 [P] Audit `.cadenceflow` migration coverage through current schema v3, including v1→v2→v3 and legacy progression-presentation normalization, and add durable prior-schema fixtures under `tests/fixtures/progressions/`
-- [ ] T154 [P] Audit attribution, license packaging, deterministic manifest integrity, and decode coverage for the committed 480-region HQ piano bank in `public/licenses/`, `public/audio/piano-hq/manifest.json`, and `scripts/prepare-piano-bank.ts`
-- [ ] T155 Run production build and bundle/asset-size review for the 480-region bank, document lazy decode/cache behavior and `/cadenceflow/` base-path deployment in `specs/001-cadenceflow-core-studio/quickstart.md`, and verify the manual-only GitHub Pages workflow and representative published assets
-- [ ] T156 Run a gap-only keyboard/accessibility regression across current US10–US13 UI, reuse accepted focused coverage, and fix only remaining critical issues across `src/ui/`
-- [ ] T157 Run `pnpm test`, `pnpm verify:fixtures`, `pnpm verify:melody-assets`, `pnpm verify:piano-bank`, focused-to-full Chromium, `pnpm build`, and offline MusicXML validation; close SC-001..SC-020 including independent MIDI/MusicXML interoperability evidence and record final acceptance notes in `specs/001-cadenceflow-core-studio/checklists/implementation-readiness.md`
-- [ ] T158 Update `specs/001-cadenceflow-core-studio/quickstart.md` with verified Node/pnpm bootstrap, local run, focused/full test, audio-bank verification, production build, and manual Pages deployment commands from the implemented project
+- [x] T154 [P] Audit attribution, license packaging, deterministic manifest integrity, and decode coverage for the committed 480-region HQ piano bank in `public/licenses/`, `public/audio/piano-hq/manifest.json`, and `scripts/prepare-piano-bank.ts`
+- [x] T155 Run production build and bundle/asset-size review for the 480-region bank, document lazy decode/cache behavior and `/cadenceflow/` base-path deployment in `specs/001-cadenceflow-core-studio/quickstart.md`, and verify the manual-only GitHub Pages workflow and representative published assets
+- [x] T156 Run a gap-only keyboard/accessibility regression across current US10–US13 UI, reuse accepted focused coverage, and fix only remaining critical issues across `src/ui/`
+- [x] T157 Run `pnpm test`, `pnpm verify:fixtures`, `pnpm verify:melody-assets`, `pnpm verify:piano-bank`, focused-to-full Chromium, `pnpm build`, and offline MusicXML validation; close SC-001..SC-020 including independent MIDI/MusicXML interoperability evidence and record final acceptance notes in `specs/001-cadenceflow-core-studio/checklists/implementation-readiness.md`
+- [x] T158 Update `specs/001-cadenceflow-core-studio/quickstart.md` with verified Node/pnpm bootstrap, local run, focused/full test, audio-bank verification, production build, and manual Pages deployment commands from the implemented project
 
 ## Phase 15: Measure-card composition layout
 
@@ -595,26 +595,30 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
 - MIDI and MusicXML must project from canonical semantics independently; neither is reconstructed from the other.
 - `spec.md` remains the product authority; if implementation reveals a product ambiguity, return to clarification rather than silently inventing behavior.
 
+## Phase 18: Melody enrichment (scheduled)
+
+- [x] T186 [US12+] Separate Pitch Motion, Rhythm, and Connection. Batch A adds deterministic chord-only
+  motions and rhythm/connection presets with legacy recipe compatibility and consistent Staff, playback,
+  MIDI, and MusicXML projection. Contextual voice-leading and the grouped preview gallery remain deferred
+  to separately accepted batches.
+- [x] T189 [US12+] Add a compact grouped Pitch Motion browser derived from canonical motion ordering,
+  synchronized draft-only selection, responsive keyboard-accessible disclosure, and focused unit/Chromium
+  acceptance in `src/ui/melody/MelodyEditorDialog.tsx`, new
+  `src/ui/melody/MelodyPitchMotionGallery.tsx`, `src/ui/melody/labels.ts`,
+  `src/styles/progression.css`, `tests/unit/ui/melody-ui.test.ts`, and
+  `tests/e2e/us12-melody-editor-staff.spec.ts` per FR-218–FR-220 and SC-021.
+- [ ] T188 [US12+] Add the canonical 128-program GM Melody Instrument catalog, schema-v5 global/default and
+  optional Step-local inheritance, shared grouped/searchable picker, explicit realtime availability with
+  lazy local loading, and partitioned one-staff/one-MIDI-track/one-MusicXML-part-per-effective-instrument
+  projection in
+  `src/domain/melody/instrumentCatalog.ts`, `src/domain/melody/types.ts`,
+  `src/app/commands/melodyCommands.ts`, `src/persistence/portableProject.ts`,
+  `src/domain/project/migrations.ts`, `src/ui/melody/`, `src/audio/`, `src/notation/`, `src/export/`, and
+  focused unit/integration/Chromium tests per FR-221–FR-226 and SC-022; do not add assets or dependencies.
+
 ## Product Backlog (not scheduled)
 
-- **T186 [Backlog] [US12+] Melody enrichment**: Separate Pitch Motion, Rhythm, and Connection; begin with
-  deterministic chord-only patterns and rhythm presets, defer contextual voice-leading, and replace the
-  flat select with a grouped preview gallery in a separate batch.
 - **T187 [Backlog] [US13+] Suzuki note colors**: Add a persisted global presentation toggle, default off,
   that decoratively colors visible noteheads using the confirmed Suzuki pitch-color mapping without
   changing musical data, playback, MIDI, or MusicXML. Colors MUST NOT be the sole accessibility cue;
   light/dark/print contrast and the exact palette plus preview/export scope MUST be fixed before work starts.
-- **T188 [Backlog] [US12+] Melody instrument palette expansion**: Audit the available/licensed
-  FluidR3_GM assets and target the full General MIDI program range (0–127) where local realtime samples
-  are feasible. Define one canonical instrument catalog for stable id, GM program, family/label, clef,
-  playable range, sample asset, and availability; drive Melody validation, grouped/searchable UI,
-  lazy audio loading, MIDI, and MusicXML from that catalog. Keep the Melody Track instrument as the
-  project-level default and add an optional Step-local Melody instrument override: each recipe explicitly
-  inherits `Use track instrument` or selects one catalog entry, without copying the global value into every
-  Step. The override and inheritance transition MUST be undoable, persist through autosave/portable files,
-  drive realtime playback and per-event MIDI/MusicXML instrument metadata, and remain independent between
-  repeated Chord Steps. Preserve the current six instrument ids and persisted projects, keep export metadata
-  available for programs without a local sample when valid, show explicit audio-unavailable state, and avoid
-  preloading the full bank. Add catalog completeness, inheritance/override, persistence migration,
-  program/clef/export, lazy-loader, and representative audio-availability tests; the final palette and asset
-  set remain subject to licensing, bundle-size, and browser-performance gates.

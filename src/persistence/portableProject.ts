@@ -31,6 +31,7 @@ import {
   type ChordMelodyRecipe,
   type MelodyTrackSettings,
 } from "../domain/melody/types";
+import { validateMelodyInstrumentId } from "../domain/melody/instrumentCatalog";
 import {
   snapshotHarmonyTrackSettings,
   validateHarmonyTrackSettings,
@@ -202,7 +203,9 @@ function decodeDuration(wire: WireDuration): MusicalDuration {
 function encodeMelodyRecipe(recipe: ChordMelodyRecipe): Record<string, unknown> {
   const snapshot = snapshotChordMelodyRecipe(recipe);
   return {
-    pattern: snapshot.pattern,
+    pitchMotion: snapshot.pitchMotion,
+    rhythm: snapshot.rhythm,
+    connection: snapshot.connection,
     grid: snapshot.grid,
     octaveOffset: snapshot.octaveOffset,
   };
@@ -311,6 +314,9 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
     performance: step.performance,
     cardView: step.cardView,
     ...(step.melody !== undefined ? { melody: encodeMelodyRecipe(step.melody) } : {}),
+    ...(step.melodyInstrumentOverride !== undefined
+      ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) }
+      : {}),
   };
 }
 
@@ -333,6 +339,9 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
     performance: raw["performance"] as StepPerformance,
     cardView: (raw["cardView"] as CardViewId | undefined) ?? "harmonic",
     ...(raw["melody"] !== undefined ? { melody: decodeMelodyRecipe(raw["melody"]) } : {}),
+    ...(raw["melodyInstrumentOverride"] !== undefined
+      ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) }
+      : {}),
   });
   return chord;
 }

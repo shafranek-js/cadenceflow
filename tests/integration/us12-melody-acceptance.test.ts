@@ -19,7 +19,7 @@ import {
   type MelodyGrid,
   type MelodyPattern,
 } from "../../src/domain/melody/projection";
-import type { ChordMelodyRecipe } from "../../src/domain/melody/types";
+import { snapshotChordMelodyRecipe, type MelodyRecipeInput } from "../../src/domain/melody/types";
 import { getHarmonicModule } from "../../src/domain/harmony/moduleRegistry";
 import { realizeProgressionMelodyPerformance } from "../../src/audio/melodyPerformance";
 import { realizeOrderedPianoProgression } from "../../src/instruments/piano/progressionRealization";
@@ -135,12 +135,12 @@ const ORACLE_GRID_EVENTS: Readonly<Record<MelodyGrid, readonly (readonly [Ration
 function freezeChordWithMelody(
   step: ChordStep,
   durationBeats: Rational,
-  recipe: ChordMelodyRecipe,
+  recipe: MelodyRecipeInput,
 ): ChordStep {
   return Object.freeze({
     ...step,
     duration: musicalDuration(durationBeats),
-    melody: Object.freeze({ ...recipe }),
+    melody: snapshotChordMelodyRecipe(recipe),
   });
 }
 

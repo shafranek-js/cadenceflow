@@ -3,13 +3,26 @@ import type {
   MusicXmlHarmonyEvent,
   MusicXmlMelodyMeasureEvent,
   MusicXmlMelodyNoteEvent,
+  MusicXmlMelodyInstrument,
   MusicXmlMelodyPart,
   MusicXmlMeasureEvent,
   MusicXmlNoteEvent,
   MusicXmlProjection,
   MusicXmlRestEvent,
 } from "./projection";
-import type { MelodyInstrument } from "../../domain/melody/types";
+import { getMelodyInstrument } from "../../domain/melody/instrumentCatalog";
+
+function melodyExportName(instrument: ReturnType<typeof getMelodyInstrument>): string {
+  return instrument.id === "synth-lead" ? "Synth Lead" : instrument.label;
+}
+
+function melodyPartsForProjection(projection: MusicXmlProjection): readonly MusicXmlMelodyPart[] {
+  if (!projection.melodyParts) return projection.melody ? [projection.melody] : [];
+  if (projection.melody && projection.melodyParts[0] !== projection.melody) {
+    return [projection.melody, ...projection.melodyParts.slice(1)];
+  }
+  return projection.melodyParts;
+}
 
 export class MusicXmlWriterError extends Error {
   readonly code = "invalid-projection" as const;
@@ -92,6 +105,19 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
   if (event.sourceMidi > 127 || event.sourcePitchMidi > 127) {
     throw new MusicXmlWriterError(`source MIDI for ${event.stepId} must be <= 127.`);
   }
+  try {
+    const metadata = getMelodyInstrument(event.instrument);
+    const expectedClef = metadata.clef === "bass" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
+    if (
+      !/^P[2-9][0-9]*-I/.test(event.instrumentId) ||
+      event.clef.sign !== expectedClef.sign ||
+      event.clef.line !== expectedClef.line
+    ) {
+      throw new Error("instrument association mismatch");
+    }
+  } catch {
+    throw new MusicXmlWriterError(`Melody note ${event.stepId} has invalid instrument metadata.`);
+  }
   if (
     !event.pitch ||
     typeof event.pitch !== "object" ||
@@ -122,8 +148,11 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
       `Melody note ${event.stepId} must use voice 1, staff 1, and no chord.`,
     );
   }
-  if (!["quarter", "eighth", "16th"].includes(event.type)) {
+  if (!["whole", "half", "quarter", "eighth", "16th"].includes(event.type)) {
     throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid written type.`);
+  }
+  if (event.dots !== undefined && event.dots !== 1) {
+    throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid dot count.`);
   }
   if (!Array.isArray(event.ties) || !Array.isArray(event.tupletMarks)) {
     throw new MusicXmlWriterError(`Melody note ${event.stepId} tie/tuplet marks must be arrays.`);
@@ -147,13 +176,18 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
     if (
       event.timeModification.actualNotes !== 3 ||
       event.timeModification.normalNotes !== 2 ||
-      !["eighth", "16th"].includes(event.timeModification.normalType)
+      !["quarter", "eighth", "16th"].includes(event.timeModification.normalType)
     ) {
       throw new MusicXmlWriterError(
         `Melody note ${event.stepId} has an invalid time modification.`,
       );
     }
-    const expectedType = event.timeModification.normalType === "16th" ? "16th" : "eighth";
+    const expectedType =
+      event.timeModification.normalType === "quarter"
+        ? "quarter"
+        : event.timeModification.normalType === "16th"
+          ? "16th"
+          : "eighth";
     if (event.type !== expectedType) {
       throw new MusicXmlWriterError(
         `Melody note ${event.stepId} written type disagrees with its time modification.`,
@@ -176,7 +210,7 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
   if (
     !melody ||
     typeof melody !== "object" ||
-    melody.id !== "P2" ||
+    !/^P[2-9][0-9]*$/.test(melody.id) ||
     !melody.name ||
     melody.instrumentName !== melody.name
   ) {
@@ -184,27 +218,19 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
       "MusicXML Melody part must be the deterministic P2 instrument part.",
     );
   }
-  const metadata: Readonly<
-    Record<MelodyInstrument, { readonly name: string; readonly program: number }>
-  > = {
-    flute: { name: "Flute", program: 73 },
-    violin: { name: "Violin", program: 40 },
-    clarinet: { name: "Clarinet", program: 71 },
-    oboe: { name: "Oboe", program: 68 },
-    cello: { name: "Cello", program: 42 },
-    "synth-lead": { name: "Synth Lead", program: 80 },
-  };
-  const instrument = metadata[melody.instrument];
+  const metadata = getMelodyInstrument(melody.instrument);
+  const melodyPartCount = melodyPartsForProjection(projection).length;
+  const expectedPartName =
+    melodyPartCount === 1 ? melodyExportName(metadata) : `Melody · ${melodyExportName(metadata)}`;
   if (
-    !instrument ||
-    melody.name !== instrument.name ||
-    melody.instrumentName !== instrument.name ||
-    melody.midiProgram !== instrument.program + 1
+    melody.name !== expectedPartName ||
+    melody.instrumentName !== expectedPartName ||
+    melody.midiProgram !== metadata.program + 1
   ) {
     throw new MusicXmlWriterError("MusicXML Melody instrument metadata is not deterministic.");
   }
-  if (melody.midiChannel !== 3) {
-    throw new MusicXmlWriterError("MusicXML Melody must use one-based MIDI channel 3.");
+  if (!Number.isInteger(melody.midiChannel) || melody.midiChannel < 1 || melody.midiChannel > 16) {
+    throw new MusicXmlWriterError("MusicXML Melody must use a one-based MIDI channel in 1..16.");
   }
   assertInteger(melody.midiProgram, "Melody MIDI program", 1);
   if (melody.midiProgram > 128) {
@@ -218,8 +244,7 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
   ) {
     throw new MusicXmlWriterError("MusicXML Melody clef must contain a supported sign and line.");
   }
-  const expectedClef =
-    melody.instrument === "cello" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
+  const expectedClef = metadata.clef === "bass" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
   if (melody.clef.sign !== expectedClef.sign || melody.clef.line !== expectedClef.line) {
     throw new MusicXmlWriterError("Melody clef does not match its instrument.");
   }
@@ -230,6 +255,42 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
   ) {
     throw new MusicXmlWriterError("MusicXML Melody must have one measure for every Piano measure.");
   }
+  const instruments: readonly MusicXmlMelodyInstrument[] = melody.instruments ?? [
+    {
+      id: `${melody.id}-I${melody.instrument}`,
+      instrument: melody.instrument,
+      name: melodyExportName(metadata),
+      family: metadata.family,
+      clef: expectedClef,
+      midiChannel: 3,
+      midiProgram: metadata.program + 1,
+    },
+  ];
+  if (instruments.length === 0) {
+    throw new MusicXmlWriterError("MusicXML Melody must declare at least one instrument.");
+  }
+  if (instruments.length !== 1) {
+    throw new MusicXmlWriterError("Each MusicXML Melody part must declare exactly one instrument.");
+  }
+  for (const instrument of instruments) {
+    const entry = getMelodyInstrument(instrument.instrument);
+    if (
+      instrument.id !== `${melody.id}-I${instrument.instrument}` ||
+      instrument.name !== melodyExportName(entry) ||
+      instrument.family !== entry.family ||
+      instrument.midiChannel !== melody.midiChannel ||
+      instrument.midiProgram !== entry.program + 1
+    ) {
+      throw new MusicXmlWriterError(
+        "MusicXML Melody instrument associations are not deterministic.",
+      );
+    }
+    const expectedClef = entry.clef === "bass" ? { sign: "F", line: 4 } : { sign: "G", line: 2 };
+    if (instrument.clef.sign !== expectedClef.sign || instrument.clef.line !== expectedClef.line) {
+      throw new MusicXmlWriterError("MusicXML Melody instrument clef is not deterministic.");
+    }
+  }
+  const instrumentIds = new Set(instruments.map((instrument) => instrument.id));
   melody.measures.forEach((measure, index) => {
     if (!measure || typeof measure !== "object" || !Array.isArray(measure.events)) {
       throw new MusicXmlWriterError(
@@ -244,8 +305,14 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
     assertInteger(measure.capacity, `Melody capacity for measure ${measure.number}`, 1);
     let duration = 0;
     measure.events.forEach((event: MusicXmlMelodyMeasureEvent) => {
-      if (event?.kind === "note") validateMelodyNote(event);
-      else if (event?.kind === "rest") validateMelodyRest(event);
+      if (event?.kind === "note") {
+        validateMelodyNote(event);
+        if (!instrumentIds.has(event.instrumentId)) {
+          throw new MusicXmlWriterError(
+            `Melody note ${event.stepId} references an undeclared instrument.`,
+          );
+        }
+      } else if (event?.kind === "rest") validateMelodyRest(event);
       else throw new MusicXmlWriterError("MusicXML Melody measure contains an invalid event.");
       duration += event.duration;
     });
@@ -284,7 +351,8 @@ function validateProjection(projection: MusicXmlProjection): void {
       if (event.kind === "rest") validateRest(event);
     });
   });
-  if (projection.melody) validateMelodyPart(projection, projection.melody);
+  const melodyParts = melodyPartsForProjection(projection);
+  melodyParts.forEach((melody) => validateMelodyPart(projection, melody));
 }
 
 function writeAttributes(projection: MusicXmlProjection, level: number): string[] {
@@ -436,8 +504,10 @@ function writeMelodyNote(event: MusicXmlMelodyNoteEvent, level: number): string[
   lines.push(closeElement("pitch", level + 1));
   lines.push(element("duration", event.duration, level + 1));
   lines.push(...writeMelodyTies(event, level + 1));
+  lines.push(selfClosingElement("instrument", level + 1, xmlAttribute("id", event.instrumentId)));
   lines.push(element("voice", event.voice, level + 1));
   lines.push(element("type", event.type, level + 1));
+  if (event.dots) lines.push(selfClosingElement("dot", level + 1));
   if (event.timeModification) {
     lines.push(emptyElement("time-modification", level + 1));
     lines.push(element("actual-notes", event.timeModification.actualNotes, level + 2));
@@ -494,10 +564,18 @@ function writeMelodyPart(
   level: number,
 ): string[] {
   const lines = [emptyElement("part", level, xmlAttribute("id", melody.id))];
+  let currentClef = melody.clef;
   melody.measures.forEach((measure, index) => {
     lines.push(`${"  ".repeat(level + 1)}<measure${xmlAttribute("number", measure.number)}>`);
     if (index === 0) lines.push(...writeMelodyAttributes(projection, melody, level + 2));
     for (const event of measure.events) {
+      if (
+        event.kind === "note" &&
+        (event.clef.sign !== currentClef.sign || event.clef.line !== currentClef.line)
+      ) {
+        lines.push(...writeMelodyClefChange(event.clef, level + 2));
+        currentClef = event.clef;
+      }
       lines.push(
         ...(event.kind === "note"
           ? writeMelodyNote(event, level + 2)
@@ -510,17 +588,42 @@ function writeMelodyPart(
   return lines;
 }
 
+function writeMelodyClefChange(
+  clef: { readonly sign: "G" | "F"; readonly line: 2 | 4 },
+  level: number,
+): string[] {
+  const lines = [emptyElement("attributes", level)];
+  lines.push(emptyElement("clef", level + 1));
+  lines.push(element("sign", clef.sign, level + 2));
+  lines.push(element("line", clef.line, level + 2));
+  lines.push(closeElement("clef", level + 1));
+  lines.push(closeElement("attributes", level));
+  return lines;
+}
+
 function writeMelodyScorePart(melody: MusicXmlMelodyPart, level: number): string[] {
-  const instrumentId = `${melody.id}-I1`;
   const lines = [emptyElement("score-part", level, xmlAttribute("id", melody.id))];
   lines.push(element("part-name", melody.name, level + 1));
-  lines.push(emptyElement("score-instrument", level + 1, xmlAttribute("id", instrumentId)));
-  lines.push(element("instrument-name", melody.instrumentName, level + 2));
-  lines.push(closeElement("score-instrument", level + 1));
-  lines.push(emptyElement("midi-instrument", level + 1, xmlAttribute("id", instrumentId)));
-  lines.push(element("midi-channel", melody.midiChannel, level + 2));
-  lines.push(element("midi-program", melody.midiProgram, level + 2));
-  lines.push(closeElement("midi-instrument", level + 1));
+  const instruments = melody.instruments ?? [
+    {
+      id: `${melody.id}-I1`,
+      instrument: melody.instrument,
+      name: melody.instrumentName,
+      family: "",
+      clef: melody.clef,
+      midiChannel: melody.midiChannel,
+      midiProgram: melody.midiProgram,
+    },
+  ];
+  for (const instrument of instruments) {
+    lines.push(emptyElement("score-instrument", level + 1, xmlAttribute("id", instrument.id)));
+    lines.push(element("instrument-name", instrument.name, level + 2));
+    lines.push(closeElement("score-instrument", level + 1));
+    lines.push(emptyElement("midi-instrument", level + 1, xmlAttribute("id", instrument.id)));
+    lines.push(element("midi-channel", instrument.midiChannel, level + 2));
+    lines.push(element("midi-program", instrument.midiProgram, level + 2));
+    lines.push(closeElement("midi-instrument", level + 1));
+  }
   lines.push(closeElement("score-part", level));
   return lines;
 }
@@ -576,6 +679,7 @@ function writeBackup(duration: number, level: number): string[] {
 /** Serializes the MusicXML semantic projection without making musical decisions. */
 export function writeMusicXml(projection: MusicXmlProjection): string {
   validateProjection(projection);
+  const melodyParts = melodyPartsForProjection(projection);
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<score-partwise version="4.0">',
@@ -583,12 +687,12 @@ export function writeMusicXml(projection: MusicXmlProjection): string {
     element("work-title", projection.title, 2),
     "  </work>",
     "  <part-list>",
-    ...(projection.melody ? writeMelodyScorePart(projection.melody, 2) : []),
+    ...melodyParts.flatMap((melody) => writeMelodyScorePart(melody, 2)),
     '    <score-part id="P1">',
     element("part-name", projection.part.name, 3),
     "    </score-part>",
     "  </part-list>",
-    ...(projection.melody ? writeMelodyPart(projection, projection.melody, 1) : []),
+    ...melodyParts.flatMap((melody) => writeMelodyPart(projection, melody, 1)),
     '  <part id="P1">',
   ];
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
 
 test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111)", () => {
   test.beforeEach(async ({ page }) => {
@@ -100,6 +101,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await page.getByTestId("duration-preset-whole").click();
     await steps.nth(1).click();
     await page.getByTestId("duration-preset-half").click();
+    await ensureSelectedProgressionSettingsVisible(page);
 
     // 1. Change tempo to 140 BPM
     const tempoInput = page.getByLabel("Tempo in BPM");
@@ -171,6 +173,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const steps = page.locator('[data-testid="progression-step"]');
     await steps.first().click();
     await page.getByTestId("duration-preset-quarter").click();
+    await ensureSelectedProgressionSettingsVisible(page);
 
     const stepDurationLabel = page.locator(".transport-step-duration .transport-label");
     await expect(stepDurationLabel).toContainText("1 beat");
@@ -359,6 +362,14 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(4);
+
+    const globalInspector = page.getByTestId("progression-global-inspector");
+    if (await globalInspector.isVisible().catch(() => false)) {
+      const loopDisclosure = globalInspector.locator(".loop-disclosure");
+      await loopDisclosure.locator(":scope > summary").click();
+    } else {
+      await ensureSelectedProgressionSettingsVisible(page);
+    }
 
     // Select Loop Range
     await page.getByRole("button", { name: "Range" }).click();

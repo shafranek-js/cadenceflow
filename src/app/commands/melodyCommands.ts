@@ -9,6 +9,7 @@ import {
   type MelodyInstrument,
   type MelodyTrackSettings,
 } from "../../domain/melody/types";
+import { validateMelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
 
 export type MelodyCommandErrorReason =
   "unknown-step" | "rest-step" | "missing-recipe" | "invalid-settings-patch";
@@ -27,6 +28,8 @@ export class MelodyCommandError extends RangeError {
 export interface MelodyStateSnapshot {
   readonly stepId?: string;
   readonly recipe?: ChordMelodyRecipe;
+  readonly melodyInstrumentOverride?: MelodyInstrument;
+  readonly hasInstrumentOverride: boolean;
   readonly melodyTrack: MelodyTrackSettings;
   readonly selectedStepId?: string;
   readonly updatedAt: string;
@@ -41,6 +44,8 @@ export interface SetMelodyRecipePayload {
   readonly stepId: string;
   readonly recipe: ChordMelodyRecipe;
   readonly instrument?: MelodyInstrument;
+  /** New T188 Step-local override. null explicitly restores track inheritance. */
+  readonly instrumentOverride?: MelodyInstrument | null;
   readonly nowIso: string;
 }
 export type SetMelodyRecipeCommand = ProjectCommand<SetMelodyRecipePayload> & {
@@ -52,6 +57,7 @@ export function createSetMelodyRecipeCommand(
   recipe: ChordMelodyRecipe,
   nowIso: string,
   instrument?: MelodyInstrument,
+  instrumentOverride?: MelodyInstrument | null,
 ): SetMelodyRecipeCommand {
   return {
     type: "melody/set-recipe",
@@ -60,7 +66,29 @@ export function createSetMelodyRecipeCommand(
       recipe,
       nowIso,
       ...(instrument !== undefined ? { instrument } : {}),
+      ...(instrumentOverride !== undefined ? { instrumentOverride } : {}),
     },
+  };
+}
+
+export interface SetMelodyInstrumentOverridePayload {
+  readonly stepId: string;
+  readonly instrument: MelodyInstrument | null;
+  readonly nowIso: string;
+}
+export type SetMelodyInstrumentOverrideCommand =
+  ProjectCommand<SetMelodyInstrumentOverridePayload> & {
+    readonly type: "melody/set-step-instrument";
+  };
+
+export function createSetMelodyInstrumentOverrideCommand(
+  stepId: string,
+  instrument: MelodyInstrument | null,
+  nowIso: string,
+): SetMelodyInstrumentOverrideCommand {
+  return {
+    type: "melody/set-step-instrument",
+    payload: { stepId, instrument, nowIso },
   };
 }
 
@@ -116,6 +144,10 @@ function snapshotState(project: Project, stepId?: string): MelodyStateSnapshot {
   return {
     ...(stepId !== undefined ? { stepId } : {}),
     ...(step?.melody !== undefined ? { recipe: snapshotChordMelodyRecipe(step.melody) } : {}),
+    ...(step?.melodyInstrumentOverride !== undefined
+      ? { melodyInstrumentOverride: step.melodyInstrumentOverride }
+      : {}),
+    hasInstrumentOverride: step?.melodyInstrumentOverride !== undefined,
     melodyTrack: snapshotMelodyTrackSettings(project.melodyTrack),
     ...(project.progression.selectedStepId !== undefined
       ? { selectedStepId: project.progression.selectedStepId }
@@ -159,10 +191,24 @@ function withMelodyState(project: Project, snapshot: MelodyStateSnapshot): Proje
     const nextStep: ChordStep = Object.freeze(
       snapshot.recipe === undefined
         ? (() => {
-            const { melody: _discard, ...withoutMelody } = step;
+            const {
+              melody: _discard,
+              melodyInstrumentOverride: _discardOverride,
+              ...withoutMelody
+            } = step;
             return withoutMelody;
           })()
-        : { ...step, melody: snapshotChordMelodyRecipe(snapshot.recipe) },
+        : {
+            ...(() => {
+              const { melodyInstrumentOverride: _discardCurrentOverride, ...withoutOverride } =
+                step;
+              return withoutOverride;
+            })(),
+            melody: snapshotChordMelodyRecipe(snapshot.recipe),
+            ...(snapshot.hasInstrumentOverride && snapshot.melodyInstrumentOverride !== undefined
+              ? { melodyInstrumentOverride: snapshot.melodyInstrumentOverride }
+              : {}),
+          },
     );
     progression = Object.freeze({
       ...restoreProgressionSelection(project, snapshot.selectedStepId),
@@ -212,6 +258,10 @@ export function setMelodyRecipe(project: Project, command: SetMelodyRecipeComman
   const step = findChordStep(project, command.payload.stepId);
   const previous = snapshotState(project, command.payload.stepId);
   const recipe = snapshotChordMelodyRecipe(command.payload.recipe);
+  const requestedOverride =
+    command.payload.instrumentOverride === undefined || command.payload.instrumentOverride === null
+      ? command.payload.instrumentOverride
+      : validateMelodyInstrumentId(command.payload.instrumentOverride);
   const melodyTrack =
     command.payload.instrument === undefined
       ? snapshotMelodyTrackSettings(project.melodyTrack)
@@ -225,7 +275,51 @@ export function setMelodyRecipe(project: Project, command: SetMelodyRecipeComman
     {
       stepId: step.id,
       recipe,
+      ...(requestedOverride !== undefined
+        ? requestedOverride === null
+          ? {}
+          : { melodyInstrumentOverride: requestedOverride }
+        : step.melodyInstrumentOverride !== undefined
+          ? { melodyInstrumentOverride: step.melodyInstrumentOverride }
+          : {}),
+      hasInstrumentOverride:
+        requestedOverride !== undefined
+          ? requestedOverride !== null
+          : step.melodyInstrumentOverride !== undefined,
       melodyTrack,
+      ...(project.progression.selectedStepId !== undefined
+        ? { selectedStepId: project.progression.selectedStepId }
+        : {}),
+      updatedAt: command.payload.nowIso,
+    },
+    previous,
+  );
+}
+
+export function setMelodyInstrumentOverride(
+  project: Project,
+  command: SetMelodyInstrumentOverrideCommand,
+): AppliedCommand {
+  const step = findChordStep(project, command.payload.stepId);
+  if (step.melody === undefined) {
+    throw new MelodyCommandError(
+      `Chord step has no melody recipe: ${command.payload.stepId}`,
+      "missing-recipe",
+    );
+  }
+  const previous = snapshotState(project, step.id);
+  const nextOverride =
+    command.payload.instrument === null
+      ? null
+      : validateMelodyInstrumentId(command.payload.instrument);
+  return appliedWithSnapshots(
+    project,
+    {
+      stepId: step.id,
+      ...(step.melody !== undefined ? { recipe: snapshotChordMelodyRecipe(step.melody) } : {}),
+      ...(nextOverride !== null ? { melodyInstrumentOverride: nextOverride } : {}),
+      hasInstrumentOverride: nextOverride !== null,
+      melodyTrack: snapshotMelodyTrackSettings(project.melodyTrack),
       ...(project.progression.selectedStepId !== undefined
         ? { selectedStepId: project.progression.selectedStepId }
         : {}),
@@ -257,6 +351,7 @@ export function removeMelodyRecipe(
       ...(project.progression.selectedStepId !== undefined
         ? { selectedStepId: project.progression.selectedStepId }
         : {}),
+      hasInstrumentOverride: false,
       updatedAt: command.payload.nowIso,
     },
     previous,
@@ -310,6 +405,7 @@ export function setMelodyTrackSettings(
       ...(project.progression.selectedStepId !== undefined
         ? { selectedStepId: project.progression.selectedStepId }
         : {}),
+      hasInstrumentOverride: false,
       updatedAt: command.payload.nowIso,
     },
     previous,
@@ -320,6 +416,7 @@ export const updateMelodyTrackSettings = setMelodyTrackSettings;
 
 export type MelodyCommand =
   | SetMelodyRecipeCommand
+  | SetMelodyInstrumentOverrideCommand
   | RemoveMelodyRecipeCommand
   | SetMelodyTrackSettingsCommand
   | RestoreMelodyStateCommand;
@@ -328,6 +425,8 @@ export function applyMelodyCommand(project: Project, command: MelodyCommand): Ap
   switch (command.type) {
     case "melody/set-recipe":
       return setMelodyRecipe(project, command);
+    case "melody/set-step-instrument":
+      return setMelodyInstrumentOverride(project, command);
     case "melody/remove-recipe":
       return removeMelodyRecipe(project, command);
     case "melody/set-track-settings":

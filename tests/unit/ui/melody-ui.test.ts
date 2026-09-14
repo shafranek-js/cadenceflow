@@ -10,12 +10,17 @@ import {
 } from "../../../src/domain/project/factory";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
+import { MELODY_PITCH_MOTIONS } from "../../../src/domain/melody/types";
 import type { ChordStep } from "../../../src/domain/progression/step";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 import { MelodyContextMenu } from "../../../src/ui/melody/MelodyContextMenu";
 import { MelodyEditorDialog } from "../../../src/ui/melody/MelodyEditorDialog";
 import { MelodyTrackControls } from "../../../src/ui/melody/MelodyTrackControls";
+import {
+  MELODY_PITCH_MOTION_GALLERY_GROUPS,
+  MELODY_PITCH_MOTION_LABELS,
+} from "../../../src/ui/melody/labels";
 
 const el = React.createElement;
 
@@ -58,6 +63,21 @@ function makeProject(step: ChordStep = makeStep()) {
 }
 
 describe("T170 — Melody UI", () => {
+  it("keeps the grouped Pitch Motion catalog complete and stable", () => {
+    const groupedMotions = MELODY_PITCH_MOTION_GALLERY_GROUPS.flatMap((group) => group.motions);
+
+    expect(groupedMotions).toEqual([...MELODY_PITCH_MOTIONS]);
+    expect(new Set(groupedMotions).size).toBe(MELODY_PITCH_MOTIONS.length);
+    expect(MELODY_PITCH_MOTION_GALLERY_GROUPS.map((group) => group.label)).toEqual([
+      "Directional",
+      "Shapes",
+      "Pedal & Alternating",
+    ]);
+    for (const pitchMotion of MELODY_PITCH_MOTIONS) {
+      expect(MELODY_PITCH_MOTION_LABELS[pitchMotion]).toBeTruthy();
+    }
+  });
+
   it("renders the correct create/edit/remove menu and restores focus on Escape", async () => {
     const invoker = document.createElement("button");
     document.body.appendChild(invoker);
@@ -89,7 +109,13 @@ describe("T170 — Melody UI", () => {
 
     const editDom = renderToString(
       el(MelodyContextMenu, {
-        step: makeStep("with-recipe", { pattern: "down", grid: "sixteenth", octaveOffset: -1 }),
+        step: makeStep("with-recipe", {
+          pitchMotion: "down",
+          rhythm: "even",
+          connection: "retrigger",
+          grid: "sixteenth",
+          octaveOffset: -1,
+        }),
         position: { x: 20, y: 20 },
         invoker,
         onEdit: vi.fn(),
@@ -108,7 +134,13 @@ describe("T170 — Melody UI", () => {
     const onApply = vi.fn();
     const onClose = vi.fn();
     const project = makeProject(
-      makeStep("editable", { pattern: "down", grid: "sixteenth", octaveOffset: -1 }),
+      makeStep("editable", {
+        pitchMotion: "down",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "sixteenth",
+        octaveOffset: -1,
+      }),
     );
     const mounted = mountToDom(
       el(MelodyEditorDialog, {
@@ -123,24 +155,30 @@ describe("T170 — Melody UI", () => {
     );
 
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const pattern = mounted.container.querySelector(
-      '[aria-label="Melody Pattern"]',
+    const pitchMotion = mounted.container.querySelector(
+      '[aria-label="Pitch Motion"]',
     ) as HTMLSelectElement;
-    const grid = mounted.container.querySelector('[aria-label="Melody Grid"]') as HTMLSelectElement;
+    const rhythm = mounted.container.querySelector('[aria-label="Rhythm"]') as HTMLSelectElement;
+    const connection = mounted.container.querySelector(
+      '[aria-label="Connection"]',
+    ) as HTMLSelectElement;
+    const grid = mounted.container.querySelector('[aria-label="Grid"]') as HTMLSelectElement;
     const octave = mounted.container.querySelector(
-      '[aria-label="Melody Octave Offset"]',
-    ) as HTMLInputElement;
+      '[aria-label="Octave offset"]',
+    ) as HTMLSelectElement;
     const instrument = mounted.container.querySelector(
       '[aria-label="Melody Instrument"]',
     ) as HTMLSelectElement;
-    expect(pattern.value).toBe("down");
+    expect(pitchMotion.value).toBe("down");
+    expect(rhythm.value).toBe("even");
+    expect(connection.value).toBe("retrigger");
     expect(grid.value).toBe("sixteenth");
     expect(octave.value).toBe("-1");
     expect(instrument.value).toBe("flute");
 
     act(() => {
-      pattern.value = "outside-in";
-      pattern.dispatchEvent(new Event("change", { bubbles: true }));
+      pitchMotion.value = "outside-in";
+      pitchMotion.dispatchEvent(new Event("change", { bubbles: true }));
       instrument.value = "cello";
       instrument.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -151,7 +189,13 @@ describe("T170 — Melody UI", () => {
     act(() => apply.click());
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith(
-      { pattern: "outside-in", grid: "sixteenth", octaveOffset: -1 },
+      {
+        pitchMotion: "outside-in",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "sixteenth",
+        octaveOffset: -1,
+      },
       "cello",
     );
     expect(onClose).not.toHaveBeenCalled();
@@ -181,8 +225,8 @@ describe("T170 — Melody UI", () => {
       }),
     );
     const octave = mounted.container.querySelector(
-      '[aria-label="Melody Octave Offset"]',
-    ) as HTMLInputElement;
+      '[aria-label="Octave offset"]',
+    ) as HTMLSelectElement;
     act(() => {
       octave.value = "1";
       octave.dispatchEvent(new Event("change", { bubbles: true }));
@@ -195,6 +239,86 @@ describe("T170 — Melody UI", () => {
         .disabled,
     ).toBe(true);
     expect(octave.value).toBe("1");
+    mounted.unmount();
+  });
+
+  it("synchronizes gallery selection, preserves draft axes, and returns focus in two Escapes", async () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    const project = makeProject(
+      makeStep("gallery", {
+        pitchMotion: "up",
+        rhythm: "dotted",
+        connection: "tie-repeated",
+        grid: "sixteenth-triplet",
+        octaveOffset: 1,
+      }),
+    );
+    const mounted = mountToDom(
+      el(MelodyEditorDialog, {
+        isOpen: true,
+        mode: "edit",
+        step: project.progression.steps[0],
+        project,
+        restoreFocusRef: { current: null },
+        onClose,
+        onApply,
+      }),
+    );
+
+    const browse = mounted.container.querySelector(
+      '[aria-label="Browse motions"]',
+    ) as HTMLButtonElement;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    act(() => browse.click());
+
+    const gallery = mounted.container.querySelector(
+      '[data-testid="melody-pitch-motion-gallery"]',
+    ) as HTMLElement;
+    expect(gallery).not.toBeNull();
+    expect(gallery.querySelectorAll('[role="radio"]')).toHaveLength(10);
+    expect(gallery.querySelectorAll(".melody-pitch-motion-gallery-group")).toHaveLength(3);
+
+    const pitchMotion = mounted.container.querySelector(
+      '[aria-label="Pitch Motion"]',
+    ) as HTMLSelectElement;
+    const rhythm = mounted.container.querySelector('[aria-label="Rhythm"]') as HTMLSelectElement;
+    const connection = mounted.container.querySelector(
+      '[aria-label="Connection"]',
+    ) as HTMLSelectElement;
+    const grid = mounted.container.querySelector('[aria-label="Grid"]') as HTMLSelectElement;
+    const octave = mounted.container.querySelector(
+      '[aria-label="Octave offset"]',
+    ) as HTMLSelectElement;
+    const tile = gallery.querySelector(
+      '[data-pitch-motion="alternate-root-up"]',
+    ) as HTMLButtonElement;
+    act(() => tile.click());
+    expect(pitchMotion.value).toBe("alternate-root-up");
+    expect(rhythm.value).toBe("dotted");
+    expect(connection.value).toBe("tie-repeated");
+    expect(grid.value).toBe("sixteenth-triplet");
+    expect(octave.value).toBe("1");
+    expect(onApply).not.toHaveBeenCalled();
+
+    act(() => {
+      tile.focus();
+      tile.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+    expect(pitchMotion.value).toBe("alternate-top-down");
+    expect(document.activeElement).toBe(
+      gallery.querySelector('[data-pitch-motion="alternate-top-down"]'),
+    );
+
+    act(() => tile.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      mounted.container.querySelector('[data-testid="melody-pitch-motion-gallery"]'),
+    ).toBeNull();
+    expect(document.activeElement).toBe(browse);
+
+    act(() => browse.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(onClose).toHaveBeenCalledTimes(1);
     mounted.unmount();
   });
 

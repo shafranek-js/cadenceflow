@@ -1,6 +1,7 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
 
 async function openProjectMenu(page: Page): Promise<void> {
   await page.getByTestId("project-menu-toggle").click();
@@ -156,6 +157,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
 
     // Swing and a live temporary branch produce concise MusicXML diagnostics;
     // the branch itself is never used as the export source.
+    await ensureSelectedProgressionSettingsVisible(page);
     await page.getByRole("button", { name: "Toggle Swing Feel" }).click();
     await page.getByRole("button", { name: "Explore Alternative" }).click();
     await expect(page.getByRole("button", { name: "Commit Branch" })).toBeVisible();

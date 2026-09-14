@@ -884,6 +884,52 @@ describe("T175 Melody MusicXML part", () => {
     }
   });
 
+  it("keeps non-even triplet rhythm and a clipped final attack semantically notated", () => {
+    const base = createDefaultProject("dotted-triplet", "Dotted Triplet");
+    const step = melodyChordStep(
+      base,
+      "I",
+      "dotted-triplet-step",
+      { numerator: 5, denominator: 2 },
+      {
+        pitchMotion: "up",
+        rhythm: "dotted",
+        connection: "retrigger",
+        grid: "eighth-triplet",
+        octaveOffset: 0,
+      },
+    );
+    const project = Object.freeze({
+      ...base,
+      progression: Object.freeze({ steps: Object.freeze([step]) }),
+    });
+    const projection = projectProjectToMusicXml(project);
+    const events = melodyNotes(projection).filter(
+      (event) => event.stepId === "dotted-triplet-step",
+    );
+
+    expect(events.map((event) => event.durationBeats)).toEqual([
+      rational(1),
+      rational(1, 3),
+      rational(1),
+      rational(1, 6),
+    ]);
+    expect(events.map((event) => event.type)).toEqual(["quarter", "eighth", "quarter", "16th"]);
+    expect(events[1]?.timeModification).toEqual({
+      actualNotes: 3,
+      normalNotes: 2,
+      normalType: "eighth",
+    });
+    expect(events[3]?.timeModification).toEqual({
+      actualNotes: 3,
+      normalNotes: 2,
+      normalType: "16th",
+    });
+    expect(events.every((event) => event.tupletMarks.length === 0)).toBe(true);
+    expect(writeMusicXml(projection)).toContain("<type>16th</type>");
+    expect(writeMusicXml(projection)).toContain("<normal-type>16th</normal-type>");
+  });
+
   it.each([
     [3, 4, [3], 3],
     [7, 8, [2, 2, 3], 3.5],

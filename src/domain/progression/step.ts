@@ -2,7 +2,7 @@ import type { HarmonicFunctionIdentity } from "../harmony/functions";
 import type { HarmonicVariant } from "../harmony/chord";
 import type { ExactPitch, PitchSpelling } from "../harmony/pitch";
 import type { MusicalDuration } from "../timing/duration";
-import type { ChordMelodyRecipe } from "../melody/types";
+import type { ChordMelodyRecipe, MelodyInstrument } from "../melody/types";
 
 export type CardViewId = "harmonic" | "piano" | "staff";
 export type PianoArticulation = "block" | "arp-up" | "arp-down" | "broken-chord" | "humanized";
@@ -38,6 +38,8 @@ export interface ChordStep {
   readonly performance: StepPerformance;
   readonly cardView: CardViewId;
   readonly melody?: ChordMelodyRecipe;
+  /** Optional Step-local override; absence inherits Melody Track settings. */
+  readonly melodyInstrumentOverride?: MelodyInstrument;
 }
 
 export interface RestStep {

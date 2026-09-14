@@ -416,15 +416,17 @@ pitch order, exact timing, source-step linkage, staff presentation, and playback
 1. **Given** a Chord Step or any of its measure-card fragments is selected, **When** the user opens its
    context menu, **Then** CadenceFlow offers `Create Melody…` when no recipe exists and `Edit Melody…`
    plus `Remove Melody` when one does.
-2. **Given** the melody editor, **When** the user applies a Pattern, Grid, Octave, and Instrument,
+2. **Given** the melody editor, **When** the user applies Pitch Motion, Rhythm, Connection, Grid,
+   Octave, and Instrument,
    **Then** the recipe is attached to that independent Chord Step and the operation is undoable as one
    semantic edit.
 3. **Given** an attached recipe, **When** CadenceFlow realizes the phrase, **Then** it uses only the
    canonical contextual upper voicing of the source Chord Step, never its independent bass voice, and
    stores the recipe rather than a list of generated notes.
-4. **Given** any supported Pattern and Grid, **When** the phrase is projected, **Then** the pattern
-   order is deterministic, repeats from the beginning for that Chord Step, uses exact Rational offsets,
-   and truncates the final event exactly to the remaining step duration.
+4. **Given** any supported Pitch Motion, Rhythm, Connection, and Grid, **When** the phrase is projected,
+   **Then** pitch and rhythm cycles are deterministic, restart for that Chord Step, use exact Rational
+   offsets, merge only eligible repeated pitches, and truncate the final event exactly to the remaining
+   step duration.
 5. **Given** a source Chord Step whose harmony, voicing, register, or duration changes, **When** the
    linked phrase is read or projected, **Then** its pitches and timing are rebuilt from the current
    source realization without stale generated-note state; Repeat copies the recipe independently,
@@ -999,10 +1001,13 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-191**: CadenceFlow MUST allow a user to attach one linked melody recipe to an individual Chord
   Step and MUST expose Create, Edit, and Remove Melody actions without changing the Chord Step's
   harmonic identity.
-- **FR-192**: A Chord Melody Recipe MUST contain exactly the supported Pattern (`up`, `down`, `up-down`,
-  `down-up`, `outside-in`, or `inside-out`), Grid (`quarter`, `eighth`, `sixteenth`,
-  `eighth-triplet`, or `sixteenth-triplet`), and Octave Offset from -2 through +2; instrument and
-  Melody Track settings are separate concerns.
+- **FR-192**: A Chord Melody Recipe MUST contain exactly one supported Pitch Motion (`up`, `down`,
+  `up-down`, `down-up`, `outside-in`, `inside-out`, `repeat-root`, `repeat-top`,
+  `alternate-root-up`, or `alternate-top-down`), Rhythm (`even`, `dotted`, `reverse-dotted`, or
+  `tresillo`), Connection (`retrigger` or `tie-repeated`), Grid (`quarter`, `eighth`, `sixteenth`,
+  `eighth-triplet`, or `sixteenth-triplet`), and Octave Offset from -2 through +2; instrument and Melody
+  Track settings are separate concerns. Legacy Pattern recipes MUST migrate to the equivalent Pitch
+  Motion with `even` and `retrigger`.
 - **FR-193**: Melody generation MUST consume the canonical contextual upper voicing already realized for
   the source Chord Step. It MUST NOT consume or infer from the independent bass voice, reimplement
   harmony, or import a piano profile into the pure melody domain.
@@ -1012,12 +1017,14 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-195**: The pure melody projection MUST sort source upper pitches by MIDI number without mutating
   the input, preserve exact duplicate MIDI pitches and octave doublings, and produce deterministic
   source-step-linked events with sequential indexes and exact Rational offsets/durations.
-- **FR-196**: Pattern traversal MUST implement full ascending/descending passes, endpoint-nonrepeating
-  Up-Down/Down-Up passes, alternating Outside-In traversal, and center-outward Inside-Out traversal;
-  each Chord Step MUST restart its pattern cycle from the first event.
+- **FR-196**: Pitch Motion traversal MUST implement full ascending/descending passes,
+  endpoint-nonrepeating Up-Down/Down-Up passes, alternating Outside-In traversal, center-outward
+  Inside-Out traversal, repeated lowest/highest chord tones, and root-up/top-down alternation; each Chord
+  Step MUST restart its motion cycle from the first event.
 - **FR-197**: Grid durations MUST be exactly 1, 1/2, 1/4, 1/3, and 1/6 quarter-note beats for the
-  supported grids. The final event MUST be truncated exactly to the remaining duration, including when
-  the source duration is shorter than one grid interval; musical time MUST NOT use floating point.
+  supported grids. Rhythm MUST apply repeating exact weights `[1]`, `[3,1]`, `[1,3]`, or `[3,3,2]` to
+  that base pulse. The final event MUST be truncated exactly to the remaining duration, including when
+  the source duration is shorter than one weighted interval; musical time MUST NOT use floating point.
 - **FR-198**: Octave Offset MUST shift MIDI number and ExactPitch octave by twelve semitones per offset
   while retaining note letter and accidental spelling. Any result outside MIDI 0..127 MUST fail with a
   typed domain validation error and MUST NOT clamp.
@@ -1029,26 +1036,28 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-201**: Melody context-menu and editor interactions MUST be keyboard accessible, expose semantic
   menu/menuitem roles, support Escape/outside-click dismissal and focus return, and apply a recipe edit as
   one undoable operation.
-- **FR-202**: When a project contains at least one melody recipe, Staff View MUST render a separate
-  Melody staff above Piano in concert pitch, select treble clef for Flute, Violin, Clarinet, Oboe, and
-  Synth Lead, bass clef for Cello, encode rests/tuplets, and split cross-bar events with ties without
-  creating repeated attacks.
-- **FR-203**: Melody Track settings MUST support Instrument, Mute, Solo, and integer Volume 0..127;
+- **FR-202**: Staff View MUST render one concert-pitch Melody staff per unique effective Melody Instrument
+  active in that score system, above Piano and on the shared temporal axis. Each staff MUST use its catalog
+  clef, contain only that instrument's notes plus rests for its inactive spans, encode tuplets, and split
+  cross-bar events with ties without creating repeated attacks. Repeated Steps using the same effective
+  instrument MUST reuse one staff; a Step override MUST move its events rather than duplicate them.
+- **FR-203**: Melody Track settings MUST support a catalog Instrument default, Mute, Solo, and integer Volume 0..127;
   enabling Mute MUST disable Solo and enabling Solo MUST disable Mute. Solo MUST suppress chord upper
   and bass playback but MUST NOT suppress the metronome.
 - **FR-204**: Melody playback MUST use a separate provider/channel role and preserve exact source-note
   velocity semantics with global Volume applied independently. Active-note highlighting MUST identify
   the currently sounding melody event while preserving chord highlighting.
-- **FR-205**: The bundled FluidR3Mono SoundFont preparation/provider path MUST be licensed, provenance
+- **FR-205**: The bundled FluidR3_GM SoundFont preparation/provider path MUST be licensed, provenance
   checked, offline-capable, and lazy-loaded. Failure to load it MUST expose an identified melody error
   and Retry state while leaving piano playback, project data, MIDI, and MusicXML available.
-- **FR-206**: When melody exists, MIDI export MUST add a deterministic Melody track before the Piano
-  tracks with the selected instrument program, channel, track name, and volume controls; playback-only
-  Mute/Solo/Volume settings MUST NOT remove melody data from export. Projects without melody MUST retain
-  the existing MIDI output.
-- **FR-207**: When melody exists, MusicXML export MUST add a deterministic single-staff Melody part before
-  Piano with instrument name, supported clef, concert-pitch notes, rests, tuplets, and cross-bar ties.
-  Projects without melody MUST retain the existing MusicXML output.
+- **FR-206**: When melody exists, MIDI format-1 export MUST add one deterministic Melody track per unique
+  effective Melody Instrument before the Piano tracks, with that instrument's program, channel, track name,
+  and notes. Playback-only Mute/Solo/Volume settings MUST NOT remove melody data from export. Projects
+  without melody MUST retain the existing MIDI output.
+- **FR-207**: When melody exists, MusicXML export MUST add one single-staff Melody part per unique effective
+  Melody Instrument before Piano, with its catalog name/clef, concert-pitch notes, rests, tuplets, and
+  cross-bar ties. Every Melody part spans the full score with rests when inactive. Projects without melody
+  MUST retain the existing MusicXML output.
 - **FR-208**: `PresentationState` MUST persist `progressionView` as `harmonic | piano | staff` and
   `measuresPerSystem` as `auto | 1 | 2 | 3 | 4`. Both settings MUST be editable by undoable presentation
   commands that do not change Progression Steps.
@@ -1071,9 +1080,10 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   the maximum count or available width is reached.
 - **FR-212**: A single Staff measure whose required width exceeds the available system width MUST retain
   that width inside a local horizontal scroller; it MUST NOT create page-level horizontal overflow.
-- **FR-213**: When any Chord Step owns a Melody recipe, every Staff system MUST render the Melody staff
-  and fill silent spans with rests. Harmony treble MUST always render; bass MUST render exactly when
-  `showBassInStaff=true` and MUST NOT disappear automatically because of available width.
+- **FR-213**: Each Staff system MUST render exactly the Melody instrument staves that have at least one
+  sounding Melody event in that system and fill their internal silent spans with rests. A system with no
+  Melody event MUST not reserve an empty Melody staff. Harmony treble MUST always render; bass MUST render
+  exactly when `showBassInStaff=true` and MUST NOT disappear automatically because of available width.
 - **FR-214**: Every Staff system MUST repeat the clef and only the first system MUST show the global time
   signature. Harmonic/Piano views MUST ignore `measuresPerSystem` and render independent, full-width
   measure sections in a vertical flow; steps within one measure MUST remain in one horizontal row with
@@ -1092,6 +1102,55 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   demonstrated. Harmonic and Piano MUST retain their independent measure sections and Step cards.
   Removing the Staff strip MUST NOT change Project persistence, Undo/Redo, playback, MIDI, MusicXML, or
   Matrix Card Views.
+- **FR-218**: The Melody editor MUST expose a compact optional Pitch Motion browser containing every
+  supported motion exactly once in three stable groups: Directional (`up`, `down`, `up-down`, `down-up`),
+  Shapes (`outside-in`, `inside-out`), and Pedal & Alternating (`repeat-root`, `repeat-top`,
+  `alternate-root-up`, `alternate-top-down`). Each tile MUST show a human-readable label and a lightweight
+  contour preview derived from the canonical pitch-order implementation rather than a duplicate motion
+  algorithm.
+- **FR-219**: Selecting a Pitch Motion tile MUST change only the editor draft's `pitchMotion`, preserve
+  Rhythm, Connection, Grid, Octave Offset, and Instrument, synchronize the existing Pitch Motion select,
+  and immediately refresh the single authoritative notation preview. Gallery selection MUST NOT play
+  audio, mutate the source Step, persist a gallery/preset identifier, or change project schema; Apply and
+  Cancel retain their existing commit/rollback behavior.
+- **FR-220**: The Pitch Motion browser MUST use disclosure and single-selection semantics with an exposed
+  current value, visible focus, pointer and keyboard operation, deterministic Escape/focus return, and
+  accessible text for each contour. At 1280×720, 1920×1080, and 200% zoom it MUST remain contained within
+  the Melody dialog, use internal scrolling when needed, keep the primary notation preview and footer
+  actions reachable, and create no page-level overflow.
+- **FR-221**: Melody Instruments MUST come from one immutable canonical catalog containing exactly one
+  selectable entry for every General MIDI Level 1 melodic program 0–127. Each entry MUST define a stable
+  id, zero-based GM program, GM family, human-readable label, concert-pitch clef, playable MIDI range,
+  optional local sample asset, and realtime-audio availability. The existing `flute`, `violin`, `clarinet`,
+  `oboe`, `cello`, and `synth-lead` ids MUST remain the canonical ids for their existing programs; the other
+  entries MUST use stable `gm-NNN` ids. Range metadata is informational in this batch: use MIDI 0..127 when
+  no verified narrower range exists and do not transpose, clamp, or reject generated notes from it. Catalog
+  validation MUST reject duplicate ids/programs and gaps.
+- **FR-222**: `MelodyTrackSettings.instrument` MUST remain the project-level default. A Chord Step with a
+  Melody recipe MAY store `melodyInstrumentOverride`; absence means `Use track instrument`. Effective
+  instrument resolution MUST be exactly `step.melodyInstrumentOverride ?? project.melodyTrack.instrument`.
+  Changing either level MUST be undoable, MUST NOT copy the global value into inheriting Steps, and MUST
+  leave repeated Step instances independent. Repeat copies an explicit override; remove-Melody removes it.
+- **FR-223**: Portable projects MUST move to schema v5. The explicit v4→v5 migration MUST preserve the
+  existing six track ids, add no Step overrides, and remain sequential with v1→v2→v3→v4 migration.
+  Autosave, recovery, portable encode/decode, Undo/Redo, Temporary Branch Steps, and future-version
+  rejection MUST preserve or validate optional Step-local overrides without serializing effective values.
+- **FR-224**: Melody Track controls and the Melody editor MUST use one compact, searchable, keyboard-
+  accessible picker grouped by GM family. The track picker edits the global default; the Step picker starts
+  with `Use track instrument` and edits only the selected Step override. Labels MUST expose GM program and
+  `Realtime` or `Export only` availability, preserve draft Apply/Cancel behavior, and remain usable at
+  1280×720, 1920×1080, light/dark, and 200% zoom without page-level overflow.
+- **FR-225**: Realtime Melody playback and preview MUST lazy-load only the effective instruments that have
+  verified local assets. An effective export-only instrument MUST produce an explicit identified audio-
+  unavailable state and MUST NOT silently substitute another timbre, preload the full catalog, stop Harmony
+  playback, corrupt project data, or disable MIDI/MusicXML export. Mixed-instrument progressions MUST retain
+  playable Step timbres while visibly reporting unavailable Step timbres.
+- **FR-226**: Staff, MIDI, and MusicXML MUST partition Melody events by effective instrument. Each unique
+  instrument MUST map to exactly one Staff line per active system, one MIDI track, and one MusicXML part;
+  events MUST never be duplicated or merged into another instrument. Instrument ordering MUST be stable by
+  first progression occurrence, with GM program then stable id as deterministic tie-breakers. Projects
+  without Melody MUST retain their accepted output, and catalog entries without local audio MUST remain
+  fully exportable.
 
 ### Scope Boundaries
 
@@ -1208,12 +1267,16 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **Progression**: Ordered sequence of Progression Steps and Rest Steps.
 - **Progression Step**: One independent chord occurrence with its own harmonic variant, duration,
   instrument realization, voicing, bass, articulation, dynamics, and notation overrides where relevant.
-- **Chord Melody Recipe**: Step-local Pattern, Grid, and Octave Offset settings from which CadenceFlow
-  deterministically derives a monophonic phrase using the Chord Step's current contextual upper voicing.
+- **Chord Melody Recipe**: Step-local Pitch Motion, Rhythm, Connection, Grid, and Octave Offset settings
+  from which CadenceFlow deterministically derives a monophonic phrase using the Chord Step's current
+  contextual upper voicing.
 - **Melody Track**: The single project-level presentation, playback, and export lane for all derived
-  Chord Melody phrases, with one curated instrument assignment and saved Mute, Solo, and Volume settings.
-- **Melody Instrument**: A curated clef, General MIDI program, label, and SoundFont timbre assignment for
-  already-derived monophonic melody notes; it is not a full chord-realization Instrument Profile.
+  Chord Melody phrases, with one default instrument assignment and saved Mute, Solo, and Volume settings.
+- **Melody Instrument**: One canonical General MIDI catalog entry containing stable identity, program,
+  family, label, clef, range, and optional local realtime sample metadata for already-derived monophonic
+  notes; it is not a full chord-realization Instrument Profile.
+- **Effective Melody Instrument**: The selected Chord Step's explicit Melody instrument override when
+  present, otherwise the Melody Track's project-level default.
 - **Rest Step**: Timed non-harmonic progression event that preserves prior harmonic context.
 - **Temporary Branch**: One active non-destructive sequence of preview steps with origin, optional
   rejoin point, and commit state.
@@ -1278,7 +1341,7 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   MIDI-exported pitches for 100% of tested manual and automatic voicings; at least three distinct
   velocity regions produce audibly and measurably different sample/timbre responses without changing
   stored note identity.
-- **SC-018**: For every supported Melody Pattern and Grid in the US12 acceptance fixture, 100% of
+- **SC-018**: For every supported Melody Pitch Motion, Rhythm, Connection, and Grid in the US12 acceptance fixture, 100% of
   generated events use only the source Chord Step's contextual upper pitches, retain exact Rational
   ordering and duration through Staff, playback, MIDI, MusicXML, save/reopen, and Undo/Redo, and never
   serialize a generated-note list.
@@ -1288,6 +1351,16 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **SC-020**: In Staff View, 100% of acceptance-fixture Chord and Rest Steps can be selected, inspected,
   reordered, removed, and reached during playback without a duplicate Step-card strip; Melody actions
   can be opened by pointer and keyboard, and Harmonic/Piano retain their existing Step-card interactions.
+- **SC-021**: All ten supported Pitch Motions are reachable and distinguishable in the grouped Melody
+  browser by pointer and keyboard; selection updates the existing draft and notation preview without
+  changing unrelated axes, and the dialog remains usable without page-level overflow at both supported
+  desktop sizes and 200% zoom.
+- **SC-022**: All 128 GM melodic programs appear exactly once in the shared grouped/searchable picker and
+  export with their canonical program/name metadata. Global inheritance and explicit Step overrides survive
+  save/reopen and Undo/Redo, repeated Steps remain independent, all six bundled timbres play without eager
+  loading, and every export-only selection reports unavailability without fallback or blocking export. A
+  mixed-instrument fixture maps every unique effective instrument to exactly one separate Staff line, MIDI
+  track, and MusicXML part, with no missing or duplicated Melody event.
 
 ## Assumptions
 

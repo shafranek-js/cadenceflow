@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { JSDOM } from "jsdom";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { ensureMelodyTrackControlsVisible } from "./test-helpers/progression-settings";
 
 const VIEWPORTS = [
   { width: 1280, height: 720 },
@@ -43,8 +44,8 @@ async function createMelody(
 
   const dialog = page.getByRole("dialog", { name: "Create Melody" });
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Melody Pattern").selectOption("outside-in");
-  await dialog.getByLabel("Melody Grid").selectOption("sixteenth-triplet");
+  await dialog.getByLabel("Pitch Motion").selectOption("outside-in");
+  await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
   if (options.instrument && !options.preview) {
     await dialog.getByLabel("Melody Instrument").selectOption(options.instrument);
   }
@@ -59,9 +60,9 @@ async function createMelody(
     await dialog.getByRole("button", { name: "Stop melody preview" }).click();
     await expect(playPreview).toBeVisible();
     // Recipe edits are observable controls: the preview is stopped before the draft changes.
-    await dialog.getByLabel("Melody Pattern").selectOption("inside-out");
+    await dialog.getByLabel("Pitch Motion").selectOption("inside-out");
     await expect(dialog.getByRole("button", { name: "Play melody preview" })).toBeVisible();
-    await dialog.getByLabel("Melody Grid").selectOption("eighth");
+    await dialog.getByLabel("Grid").selectOption("eighth");
     if (options.instrument) {
       await dialog.getByLabel("Melody Instrument").selectOption(options.instrument);
     }
@@ -335,7 +336,6 @@ async function exportFiles(page: Page): Promise<{
 }
 
 async function assertThemesAndLayout(page: Page): Promise<void> {
-  const progression = page.getByRole("region", { name: "My Progression" });
   const themes = page.getByRole("group", { name: "Theme" });
   for (const theme of ["light", "dark"] as const) {
     const button = themes.getByRole("button", {
@@ -343,7 +343,7 @@ async function assertThemesAndLayout(page: Page): Promise<void> {
     });
     if ((await button.getAttribute("aria-pressed")) !== "true") await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(progression.getByRole("region", { name: "Melody Track controls" })).toBeVisible();
+    await expect(await ensureMelodyTrackControlsVisible(page)).toBeVisible();
     await expect(page.getByTestId("progression-score-system").first()).toBeVisible();
     await expect(page.locator(".score-system-canvas > svg").first()).toBeVisible();
     await expect(page.locator(".melody-staff-note.is-selected").first()).toBeVisible();
@@ -376,7 +376,7 @@ for (const viewport of VIEWPORTS) {
       await createMelody(page, { preview: true, instrument: "cello" });
 
       const progression = page.getByRole("region", { name: "My Progression" });
-      const controls = progression.getByRole("region", { name: "Melody Track controls" });
+      let controls: Locator = await ensureMelodyTrackControlsVisible(page);
       await expect(controls).toBeVisible();
       await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
       await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
@@ -387,10 +387,9 @@ for (const viewport of VIEWPORTS) {
       const redo = page.getByRole("button", { name: "Redo", exact: true });
       await expect(undo).toBeEnabled();
       await undo.click();
-      await expect(progression.getByRole("region", { name: "Melody Track controls" })).toHaveCount(
-        0,
-      );
+      await expect(page.getByRole("region", { name: "Melody Track controls" })).toHaveCount(0);
       await redo.click();
+      controls = await ensureMelodyTrackControlsVisible(page);
       await expect(controls).toBeVisible();
 
       await addChord(page, "V");
@@ -424,19 +423,16 @@ for (const viewport of VIEWPORTS) {
       await waitForAutosaveWithMelody(page);
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
-      await expect(
-        progression.getByRole("region", { name: "Melody Track controls" }),
-      ).toBeVisible();
-      await expect(progression.getByLabel("Melody Track Instrument")).toHaveValue("cello");
-      await expect(progression.getByLabel("Melody Track Volume")).toHaveValue("73");
+      controls = await ensureMelodyTrackControlsVisible(page);
+      await expect(controls).toBeVisible();
+      await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
+      await expect(controls.getByLabel("Melody Track Volume")).toHaveValue("73");
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
       await expect(
         page.locator('[data-testid="progression-step"][data-playing="true"]'),
       ).toHaveCount(0);
       await assertFreshHistory(page);
-      await expect(
-        progression.getByRole("region", { name: "Melody Track controls" }),
-      ).toContainText("Melody audio ready", { timeout: 60_000 });
+      await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
 
       const persistedMelodyNote = page.locator("[data-melody-event-key]").first();
       await expect(persistedMelodyNote).toBeVisible();
@@ -450,13 +446,13 @@ for (const viewport of VIEWPORTS) {
       const persistedMenu = page.getByRole("menu", { name: /Melody actions/ });
       await persistedMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
       const editDialog = page.getByRole("dialog", { name: "Edit Melody" });
-      await expect(editDialog.getByLabel("Melody Pattern")).toHaveValue("inside-out");
-      await expect(editDialog.getByLabel("Melody Grid")).toHaveValue("eighth");
+      await expect(editDialog.getByLabel("Pitch Motion")).toHaveValue("inside-out");
+      await expect(editDialog.getByLabel("Grid")).toHaveValue("eighth");
       await expect(editDialog.getByLabel("Melody Instrument")).toHaveValue("cello");
       await editDialog.getByRole("button", { name: "Cancel" }).click();
       await expect(persistedInvoker).toBeFocused();
 
-      const melodyInstrument = progression.getByLabel("Melody Track Instrument");
+      const melodyInstrument = controls.getByLabel("Melody Track Instrument");
       const scoreSvg = page
         .getByTestId("progression-score-system")
         .first()
@@ -605,7 +601,7 @@ test.describe("US12 Melody provider isolation", () => {
     await addChord(page, "I");
     await createMelody(page, { preview: false });
     const progression = page.getByRole("region", { name: "My Progression" });
-    const controls = progression.getByRole("region", { name: "Melody Track controls" });
+    const controls = await ensureMelodyTrackControlsVisible(page);
     await expect(controls).toContainText("Melody audio error", { timeout: 30_000 });
     await expect(controls.getByRole("button", { name: "Retry" })).toBeVisible();
     const pianoStatus = page.getByTestId("piano-audio-status");

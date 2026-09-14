@@ -4,7 +4,8 @@ import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
 import { realizeChordMelody } from "../domain/melody/projection";
 import { melodyGridDuration } from "../domain/melody/patterns";
-import type { MelodyTrackSettings } from "../domain/melody/types";
+import { validateChordMelodyRecipe, type MelodyTrackSettings } from "../domain/melody/types";
+import { resolveEffectiveMelodyInstrument } from "../domain/melody/instrumentCatalog";
 import type { ProgressionStep } from "../domain/progression/step";
 import { projectSwingTiming, type GrooveSettings, type TimedEvent } from "../domain/timing/swing";
 import {
@@ -26,6 +27,7 @@ export interface MelodyPerformanceEvent extends AudioNoteEvent {
   readonly stepIndex: number;
   readonly startBeats: Rational;
   readonly durationBeats: Rational;
+  readonly instrument: MelodyTrackSettings["instrument"];
 }
 
 export interface MelodyPerformanceProjection {
@@ -68,6 +70,7 @@ export function realizeProgressionMelodyPerformance(
   }
 
   const track = input.melodyTrack;
+  const trackInstrument = track?.instrument ?? "flute";
   const projected = projectProgressionStepTimings(
     input.steps,
     input.groove ?? { feel: "straight", swingAmount: 0 },
@@ -96,15 +99,22 @@ export function realizeProgressionMelodyPerformance(
       throw new Error(`missing contextual melody realization for step ${step.id}`);
     }
 
+    const recipe = validateChordMelodyRecipe(step.melody);
+    const instrument = resolveEffectiveMelodyInstrument(
+      step.melodyInstrumentOverride,
+      trackInstrument,
+    ).id;
     const phrase = realizeChordMelody({
       sourceStepId: step.id,
       upperPitches: realization.upperPitches,
       durationBeats: timing.durationBeats,
-      recipe: step.melody,
+      recipe,
     });
     const canSwing =
-      (input.groove?.feel ?? "straight") === "swing" && isStraightMelodyGrid(step.melody.grid);
-    const gridDuration = melodyGridDuration(step.melody.grid);
+      recipe.rhythm === "even" &&
+      (input.groove?.feel ?? "straight") === "swing" &&
+      isStraightMelodyGrid(recipe.grid);
+    const gridDuration = melodyGridDuration(recipe.grid);
     const phraseTimedEvents: readonly TimedEvent[] = phrase.events.map((event) => ({
       startBeats: event.startOffsetBeats,
       durationBeats: event.durationBeats,
@@ -135,6 +145,7 @@ export function realizeProgressionMelodyPerformance(
           stepIndex,
           startBeats,
           durationBeats: timedEvent.durationBeats,
+          instrument,
         }),
       );
     });

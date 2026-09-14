@@ -10,6 +10,7 @@ import type { TemporaryBranch } from "../../src/domain/progression/branch";
 import type { FunctionalPreset } from "../../src/domain/progression/presets";
 import { snapshotChordMelodyRecipe } from "../../src/domain/melody/types";
 import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../../src/domain/harmony/track";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrations";
 
 /**
  * Rich, canonical Project fixture covering all accepted semantic domains (US1–US12).
@@ -181,7 +182,7 @@ export function createRichProjectFixture(): Project {
 
   return Object.freeze({
     id: "project-us8-rich-fixture-001",
-    schemaVersion: 3,
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     name: "Rich US8 Acceptance Project",
     createdAt: "2026-09-05T20:00:00.000Z",
     updatedAt: "2026-09-05T20:30:00.000Z",

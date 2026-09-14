@@ -1,8 +1,8 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-13
-**Current implementation stage:** Phase 14 robustness T151–T153 is accepted; the asset, deployment, and quickstart audit is the next proposed controlled batch
-**Task progress:** 179 accepted tasks, 179 / 185 scheduled tasks; T186–T188 remain unscheduled product backlog
+**Handoff date:** 2026-09-14
+**Current implementation stage:** T188 GM Melody catalog and global/Step-local inheritance authorized
+**Task progress:** 187 accepted tasks, 187 / 188 scheduled tasks; T187 remains unscheduled product backlog
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +10,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** is **ACCEPTED / COMPLETE** for **T141–T149**, including current Staff accessibility expectations, focus/landmark behavior, and the final desktop journey. **Phase 15: User Story 11** is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**. **Phase 17: User Story 13** is **ACCEPTED / COMPLETE** for **T177–T185**, including direct Staff interaction, visual polish, and final responsive Chromium acceptance. Phase 14 remains the release-candidate gate and now covers SC-001–SC-020. SC-013 and SC-014 remain open because independent MIDI/notation-application interoperability has not been verified.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** is **ACCEPTED / COMPLETE** for **T141–T149**, including current Staff accessibility expectations, focus/landmark behavior, and the final desktop journey. **Phase 15: User Story 11** is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**. **Phase 17: User Story 13** is **ACCEPTED / COMPLETE** for **T177–T185**, including direct Staff interaction, visual polish, and final responsive Chromium acceptance. **Phase 14** is now **ACCEPTED / COMPLETE** through T157 with SC-001–SC-020 closed from current repository and independent MuseScore evidence.
 
 ## 2. Sources of truth
 
@@ -24,9 +24,9 @@ Use the following precedence when requirements appear ambiguous:
 
 Current spec verification:
 
-- 1314 physical lines / 1175 non-empty lines.
-- FR-001 through FR-217: 217 unique functional requirements.
-- SC-001 through SC-020: 20 unique success criteria.
+- 1342 physical lines / 1203 non-empty lines.
+- FR-001 through FR-220: 220 unique functional requirements.
+- SC-001 through SC-021: 21 unique success criteria.
 - No `TODO`, `TBD`, or `NEEDS CLARIFICATION` placeholders.
 
 ## 3. Completed work
@@ -441,7 +441,7 @@ Final verified US9 acceptance baseline:
 - Full Chromium: `49 / 49`, retries `0`.
 - TypeScript, production build, ESLint, Prettier, and `git diff --check`: PASS.
 
-External interoperability remains an honest open gap: SC-013 and SC-014 have not been verified in independent MIDI/notation applications. The gate is scheduled for closure no later than T150/T157; heavy applications are intentionally not installed in this assignment.
+At the US9 checkpoint, external interoperability remained open and was intentionally deferred to T157. It is now closed by the final release-candidate acceptance recorded below.
 
 ### US10 Batch A — responsive desktop Studio shell — T141, T143, T144
 
@@ -576,8 +576,8 @@ The real toolchain and test suite were verified on 2026-09-05:
 
 1. **Active Git Repository**: development is on `master`; every batch must preserve the current untracked QA/source materials and isolate only its intended tracked diff.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
-3. **HQ piano assets**: the complete 480-region OGG bank is committed and currently verifies 480/480 decoded files. Phase 14 T154–T155 still owns the final attribution, bundle-size, lazy-decode/cache, and deployment audit.
-4. **Release acceptance**: T150–T158 remain open as gap-only/final release work; SC-013/SC-014 external interoperability is still open.
+3. **HQ piano assets**: the complete 480-region OGG bank verifies 480/480 decoded files. Attribution and the CC BY 3.0 URL are packaged, but no separate full piano-bank license text is currently committed; the final release gate must record an explicit disposition.
+4. **Release acceptance**: the v1 baseline through T189 is accepted; SC-013/SC-014 external interoperability is closed with MuseScore 4.7.4 evidence. T188 is active; T187 remains product backlog.
 
 ## 8. Phase 16 / US12 — accepted and complete through T176
 
@@ -663,11 +663,11 @@ post-review Inspector rerun **11 / 11**, production build, scoped ESLint/Prettie
 The build retains only the known large-chunk warning. The accepted result remains uncommitted in the
 protected dirty worktree.
 
-Phase 14 robustness T151–T153 is accepted in the next section. T186–T188 remain separately prioritized
-product backlog; T188 includes a global Melody Track instrument default plus optional Step-local instrument
-overrides with inheritance.
+Phase 14 robustness T150–T156 and T158 is accepted in the next section. T186 Melody-enrichment Batch A and
+T189 Pitch Motion discovery are independently accepted. T188 is the active controlled batch for the GM
+catalog plus global Melody Track default and optional Step-local inheritance; T187 remains product backlog.
 
-## 13. Phase 14 robustness — T151–T153 accepted
+## 13. Phase 14 robustness — T150–T156 and T158 accepted
 
 T151 adds warm-up-separated p50/p95/max benchmarks for recommendation refresh and ordinary Matrix actions
 against the <100 ms target. Independent review repaired the acceptance assertion so a p95 regression now
@@ -685,6 +685,77 @@ scoped Prettier, and `git diff --check` passed; Chromium was correctly skipped b
 not changed. The build retains only the known large-chunk warning. The accepted result remains uncommitted
 in the protected dirty worktree.
 
-The next proposed controlled batch is **T154, T155, and T158**: audit the committed piano-bank assets and
-attribution, verify production build/base-path/manual Pages evidence, and bring Quickstart commands in line
-with the verified repository. It must not start until explicitly approved.
+T154 verifies a deterministic 480-region manifest and 480/480 present, non-empty, decodable OGG assets.
+The committed attribution identifies Salamander Grand Piano V3, Alexander Holm, the pinned upstream
+revision, and the CC BY 3.0 URL; the absence of a separate full piano-bank license text remains explicitly
+recorded rather than being hidden by an unsupported packaging claim.
+
+T155 verifies lazy fetch/decode and bounded cache behavior, the `/cadenceflow/` Pages base path, the
+manual-only least-privilege Pages workflow, production bundle/asset sizes, and representative published
+assets. T158 replaces the stale implementation bootstrap with reproducible current Quickstart commands.
+Independent review passed 32 focused Vitest assertions, Melody and 480/480 piano asset verification, the
+real Chromium decode/cache smoke test, local and Pages builds, scoped Prettier, and `git diff --check`.
+The reviewer clarified that Chromium must rebuild a local `/`-base `dist/` before previewing it.
+
+T156 adds one shared application-shortcut guard so native form controls, menus, and dialogs retain their
+keyboard behavior. Independent review confirms that Escape in focused Matrix/Progression selects no longer
+clears selection and Ctrl/Cmd+Z in Inspector text input no longer triggers application Undo. The accepted
+batch also repairs stale Inspector and score-SVG locators without weakening behavior assertions. Focused
+Chromium passed 34/34, focused Vitest passed 18/18, and the production build, scoped ESLint/Prettier, and
+`git diff --check` passed. Layout was unchanged, so no new visual baseline was required.
+
+T150 maps SC-001–SC-020 to the existing deterministic fixture, unit, and integration evidence. The audit
+found no production defects or stale deterministic assertions. It adds one missing SC-016 proof showing
+that a second `InstrumentProfile` can realize the same saved harmonic progression without entering or
+changing portable project semantics. Independent verification passed 93 Vitest files / 737 tests,
+`verify:fixtures` over 25 fixture files, the production build, scoped ESLint/Prettier, and
+`git diff --check`. Browser-, asset-, and external-application-only claims remain reserved for T157.
+
+T157 is independently accepted. Full Vitest passed 93/93 files and 737/737 tests; fixture, Melody-asset, and
+480-region HQ-piano verification passed; full Chromium passed 136/136; production build and MusicXML
+validation passed. MuseScore 4.7.4 independently imported and rendered the fresh MIDI/MusicXML exports,
+including grouped meters, tempo, parts/staves, rests, dynamics, velocities, ties/tuplets, and chromatic
+spelling. The accepted v1 baseline and SC-001–SC-021 are closed. T186 Melody enrichment Batch A and T189
+Pitch Motion discovery are also independently accepted. T188 is authorized for implementation; T187 does
+not start without a separate prioritization decision.
+
+## 14. Phase 18 / Melody enrichment Batch A — T186 accepted
+
+T186 separates the canonical Chord Melody recipe into independent `pitchMotion`, `rhythm`, `connection`,
+`grid`, and `octaveOffset` axes. The deterministic vocabulary now contains ten chord-tone motions, four
+rhythm weight cycles, and retrigger/tie-repeated connection behavior. Staff preview/live notation,
+realtime playback, MIDI, and MusicXML consume the same canonical realized Melody events.
+
+Portable projects now use schema v4. The explicit v3→v4 migration upgrades legacy `{pattern, grid,
+octaveOffset}` recipes in both the main progression and Temporary Branch to `even` + `retrigger`; v4 saves
+only the canonical shape, rejects mixed keys, and retains sequential v1→v2→v3→v4 recovery and future-version
+rejection.
+
+Independent acceptance passed focused Melody/domain/export Vitest **12 files / 143 tests**, an additional
+persistence/migration/autosave set **5 files / 103 tests**, focused Chromium **10 / 10**, production build,
+and `git diff --check`. Visual review confirmed the five compact accessible controls fit in two rows and the
+notation preview remains unobstructed and updates immediately. The accepted result remains uncommitted in
+the protected dirty worktree.
+
+## 15. Phase 18 / Melody Pitch Motion discovery — T189 accepted
+
+T189 keeps the compact `Pitch Motion` select as the primary editor control and adds an optional grouped
+browser for all ten canonical motions. The three UI-only groups and lightweight contour thumbnails derive
+their pitch order from the existing canonical motion implementation; they add no persisted state and do not
+change schema v4, playback, Staff, MIDI, or MusicXML semantics.
+
+Independent acceptance passed focused Melody/UI/domain Vitest **5 files / 45 tests**, focused Chromium
+**5 / 5**, production build, scoped ESLint/Prettier, and `git diff --check`. Manual visual review covered the
+normal desktop viewport, 1280×720, and a narrow 640×360 viewport equivalent to the 200% layout pressure:
+tiles remained compact, the gallery used internal scrolling, notation stayed unobstructed, and dialog actions
+remained reachable. The accepted result remains uncommitted in the protected dirty worktree. T188 is the
+next controlled developer assignment.
+
+## 16. Phase 18 / GM Melody catalog and inheritance — T188 active
+
+T188 adds the complete 128-program General MIDI catalog while keeping only the six existing verified local
+FluidR3_GM assets realtime-capable. It introduces schema v5 and an optional Step-local Melody instrument
+override; absence continues to mean inheritance from the Melody Track default. UI, Staff, playback, MIDI,
+and MusicXML consume one pure effective-instrument resolver and event partition: each unique effective
+instrument receives one active-system Staff line, one MIDI track, and one full-score MusicXML part. No assets
+or dependencies are added, and export-only instruments report audio unavailability without silent fallback.

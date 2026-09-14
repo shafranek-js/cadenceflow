@@ -30,7 +30,9 @@ const T0 = "2026-09-10T12:00:00.000Z";
 const T1 = "2026-09-10T12:01:00.000Z";
 
 const recipe = {
-  pattern: "inside-out" as const,
+  pitchMotion: "inside-out" as const,
+  rhythm: "even" as const,
+  connection: "retrigger" as const,
   grid: "eighth-triplet" as const,
   octaveOffset: 1 as const,
 };
@@ -88,7 +90,13 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
       type: "melody/set-recipe",
       payload: {
         stepId: "step-1",
-        recipe: { pattern: "down", grid: "quarter", octaveOffset: -1 },
+        recipe: {
+          pitchMotion: "down",
+          rhythm: "even",
+          connection: "retrigger",
+          grid: "quarter",
+          octaveOffset: -1,
+        },
         nowIso: "2026-09-10T12:02:00.000Z",
       },
     });
@@ -212,7 +220,13 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
         type: "melody/set-recipe",
         payload: {
           stepId: "step-1",
-          recipe: { pattern: "random" as never, grid: "quarter", octaveOffset: 0 },
+          recipe: {
+            pitchMotion: "random" as never,
+            rhythm: "even",
+            connection: "retrigger",
+            grid: "quarter",
+            octaveOffset: 0,
+          },
           nowIso: T1,
         },
       }),

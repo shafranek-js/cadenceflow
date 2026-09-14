@@ -54,6 +54,248 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(play).toBeVisible();
   });
 
+  test("browses every Pitch Motion with pointer and keyboard while preserving draft axes", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openStudio(page);
+    await addChord(page, "I");
+
+    const step = page.locator("[data-progression-step-select]").last();
+    const openCreateDialog = async () => {
+      await step.click({ button: "right" });
+      const menu = page.getByRole("menu", { name: /Melody actions/ });
+      await menu.getByRole("menuitem", { name: "Create Melody…" }).click();
+      return page.getByRole("dialog", { name: "Create Melody" });
+    };
+
+    let dialog = await openCreateDialog();
+    await dialog.getByLabel("Rhythm").selectOption("dotted");
+    await dialog.getByLabel("Connection").selectOption("tie-repeated");
+    await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
+    await dialog.getByLabel("Octave offset").selectOption("1");
+    await dialog.getByLabel("Melody Instrument").selectOption("cello");
+
+    const browse = dialog.getByRole("button", { name: "Browse motions" });
+    await browse.click();
+    const gallery = dialog.getByTestId("melody-pitch-motion-gallery");
+    await expect(gallery.getByRole("radio")).toHaveCount(10);
+    await expect(gallery.getByRole("heading", { name: "Directional" })).toBeVisible();
+    await expect(gallery.getByRole("heading", { name: "Shapes" })).toBeVisible();
+    await expect(gallery.getByRole("heading", { name: "Pedal & Alternating" })).toBeVisible();
+    await expect(gallery.locator(".melody-pitch-motion-contour")).toHaveCount(10);
+
+    const notationBefore = await dialog
+      .getByTestId("melody-staff-measure")
+      .getAttribute("aria-label");
+    await gallery.locator('[data-pitch-motion="outside-in"]').click();
+    await expect(dialog.getByLabel("Pitch Motion", { exact: true })).toHaveValue("outside-in");
+    await expect(dialog.getByLabel("Rhythm")).toHaveValue("dotted");
+    await expect(dialog.getByLabel("Connection")).toHaveValue("tie-repeated");
+    await expect(dialog.getByLabel("Grid")).toHaveValue("sixteenth-triplet");
+    await expect(dialog.getByLabel("Octave offset")).toHaveValue("1");
+    await expect(dialog.getByLabel("Melody Instrument")).toHaveValue("cello");
+    await expect
+      .poll(() => dialog.getByTestId("melody-staff-measure").getAttribute("aria-label"))
+      .not.toBe(notationBefore);
+
+    const outsideIn = gallery.locator('[data-pitch-motion="outside-in"]');
+    await outsideIn.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog.getByLabel("Pitch Motion", { exact: true })).toHaveValue("inside-out");
+    await expect(gallery.locator('[data-pitch-motion="inside-out"]')).toBeFocused();
+    await expect(gallery.locator('[data-pitch-motion="inside-out"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(gallery).toHaveCount(0);
+    await expect(browse).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Create Melody" })).toHaveCount(0);
+
+    dialog = await openCreateDialog();
+    await expect(dialog.getByLabel("Pitch Motion", { exact: true })).toHaveValue("up");
+    await expect(dialog.getByLabel("Rhythm")).toHaveValue("even");
+    await expect(dialog.getByLabel("Connection")).toHaveValue("retrigger");
+    await expect(dialog.getByLabel("Grid")).toHaveValue("eighth");
+    await expect(dialog.getByLabel("Octave offset")).toHaveValue("0");
+    await expect(dialog.getByLabel("Melody Instrument")).toHaveValue("flute");
+    await dialog.getByLabel("Pitch Motion", { exact: true }).selectOption("down");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("dialog", { name: "Create Melody" })).toHaveCount(0);
+
+    dialog = await openCreateDialog();
+    await dialog.getByLabel("Rhythm").selectOption("reverse-dotted");
+    await dialog.getByLabel("Connection").selectOption("tie-repeated");
+    await dialog.getByLabel("Grid").selectOption("quarter");
+    await dialog.getByLabel("Octave offset").selectOption("-1");
+    await dialog.getByLabel("Melody Instrument").selectOption("violin");
+    await dialog.getByRole("button", { name: "Browse motions" }).click();
+    await dialog
+      .getByTestId("melody-pitch-motion-gallery")
+      .locator('[data-pitch-motion="alternate-top-down"]')
+      .click();
+    await dialog.getByRole("button", { name: "Apply Melody" }).click();
+
+    await step.click({ button: "right" });
+    await page
+      .getByRole("menu", { name: /Melody actions/ })
+      .getByRole("menuitem", { name: "Edit Melody…" })
+      .click();
+    const editDialog = page.getByRole("dialog", { name: "Edit Melody" });
+    await expect(editDialog.getByLabel("Pitch Motion")).toHaveValue("alternate-top-down");
+    await expect(editDialog.getByLabel("Rhythm")).toHaveValue("reverse-dotted");
+    await expect(editDialog.getByLabel("Connection")).toHaveValue("tie-repeated");
+    await expect(editDialog.getByLabel("Grid")).toHaveValue("quarter");
+    await expect(editDialog.getByLabel("Octave offset")).toHaveValue("-1");
+    await expect(editDialog.getByLabel("Melody Instrument")).toHaveValue("violin");
+    await editDialog.getByRole("button", { name: "Cancel" }).click();
+  });
+
+  test("contains the Pitch Motion gallery at desktop sizes, themes, and 200% zoom", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openStudio(page);
+    await addChord(page, "I");
+    const step = page.locator("[data-progression-step-select]").last();
+    const theme = page.getByRole("group", { name: "Theme" });
+
+    for (const themeName of ["Dark theme", "Light theme"] as const) {
+      await theme.getByRole("button", { name: themeName, exact: true }).click();
+      await step.click({ button: "right" });
+      await page
+        .getByRole("menu", { name: /Melody actions/ })
+        .getByRole("menuitem", { name: "Create Melody…" })
+        .click();
+      const dialog = page.getByRole("dialog", { name: "Create Melody" });
+      const browse = dialog.getByRole("button", { name: "Browse motions" });
+
+      for (const viewport of [
+        { width: 1280, height: 720 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await browse.click();
+        const gallery = dialog.getByTestId("melody-pitch-motion-gallery");
+        const bounds = await dialog.evaluate((dialogElement) => {
+          const dialogBounds = dialogElement.getBoundingClientRect();
+          const galleryBounds = dialogElement
+            .querySelector("[data-testid=melody-pitch-motion-gallery]")!
+            .getBoundingClientRect();
+          return {
+            dialog: { left: dialogBounds.left, right: dialogBounds.right },
+            gallery: { left: galleryBounds.left, right: galleryBounds.right },
+          };
+        });
+        expect(bounds.gallery.left).toBeGreaterThanOrEqual(bounds.dialog.left - 1);
+        expect(bounds.gallery.right).toBeLessThanOrEqual(bounds.dialog.right + 1);
+        await expect(dialog.getByTestId("melody-editor-preview")).toBeVisible();
+        await expect(dialog.getByRole("button", { name: "Apply Melody" })).toBeVisible();
+        await expect(gallery).toHaveCSS("overflow-y", "auto");
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+        ).toBeLessThanOrEqual(0);
+        await browse.click();
+      }
+
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.evaluate(() => {
+        document.documentElement.style.zoom = "2";
+      });
+      await browse.click();
+      const zoomedGallery = dialog.getByTestId("melody-pitch-motion-gallery");
+      await expect(zoomedGallery).toBeVisible();
+      await expect(dialog.getByTestId("melody-editor-preview")).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Cancel" })).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+      ).toBeLessThanOrEqual(0);
+      await page.evaluate(() => {
+        document.documentElement.style.zoom = "";
+      });
+      const cancel = dialog.getByRole("button", { name: "Cancel" });
+      await dialog.evaluate((dialogElement) => {
+        dialogElement.scrollTop = dialogElement.scrollHeight;
+      });
+      await cancel.click();
+    }
+  });
+
+  test("persists non-default Rhythm and Connection through edit and reload", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      (
+        window as unknown as { __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean }
+      ).__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+    });
+    await openStudio(page);
+    await addChord(page, "I");
+    await page.getByLabel("Progression Card View").selectOption("staff");
+
+    const step = page.locator("[data-progression-step-select]").last();
+    await step.click({ button: "right" });
+    const menu = page.getByRole("menu", { name: /Melody actions/ });
+    await menu.getByRole("menuitem", { name: "Create Melody…" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Create Melody" });
+    const preview = dialog.getByTestId("melody-staff-measure");
+    await expect(dialog.getByLabel("Rhythm")).toHaveValue("even");
+    await expect(dialog.getByLabel("Connection")).toHaveValue("retrigger");
+    await dialog.getByLabel("Rhythm").selectOption("dotted");
+    await dialog.getByLabel("Connection").selectOption("tie-repeated");
+    await expect(preview).toHaveAttribute("aria-label", /for 3\/2 beats/);
+    await dialog.getByRole("button", { name: "Apply Melody" }).click();
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const state = (
+              window as unknown as {
+                __cadenceflow_persistence__?: { lastCompletedProjectSnapshot?: string };
+              }
+            ).__cadenceflow_persistence__;
+            return (
+              state?.lastCompletedProjectSnapshot?.includes('"rhythm":"dotted"') === true &&
+              state.lastCompletedProjectSnapshot.includes('"connection":"tie-repeated"')
+            );
+          }),
+        { timeout: 30_000, intervals: [50, 100, 250, 500, 1000] },
+      )
+      .toBe(true);
+
+    await step.click({ button: "right" });
+    await page
+      .getByRole("menu", { name: /Melody actions/ })
+      .getByRole("menuitem", { name: "Edit Melody…" })
+      .click();
+    let editDialog = page.getByRole("dialog", { name: "Edit Melody" });
+    await expect(editDialog.getByLabel("Rhythm")).toHaveValue("dotted");
+    await expect(editDialog.getByLabel("Connection")).toHaveValue("tie-repeated");
+    await editDialog.getByRole("button", { name: "Cancel" }).click();
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+    const reloadedStep = page.locator("[data-progression-step-select]").last();
+    await reloadedStep.click({ button: "right" });
+    await page
+      .getByRole("menu", { name: /Melody actions/ })
+      .getByRole("menuitem", { name: "Edit Melody…" })
+      .click();
+    editDialog = page.getByRole("dialog", { name: "Edit Melody" });
+    await expect(editDialog.getByLabel("Rhythm")).toHaveValue("dotted");
+    await expect(editDialog.getByLabel("Connection")).toHaveValue("tie-repeated");
+    await expect(editDialog.getByTestId("melody-staff-measure")).toHaveAttribute(
+      "aria-label",
+      /for 3\/2 beats/,
+    );
+    await editDialog.getByRole("button", { name: "Cancel" }).click();
+  });
+
   test("creates, edits, selects, controls, removes, and undoes a melody", async ({
     page,
   }, testInfo) => {
@@ -122,15 +364,20 @@ test.describe("US12 — melody editor and derived staff", () => {
 
     const dialog = page.getByRole("dialog", { name: "Create Melody" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByLabel("Melody Pattern")).toHaveValue("up");
-    await expect(dialog.getByLabel("Melody Grid")).toHaveValue("eighth");
-    await dialog.getByLabel("Melody Pattern").selectOption("outside-in");
-    await dialog.getByLabel("Melody Grid").selectOption("sixteenth-triplet");
+    await expect(dialog.getByLabel("Pitch Motion")).toHaveValue("up");
+    await expect(dialog.getByLabel("Rhythm")).toHaveValue("even");
+    await expect(dialog.getByLabel("Connection")).toHaveValue("retrigger");
+    await expect(dialog.getByLabel("Grid")).toHaveValue("eighth");
+    await dialog.getByLabel("Pitch Motion").selectOption("outside-in");
+    await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
     await dialog.getByLabel("Melody Instrument").selectOption("cello");
     await dialog.getByRole("button", { name: "Apply Melody" }).click();
 
-    const progression = page.getByRole("region", { name: "My Progression" });
-    const controls = progression.getByRole("region", { name: "Melody Track controls" });
+    const progressionSettings = selectedInspector.getByTestId("selected-progression-settings");
+    if (!(await progressionSettings.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await progressionSettings.locator(":scope > summary").click();
+    }
+    const controls = selectedInspector.getByRole("region", { name: "Melody Track controls" });
     await expect(controls).toBeVisible();
     await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
     await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });

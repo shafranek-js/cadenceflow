@@ -3,6 +3,7 @@ import { realizeProgressionMelodyPerformance } from "../../audio/melodyPerforman
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { modeForModule } from "../../domain/harmony/functions";
 import type { MelodyInstrument } from "../../domain/melody/types";
+import { getMelodyInstrument } from "../../domain/melody/instrumentCatalog";
 import type { Project } from "../../domain/project/project";
 import { addRational, subtractRational, ZERO, type Rational } from "../../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../../domain/timing/measureLayout";
@@ -22,19 +23,37 @@ export interface MidiProjectionMelodyNote {
   readonly stepIndex: number;
   readonly stepId: string;
   readonly order: number;
-  readonly channel: 2;
+  readonly channel: number;
   readonly pitch: number;
   readonly velocity: number;
   readonly startTick: number;
   readonly endTick: number;
+  readonly instrument: MelodyInstrument;
+  readonly instrumentName: string;
+  readonly family: string;
+  readonly clef: "treble" | "bass";
+}
+
+export interface MidiProjectionMelodyProgramChange {
+  readonly stepIndex: number;
+  readonly stepId: string;
+  readonly tick: number;
+  readonly instrument: MelodyInstrument;
+  readonly instrumentName: string;
+  readonly program: number;
+  readonly family: string;
+  readonly clef: "treble" | "bass";
 }
 
 export interface MidiProjectionMelody {
+  readonly firstStepIndex: number;
+  readonly channel: number;
   readonly instrument: MelodyInstrument;
   readonly instrumentName: string;
   readonly program: number;
   readonly volume: number;
   readonly notes: readonly MidiProjectionMelodyNote[];
+  readonly programChanges: readonly MidiProjectionMelodyProgramChange[];
 }
 
 export interface MidiProjectionNote {
@@ -65,6 +84,8 @@ export interface MidiProjection {
   readonly notes: readonly MidiProjectionNote[];
   /** Omitted for projects without an authored saved Melody recipe. */
   readonly melody?: MidiProjectionMelody;
+  /** One deterministic format-1 track per unique effective Melody instrument. */
+  readonly melodyTracks?: readonly MidiProjectionMelody[];
 }
 
 interface QuantizedStepTiming {
@@ -151,28 +172,17 @@ function rawNoteComparator(a: RawProjectionNote, b: RawProjectionNote): number {
   );
 }
 
-const MELODY_MIDI_METADATA: Readonly<
-  Record<MelodyInstrument, { readonly label: string; readonly program: number }>
-> = Object.freeze({
-  flute: Object.freeze({ label: "Flute", program: 73 }),
-  violin: Object.freeze({ label: "Violin", program: 40 }),
-  clarinet: Object.freeze({ label: "Clarinet", program: 71 }),
-  oboe: Object.freeze({ label: "Oboe", program: 68 }),
-  cello: Object.freeze({ label: "Cello", program: 42 }),
-  "synth-lead": Object.freeze({ label: "Synth Lead", program: 80 }),
-});
-
 function hasAuthoredMelody(project: Project): boolean {
   return project.progression.steps.some(
     (step) => step.kind === "chord" && step.melody !== undefined,
   );
 }
 
-function projectMelodyToMidi(
+function projectMelodyToMidiTracks(
   project: Project,
   quantizedSteps: ReadonlyMap<number, QuantizedStepTiming>,
   totalTicks: number,
-): MidiProjectionMelody | undefined {
+): readonly MidiProjectionMelody[] | undefined {
   if (!hasAuthoredMelody(project)) return undefined;
 
   // Deliberately omit track settings here: mute/solo are playback controls and
@@ -184,6 +194,7 @@ function projectMelodyToMidi(
     context: createContext(project),
     tempoBpm: project.globalTiming.tempoBpm,
     groove: project.groove,
+    melodyTrack: Object.freeze({ ...project.melodyTrack, muted: false, solo: false }),
   });
   const rawNotes = performance.events.map((event) => {
     const stepTiming = quantizedSteps.get(event.stepIndex);
@@ -201,43 +212,84 @@ function projectMelodyToMidi(
     return {
       stepIndex: event.stepIndex,
       stepId: event.sourceStepId,
-      channel: 2 as const,
+      channel: 2,
       pitch: event.pitch,
       velocity: event.velocity,
       startTick,
       endTick,
       emissionIndex: event.eventIndex,
+      instrument: event.instrument,
     };
   });
-  const notes = rawNotes
-    .sort(
-      (a, b) =>
-        a.startTick - b.startTick ||
-        a.pitch - b.pitch ||
-        a.stepIndex - b.stepIndex ||
-        a.emissionIndex - b.emissionIndex,
-    )
-    .map((note, order) =>
-      Object.freeze({
-        stepIndex: note.stepIndex,
-        stepId: note.stepId,
-        order,
-        channel: note.channel,
-        pitch: note.pitch,
-        velocity: note.velocity,
-        startTick: note.startTick,
-        endTick: note.endTick,
-      }),
-    );
-  const metadata = MELODY_MIDI_METADATA[project.melodyTrack.instrument];
-
-  return Object.freeze({
-    instrument: project.melodyTrack.instrument,
-    instrumentName: metadata.label,
-    program: metadata.program,
-    volume: project.melodyTrack.volume,
-    notes: Object.freeze(notes),
+  const firstStepByInstrument = new Map<MelodyInstrument, number>();
+  performance.events.forEach((event) => {
+    const current = firstStepByInstrument.get(event.instrument);
+    if (current === undefined || event.stepIndex < current) {
+      firstStepByInstrument.set(event.instrument, event.stepIndex);
+    }
   });
+  const instruments = [...firstStepByInstrument.keys()].sort(
+    (a, b) =>
+      firstStepByInstrument.get(a)! - firstStepByInstrument.get(b)! ||
+      getMelodyInstrument(a).program - getMelodyInstrument(b).program ||
+      a.localeCompare(b),
+  );
+
+  return Object.freeze(
+    instruments.map((instrument, laneIndex) => {
+      const channel = 2 + (laneIndex % 14);
+      const metadata = getMelodyInstrument(instrument);
+      const notes = rawNotes
+        .filter((note) => note.instrument === instrument)
+        .sort(
+          (a, b) =>
+            a.startTick - b.startTick ||
+            a.pitch - b.pitch ||
+            a.stepIndex - b.stepIndex ||
+            a.emissionIndex - b.emissionIndex,
+        )
+        .map((note, order) =>
+          Object.freeze({
+            stepIndex: note.stepIndex,
+            stepId: note.stepId,
+            order,
+            channel,
+            pitch: note.pitch,
+            velocity: note.velocity,
+            startTick: note.startTick,
+            endTick: note.endTick,
+            instrument,
+            instrumentName: metadata.label,
+            family: metadata.family,
+            clef: metadata.clef,
+          }),
+        );
+      const firstEvent = performance.events.find((event) => event.instrument === instrument);
+      if (!firstEvent) throw new Error(`missing first Melody event for ${instrument}`);
+      const programChanges: MidiProjectionMelodyProgramChange[] = [
+        Object.freeze({
+          stepIndex: firstEvent.stepIndex,
+          stepId: firstEvent.sourceStepId,
+          tick: 0,
+          instrument,
+          instrumentName: metadata.label,
+          program: metadata.program,
+          family: metadata.family,
+          clef: metadata.clef,
+        }),
+      ];
+      return Object.freeze({
+        firstStepIndex: firstStepByInstrument.get(instrument)!,
+        channel,
+        instrument,
+        instrumentName: metadata.label,
+        program: metadata.program,
+        volume: project.melodyTrack.volume,
+        notes: Object.freeze(notes),
+        programChanges: Object.freeze(programChanges),
+      });
+    }),
+  );
 }
 
 /**
@@ -300,7 +352,7 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     }),
   );
 
-  const melody = projectMelodyToMidi(project, quantizedSteps.timings, totalTicks);
+  const melodyTracks = projectMelodyToMidiTracks(project, quantizedSteps.timings, totalTicks);
 
   return Object.freeze({
     ppq: MIDI_PPQ,
@@ -308,7 +360,7 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     meter: freezeMeter(project),
     totalTicks,
     notes: Object.freeze(notes),
-    ...(melody ? { melody } : {}),
+    ...(melodyTracks && melodyTracks.length > 0 ? { melody: melodyTracks[0], melodyTracks } : {}),
   });
 }
 

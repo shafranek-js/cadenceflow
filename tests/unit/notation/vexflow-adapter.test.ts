@@ -455,6 +455,55 @@ describe("renderStaffSystem", () => {
     expect(svg.dataset.staffBassEntries).toBe("harmony-1,harmony-2");
   });
 
+  it("renders one aligned staff row for each active Melody lane", () => {
+    const note = (key: string, pitch: number): StaffSequenceEntry => ({
+      key,
+      kind: "note",
+      projection: projectionFor([exactPitch(pitch, { step: "C", alter: 0 })]),
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    });
+    const container = document.createElement("div");
+    let positions: readonly StaffSystemPosition[] = [];
+
+    renderStaffSystem(
+      container,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 280,
+          harmonyEntries: [
+            {
+              key: "harmony",
+              kind: "chord",
+              projection: cMajor,
+              startOffsetBeats: rational(0),
+              duration: musicalDuration(rational(4)),
+            },
+          ],
+          melodyLanes: [
+            { id: "cello", clef: "bass", entries: [note("cello-note", 48)] },
+            { id: "violin", clef: "treble", entries: [note("violin-note", 72)] },
+          ],
+        },
+      ],
+      meter(4, 4),
+      (next) => {
+        positions = next;
+      },
+    );
+
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    expect(svg.dataset.staffSystemClefs).toBe("bass,treble,treble");
+    expect(svg.querySelectorAll(".vf-clef")).toHaveLength(3);
+    const cello = positions.find((position) => position.staff === "melody:cello");
+    const violin = positions.find((position) => position.staff === "melody:violin");
+    const harmony = positions.find((position) => position.staff === "harmony");
+    expect(cello?.x).toBe(violin?.x);
+    expect(violin?.x).toBe(harmony?.x);
+  });
+
   it("uses the available width for a complete system without adding a page-wide minimum", () => {
     const container = document.createElement("div");
 

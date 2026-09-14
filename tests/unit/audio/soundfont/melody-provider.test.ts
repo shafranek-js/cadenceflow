@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AudioNoteEvent } from "../../../../src/audio/contracts";
 import {
+  formatMelodyPreparationNotice,
   MELODY_SAMPLE_FILES,
   MelodySoundFontProvider,
   type MelodySamplePlayer,
@@ -112,5 +113,70 @@ describe("T172 — local sampled Melody provider", () => {
       flute: "flute-mp3.js",
       "synth-lead": "lead_1_square-mp3.js",
     });
+  });
+
+  it("reports export-only programs explicitly and keeps realtime loading lazy", async () => {
+    const violin = createPlayer();
+    const loader = vi.fn(async () => violin);
+    const provider = new MelodySoundFontProvider({
+      audioContext: createContext(),
+      loadInstrument: loader,
+      instrument: "gm-081",
+    });
+
+    const unavailable = await provider.prepareForInstruments(["gm-081"]);
+    expect(unavailable).toMatchObject({ ready: [], unavailable: ["gm-081"], failed: [] });
+    expect(loader).not.toHaveBeenCalled();
+    expect(provider.state).toBe("error");
+    expect(provider.lastError?.message).toContain("Export only");
+
+    const mixed = await provider.prepareForInstruments(["gm-081", "violin"]);
+    expect(mixed.unavailable).toEqual(["gm-081"]);
+    expect(mixed.ready).toEqual(["violin"]);
+    expect(provider.state).toBe("ready");
+    expect(formatMelodyPreparationNotice(mixed)).toBe(
+      "GM 081 · Lead 2 (sawtooth) · Export only / no bundled realtime sample",
+    );
+    expect(loader).toHaveBeenCalledTimes(1);
+    const playback = provider.schedule(
+      [
+        { ...event, instrument: "gm-081" },
+        { ...event, instrument: "violin", startSeconds: 1 },
+      ],
+      { now: () => 10 },
+    );
+    expect(violin.play).toHaveBeenCalledTimes(1);
+    playback.cancel();
+  });
+
+  it("keeps available playback running when another realtime lane fails to load", async () => {
+    const violin = createPlayer();
+    const loader = vi.fn(async (_context, instrument) => {
+      if (instrument === "cello") throw new Error("cello sample failed");
+      return violin;
+    });
+    const provider = new MelodySoundFontProvider({
+      audioContext: createContext(),
+      loadInstrument: loader,
+      instrument: "violin",
+    });
+
+    const result = await provider.prepareForInstruments(["violin", "cello"]);
+    expect(result.ready).toEqual(["violin"]);
+    expect(result.failed).toEqual(["cello"]);
+    expect(provider.state).toBe("ready");
+    expect(formatMelodyPreparationNotice(result)).toBe(
+      "GM 042 · Cello · Realtime sample failed to load",
+    );
+
+    const playback = provider.schedule(
+      [
+        { ...event, instrument: "cello" },
+        { ...event, instrument: "violin", startSeconds: 1 },
+      ],
+      { now: () => 10 },
+    );
+    expect(violin.play).toHaveBeenCalledTimes(1);
+    playback.cancel();
   });
 });

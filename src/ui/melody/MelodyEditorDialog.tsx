@@ -1,10 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
+import {
+  MELODY_CONNECTIONS,
+  MELODY_GRIDS,
+  MELODY_PITCH_MOTIONS,
+  MELODY_RHYTHMS,
+  validateChordMelodyRecipe,
+} from "../../domain/melody/types";
 import type {
   ChordMelodyRecipe,
   MelodyGrid,
   MelodyInstrument,
   MelodyOctaveOffset,
-  MelodyPattern,
+  MelodyPitchMotion,
 } from "../../domain/melody/types";
 import type { AudioProviderState } from "../../audio/contracts";
 import type { ChordStep } from "../../domain/progression/step";
@@ -13,41 +28,39 @@ import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
 import { MelodyStaffView } from "./MelodyStaffView";
-import { MELODY_GRID_LABELS, MELODY_INSTRUMENT_LABELS, MELODY_PATTERN_LABELS } from "./labels";
+import { MelodyPitchMotionGallery } from "./MelodyPitchMotionGallery";
+import { MelodyInstrumentPicker } from "./MelodyInstrumentPicker";
+import {
+  MELODY_CONNECTION_LABELS,
+  MELODY_GRID_LABELS,
+  MELODY_PITCH_MOTION_LABELS,
+  MELODY_RHYTHM_LABELS,
+} from "./labels";
 
 export const DEFAULT_MELODY_RECIPE: ChordMelodyRecipe = Object.freeze({
-  pattern: "up",
+  pitchMotion: "up",
+  rhythm: "even",
+  connection: "retrigger",
   grid: "eighth",
   octaveOffset: 0,
 });
 
-const PATTERNS: readonly MelodyPattern[] = Object.freeze([
-  "up",
-  "down",
-  "up-down",
-  "down-up",
-  "outside-in",
-  "inside-out",
-]);
-const GRIDS: readonly MelodyGrid[] = Object.freeze([
-  "quarter",
-  "eighth",
-  "sixteenth",
-  "eighth-triplet",
-  "sixteenth-triplet",
-]);
 const OCTAVE_OFFSETS: readonly MelodyOctaveOffset[] = Object.freeze([-2, -1, 0, 1, 2]);
 
 function previewProject(
   project: Project,
   step: ChordStep,
   recipe: ChordMelodyRecipe,
-  instrument: MelodyInstrument,
+  instrumentOverride: MelodyInstrument | undefined,
 ): Project {
-  const previewStep: ChordStep = Object.freeze({ ...step, melody: Object.freeze({ ...recipe }) });
+  const { melodyInstrumentOverride: _discardOverride, ...stepWithoutOverride } = step;
+  const previewStep: ChordStep = Object.freeze({
+    ...stepWithoutOverride,
+    melody: Object.freeze({ ...recipe }),
+    ...(instrumentOverride !== undefined ? { melodyInstrumentOverride: instrumentOverride } : {}),
+  });
   return Object.freeze({
     ...project,
-    melodyTrack: Object.freeze({ ...project.melodyTrack, instrument }),
     progression: Object.freeze({
       ...project.progression,
       // Preserve the complete progression so automatic voicing receives the
@@ -74,7 +87,7 @@ export interface MelodyEditorDialogProps {
   readonly project: Project;
   readonly restoreFocusRef?: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
-  readonly onApply: (recipe: ChordMelodyRecipe, instrument: MelodyInstrument) => void;
+  readonly onApply: (recipe: ChordMelodyRecipe, instrumentOverride?: MelodyInstrument) => void;
   readonly providerState?: AudioProviderState;
   readonly providerError?: string | null;
   readonly onRetryAudio?: () => void;
@@ -98,39 +111,69 @@ export function MelodyEditorDialog({
   onPlayPreview,
   onStopPreview,
 }: MelodyEditorDialogProps) {
-  const patternRef = useRef<HTMLSelectElement | null>(null);
+  const pitchMotionRef = useRef<HTMLSelectElement | null>(null);
+  const browseMotionsRef = useRef<HTMLButtonElement | null>(null);
+  const galleryOpenRef = useRef(false);
   const [recipe, setRecipe] = useState<ChordMelodyRecipe>(DEFAULT_MELODY_RECIPE);
-  const [instrument, setInstrument] = useState<MelodyInstrument>(project.melodyTrack.instrument);
+  const [instrumentOverride, setInstrumentOverride] = useState<MelodyInstrument | undefined>(
+    step.melodyInstrumentOverride,
+  );
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
+  const closeGallery = useCallback(() => {
+    galleryOpenRef.current = false;
+    setIsGalleryOpen(false);
+    browseMotionsRef.current?.focus();
+  }, []);
+
+  const handleDialogClose = useCallback(() => {
+    if (galleryOpenRef.current) {
+      closeGallery();
+      return;
+    }
+    onClose();
+  }, [closeGallery, onClose]);
 
   const dialogRef = useModalFocus<HTMLElement>({
     isOpen,
     isTopmost: true,
-    onClose,
-    initialFocusRef: patternRef,
+    onClose: handleDialogClose,
+    initialFocusRef: pitchMotionRef,
     ...(restoreFocusRef ? { restoreFocusRef } : {}),
   });
 
   useEffect(() => {
     if (!isOpen) return;
-    setRecipe(step.melody ? { ...step.melody } : { ...DEFAULT_MELODY_RECIPE });
-    setInstrument(project.melodyTrack.instrument);
+    setRecipe(step.melody ? validateChordMelodyRecipe(step.melody) : { ...DEFAULT_MELODY_RECIPE });
+    setInstrumentOverride(step.melodyInstrumentOverride);
   }, [isOpen, project.melodyTrack.instrument, step]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      galleryOpenRef.current = false;
+      setIsGalleryOpen(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     onStopPreview?.();
     return () => onStopPreview?.();
-  }, [instrument, isOpen, onStopPreview, recipe, step.id]);
+  }, [instrumentOverride, isOpen, onStopPreview, recipe, step.id]);
 
   const preview = useMemo(() => {
     if (!isOpen) return { kind: "closed" as const };
     try {
-      const projectWithDraft = previewProject(project, step, recipe, instrument);
+      const projectWithDraft = previewProject(project, step, recipe, instrumentOverride);
       const timeline = createMelodyTimeline(projectWithDraft);
+      const lane = timeline.lanes.find((candidate) =>
+        candidate.events.some((event) => event.sourceStepId === step.id),
+      );
       return {
         kind: "ready" as const,
         project: projectWithDraft,
         timeline,
-        measures: timeline.measures.filter((measure) =>
+        ...(lane ? { lane } : {}),
+        measures: (lane?.measures ?? timeline.measures).filter((measure) =>
           measure.entries.some((entry) => entry.kind === "note" && entry.sourceStepId === step.id),
         ),
       };
@@ -140,16 +183,18 @@ export function MelodyEditorDialog({
         message: error instanceof Error ? error.message : "Melody preview could not be realized",
       };
     }
-  }, [instrument, isOpen, project, recipe, step]);
+  }, [instrumentOverride, isOpen, project, recipe, step]);
 
   if (!isOpen) return null;
 
   const title = mode === "create" ? "Create Melody" : "Edit Melody";
   const applyDisabled = preview.kind !== "ready";
+  const setPitchMotion = (pitchMotion: MelodyPitchMotion) =>
+    setRecipe((current) => ({ ...current, pitchMotion }));
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (applyDisabled) return;
-    onApply(recipe, instrument);
+    onApply(recipe, instrumentOverride);
   };
 
   return (
@@ -186,21 +231,73 @@ export function MelodyEditorDialog({
           <div className="dialog-body melody-editor-body">
             <div className="melody-editor-fields">
               <label>
-                <span>Pattern</span>
+                <span>Pitch Motion</span>
+                <div className="melody-pitch-motion-field">
+                  <select
+                    ref={pitchMotionRef}
+                    aria-label="Pitch Motion"
+                    value={recipe.pitchMotion}
+                    onChange={(event) => setPitchMotion(event.target.value as MelodyPitchMotion)}
+                  >
+                    {MELODY_PITCH_MOTIONS.map((pitchMotion) => (
+                      <option key={pitchMotion} value={pitchMotion}>
+                        {MELODY_PITCH_MOTION_LABELS[pitchMotion]}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="secondary-btn melody-pitch-motion-browse"
+                    ref={browseMotionsRef}
+                    aria-label="Browse motions"
+                    aria-expanded={isGalleryOpen}
+                    aria-controls="melody-pitch-motion-gallery"
+                    onClick={() => {
+                      galleryOpenRef.current = !isGalleryOpen;
+                      setIsGalleryOpen((current) => !current);
+                    }}
+                  >
+                    Browse motions
+                  </button>
+                </div>
+                <span className="melody-pitch-motion-current">
+                  Current: {MELODY_PITCH_MOTION_LABELS[recipe.pitchMotion]}
+                </span>
+              </label>
+              <label>
+                <span>Rhythm</span>
                 <select
-                  ref={patternRef}
-                  aria-label="Melody Pattern"
-                  value={recipe.pattern}
+                  aria-label="Rhythm"
+                  value={recipe.rhythm}
                   onChange={(event) =>
                     setRecipe((current) => ({
                       ...current,
-                      pattern: event.target.value as MelodyPattern,
+                      rhythm: event.target.value as ChordMelodyRecipe["rhythm"],
                     }))
                   }
                 >
-                  {PATTERNS.map((pattern) => (
-                    <option key={pattern} value={pattern}>
-                      {MELODY_PATTERN_LABELS[pattern]}
+                  {MELODY_RHYTHMS.map((rhythm) => (
+                    <option key={rhythm} value={rhythm}>
+                      {MELODY_RHYTHM_LABELS[rhythm]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Connection</span>
+                <select
+                  aria-label="Connection"
+                  value={recipe.connection}
+                  onChange={(event) =>
+                    setRecipe((current) => ({
+                      ...current,
+                      connection: event.target.value as ChordMelodyRecipe["connection"],
+                    }))
+                  }
+                >
+                  {MELODY_CONNECTIONS.map((connection) => (
+                    <option key={connection} value={connection}>
+                      {MELODY_CONNECTION_LABELS[connection]}
                     </option>
                   ))}
                 </select>
@@ -208,7 +305,7 @@ export function MelodyEditorDialog({
               <label>
                 <span>Grid</span>
                 <select
-                  aria-label="Melody Grid"
+                  aria-label="Grid"
                   value={recipe.grid}
                   onChange={(event) =>
                     setRecipe((current) => ({
@@ -217,7 +314,7 @@ export function MelodyEditorDialog({
                     }))
                   }
                 >
-                  {GRIDS.map((grid) => (
+                  {MELODY_GRIDS.map((grid) => (
                     <option key={grid} value={grid}>
                       {MELODY_GRID_LABELS[grid]}
                     </option>
@@ -227,7 +324,7 @@ export function MelodyEditorDialog({
               <label>
                 <span>Octave offset</span>
                 <select
-                  aria-label="Melody Octave Offset"
+                  aria-label="Octave offset"
                   value={recipe.octaveOffset}
                   onChange={(event) =>
                     setRecipe((current) => ({
@@ -246,19 +343,23 @@ export function MelodyEditorDialog({
               </label>
               <label>
                 <span>Instrument</span>
-                <select
-                  aria-label="Melody Instrument"
-                  value={instrument}
-                  onChange={(event) => setInstrument(event.target.value as MelodyInstrument)}
-                >
-                  {Object.entries(MELODY_INSTRUMENT_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <MelodyInstrumentPicker
+                  value={instrumentOverride ?? project.melodyTrack.instrument}
+                  allowInherit
+                  trackInstrument={project.melodyTrack.instrument}
+                  inherited={instrumentOverride === undefined}
+                  ariaLabel="Melody Instrument"
+                  onChange={setInstrumentOverride}
+                />
               </label>
             </div>
+            {isGalleryOpen ? (
+              <MelodyPitchMotionGallery
+                value={recipe.pitchMotion}
+                onChange={setPitchMotion}
+                onClose={closeGallery}
+              />
+            ) : null}
             <div className="melody-editor-preview" data-testid="melody-editor-preview">
               <div className="melody-editor-preview-heading">
                 <strong>Notation preview</strong>
@@ -284,9 +385,9 @@ export function MelodyEditorDialog({
                 >
                   <Icon name={isPreviewPlaying ? "stop" : "play"} />
                 </button>
-                <span role={providerError ? "alert" : "status"}>
+                <span role={providerError && providerState === "error" ? "alert" : "status"}>
                   {providerError
-                    ? `Melody audio error: ${providerError}`
+                    ? `Melody audio ${providerState === "error" ? "error" : "warning"}: ${providerError}`
                     : providerState === "loading"
                       ? "Loading melody audio…"
                       : providerState === "ready"
@@ -311,6 +412,7 @@ export function MelodyEditorDialog({
                       project={preview.project}
                       timeline={preview.timeline}
                       measure={measure}
+                      {...(preview.lane ? { lane: preview.lane } : {})}
                       onSelectStep={() => undefined}
                     />
                   ))}

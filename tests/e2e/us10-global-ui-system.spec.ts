@@ -138,9 +138,9 @@ test.describe("US10 Batch 4 — global UI system", () => {
         bodySize: getComputedStyle(document.body).fontSize,
       };
     });
-    expect(tokens.space).toEqual(["4px", "8px", "12px", "16px", "24px"]);
-    expect(tokens.radii).toEqual(["12px", "10px", "7px"]);
-    expect(tokens.bodySize).toBe("14px");
+    expect(tokens.space).toEqual(["3px", "6px", "10px", "14px", "20px"]);
+    expect(tokens.radii).toEqual(["6px", "4px", "3px"]);
+    expect(tokens.bodySize).toBe("13px");
   });
 
   test("keeps wrapped progression and toolbar inside the page at desktop zoom levels", async ({

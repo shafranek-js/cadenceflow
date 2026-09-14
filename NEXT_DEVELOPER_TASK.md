@@ -1,46 +1,66 @@
-# Next Developer Assignment — proposed Phase 14 assets and documentation batch
+# Next Developer Assignment — T188 GM Melody catalog and inheritance
 
-**Status:** Proposed only. Do not start until the user explicitly approves this batch.
+**Status:** Authorized for implementation. Stop after this batch for independent orchestrator acceptance.
 
-**Assignment:** T154 + T155 + T158 — audit the committed HQ piano bank and attribution, verify production
-build/deployment behavior, and update Quickstart from current repository evidence; then stop for independent
-review.
+Implement only T188: replace the six-value Melody instrument union with one canonical 128-program General
+MIDI catalog, retain the current six ids and local timbres, and add a project-level default plus optional
+Step-local instrument override. Do not add audio assets or dependencies.
 
-## Accepted baseline
+## Accepted baseline and invariants
 
-- T151–T153 are accepted: performance limits are asserted, transport soak is virtual-clock based, and
-  durable v1/v2/v3 migration fixtures cover legacy presentation normalization.
-- The complete 480-region HQ piano bank is present in the repository, but final attribution, manifest,
-  decode, bundle, cache/lazy-load, base-path, and deployment evidence remains the scope of this batch.
-- Treat current application behavior and all accepted US10–US13 tests as protected baseline.
-- Preserve all existing dirty/untracked Graphify, QA, source, screenshot, and documentation materials.
+- T001–T186 and T189, schema v4, FR-001–FR-220, and SC-001–SC-021 are accepted.
+- Melody recipe generation and its five axes remain unchanged. Instrument is a separate Step/Track concern.
+- Existing six ids and v1–v4 projects remain valid; no-Melody MIDI/MusicXML output remains compatible.
+- The checkout is intentionally dirty. Preserve accepted tracked work and unrelated untracked Graphify, QA,
+  source, screenshot, and evidence files. Do not commit, push, deploy, or reformat unrelated files.
 
-## Scope
+## Required implementation
 
-1. T154: audit the committed 480-region HQ piano manifest, referenced files, deterministic decode checks,
-   attribution files, upstream revision, and license packaging. Use authoritative repository evidence and
-   identify any mismatch explicitly; do not make unsupported licensing claims.
-2. T155: run the production build and record exact bundle/asset-size evidence. Verify from code/tests that
-   piano samples load/decode/cache lazily, confirm the `/cadenceflow/` production base path, inspect the
-   manual-only GitHub Pages workflow, and perform read-only checks of representative published assets when
-   available. Do not trigger a deployment or workflow run.
-3. T158: update `specs/001-cadenceflow-core-studio/quickstart.md` with the verified Node/pnpm bootstrap,
-   local run, focused/full test, piano/Melody asset verification, production build, and manual Pages commands.
-   Keep commands reproducible and avoid static test totals that will immediately become stale.
-
-## Boundaries
-
-- Do not start T150, T156, T157, or product backlog T186–T188.
-- Do not redesign UI, change musical/domain/schema semantics, download or replace the piano bank, trigger
-  remote workflows/deployments, update task/status checkboxes, commit, or push.
-- Keep small deterministic review fixes in this task and preserve unrelated worktree changes.
+1. Add a pure immutable catalog in `src/domain/melody/instrumentCatalog.ts` with exactly one entry for each
+   zero-based GM program 0–127: stable id, family, label, clef, playable range, optional sample asset, and
+   `available | export-only`. Keep `flute`, `violin`, `clarinet`, `oboe`, `cello`, and `synth-lead` as the
+   canonical ids for their existing programs; use `gm-NNN` for the other 122. Reject duplicate ids/programs,
+   missing programs, invalid ranges, and asset metadata not backed by the existing manifest. Range metadata
+   is informational: use 0..127 unless a narrower range is already verified; do not invent range enforcement.
+2. Move Project persistence to schema v5. Add optional `ChordStep.melodyInstrumentOverride`; absence means
+   `Use track instrument`. Implement strict v4→v5 migration with no overrides, sequential old-version
+   migration, Temporary Branch support, autosave/recovery, future-version rejection, and canonical v5 JSON
+   schema/codec coverage. Never serialize an inherited effective value.
+3. Add one pure resolver equivalent to
+   `step.melodyInstrumentOverride ?? project.melodyTrack.instrument`. Add undoable commands for the global
+   default and Step override/inherit transition. Repeat copies an explicit override into an independent Step;
+   Remove Melody removes its override; reorder/replace/delete and Undo/Redo keep canonical Step identity.
+4. Replace the current Instrument selects with one reusable compact grouped/searchable keyboard-accessible
+   picker. In Melody Track controls it edits the global default. In Create/Edit Melody it starts with
+   `Use track instrument`, edits only the draft Step override, and preserves Apply/Cancel semantics and every
+   Melody recipe axis. Show GM program plus `Realtime`/`Export only`; keep focus, Escape, light/dark,
+   1280×720, 1920×1080, 200% zoom, internal scrolling, and no page overflow.
+5. Drive Melody preview, Staff labels/clefs, live playback, MIDI, and MusicXML from the effective instrument.
+   Lazy-load only used playable timbres. Export-only choices must expose an identified nonfatal unavailable
+   state, never substitute a timbre or stop Harmony, and remain exportable. Mixed-instrument progressions
+   retain playable phrases and report unavailable ones. Do not preload all six assets.
+6. Partition events by effective instrument with no duplication. Each unique instrument gets exactly one
+   Staff line in every system where it sounds, one MIDI track, and one full-score MusicXML part. Repeated
+   Steps using the same instrument reuse that lane. A Step override moves its events to the override lane.
+   Staff omits lanes inactive for that system; MusicXML fills inactive measures with rests. Order lanes by
+   first progression occurrence, then GM program/id. Preserve timing/ties/tuplets and no-Melody output.
 
 ## Verification
 
-- Run the repository's focused piano-bank and Melody-asset verification commands plus only directly relevant
-  unit tests with `--maxWorkers=1`.
-- Run `pnpm build`, scoped ESLint/Prettier, and `git diff --check`; use read-only HTTP/Pages checks only where
-  they directly verify T155.
-- Report manifest/file/decode counts, attribution evidence, bundle and asset sizes, lazy-load/cache evidence,
-  base-path/workflow/Pages findings, exact changed files and commands, residual gaps, and final Git status;
-  then stop for independent acceptance.
+- Add focused catalog completeness/metadata tests for all 128 programs and six manifest-backed assets.
+- Add command, Repeat/remove, migration/codec/autosave, inheritance, mixed-instrument playback/provider,
+  Staff lane, separate MIDI-track, separate MusicXML-part, event-partition, and no-Melody compatibility tests.
+- Add focused Chromium for global/default inheritance, two independent Step overrides, Apply/Cancel,
+  search/group/keyboard/focus, explicit export-only state, save/reload, Undo/Redo, and responsive containment.
+- Run focused Vitest with `--maxWorkers=1`, focused Chromium with `--workers=1 --retries=0`, `pnpm build`,
+  scoped ESLint/Prettier, and `git diff --check`.
+
+## Boundaries
+
+Do not add/download assets, implement arbitrary SoundFont management, create chord Instrument Profiles or
+multiple Melody Tracks, alter pitch/rhythm generation, add Suzuki colors, touch Matrix views, or broaden
+Harmony behavior. If the existing audio scheduling interface cannot represent mixed effective instruments,
+extend only the Melody event/provider path and preserve piano/harmony contracts.
+
+Report decisions, changed files, exact checks/totals, unavailable-audio behavior, remaining risks, and final
+Git status; then stop for independent acceptance.

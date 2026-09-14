@@ -2,6 +2,10 @@ import type { ProgressionStep } from "../domain/progression/step";
 import type { Project } from "../domain/project/project";
 import { realizeChordMelody, type MelodyEvent } from "../domain/melody/projection";
 import type { MelodyInstrument } from "../domain/melody/types";
+import {
+  getMelodyInstrument,
+  resolveEffectiveMelodyInstrument,
+} from "../domain/melody/instrumentCatalog";
 import { getHarmonicModule } from "../domain/harmony/moduleRegistry";
 import {
   addRational,
@@ -22,6 +26,8 @@ export type MelodyStaffClef = "treble" | "bass";
 export interface MelodyTimelineEvent extends MelodyEvent {
   readonly eventKey: string;
   readonly startBeats: Rational;
+  readonly instrument: MelodyInstrument;
+  readonly clef: MelodyStaffClef;
 }
 
 export interface MelodyStaffNoteFragment {
@@ -37,6 +43,8 @@ export interface MelodyStaffNoteFragment {
   readonly startsHere: boolean;
   readonly continuesFromPrevious: boolean;
   readonly continuesToNext: boolean;
+  readonly instrument: MelodyInstrument;
+  readonly clef: MelodyStaffClef;
 }
 
 export type MelodyRestSourceKind = "no-melody-chord" | "rest-step" | "virtual-gap";
@@ -61,11 +69,22 @@ export interface MelodyStaffMeasure {
   readonly entries: readonly MelodyStaffEntry[];
 }
 
+export interface MelodyInstrumentLane {
+  readonly instrumentId: MelodyInstrument;
+  readonly firstStepIndex: number;
+  readonly clef: MelodyStaffClef;
+  readonly events: readonly MelodyTimelineEvent[];
+  readonly measures: readonly MelodyStaffMeasure[];
+  /** Measure indexes containing at least one sounding note for this lane. */
+  readonly activeSystemIndexes: readonly number[];
+}
+
 export interface MelodyTimeline {
   readonly instrument: MelodyInstrument;
   readonly clef: MelodyStaffClef;
   readonly events: readonly MelodyTimelineEvent[];
   readonly measures: readonly MelodyStaffMeasure[];
+  readonly lanes: readonly MelodyInstrumentLane[];
 }
 
 interface TimelineSpanBase {
@@ -88,7 +107,7 @@ interface RestSpan extends TimelineSpanBase {
 type TimelineSpan = NoteSpan | RestSpan;
 
 export function melodyClefForInstrument(instrument: MelodyInstrument): MelodyStaffClef {
-  return instrument === "cello" ? "bass" : "treble";
+  return getMelodyInstrument(instrument).clef;
 }
 
 function contextForProject(project: Project) {
@@ -115,11 +134,14 @@ function createMelodyEvent(
   sourceStepId: string,
   event: MelodyEvent,
   stepStart: Rational,
+  instrument: MelodyInstrument,
 ): MelodyTimelineEvent {
   return Object.freeze({
     ...event,
     eventKey: `${sourceStepId}:${event.index}`,
     startBeats: addRational(stepStart, event.startOffsetBeats),
+    instrument,
+    clef: melodyClefForInstrument(instrument),
   });
 }
 
@@ -130,6 +152,7 @@ function addStepSpan(
   spans: TimelineSpan[],
   events: MelodyTimelineEvent[],
   restOrdinal: number,
+  trackInstrument: MelodyInstrument,
 ): number {
   const stepEnd = addRational(stepStart, step.duration.beats);
   if (step.kind !== "chord" || step.melody === undefined) {
@@ -151,8 +174,12 @@ function addStepSpan(
     durationBeats: step.duration.beats,
     recipe: step.melody,
   });
+  const instrument = resolveEffectiveMelodyInstrument(
+    step.melodyInstrumentOverride,
+    trackInstrument,
+  ).id;
   phrase.events.forEach((event) => {
-    const timelineEvent = createMelodyEvent(step.id, event, stepStart);
+    const timelineEvent = createMelodyEvent(step.id, event, stepStart, instrument);
     events.push(timelineEvent);
     spans.push({
       kind: "note",
@@ -197,6 +224,8 @@ function splitTimelineSpan(
           startsHere: compareRational(cursor, event.startBeats) === 0,
           continuesFromPrevious: compareRational(cursor, event.startBeats) > 0,
           continuesToNext: compareRational(fragmentEnd, endOfSpan(span)) < 0,
+          instrument: event.instrument,
+          clef: event.clef,
         }),
       );
     } else {
@@ -216,6 +245,63 @@ function splitTimelineSpan(
   }
 }
 
+function buildMeasures(
+  layout: ReturnType<typeof createProgressionMeasureLayout>,
+  spans: readonly TimelineSpan[],
+  barLengthBeats: Rational,
+): readonly MelodyStaffMeasure[] {
+  const mutableMeasures = layout.measures.map((measure) => ({
+    startBeats: measure.startBeats,
+    endBeats: measure.endBeats,
+    entries: [] as MelodyStaffEntry[],
+  }));
+  spans.forEach((span) => splitTimelineSpan(span, barLengthBeats, mutableMeasures));
+  return Object.freeze(
+    layout.measures.map((measure, measureIndex) =>
+      Object.freeze({
+        measureIndex: measure.measureIndex,
+        number: measure.number,
+        startBeats: measure.startBeats,
+        endBeats: measure.endBeats,
+        entries: Object.freeze(mutableMeasures[measureIndex]!.entries),
+      }),
+    ),
+  );
+}
+
+function fillLaneSpans(
+  events: readonly MelodyTimelineEvent[],
+  endBeats: Rational,
+): readonly TimelineSpan[] {
+  const spans: TimelineSpan[] = [];
+  let cursor = ZERO;
+  let ordinal = 0;
+  events.forEach((event) => {
+    const eventEnd = addRational(event.startBeats, event.durationBeats);
+    if (compareRational(cursor, event.startBeats) < 0) {
+      spans.push({
+        kind: "rest",
+        startBeats: cursor,
+        endBeats: event.startBeats,
+        sourceKind: "virtual-gap",
+        ordinal: ordinal++,
+      });
+    }
+    spans.push({ kind: "note", event, startBeats: event.startBeats, endBeats: eventEnd });
+    if (compareRational(eventEnd, cursor) > 0) cursor = eventEnd;
+  });
+  if (compareRational(cursor, endBeats) < 0) {
+    spans.push({
+      kind: "rest",
+      startBeats: cursor,
+      endBeats,
+      sourceKind: "virtual-gap",
+      ordinal,
+    });
+  }
+  return Object.freeze(spans);
+}
+
 /**
  * Derives the complete written Melody timeline without adding generated notes
  * to Project. The adapter deliberately consumes the Piano realization seam and
@@ -231,6 +317,10 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
   );
   const spans: TimelineSpan[] = [];
   const events: MelodyTimelineEvent[] = [];
+  const laneBuckets = new Map<
+    MelodyInstrument,
+    { readonly firstStepIndex: number; readonly events: MelodyTimelineEvent[] }
+  >();
   const context = contextForProject(project);
   const orderedRealizations = realizeOrderedPianoProgression({
     steps: project.progression.steps,
@@ -240,6 +330,7 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
   let cursor = ZERO;
   let restOrdinal = 0;
   project.progression.steps.forEach((step, stepIndex) => {
+    const eventStart = events.length;
     restOrdinal = addStepSpan(
       step,
       cursor,
@@ -247,7 +338,18 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
       spans,
       events,
       restOrdinal,
+      instrument,
     );
+    if (step.kind === "chord" && step.melody !== undefined) {
+      const stepEvents = events.slice(eventStart);
+      const stepInstrument = resolveEffectiveMelodyInstrument(
+        step.melodyInstrumentOverride,
+        instrument,
+      ).id;
+      const bucket = laneBuckets.get(stepInstrument);
+      if (bucket) bucket.events.push(...stepEvents);
+      else laneBuckets.set(stepInstrument, { firstStepIndex: stepIndex, events: [...stepEvents] });
+    }
     cursor = addRational(cursor, step.duration.beats);
   });
   if (compareRational(layout.playbackDurationBeats, cursor) > 0) {
@@ -260,27 +362,41 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
     });
   }
 
-  const mutableMeasures = layout.measures.map((measure) => ({
-    startBeats: measure.startBeats,
-    endBeats: measure.endBeats,
-    entries: [] as MelodyStaffEntry[],
-  }));
-  spans.forEach((span) => splitTimelineSpan(span, layout.barLengthBeats, mutableMeasures));
-
-  const measures = layout.measures.map((measure, measureIndex) =>
-    Object.freeze({
-      measureIndex: measure.measureIndex,
-      number: measure.number,
-      startBeats: measure.startBeats,
-      endBeats: measure.endBeats,
-      entries: Object.freeze(mutableMeasures[measureIndex]!.entries),
-    }),
-  );
+  const measures = buildMeasures(layout, spans, layout.barLengthBeats);
+  const lanes = [...laneBuckets.entries()]
+    .sort(
+      ([a, aValue], [b, bValue]) =>
+        aValue.firstStepIndex - bValue.firstStepIndex ||
+        getMelodyInstrument(a).program - getMelodyInstrument(b).program ||
+        a.localeCompare(b),
+    )
+    .map(([instrumentId, bucket]) => {
+      const laneEvents = Object.freeze([...bucket.events]);
+      const laneMeasures = buildMeasures(
+        layout,
+        fillLaneSpans(laneEvents, layout.playbackDurationBeats),
+        layout.barLengthBeats,
+      );
+      const activeSystemIndexes = Object.freeze(
+        laneMeasures
+          .filter((measure) => measure.entries.some((entry) => entry.kind === "note"))
+          .map((measure) => measure.measureIndex),
+      );
+      return Object.freeze({
+        instrumentId,
+        firstStepIndex: bucket.firstStepIndex,
+        clef: melodyClefForInstrument(instrumentId),
+        events: laneEvents,
+        measures: laneMeasures,
+        activeSystemIndexes,
+      });
+    });
   return Object.freeze({
     instrument,
-    clef,
+    clef: events[0]?.clef ?? clef,
     events: Object.freeze(events),
-    measures: Object.freeze(measures),
+    measures,
+    lanes: Object.freeze(lanes),
   });
 }
 

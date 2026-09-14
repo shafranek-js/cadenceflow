@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { AudioProviderState } from "../../audio/contracts";
 
 export interface TrackControlSettings {
@@ -18,6 +18,7 @@ export function TrackControls({
   settings,
   onChange,
   instrumentOptions,
+  instrumentControl,
   instrumentDisabled = false,
   providerState = "idle",
   providerError = null,
@@ -26,13 +27,15 @@ export function TrackControls({
   readonly trackName: string;
   readonly settings: TrackControlSettings;
   readonly onChange: (patch: Partial<TrackControlSettings>) => void;
-  readonly instrumentOptions: readonly TrackInstrumentOption[];
+  readonly instrumentOptions?: readonly TrackInstrumentOption[];
+  readonly instrumentControl?: ReactNode;
   readonly instrumentDisabled?: boolean;
   readonly providerState?: AudioProviderState;
   readonly providerError?: string | null;
   readonly onRetry?: () => void;
 }) {
   const legacyClassPrefix = trackName.toLowerCase();
+  const providerIssueIsFatal = providerState === "error";
   const [volumeDraft, setVolumeDraft] = useState(settings.volume);
   const volumeDraftRef = useRef(settings.volume);
   const pointerEditingRef = useRef(false);
@@ -72,10 +75,10 @@ export function TrackControls({
       </div>
       <div
         className={`track-controls-audio-status ${legacyClassPrefix}-track-audio-status`}
-        role={providerError ? "alert" : "status"}
+        role={providerError && providerIssueIsFatal ? "alert" : "status"}
       >
         {providerError
-          ? `${trackName} audio error: ${providerError}`
+          ? `${trackName} audio ${providerIssueIsFatal ? "error" : "warning"}: ${providerError}`
           : providerState === "loading"
             ? `${trackName} audio loading…`
             : providerState === "ready"
@@ -93,21 +96,28 @@ export function TrackControls({
           </button>
         ) : null}
       </div>
-      <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
-        <span>Instrument</span>
-        <select
-          aria-label={`${trackName} Track Instrument`}
-          value={settings.instrument}
-          disabled={instrumentDisabled}
-          onChange={(event) => onChange({ instrument: event.target.value })}
-        >
-          {instrumentOptions.map((instrument) => (
-            <option key={instrument.value} value={instrument.value}>
-              {instrument.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {instrumentControl ? (
+        <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
+          <span>Instrument</span>
+          {instrumentControl}
+        </label>
+      ) : (
+        <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
+          <span>Instrument</span>
+          <select
+            aria-label={`${trackName} Track Instrument`}
+            value={settings.instrument}
+            disabled={instrumentDisabled}
+            onChange={(event) => onChange({ instrument: event.target.value })}
+          >
+            {(instrumentOptions ?? []).map((instrument) => (
+              <option key={instrument.value} value={instrument.value}>
+                {instrument.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <button
         type="button"
         className={`track-controls-toggle ${legacyClassPrefix}-track-toggle`}

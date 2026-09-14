@@ -256,9 +256,9 @@ async function expectSharedLayoutSpacing(page: Page): Promise<void> {
     };
   });
 
-  expect(spacing.gutter).toBe("12px");
-  expect(spacing.panelGap).toBe("16px");
-  expect(spacing.panelPadding).toBe("14px");
+  expect(spacing.gutter).toBe("8px");
+  expect(spacing.panelGap).toBe("10px");
+  expect(spacing.panelPadding).toBe("10px");
   expect(spacing.shellPaddingInline).toBe(spacing.gutter);
   expect(spacing.gridGap).toBe(spacing.panelGap);
   expect(spacing.mainGap).toBe(spacing.panelGap);

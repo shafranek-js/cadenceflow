@@ -1,8 +1,7 @@
 import type { AudioProviderState } from "../../audio/contracts";
 import type { MelodyTrackSettings } from "../../domain/melody/types";
-import { MELODY_INSTRUMENTS } from "../../domain/melody/types";
-import { melodyInstrumentLabel } from "./labels";
 import { TrackControls } from "../track/TrackControls";
+import { MelodyInstrumentPicker } from "./MelodyInstrumentPicker";
 
 export function MelodyTrackControls({
   settings,
@@ -22,10 +21,15 @@ export function MelodyTrackControls({
       trackName="Melody"
       settings={settings}
       onChange={(patch) => onChange(patch as Partial<MelodyTrackSettings>)}
-      instrumentOptions={MELODY_INSTRUMENTS.map((instrument) => ({
-        value: instrument,
-        label: melodyInstrumentLabel(instrument),
-      }))}
+      instrumentControl={
+        <MelodyInstrumentPicker
+          value={settings.instrument}
+          onChange={(instrument) => {
+            if (instrument) onChange({ instrument });
+          }}
+          ariaLabel="Melody Track Instrument"
+        />
+      }
       providerState={providerState}
       providerError={providerError}
       {...(onRetry ? { onRetry } : {})}

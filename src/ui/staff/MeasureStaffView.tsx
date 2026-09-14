@@ -240,23 +240,22 @@ export function MeasureStaffView({
                     aria-label={`Select ${title}`}
                     aria-pressed={selected}
                     aria-current={playing ? "step" : undefined}
-                    aria-haspopup={chord && onOpenMelodyMenu ? "menu" : undefined}
+                    aria-haspopup={onOpenMelodyMenu ? "menu" : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSelect(item.stepId);
                     }}
                     onContextMenu={(event) => {
-                      if (!chord || !onOpenMelodyMenu) return;
+                      if (!onOpenMelodyMenu) return;
                       event.preventDefault();
                       event.stopPropagation();
-                      onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                      onOpenMelodyMenu(item.stepId, event.currentTarget, {
                         x: event.clientX,
                         y: event.clientY,
                       });
                     }}
                     onKeyDown={(event) => {
                       if (
-                        !chord ||
                         !onOpenMelodyMenu ||
                         (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey))
                       ) {
@@ -265,7 +264,7 @@ export function MeasureStaffView({
                       event.preventDefault();
                       event.stopPropagation();
                       const rect = event.currentTarget.getBoundingClientRect();
-                      onOpenMelodyMenu(chord.stepId, event.currentTarget, {
+                      onOpenMelodyMenu(item.stepId, event.currentTarget, {
                         x: rect.left,
                         y: rect.bottom,
                       });

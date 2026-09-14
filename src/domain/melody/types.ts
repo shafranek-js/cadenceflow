@@ -1,29 +1,49 @@
 import type { ExactPitch } from "../harmony/pitch";
 import type { Rational } from "../timing/rational";
+import {
+  MELODY_INSTRUMENT_CATALOG,
+  validateMelodyInstrumentId,
+  type MelodyInstrumentId,
+} from "./instrumentCatalog";
 
 export type MelodyPattern = "up" | "down" | "up-down" | "down-up" | "outside-in" | "inside-out";
+
+export type MelodyPitchMotion =
+  MelodyPattern | "repeat-root" | "repeat-top" | "alternate-root-up" | "alternate-top-down";
+
+export type MelodyRhythm = "even" | "dotted" | "reverse-dotted" | "tresillo";
+
+export type MelodyConnection = "retrigger" | "tie-repeated";
 
 export type MelodyGrid =
   "quarter" | "eighth" | "sixteenth" | "eighth-triplet" | "sixteenth-triplet";
 
 export type MelodyOctaveOffset = -2 | -1 | 0 | 1 | 2;
 
-export type MelodyInstrument = "flute" | "violin" | "clarinet" | "oboe" | "cello" | "synth-lead";
+export type MelodyInstrument = MelodyInstrumentId;
 
-export const MELODY_INSTRUMENTS: readonly MelodyInstrument[] = Object.freeze([
-  "flute",
-  "violin",
-  "clarinet",
-  "oboe",
-  "cello",
-  "synth-lead",
-]);
+/** Backward-compatible export; the canonical source is the immutable catalog. */
+export { MELODY_INSTRUMENT_CATALOG };
+export const MELODY_INSTRUMENTS: readonly MelodyInstrument[] = Object.freeze(
+  MELODY_INSTRUMENT_CATALOG.map((entry) => entry.id),
+);
 
 export interface ChordMelodyRecipe {
+  readonly pitchMotion: MelodyPitchMotion;
+  readonly rhythm: MelodyRhythm;
+  readonly connection: MelodyConnection;
+  readonly grid: MelodyGrid;
+  readonly octaveOffset: MelodyOctaveOffset;
+}
+
+/** Pre-T186 wire shape retained only as a load/command compatibility input. */
+export interface LegacyChordMelodyRecipe {
   readonly pattern: MelodyPattern;
   readonly grid: MelodyGrid;
   readonly octaveOffset: MelodyOctaveOffset;
 }
+
+export type MelodyRecipeInput = ChordMelodyRecipe | LegacyChordMelodyRecipe;
 
 export interface MelodyTrackSettings {
   readonly instrument: MelodyInstrument;
@@ -72,7 +92,7 @@ export class MelodyValidationError extends Error {
   }
 }
 
-const MELODY_PATTERNS: readonly MelodyPattern[] = Object.freeze([
+const LEGACY_MELODY_PATTERNS: readonly MelodyPattern[] = Object.freeze([
   "up",
   "down",
   "up-down",
@@ -81,7 +101,27 @@ const MELODY_PATTERNS: readonly MelodyPattern[] = Object.freeze([
   "inside-out",
 ]);
 
-const MELODY_GRIDS: readonly MelodyGrid[] = Object.freeze([
+export const MELODY_PITCH_MOTIONS: readonly MelodyPitchMotion[] = Object.freeze([
+  ...LEGACY_MELODY_PATTERNS,
+  "repeat-root",
+  "repeat-top",
+  "alternate-root-up",
+  "alternate-top-down",
+]);
+
+export const MELODY_RHYTHMS: readonly MelodyRhythm[] = Object.freeze([
+  "even",
+  "dotted",
+  "reverse-dotted",
+  "tresillo",
+]);
+
+export const MELODY_CONNECTIONS: readonly MelodyConnection[] = Object.freeze([
+  "retrigger",
+  "tie-repeated",
+]);
+
+export const MELODY_GRIDS: readonly MelodyGrid[] = Object.freeze([
   "quarter",
   "eighth",
   "sixteenth",
@@ -97,31 +137,48 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): b
   return Object.keys(value).every((key) => keys.includes(key));
 }
 
-export function snapshotChordMelodyRecipe(recipe: ChordMelodyRecipe): ChordMelodyRecipe {
+export function snapshotChordMelodyRecipe(recipe: MelodyRecipeInput): ChordMelodyRecipe {
   return validateChordMelodyRecipe(recipe);
 }
 
 export function validateChordMelodyRecipe(value: unknown): ChordMelodyRecipe {
+  const pitchMotion = isRecord(value) ? value.pitchMotion : undefined;
+  const rhythm = isRecord(value) ? value.rhythm : undefined;
+  const connection = isRecord(value) ? value.connection : undefined;
   const pattern = isRecord(value) ? value.pattern : undefined;
   const grid = isRecord(value) ? value.grid : undefined;
   const octaveOffset = isRecord(value) ? value.octaveOffset : undefined;
+
+  const canonical =
+    isRecord(value) &&
+    hasOnlyKeys(value, ["pitchMotion", "rhythm", "connection", "grid", "octaveOffset"]);
+  const legacy = isRecord(value) && hasOnlyKeys(value, ["pattern", "grid", "octaveOffset"]);
+  const validCommon =
+    MELODY_GRIDS.includes(grid as MelodyGrid) &&
+    Number.isInteger(octaveOffset) &&
+    (octaveOffset as number) >= -2 &&
+    (octaveOffset as number) <= 2;
+
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ["pattern", "grid", "octaveOffset"]) ||
-    !MELODY_PATTERNS.includes(pattern as MelodyPattern) ||
-    !MELODY_GRIDS.includes(grid as MelodyGrid) ||
-    !Number.isInteger(octaveOffset) ||
-    (octaveOffset as number) < -2 ||
-    (octaveOffset as number) > 2
+    !validCommon ||
+    (canonical &&
+      (!MELODY_PITCH_MOTIONS.includes(pitchMotion as MelodyPitchMotion) ||
+        !MELODY_RHYTHMS.includes(rhythm as MelodyRhythm) ||
+        !MELODY_CONNECTIONS.includes(connection as MelodyConnection))) ||
+    (legacy && !LEGACY_MELODY_PATTERNS.includes(pattern as MelodyPattern)) ||
+    (!canonical && !legacy)
   ) {
     throw new MelodyValidationError(
-      "Melody recipe must contain a supported pattern, grid, and octave offset from -2 through +2",
+      "Melody recipe must contain a supported pitch motion, rhythm, connection, grid, and octave offset from -2 through +2",
       "invalid-recipe",
     );
   }
 
   return Object.freeze({
-    pattern: pattern as MelodyPattern,
+    pitchMotion: (canonical ? pitchMotion : pattern) as MelodyPitchMotion,
+    rhythm: (canonical ? rhythm : "even") as MelodyRhythm,
+    connection: (canonical ? connection : "retrigger") as MelodyConnection,
     grid: grid as MelodyGrid,
     octaveOffset: octaveOffset as MelodyOctaveOffset,
   });
@@ -139,7 +196,14 @@ export function validateMelodyTrackSettings(value: unknown): MelodyTrackSettings
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, ["instrument", "muted", "solo", "volume"]) ||
-    !MELODY_INSTRUMENTS.includes(instrument as MelodyInstrument) ||
+    (() => {
+      try {
+        validateMelodyInstrumentId(instrument);
+        return false;
+      } catch {
+        return true;
+      }
+    })() ||
     typeof muted !== "boolean" ||
     typeof solo !== "boolean" ||
     (muted === true && solo === true) ||

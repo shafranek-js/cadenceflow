@@ -368,9 +368,10 @@ Exit gate:
 Deliver:
 - US12 product contracts for one linked Melody Track without expanding scope to a piano roll, multiple
   Melody Tracks, arbitrary external SoundFonts, or rendered-audio export;
-- pure framework-independent melody types, six deterministic pitch-order patterns, five exact Rational
-  grids, octave-offset validation, and immutable source-step-linked projection;
-- Project schema v2, v1 migration, portable persistence, and recipe-only storage;
+- pure framework-independent melody types, ten deterministic pitch motions, four exact rhythm cycles,
+  two connection modes, five exact Rational grids, octave-offset validation, and immutable
+  source-step-linked projection;
+- Project schema v4, sequential v1→v2→v3→v4 migration, portable persistence, and recipe-only storage;
 - undoable create/edit/remove and Repeat/Extend/delete/reorder semantics for linked melody recipes;
 - accessible Chord Step context menu, compact editor, preview, Melody Track controls, Melody Staff, and
   active-note highlighting;
@@ -406,6 +407,44 @@ Exit gate:
 - FR-208–FR-217 and SC-019–SC-020 pass focused unit/integration/Chromium checks, production build, scoped
   formatting, and independent diff review without changing Melody, playback, Matrix Card View, or export
   semantics.
+
+### Slice 13 — Melody Pitch Motion discovery
+
+Deliver:
+- an optional grouped browser for all ten canonical Pitch Motions while retaining the compact select;
+- one lightweight contour per motion derived from canonical pitch ordering and one authoritative full
+  notation preview for the selected draft;
+- draft-only selection that preserves Rhythm, Connection, Grid, Octave Offset, and Instrument and adds no
+  persisted preset identity or schema migration;
+- responsive disclosure, keyboard single-selection semantics, Escape/focus return, and internal overflow
+  containment at supported desktop sizes and 200% zoom.
+
+Exit gate:
+- FR-218–FR-220 and SC-021 pass focused unit and Chromium checks; existing Melody projection, persistence,
+  playback, MIDI, MusicXML, and no-Melody behavior remain unchanged.
+
+### Slice 14 — General MIDI Melody catalog and per-Step inheritance
+
+Deliver:
+- one pure immutable 128-program GM catalog that retains the six existing ids and identifies the six
+  verified local FluidR3_GM assets separately from export-only entries;
+- schema v5 with an optional sibling `ChordStep.melodyInstrumentOverride`, sequential v4→v5 migration,
+  strict validation, portable/autosave recovery, and undoable global/Step-local transitions;
+- one reusable compact grouped/searchable instrument picker used by Melody Track controls and the Melody
+  editor, including `Use track instrument`, explicit availability, keyboard/focus behavior, and responsive
+  containment;
+- pure effective-instrument resolution and event partitioning shared by Staff, realtime preview/playback,
+  MIDI, and MusicXML;
+- lazy loading only for used available timbres, explicit non-fallback status for export-only timbres,
+  one active-system Staff line, MIDI track, and full-score MusicXML part per unique effective instrument,
+  stable first-occurrence ordering, full-score rests, and catalog clefs.
+
+No new sound assets, dependencies, network loading, chord Instrument Profiles, multiple Melody Tracks, or
+arbitrary external SoundFont management enter this slice.
+
+Exit gate:
+- FR-221–FR-226 and SC-022 pass catalog, migration/persistence, command, Staff/playback/export, and focused
+  Chromium acceptance; the existing six projects and no-Melody outputs remain compatible.
 
 ## Performance and Audio Strategy
 

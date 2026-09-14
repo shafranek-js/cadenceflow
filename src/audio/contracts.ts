@@ -9,6 +9,8 @@ export interface AudioNoteEvent {
   readonly durationSeconds: number;
   readonly velocity: number;
   readonly channelRole: AudioChannelRole;
+  /** Effective Melody catalog id for melody events; absent on legacy generic events. */
+  readonly instrument?: string | undefined;
   /** Stable identity retained for derived live events and exact UI highlighting. */
   readonly eventKey?: string | undefined;
   readonly sourceStepId?: string | undefined;

@@ -164,9 +164,16 @@ export interface StaffSystemMeasureInput {
   readonly widthPx: number;
   readonly harmonyEntries: readonly StaffSequenceEntry[];
   readonly melodyEntries?: readonly StaffSequenceEntry[];
+  readonly melodyLanes?: readonly StaffSystemMelodyLaneInput[];
 }
 
-export type StaffSystemStaff = "melody" | "harmony" | "bass";
+export interface StaffSystemMelodyLaneInput {
+  readonly id: string;
+  readonly clef: StaffClef;
+  readonly entries: readonly StaffSequenceEntry[];
+}
+
+export type StaffSystemStaff = "melody" | "harmony" | "bass" | `melody:${string}`;
 
 export interface StaffSystemPosition extends StaffSequencePosition {
   readonly staff: StaffSystemStaff;
@@ -802,9 +809,21 @@ export function renderStaffSystem(
         (entry) => entry.kind === "chord" && Boolean(entry.bassProjection),
       ),
     );
-  const hasMelody = measures.some((measure) => measure.melodyEntries !== undefined);
+  const melodyLaneInputs = measures[0]?.melodyLanes;
+  const hasMelodyLanes = melodyLaneInputs !== undefined && melodyLaneInputs.length > 0;
+  const hasMelody =
+    hasMelodyLanes || measures.some((measure) => measure.melodyEntries !== undefined);
   const rows: SystemRow[] = [];
-  if (hasMelody) {
+  if (melodyLaneInputs && melodyLaneInputs.length > 0) {
+    melodyLaneInputs.forEach((lane) => {
+      rows.push({
+        staff: `melody:${lane.id}`,
+        clef: lane.clef,
+        entriesForMeasure: (measure) =>
+          measure.melodyLanes?.find((candidate) => candidate.id === lane.id)?.entries ?? [],
+      });
+    });
+  } else if (hasMelody) {
     rows.push({
       staff: "melody",
       clef: options.melodyClef ?? "treble",

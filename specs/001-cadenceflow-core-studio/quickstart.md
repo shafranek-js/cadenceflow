@@ -1,112 +1,127 @@
-# Quickstart: CadenceFlow v1 Implementation
+# Quickstart: CadenceFlow
+
+Run the commands below from the repository root.
 
 ## Prerequisites
 
-- Node.js current LTS supported by Vite 8
-- pnpm
-- Modern Chrome/Edge and Firefox
-- Python or Java available only if chosen for MusicXML XSD validation tooling
+- Node.js 22 or newer. The current validated checkout uses Node.js 24.14.0.
+- pnpm 10.12.4, pinned by `package.json` and the Pages workflow.
+- A modern browser for the UI and Chromium checks.
+- `ffmpeg` on `PATH` for the full HQ piano-bank file and decode verification.
+- The GitHub CLI (`gh`) is optional and is only needed to start or inspect the
+  manual Pages workflow.
 
 ## Bootstrap
 
+For a fresh checkout:
+
 ```bash
-pnpm create vite cadenceflow --template react-ts
+git clone https://github.com/shafranek-js/cadenceflow.git
 cd cadenceflow
-pnpm install
+corepack enable
+pnpm --version
+pnpm install --frozen-lockfile
 ```
 
-Pin the approved major/minor dependency line in the lockfile before implementation begins.
+`pnpm --version` should report `10.12.4`. Check the Node.js version with
+`node --version` before installing dependencies.
 
-Core dependencies expected by the plan:
+## Local development
+
+Start the Vite development server on the repository's stable local port:
 
 ```bash
-pnpm add react react-dom dexie vexflow spessasynth_lib
-pnpm add -D typescript vite vitest @playwright/test
+pnpm run dev -- --host 127.0.0.1 --port 5174 --strictPort --force
 ```
 
-Do not add theory/audio state libraries before the domain boundaries in `plan.md` are established.
+Open <http://127.0.0.1:5174/> in a supported browser.
 
-## Required first implementation step
+To build and preview the production output locally:
 
-Create pure TypeScript domain packages and fixtures before building the full UI:
-
-```text
-src/domain/harmony
-src/domain/progression
-src/domain/timing
-tests/fixtures
+```bash
+pnpm build
+pnpm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
-Minimum fixture gate:
-- C Major Progressions functions
-- D Major transposition
-- A Tonal Minor/Dark Harmony core
-- `V7 -> I` and `V7 -> i` realization
-- secondary dominant
-- secondary diminished baseline
-- N6
-- ambiguous Major<->Minor conversion fixture
+The normal local build uses `/` as its base path. The Pages build below uses
+`/cadenceflow/`.
 
-## Run checks
+## Tests and verification
+
+Run the complete Vitest suite and Chromium suite with:
 
 ```bash
 pnpm test
-pnpm exec playwright test
+pnpm build
+pnpm run test:e2e:chromium
+```
+
+The Chromium suite previews the existing `dist/` directory. Rebuild it without
+`GITHUB_ACTIONS=true` first so local tests use the `/` base path.
+
+Run the directly relevant HQ piano/Melody tests with one Vitest worker:
+
+```bash
+pnpm exec vitest run \
+  tests/unit/audio/prepare-piano-bank.test.ts \
+  tests/unit/audio/hq-sample-piano/manifest.test.ts \
+  tests/unit/audio/hq-sample-piano/sample-cache.test.ts \
+  tests/unit/audio/hq-sample-piano/provider.test.ts \
+  tests/unit/audio/soundfont/melody-provider.test.ts \
+  --maxWorkers=1
+```
+
+The browser-level HQ decode/cache smoke test is:
+
+```bash
+pnpm build
+pnpm exec playwright test tests/e2e/us5-audio-playback.spec.ts \
+  --project=chromium --workers=1 --retries=0
+```
+
+Verify the committed audio assets offline:
+
+```bash
+pnpm run verify:melody-assets
+pnpm run verify:piano-bank
+```
+
+`verify:melody-assets` checks the six hashed FluidR3 GM assets, manifest,
+license, and attribution. `verify:piano-bank` regenerates the deterministic
+480-region manifest and checks every referenced OGG file with `ffmpeg`,
+including decode coverage.
+
+## Production build for GitHub Pages
+
+On PowerShell:
+
+```powershell
+$env:GITHUB_ACTIONS = "true"
 pnpm build
 ```
 
-## Piano bank development
+On macOS/Linux shells:
 
-The repository MUST NOT blindly vendor the original source bank without a documented preparation/licensing step.
-
-Expected workflow:
-
-```text
-licensed source sample bank
-  -> scripts/prepare-piano-bank
-  -> web-encoded sample assets
-  -> public/audio/piano-hq/manifest.json
-  -> public/audio/piano-hq/samples/*
-  -> public/licenses/piano-hq-attribution.txt
+```bash
+GITHUB_ACTIONS=true pnpm build
 ```
 
-The manifest should map:
-- source pitch
-- playable pitch region
-- velocity layer/range
-- asset URL
-- optional gain/tuning/release metadata
+This build emits `/cadenceflow/`-prefixed HTML asset URLs and copies the
+manifest, piano samples, Melody assets, and license files into `dist/`.
 
-The app must remain usable while the HQ bank warms its cache.
+## Manual GitHub Pages workflow
 
-## Architecture smoke test
+The repository workflow is manual-only (`workflow_dispatch`). After the desired
+commit is pushed and GitHub CLI authentication is available, start it with:
 
-Before UI feature expansion, verify:
+```bash
+gh workflow run deploy.yml \
+  --repo shafranek-js/cadenceflow \
+  --ref master
+gh run list --repo shafranek-js/cadenceflow --workflow deploy.yml --limit 1
+gh run watch RUN_ID --repo shafranek-js/cadenceflow --exit-status
+```
 
-1. A domain progression can be created without React/WebAudio imports.
-2. Piano profile can realize it into exact pitches.
-3. The same exact pitch list can feed:
-   - mock audio provider
-   - Piano visualization DTO
-   - Staff visualization DTO
-   - MIDI event projection
-4. Project JSON round-trips through the portable schema without Undo history.
-5. Switching the mock Instrument Profile does not change stored harmonic function IDs.
-
-## MusicXML validation
-
-Export fixtures as MusicXML 4.0 and validate against the official W3C XSD during integration testing. Keep schemas cached locally in test tooling; tests should not depend on network availability.
-
-## Definition of first vertical slice
-
-The first end-to-end playable slice is complete when a user can:
-
-1. open a new project,
-2. choose C + Progressions,
-3. preview `I`,
-4. add it with `+`,
-5. add `V`,
-6. see two independent Progression Steps,
-7. hear both using the audio provider,
-8. save/reopen the project,
-9. export deterministic MIDI matching the same realized pitches.
+Replace `RUN_ID` with the run ID returned by `gh run list`. The workflow builds
+with `GITHUB_ACTIONS=true`, uploads `dist/`, and deploys through the GitHub
+Pages environment. No deployment is started automatically by local commands.

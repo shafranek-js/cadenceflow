@@ -6,6 +6,7 @@ import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { rational, rationalToNumber } from "../../domain/timing/rational";
 import { projectPitchesToStaff } from "../../notation/staffProjection";
 import type {
+  MelodyInstrumentLane,
   MelodyStaffEntry,
   MelodyStaffMeasure,
   MelodyTimeline,
@@ -47,6 +48,7 @@ function positionRecord(
 export interface MelodyStaffViewProps {
   readonly project: Project;
   readonly timeline: MelodyTimeline;
+  readonly lane?: MelodyInstrumentLane;
   readonly measure: MelodyStaffMeasure;
   readonly selectedStepId?: string;
   readonly activeMelodyEventKey?: string;
@@ -56,6 +58,7 @@ export interface MelodyStaffViewProps {
 export function MelodyStaffView({
   project,
   timeline,
+  lane,
   measure,
   selectedStepId,
   activeMelodyEventKey,
@@ -104,7 +107,7 @@ export function MelodyStaffView({
             JSON.stringify(current) === JSON.stringify(next) ? current : next,
           );
         },
-        { clef: timeline.clef },
+        { clef: lane?.clef ?? timeline.clef },
       );
     };
     draw();
@@ -114,12 +117,13 @@ export function MelodyStaffView({
       observer?.disconnect();
       cleanup();
     };
-  }, [project.globalTiming.meter, sequence, timeline.clef]);
+  }, [lane?.clef, project.globalTiming.meter, sequence, timeline.clef]);
 
   const barLength = rationalToNumber(
     rational(project.globalTiming.meter.numerator * 4, project.globalTiming.meter.denominator),
   );
-  const instrument = melodyInstrumentLabel(timeline.instrument);
+  const instrumentId = lane?.instrumentId ?? timeline.instrument;
+  const instrument = melodyInstrumentLabel(instrumentId);
   const noteSummary = measure.entries
     .map((entry) =>
       entry.kind === "note"
@@ -138,7 +142,7 @@ export function MelodyStaffView({
       <header className="melody-staff-header">
         <strong>Melody</strong>
         <span>{instrument}</span>
-        <span>{timeline.clef === "bass" ? "Bass clef" : "Treble clef"}</span>
+        <span>{(lane?.clef ?? timeline.clef) === "bass" ? "Bass clef" : "Treble clef"}</span>
       </header>
       <div className="melody-staff-paper">
         <div
@@ -156,7 +160,8 @@ export function MelodyStaffView({
             const active = activeMelodyEventKey === entry.eventKey;
             const pitch = formatPitch(entry);
             const source = sourceChordLabel(project, entry.sourceStepId);
-            const label = `Melody ${instrument}, ${pitch}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${source}`;
+            const entryInstrument = melodyInstrumentLabel(entry.instrument);
+            const label = `Melody ${entryInstrument}, ${pitch}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${source}`;
             const style = {
               "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
             } as CSSProperties;

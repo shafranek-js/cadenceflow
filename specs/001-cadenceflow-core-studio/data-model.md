@@ -155,8 +155,75 @@ ChordStep
 - explicitSpellingOverrides?: ...
 - duration: MusicalDuration
 - performance: StepPerformance
+- melody?: ChordMelodyRecipe
+- melodyInstrumentOverride?: MelodyInstrumentId
 - cardView: CardViewId (legacy compatibility only; hidden and ignored by My Progression rendering)
 ```
+
+## ChordMelodyRecipe
+
+```text
+ChordMelodyRecipe
+- pitchMotion: up | down | up-down | down-up | outside-in | inside-out |
+  repeat-root | repeat-top | alternate-root-up | alternate-top-down
+- rhythm: even | dotted | reverse-dotted | tresillo
+- connection: retrigger | tie-repeated
+- grid: quarter | eighth | sixteenth | eighth-triplet | sixteenth-triplet
+- octaveOffset: -2 | -1 | 0 | +1 | +2
+```
+
+Generated Melody events are derived and never persisted. Schema v5 keeps this canonical recipe shape and
+stores an optional sibling `melodyInstrumentOverride` only when the Step does not inherit the Melody Track
+default. Schema-v3 `{pattern, grid, octaveOffset}` recipes migrate to the equivalent motion with `even` and
+`retrigger`; schema v4 migrates without adding overrides.
+
+## MelodyInstrumentCatalogEntry
+
+```text
+MelodyInstrumentCatalogEntry
+- id: existing stable id | gm-NNN
+- program: integer 0..127 (zero-based MIDI program)
+- family: Piano | Chromatic Percussion | Organ | Guitar | Bass | Strings | Ensemble |
+  Brass | Reed | Pipe | Synth Lead | Synth Pad | Synth Effects | Ethnic | Percussive | Sound Effects
+- label: canonical General MIDI program name
+- clef: treble | bass
+- playableRange: { minMidi: 0..127, maxMidi: 0..127 }
+- sampleAsset?: verified local FluidR3_GM file
+- realtimeAvailability: available | export-only
+```
+
+The immutable catalog contains exactly 128 entries and one entry per program. Existing ids `flute`,
+`violin`, `clarinet`, `oboe`, `cello`, and `synth-lead` remain canonical; programs without those ids use
+`gm-NNN`. Effective resolution is pure: `step.melodyInstrumentOverride ?? melodyTrack.instrument`.
+Availability affects realtime audition only and never changes notes or export eligibility.
+
+## MelodyInstrumentLane (derived, not persisted)
+
+```text
+MelodyInstrumentLane
+- instrumentId: MelodyInstrumentId
+- firstStepIndex: integer >= 0
+- events: MelodyEvent[] belonging only to that effective instrument
+- activeSystemIndexes: integer[]
+```
+
+Events are partitioned without duplication. One lane produces one Staff line in each system where it is
+active, one MIDI track, and one full-score MusicXML part. Staff omits inactive lanes for the current system;
+MusicXML retains empty measures as rests. Lane order is first progression occurrence, then GM program and id.
+
+## MelodyPitchMotionGalleryItem (UI projection, not persisted)
+
+```text
+MelodyPitchMotionGalleryItem
+- pitchMotion: ChordMelodyRecipe.pitchMotion
+- group: Directional | Shapes | PedalAndAlternating
+- label: string
+- contour: derived canonical ordered pitch sample
+```
+
+The gallery contains every supported Pitch Motion exactly once. Selecting an item changes only the
+editor draft's `pitchMotion`; group, label, contour, expanded state, and any gallery selection metadata are
+presentation-only and MUST NOT enter Project persistence, Undo/Redo, playback, MIDI, or MusicXML.
 
 ### RestStep
 

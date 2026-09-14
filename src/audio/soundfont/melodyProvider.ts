@@ -9,15 +9,21 @@ import type {
   ScheduledPlayback,
 } from "../contracts";
 import type { MelodyInstrument, MelodyTrackSettings } from "../../domain/melody/types";
+import {
+  getMelodyInstrument,
+  isRealtimeMelodyInstrument,
+  type MelodyInstrumentId,
+} from "../../domain/melody/instrumentCatalog";
 
-export const MELODY_SAMPLE_FILES: Readonly<Record<MelodyInstrument, string>> = Object.freeze({
-  violin: "violin-mp3.js",
-  cello: "cello-mp3.js",
-  oboe: "oboe-mp3.js",
-  clarinet: "clarinet-mp3.js",
-  flute: "flute-mp3.js",
-  "synth-lead": "lead_1_square-mp3.js",
-});
+export const MELODY_SAMPLE_FILES: Readonly<Partial<Record<MelodyInstrument, string>>> =
+  Object.freeze({
+    violin: "violin-mp3.js",
+    cello: "cello-mp3.js",
+    oboe: "oboe-mp3.js",
+    clarinet: "clarinet-mp3.js",
+    flute: "flute-mp3.js",
+    "synth-lead": "lead_1_square-mp3.js",
+  });
 
 interface SampleNode {
   stop(when?: number): void;
@@ -52,6 +58,37 @@ interface ActivePlayback {
   cancelled: boolean;
 }
 
+export interface MelodyPreparationResult {
+  readonly ready: readonly MelodyInstrumentId[];
+  readonly unavailable: readonly MelodyInstrumentId[];
+  readonly failed: readonly MelodyInstrumentId[];
+}
+
+/**
+ * Stable user-facing summary for instruments which cannot be played by the
+ * bundled realtime provider. This is also used for mixed preparation so the
+ * playable lanes can continue while every unavailable lane remains identified.
+ */
+export function formatMelodyPreparationNotice(
+  result: Pick<MelodyPreparationResult, "unavailable" | "failed">,
+): string | null {
+  const unavailable = new Set(result.unavailable);
+  const failed = new Set(result.failed);
+  const instruments = [...new Set([...result.unavailable, ...result.failed])].sort(
+    (a, b) => getMelodyInstrument(a).program - getMelodyInstrument(b).program || a.localeCompare(b),
+  );
+  if (instruments.length === 0) return null;
+  return instruments
+    .map((instrument) => {
+      const entry = getMelodyInstrument(instrument);
+      const prefix = `GM ${String(entry.program).padStart(3, "0")} · ${entry.label} ·`;
+      if (unavailable.has(instrument)) return `${prefix} Export only / no bundled realtime sample`;
+      if (failed.has(instrument)) return `${prefix} Realtime sample failed to load`;
+      return `${prefix} Realtime sample unavailable`;
+    })
+    .join("; ");
+}
+
 export interface MelodySoundFontProviderOptions {
   readonly audioContext?: AudioContext | undefined;
   readonly destination?: AudioNode | undefined;
@@ -84,8 +121,8 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
   private previewVolume: number;
   private playbackCounter = 0;
   private preparationError: Error | null = null;
-  private preparationPromise: Promise<void> | null = null;
-  private preparationInstrument: MelodyInstrument | null = null;
+  private unavailableInstruments: readonly MelodyInstrumentId[] = Object.freeze([]);
+  private failedInstruments: readonly MelodyInstrumentId[] = Object.freeze([]);
 
   constructor(options: MelodySoundFontProviderOptions = {}) {
     this.audioContext = options.audioContext ?? null;
@@ -120,38 +157,68 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     return this.preparationError;
   }
 
+  get unavailable(): readonly MelodyInstrumentId[] {
+    return this.unavailableInstruments;
+  }
+
   async prepare(): Promise<void> {
-    const instrument = this.liveInstrument;
-    if (this.players.has(instrument)) {
-      this.setProviderState("ready");
-      return;
+    const result = await this.prepareForInstruments([this.liveInstrument]);
+    if (result.unavailable.length > 0 || result.failed.length > 0) {
+      throw this.preparationError ?? new Error(this.unavailableMessage(result.unavailable));
     }
-
-    if (this.preparationPromise && this.preparationInstrument === instrument) {
-      return this.preparationPromise;
-    }
-
-    this.preparationInstrument = instrument;
-    const preparation = this.prepareInstrument(instrument);
-    this.preparationPromise = preparation;
-    return preparation;
   }
 
   async preparePreview(instrument: MelodyInstrument, volume: number): Promise<void> {
     this.setPreviewSettings(instrument, volume);
-    const hasPlayableLiveInstrument = this.players.has(this.liveInstrument);
-    if (!this.players.has(instrument) && !hasPlayableLiveInstrument) {
-      this.setProviderState("loading");
-      this.preparationError = null;
+    const result = await this.prepareForInstruments([instrument]);
+    if (result.unavailable.length > 0 || result.failed.length > 0) {
+      throw this.preparationError ?? new Error(this.unavailableMessage(result.unavailable));
     }
-    try {
-      await this.loadPlayer(instrument);
-      if (!hasPlayableLiveInstrument) this.setProviderState("ready");
-    } catch (error) {
-      this.preparationError = error instanceof Error ? error : new Error(String(error));
-      if (!hasPlayableLiveInstrument) this.setProviderState("error");
-      throw error;
+  }
+
+  async prepareForInstruments(
+    instruments: readonly MelodyInstrument[],
+  ): Promise<MelodyPreparationResult> {
+    const requested = [...new Set(instruments)] as MelodyInstrumentId[];
+    const ready: MelodyInstrumentId[] = [];
+    const unavailable: MelodyInstrumentId[] = [];
+    const failed: MelodyInstrumentId[] = [];
+    this.setProviderState("loading");
+    this.preparationError = null;
+
+    await Promise.all(
+      requested.map(async (instrument) => {
+        if (!isRealtimeMelodyInstrument(instrument)) {
+          unavailable.push(instrument);
+          return;
+        }
+        try {
+          await this.loadPlayer(instrument);
+          ready.push(instrument);
+        } catch (error) {
+          failed.push(instrument);
+          this.preparationError ??= error instanceof Error ? error : new Error(String(error));
+        }
+      }),
+    );
+    ready.sort();
+    unavailable.sort();
+    failed.sort();
+    this.unavailableInstruments = Object.freeze(unavailable);
+    this.failedInstruments = Object.freeze(failed);
+    if (ready.length === 0 && (failed.length > 0 || unavailable.length > 0)) {
+      this.preparationError ??= new Error(this.unavailableMessage(unavailable));
+      this.setProviderState("error");
+    } else if (ready.length > 0) {
+      this.setProviderState("ready");
+    } else {
+      this.setProviderState("idle");
     }
+    return Object.freeze({
+      ready: Object.freeze(ready),
+      unavailable: Object.freeze(unavailable),
+      failed: Object.freeze(failed),
+    });
   }
 
   setTrackSettings(settings: MelodyTrackSettings): void {
@@ -159,7 +226,13 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     if (instrumentChanged) this.cancelPlaybacks(this.livePlaybacks);
     this.liveInstrument = settings.instrument;
     this.liveVolume = clampMidi(settings.volume);
-    if (!this.players.has(this.liveInstrument)) this.setProviderState("idle");
+    if (!isRealtimeMelodyInstrument(this.liveInstrument)) {
+      this.preparationError = new Error(this.unavailableMessage([this.liveInstrument]));
+      this.setProviderState("error");
+    } else if (!this.players.has(this.liveInstrument)) {
+      this.preparationError = null;
+      this.setProviderState("idle");
+    }
   }
 
   setPreviewSettings(instrument: MelodyInstrument, volume: number): void {
@@ -169,21 +242,13 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
   }
 
   schedule(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback {
-    return this.scheduleWithPlayer(
-      events,
-      clock,
-      this.liveInstrument,
-      this.liveVolume,
-      this.livePlaybacks,
-      "live",
-    );
+    return this.scheduleWithPlayer(events, clock, this.liveVolume, this.livePlaybacks, "live");
   }
 
   schedulePreview(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback {
     return this.scheduleWithPlayer(
       events,
       clock,
-      this.previewInstrument,
       this.previewVolume,
       this.previewPlaybacks,
       "preview",
@@ -202,10 +267,10 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     for (const player of this.players.values()) player.stop();
     this.players.clear();
     this.loads.clear();
-    this.preparationPromise = null;
-    this.preparationInstrument = null;
     this.audioContext = null;
     this.preparationError = null;
+    this.unavailableInstruments = Object.freeze([]);
+    this.failedInstruments = Object.freeze([]);
     this.setProviderState("idle");
   }
 
@@ -218,7 +283,11 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
 
     const context = this.ensureAudioContext();
     const destination = this.destinationNode ?? context.destination;
-    const fileName = MELODY_SAMPLE_FILES[instrument];
+    const entry = getMelodyInstrument(instrument);
+    if (entry.realtimeAvailability !== "available" || !entry.sampleAsset) {
+      throw new Error(this.unavailableMessage([instrument]));
+    }
+    const fileName = entry.sampleAsset;
     const url = `${this.assetBaseUrl}${fileName}`;
     const loading = this.loadInstrument(context, instrument, url, destination)
       .then((player) => {
@@ -228,26 +297,6 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
       .finally(() => this.loads.delete(instrument));
     this.loads.set(instrument, loading);
     return loading;
-  }
-
-  private async prepareInstrument(instrument: MelodyInstrument): Promise<void> {
-    this.setProviderState("loading");
-    this.preparationError = null;
-    try {
-      await this.loadPlayer(instrument);
-      if (this.liveInstrument === instrument) this.setProviderState("ready");
-    } catch (error) {
-      if (this.liveInstrument === instrument) {
-        this.preparationError = error instanceof Error ? error : new Error(String(error));
-        this.setProviderState("error");
-      }
-      throw error;
-    } finally {
-      if (this.preparationInstrument === instrument) {
-        this.preparationPromise = null;
-        this.preparationInstrument = null;
-      }
-    }
   }
 
   private ensureAudioContext(): AudioContext {
@@ -263,15 +312,12 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
   private scheduleWithPlayer(
     events: readonly AudioNoteEvent[],
     clock: AudioClock,
-    instrument: MelodyInstrument,
     volume: number,
     collection: Set<ActivePlayback>,
     scope: "live" | "preview",
   ): ScheduledPlayback {
     assertMelodyEvents(events);
     const context = this.ensureAudioContext();
-    const player = this.players.get(instrument);
-    if (!player) throw new Error(`${instrument} samples are not ready`);
 
     const playback: ActivePlayback = {
       id: `melody-${scope}-${++this.playbackCounter}`,
@@ -284,6 +330,21 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
 
     try {
       for (const event of events) {
+        const instrument =
+          (event.instrument as MelodyInstrument | undefined) ??
+          (scope === "preview" ? this.previewInstrument : this.liveInstrument);
+        const entry = getMelodyInstrument(instrument);
+        const player = this.players.get(instrument);
+        // Export-only programs are intentionally silent in realtime while the
+        // rest of a mixed Melody remains playable; the UI reports the status.
+        if (
+          !player &&
+          (entry.realtimeAvailability === "export-only" ||
+            this.unavailableInstruments.includes(instrument) ||
+            this.failedInstruments.includes(instrument))
+        )
+          continue;
+        if (!player) throw new Error(`${instrument} samples are not ready`);
         const node = player.play(event.pitch, baseTime + event.startSeconds, {
           duration: event.durationSeconds,
           gain: (event.velocity / 127) * trackGain,
@@ -325,6 +386,13 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     if (this.providerState === nextState) return;
     this.providerState = nextState;
     this.onStateChange?.(nextState);
+  }
+
+  private unavailableMessage(instruments: readonly MelodyInstrumentId[]): string {
+    return (
+      formatMelodyPreparationNotice({ unavailable: instruments, failed: [] }) ??
+      "No realtime Melody sample is available"
+    );
   }
 }
 

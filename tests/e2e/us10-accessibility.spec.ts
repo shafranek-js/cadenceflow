@@ -389,7 +389,12 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await page.keyboard.press("Space");
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
 
-    const swing = page.getByRole("button", { name: "Toggle Swing Feel" });
+    const selectedInspector = page.getByTestId("step-performance-inspector");
+    const progressionSettings = selectedInspector.getByTestId("selected-progression-settings");
+    if (!(await progressionSettings.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await progressionSettings.locator(":scope > summary").click();
+    }
+    const swing = progressionSettings.getByRole("button", { name: "Toggle Swing Feel" });
     await swing.focus();
     await page.keyboard.press("Enter");
     await expect(swing).toHaveAttribute("aria-pressed", "true");
