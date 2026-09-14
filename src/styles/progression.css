@@ -900,7 +900,8 @@
   min-width: 204px;
 }
 
-.progression-context-menu {
+.progression-context-menu,
+.matrix-context-menu {
   min-width: 220px;
 }
 

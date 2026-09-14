@@ -35,9 +35,9 @@ export function HarmonicMatrix({
   onTemplateOpen,
   onTemplateReset,
   onResetCurrentModule: _onResetCurrentModule,
-  onResetAllModules: _onResetAllModules,
   onStaffOctaveChange,
   onClearSelection,
+  onOpenMatrixMenu,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -54,6 +54,7 @@ export function HarmonicMatrix({
   readonly onResetAllModules?: () => void;
   readonly onStaffOctaveChange: (functionId: string, direction: StaffOctaveDirection) => void;
   readonly onClearSelection?: () => void;
+  readonly onOpenMatrixMenu?: (anchor: HTMLElement, position: { x: number; y: number }) => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -136,6 +137,13 @@ export function HarmonicMatrix({
     onClearSelection();
   };
 
+  const handleToolbarContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onOpenMatrixMenu?.(event.currentTarget, { x: event.clientX, y: event.clientY });
+  };
+
   return (
     <section
       className="matrix-panel"
@@ -143,7 +151,7 @@ export function HarmonicMatrix({
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
     >
-      <header className="matrix-toolbar">
+      <header className="matrix-toolbar" onContextMenu={handleToolbarContextMenu}>
         <ModuleSelector value={project.activeModule} onChange={onModuleChange} />
         <TonicSelector
           tonic={project.tonic}

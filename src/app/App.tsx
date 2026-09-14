@@ -57,6 +57,7 @@ import { BranchControls } from "../ui/progression/BranchControls";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
+import { MatrixContextMenu } from "../ui/matrix/MatrixContextMenu";
 import { ViewModeToggle } from "../ui/common/ViewModeToggle";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
@@ -376,6 +377,8 @@ export function App() {
     setPresetsPanelOpen(false);
     setSavePresetDialogOpen(false);
     setApplyDialogPreset(null);
+    setMatrixMenu(null);
+    setProgressionMenu(null);
   }, [clearStepPreviewHighlights, transportStore]);
 
   const projectController = useMemo(() => new ProjectController({ store }), [store]);
@@ -1459,6 +1462,11 @@ export function App() {
     position: { x: number; y: number };
   } | null>(null);
 
+  const [matrixMenu, setMatrixMenu] = useState<{
+    anchor?: HTMLElement | undefined;
+    position: { x: number; y: number };
+  } | null>(null);
+
   const handleProgressionHeadingContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest("button, select, input, textarea, a")) {
@@ -2326,6 +2334,7 @@ export function App() {
           onTemplateReset={resetCard}
           onStaffOctaveChange={changeMatrixStaffOctave}
           onClearSelection={clearMatrixSelection}
+          onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
         />
       }
       inspector={
@@ -2733,6 +2742,46 @@ export function App() {
               onAddRest={() => addRest()}
               onClearAllSteps={clearAllProgressionSteps}
               onClose={() => setProgressionMenu(null)}
+            />
+          ) : null}
+          {matrixMenu ? (
+            <MatrixContextMenu
+              position={matrixMenu.position}
+              invoker={matrixMenu.anchor}
+              activeModule={project.activeModule}
+              tonic={project.tonic}
+              globalView={project.presentation.globalMatrixCardView}
+              showBassInStaff={project.presentation.showBassInStaff}
+              currentArticulation={project.defaults.piano.performance.articulation}
+              currentRegister={project.defaults.piano.performance.register}
+              hasPreviewSelection={Boolean(activePreviewId)}
+              isRecommendationsActive={globalSettingsVisibility.showRecommendationContext}
+              onResetCurrentModule={() => resetMatrix("current-module")}
+              onResetAllModules={() => resetMatrix("all-modules")}
+              onResetTemplateDefaults={() => resetTemplate()}
+              onSetModule={requestModuleSwitch}
+              onTranspose={(semitones) =>
+                changeTonic(((project.tonic + semitones) % 12 + 12) % 12)
+              }
+              onSetTonic={changeTonic}
+              onSetView={globalView}
+              onToggleBassInStaff={() =>
+                changeStaffBassVisibility(!project.presentation.showBassInStaff)
+              }
+              onSetArticulation={(articulation) =>
+                patchTemplatePerformance({ articulation })
+              }
+              onSetRegister={(register) =>
+                patchTemplatePerformance({ register })
+              }
+              onToggleRecommendations={() =>
+                setGlobalSettingsVisibility((prev) => ({
+                  ...prev,
+                  showRecommendationContext: !prev.showRecommendationContext,
+                }))
+              }
+              onClearSelection={clearMatrixSelection}
+              onClose={() => setMatrixMenu(null)}
             />
           ) : null}
         </>
