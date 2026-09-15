@@ -285,8 +285,12 @@
 
 .matrix-layer-cards {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.matrix-panel[data-module="dark-harmony"] .matrix-layer-cards {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .chord-card {

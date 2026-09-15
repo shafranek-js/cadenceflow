@@ -20,7 +20,7 @@ const MINOR_TO_MAJOR: Readonly<Record<string, string>> = Object.fromEntries(
 
 function categoryFor(functionId: string, moduleId: HarmonicModuleId): HarmonicFunctionCategory {
   if (moduleId === "progressions") {
-    if (functionId.startsWith("V7/")) return "secondary-dominant";
+    if (functionId === "V7" || functionId.startsWith("V7/")) return "secondary-dominant";
     if (["bIII", "bVI", "iv", "bVII"].includes(functionId)) return "modal-interchange";
     return "core";
   }
@@ -46,8 +46,8 @@ function curatedAlternatives(
   destinationModule: HarmonicModuleId,
 ): readonly HarmonicFunctionIdentity[] {
   if (destinationModule === "dark-harmony") {
-    if (source.functionId.startsWith("V7/")) {
-      const target = source.targetFunctionId;
+    if (source.functionId === "V7" || source.functionId.startsWith("V7/")) {
+      const target = source.targetFunctionId ?? (source.functionId === "V7" ? "I" : undefined);
       const mappedTarget = target ? MAJOR_TO_MINOR[target] : undefined;
       const options: HarmonicFunctionIdentity[] = [identity("dark-harmony", "V")];
       if (mappedTarget)
@@ -78,7 +78,9 @@ function curatedAlternatives(
     return Object.freeze(
       mappedTarget
         ? [
-            identity("progressions", `V7/${mappedTarget}`, mappedTarget),
+            mappedTarget === "I"
+              ? identity("progressions", "V7", "I")
+              : identity("progressions", `V7/${mappedTarget}`, mappedTarget),
             identity("progressions", mappedTarget),
           ]
         : [identity("progressions", "V"), identity("progressions", "ii")],

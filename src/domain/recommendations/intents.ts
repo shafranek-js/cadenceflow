@@ -20,12 +20,13 @@ export function intentAdjustment(
   if (intent === "neutral") return null;
   if (intent === "resolve") {
     if (TONICS[moduleId].includes(to)) return { amount: 18, code: "intent-resolve" };
-    if (to === "V" || to === "vii°") return { amount: 6, code: "intent-resolve-setup" };
+    if (to === "V" || to === "V7" || to === "vii°") return { amount: 6, code: "intent-resolve-setup" };
     return null;
   }
   if (intent === "build-tension") {
     if (
       to === "V" ||
+      to === "V7" ||
       to === "vii°" ||
       to.startsWith("V7/") ||
       to.startsWith("vii°7/") ||

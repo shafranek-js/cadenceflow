@@ -9,18 +9,23 @@ export interface RecommendationRule {
 
 export const PROGRESSIONS_RULES: readonly RecommendationRule[] = [
   { from: "I", to: "V", score: 92, factor: "tonic-to-dominant" },
+  { from: "I", to: "V7", score: 92, factor: "tonic-to-dominant" },
   { from: "I", to: "vi", score: 86, factor: "tonic-to-relative-minor" },
   { from: "I", to: "IV", score: 82, factor: "tonic-to-subdominant" },
   { from: "vi", to: "IV", score: 90, factor: "relative-minor-to-subdominant" },
   { from: "vi", to: "ii", score: 84, factor: "predominant-expansion" },
   { from: "vi", to: "V", score: 80, factor: "minor-to-dominant" },
   { from: "IV", to: "V", score: 96, factor: "predominant-to-dominant" },
+  { from: "IV", to: "V7", score: 96, factor: "predominant-to-dominant" },
   { from: "IV", to: "I", score: 82, factor: "plagal-resolution" },
   { from: "IV", to: "ii", score: 76, factor: "predominant-variation" },
   { from: "ii", to: "V", score: 100, factor: "predominant-to-dominant" },
+  { from: "ii", to: "V7", score: 100, factor: "predominant-to-dominant" },
   { from: "ii", to: "IV", score: 74, factor: "predominant-color" },
   { from: "V", to: "I", score: 110, factor: "dominant-resolution" },
   { from: "V", to: "vi", score: 88, factor: "deceptive-resolution" },
+  { from: "V7", to: "I", score: 110, factor: "dominant-resolution" },
+  { from: "V7", to: "vi", score: 88, factor: "deceptive-resolution" },
   { from: "iii", to: "vi", score: 88, factor: "mediant-to-relative-minor" },
   { from: "iii", to: "IV", score: 72, factor: "stepwise-bass-motion" },
   { from: "vii°", to: "I", score: 106, factor: "leading-tone-resolution" },
@@ -58,6 +63,7 @@ export function rulesForModule(moduleId: HarmonicModuleId): readonly Recommendat
 }
 
 export function secondaryDominantTarget(functionId: string): string | undefined {
+  if (functionId === "V7" || functionId === "V7/I") return "I";
   return functionId.startsWith("V7/") ? functionId.slice(3) : undefined;
 }
 

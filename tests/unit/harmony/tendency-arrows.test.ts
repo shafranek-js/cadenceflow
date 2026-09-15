@@ -40,6 +40,11 @@ describe("Harmonic tendency arrows and functional zoning", () => {
   });
 
   describe("getResolutionTarget", () => {
+    it("maps dominant V7 and V7/I to tonic I", () => {
+      expect(getResolutionTarget("V7", "progressions")).toBe("I");
+      expect(getResolutionTarget("V7/I", "progressions")).toBe("I");
+    });
+
     it("maps standard secondary dominants to their diatonic core targets", () => {
       expect(getResolutionTarget("V7/ii", "progressions")).toBe("ii");
       expect(getResolutionTarget("V7/iii", "progressions")).toBe("iii");

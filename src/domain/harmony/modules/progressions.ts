@@ -13,27 +13,30 @@ interface FunctionSpec {
   readonly quality: BaseChordQuality;
   readonly targetFunctionId?: string;
   readonly position: { readonly column: number; readonly row: number };
+  readonly baseline?: boolean;
 }
 
 export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
-  // Secondary dominants
+  // Secondary dominants (Row 0, 6 columns strictly aligned above their diatonic targets)
   {
-    id: "V7/ii",
+    id: "V7",
     layerId: "secondary-dominants",
     category: "secondary-dominant",
-    degree: 6,
+    degree: 5,
     quality: "dominant",
-    targetFunctionId: "ii",
-    position: { column: 1, row: 0 },
+    targetFunctionId: "I",
+    position: { column: 0, row: 0 },
+    baseline: true,
   },
   {
-    id: "V7/iii",
+    id: "V7/vi",
     layerId: "secondary-dominants",
     category: "secondary-dominant",
-    degree: 7,
+    degree: 3,
     quality: "dominant",
-    targetFunctionId: "iii",
-    position: { column: 2, row: 0 },
+    targetFunctionId: "vi",
+    position: { column: 1, row: 0 },
+    baseline: true,
   },
   {
     id: "V7/IV",
@@ -42,7 +45,18 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 1,
     quality: "dominant",
     targetFunctionId: "IV",
+    position: { column: 2, row: 0 },
+    baseline: true,
+  },
+  {
+    id: "V7/ii",
+    layerId: "secondary-dominants",
+    category: "secondary-dominant",
+    degree: 6,
+    quality: "dominant",
+    targetFunctionId: "ii",
     position: { column: 3, row: 0 },
+    baseline: true,
   },
   {
     id: "V7/V",
@@ -52,17 +66,19 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     quality: "dominant",
     targetFunctionId: "V",
     position: { column: 4, row: 0 },
+    baseline: true,
   },
   {
-    id: "V7/vi",
+    id: "V7/iii",
     layerId: "secondary-dominants",
     category: "secondary-dominant",
-    degree: 3,
+    degree: 7,
     quality: "dominant",
-    targetFunctionId: "vi",
+    targetFunctionId: "iii",
     position: { column: 5, row: 0 },
+    baseline: true,
   },
-  // Diatonic core; visual order follows the CadenceFlow concept.
+  // Diatonic core (Row 1, 3 harmonic pairs in columns 0..5, plus non-baseline vii°)
   {
     id: "I",
     layerId: "diatonic-core",
@@ -70,6 +86,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 1,
     quality: "major",
     position: { column: 0, row: 1 },
+    baseline: true,
   },
   {
     id: "vi",
@@ -78,6 +95,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 6,
     quality: "minor",
     position: { column: 1, row: 1 },
+    baseline: true,
   },
   {
     id: "IV",
@@ -86,6 +104,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 4,
     quality: "major",
     position: { column: 2, row: 1 },
+    baseline: true,
   },
   {
     id: "ii",
@@ -94,6 +113,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 2,
     quality: "minor",
     position: { column: 3, row: 1 },
+    baseline: true,
   },
   {
     id: "V",
@@ -102,6 +122,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 5,
     quality: "major",
     position: { column: 4, row: 1 },
+    baseline: true,
   },
   {
     id: "iii",
@@ -110,6 +131,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 3,
     quality: "minor",
     position: { column: 5, row: 1 },
+    baseline: true,
   },
   {
     id: "vii°",
@@ -118,8 +140,9 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 7,
     quality: "diminished",
     position: { column: 6, row: 1 },
+    baseline: false,
   },
-  // Modal interchange from parallel minor.
+  // Modal interchange from parallel minor (Row 2, centered across columns 1..4)
   {
     id: "bIII",
     layerId: "modal-interchange",
@@ -128,6 +151,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     chromaticAlter: -1,
     quality: "major",
     position: { column: 1, row: 2 },
+    baseline: true,
   },
   {
     id: "bVI",
@@ -137,6 +161,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     chromaticAlter: -1,
     quality: "major",
     position: { column: 2, row: 2 },
+    baseline: true,
   },
   {
     id: "iv",
@@ -145,6 +170,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     degree: 4,
     quality: "minor",
     position: { column: 3, row: 2 },
+    baseline: true,
   },
   {
     id: "bVII",
@@ -154,6 +180,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     chromaticAlter: -1,
     quality: "major",
     position: { column: 4, row: 2 },
+    baseline: true,
   },
 ];
 
@@ -194,7 +221,7 @@ export const PROGRESSIONS_MODULE = {
         identity: identity(spec),
         layerId: spec.layerId,
         position: spec.position,
-        baseline: true,
+        baseline: spec.baseline ?? true,
       })),
     ),
     routes: Object.freeze([]),
@@ -202,7 +229,8 @@ export const PROGRESSIONS_MODULE = {
 } satisfies HarmonicModuleDefinition;
 
 export function getProgressionsFunction(functionId: string): FunctionSpec {
-  const spec = PROGRESSIONS_FUNCTIONS.find((candidate) => candidate.id === functionId);
+  const normalizedId = functionId === "V7/I" ? "V7" : functionId;
+  const spec = PROGRESSIONS_FUNCTIONS.find((candidate) => candidate.id === normalizedId);
   if (!spec) throw new RangeError(`Unsupported Progressions function: ${functionId}`);
   return spec;
 }

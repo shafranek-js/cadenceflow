@@ -89,7 +89,10 @@ export function HarmonicMatrix({
       })()
     : undefined;
 
-  const renderCard = (identity: HarmonicFunctionIdentity) => {
+  const renderCard = (
+    identity: HarmonicFunctionIdentity,
+    position?: { readonly column: number; readonly row: number },
+  ) => {
     const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
     const template = project.moduleTemplateStates[project.activeModule].cards[identity.functionId];
     const view = project.presentation.globalMatrixCardView;
@@ -113,6 +116,14 @@ export function HarmonicMatrix({
     return (
       <ChordCard
         key={cardKey(identity)}
+        style={
+          position
+            ? {
+                gridColumnStart: position.column + 1,
+                gridRowStart: 1,
+              }
+            : undefined
+        }
         model={{
           chord: preview.chord,
           realizedPitches: preview.pitches,
@@ -196,6 +207,7 @@ export function HarmonicMatrix({
     <section
       className="matrix-panel"
       aria-label="Harmonic Matrix"
+      data-module={project.activeModule}
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
     >
@@ -250,7 +262,7 @@ export function HarmonicMatrix({
                     : undefined
                 }
               >
-                {baselineEntries.map((entry) => renderCard(entry.identity))}
+                {baselineEntries.map((entry) => renderCard(entry.identity, entry.position))}
               </FunctionalLayer>
             );
           })}

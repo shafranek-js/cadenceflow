@@ -67,6 +67,8 @@ export function getZoneForLayer(layerId: string): MatrixZoneInfo {
  * Canonical dictionary of resolution targets for tension / secondary chords.
  */
 const CANONICAL_RESOLUTION_TARGETS: Readonly<Record<string, string>> = Object.freeze({
+  "V7": "I",
+  "V7/I": "I",
   "V7/ii": "ii",
   "V7/iii": "iii",
   "V7/IV": "IV",

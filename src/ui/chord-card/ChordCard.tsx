@@ -17,6 +17,7 @@ export function ChordCard({
   suzukiColors = false,
   resolutionTargetSymbol,
   isResolutionTarget,
+  style,
   onMouseEnter,
   onMouseLeave,
   onClickResolutionTarget,
@@ -33,6 +34,7 @@ export function ChordCard({
   readonly suzukiColors?: boolean;
   readonly resolutionTargetSymbol?: string | undefined;
   readonly isResolutionTarget?: boolean | undefined;
+  readonly style?: React.CSSProperties | undefined;
   readonly onMouseEnter?: (() => void) | undefined;
   readonly onMouseLeave?: (() => void) | undefined;
   readonly onClickResolutionTarget?: (() => void) | undefined;
@@ -62,6 +64,7 @@ export function ChordCard({
   return (
     <article
       className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""}`.trim()}
+      style={style}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
       data-recommendation={model.recommendationStatus}
       data-customized={customizedCount > 0 ? customizedCount : undefined}
