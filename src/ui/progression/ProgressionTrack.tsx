@@ -11,6 +11,7 @@ import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/p
 import type { AudioProviderState } from "../../audio/contracts";
 import type { PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
+import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { realizeChord } from "../../domain/harmony/realization";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import {
@@ -273,14 +274,22 @@ export function ProgressionTrack({
         };
       }
       const realization = realizeProgressionStepRealization(item.step, project.tonic);
+      const chord = realizeChord(item.step.harmonicFunction, project.tonic);
+      const rawLabel = formatChordSymbol({
+        ...chord,
+        variant: item.step.harmonicVariant,
+      });
+      const isInvertedBass =
+        realization.bassPitch !== undefined &&
+        realization.bassPitch.pitchClassIdentity !== chord.rootPitchClass;
+      const label = isInvertedBass
+        ? `${rawLabel}/${formatPitchSpelling(realization.bassPitch!.spelling)}`
+        : rawLabel;
       return {
         key: `${item.step.id}-${item.fragmentIndex}`,
         kind: "chord",
         stepId: item.step.id,
-        label: formatChordSymbol({
-          ...realizeChord(item.step.harmonicFunction, project.tonic),
-          variant: item.step.harmonicVariant,
-        }),
+        label,
         pitches: realization.pitches,
         ...(project.presentation.showBassInStaff && realization.bassPitch
           ? { bassPitch: realization.bassPitch }

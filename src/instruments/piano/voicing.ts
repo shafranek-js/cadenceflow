@@ -240,7 +240,7 @@ export function generateVoicingCandidates(chord: ChordDefinition): readonly Voic
  */
 export function contextualAutoVoicing(
   chord: ChordDefinition,
-  _performance: StepPerformance,
+  performance: StepPerformance,
   _context: HarmonicContext,
   previousPitches?: readonly ExactPitch[],
 ): readonly ExactPitch[] {
@@ -250,7 +250,15 @@ export function contextualAutoVoicing(
     return [exactPitch(60, chord.spelling.root)];
   }
 
-  const best = selectBestVoicing(candidates, previousPitches);
+  let filteredCandidates = candidates;
+  if (performance.inversion !== undefined && performance.inversion !== "auto") {
+    const matching = candidates.filter((c) => c.inversionIndex === performance.inversion);
+    if (matching.length > 0) {
+      filteredCandidates = matching;
+    }
+  }
+
+  const best = selectBestVoicing(filteredCandidates, previousPitches);
   return best.pitches;
 }
 

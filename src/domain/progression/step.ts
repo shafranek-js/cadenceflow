@@ -8,8 +8,9 @@ export type CardViewId = "harmonic" | "piano" | "staff";
 export type PianoArticulation = "block" | "arp-up" | "arp-down" | "broken-chord" | "humanized";
 export type RegisterOffset = "auto" | -2 | -1 | 0 | 1 | 2;
 export type DynamicsViewPreference = "musical" | "midi";
-export type BassChoice = "auto" | "root" | "third" | "fifth" | "custom";
+export type BassChoice = "auto" | "root" | "third" | "fifth" | "seventh" | "custom";
 export type BassOctaveOffset = "auto" | -1 | -2;
+export type InversionChoice = "auto" | 0 | 1 | 2 | 3;
 
 export interface BassSettings {
   readonly choice: BassChoice;
@@ -21,6 +22,7 @@ export interface StepPerformance {
   readonly articulation: PianoArticulation;
   readonly register: RegisterOffset;
   readonly voicingMode: "auto" | "manual";
+  readonly inversion?: InversionChoice;
   readonly manualVoicing?: readonly ExactPitch[];
   readonly bass: BassSettings;
   readonly masterVelocity: number;

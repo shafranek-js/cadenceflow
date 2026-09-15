@@ -35,7 +35,11 @@ import {
   recommendationVocabulary,
 } from "../domain/harmony/moduleRegistry";
 import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/moduleSwitch";
-import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
+import {
+  modeForModule,
+  type HarmonicFunctionIdentity,
+  type HarmonicModuleId,
+} from "../domain/harmony/functions";
 import { realizeChord } from "../domain/harmony/realization";
 import { formatChordSymbol } from "../domain/harmony/chord";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
@@ -56,6 +60,11 @@ import { HarmonyDetails } from "../ui/inspector/HarmonyDetails";
 import { CompositionIntentControl } from "../ui/inspector/CompositionIntentControl";
 import { BranchComparison } from "../ui/progression/BranchComparison";
 import { BranchControls } from "../ui/progression/BranchControls";
+import { VoiceLeadingMenu } from "../ui/progression/VoiceLeadingMenu";
+import {
+  optimizeProgressionVoiceLeading,
+  type VoiceLeadingStrategy,
+} from "../domain/progression/voiceLeadingOptimizer";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
 import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
@@ -1762,6 +1771,21 @@ export function App() {
     batchEditProgressionPerformance({ articulation });
   };
 
+  const handleApplyVoiceLeading = (strategy: VoiceLeadingStrategy) => {
+    const result = optimizeProgressionVoiceLeading(
+      project.progression.steps,
+      project.tonic,
+      modeForModule(project.activeModule),
+      strategy,
+    );
+    if (result.updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates: result.updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
   const duplicateAllSteps = () => {
     if (project.progression.steps.length === 0) return;
     const command: DuplicateStepsCommand = {
@@ -2728,6 +2752,10 @@ export function App() {
               </div>
             </div>
             <div className="progression-heading-actions">
+              <VoiceLeadingMenu
+                onApplyVoiceLeading={handleApplyVoiceLeading}
+                disabled={project.progression.steps.length === 0}
+              />
               <BranchControls
                 project={project}
                 selectedBranchStepIds={selectedBranchStepIds}

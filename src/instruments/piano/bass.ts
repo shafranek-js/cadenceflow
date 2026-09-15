@@ -65,6 +65,30 @@ export function resolveBassPitch(
 
     targetPc = normalizePitchClass(rootPc + fifthInterval);
     targetSpelling = spellChordTone(rootSpelling, fifthInterval, 5);
+  } else if (bassSettings.choice === "seventh") {
+    let seventhInterval = 10;
+    if (chord.variant.seventh) {
+      switch (chord.variant.seventh) {
+        case "minor7":
+        case "half-diminished7":
+          seventhInterval = 10;
+          break;
+        case "major7":
+          seventhInterval = 11;
+          break;
+        case "diminished7":
+          seventhInterval = 9;
+          break;
+      }
+    } else if (chord.baseQuality === "major") {
+      seventhInterval = 11;
+    } else if (chord.baseQuality === "dominant" || chord.baseQuality === "minor") {
+      seventhInterval = 10;
+    } else if (chord.baseQuality === "diminished") {
+      seventhInterval = 9;
+    }
+    targetPc = normalizePitchClass(rootPc + seventhInterval);
+    targetSpelling = spellChordTone(rootSpelling, seventhInterval, 7);
   } else if (bassSettings.choice === "root") {
     targetPc = rootPc;
     targetSpelling = rootSpelling;

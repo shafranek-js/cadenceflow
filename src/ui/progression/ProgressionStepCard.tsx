@@ -1,5 +1,6 @@
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
+import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { realizeChord } from "../../domain/harmony/realization";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
 import type { ProgressionView } from "../../domain/project/project";
@@ -58,10 +59,17 @@ export function ProgressionStepCard({
     showBassInStaff && realization.bassPitch
       ? Object.freeze([realization.bassPitch, ...pianoPitches])
       : pianoPitches;
-  const chordLabel = formatChordSymbol({
+  const baseChord = {
     ...realizeChord(step.harmonicFunction, tonic),
     variant: step.harmonicVariant,
-  });
+  };
+  const rawChordLabel = formatChordSymbol(baseChord);
+  const isInvertedBass =
+    realization.bassPitch !== undefined &&
+    realization.bassPitch.pitchClassIdentity !== baseChord.rootPitchClass;
+  const chordLabel = isInvertedBass
+    ? `${rawChordLabel}/${formatPitchSpelling(realization.bassPitch!.spelling)}`
+    : rawChordLabel;
   const durationLabel = formatMusicalDuration(step.duration);
   const selectionAriaLabel = `Select progression step ${stepNumber}: ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`;
   const changeStaffOctave = (direction: StaffOctaveDirection) => {
@@ -159,8 +167,16 @@ export function ProgressionStepCard({
           <span className="step-view">
             {view === "harmonic" ? (
               <>
-                <strong data-testid="step-function">{step.harmonicFunction.functionId}</strong>
+                <strong data-testid="step-function">
+                  {step.harmonicFunction.functionId}
+                  {isInvertedBass ? (
+                    <span className="step-inversion-badge">
+                      /{formatPitchSpelling(realization.bassPitch!.spelling)}
+                    </span>
+                  ) : null}
+                </strong>
                 <span>
+                  {isInvertedBass ? `${chordLabel} · ` : ""}
                   {step.performance.articulation} · v{step.performance.masterVelocity} ·{" "}
                   {durationLabel}
                 </span>

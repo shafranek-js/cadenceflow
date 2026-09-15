@@ -11,6 +11,7 @@ import type {
   BassOctaveOffset,
   ChordStep,
   DynamicsViewPreference,
+  InversionChoice,
   ProgressionStep,
   StepPerformance,
 } from "../../domain/progression/step";
@@ -48,7 +49,17 @@ const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: strin
     Object.freeze({ value: "root", label: "Root" }),
     Object.freeze({ value: "third", label: "3rd" }),
     Object.freeze({ value: "fifth", label: "5th" }),
+    Object.freeze({ value: "seventh", label: "7th" }),
     Object.freeze({ value: "custom", label: "Custom" }),
+  ]);
+
+const INVERSION_CHOICES: readonly { readonly value: InversionChoice; readonly label: string }[] =
+  Object.freeze([
+    Object.freeze({ value: "auto", label: "Auto (Voice Leading)" }),
+    Object.freeze({ value: 0, label: "Root Position (I)" }),
+    Object.freeze({ value: 1, label: "1st Inversion (6 / 6/5)" }),
+    Object.freeze({ value: 2, label: "2nd Inversion (6/4 / 4/3)" }),
+    Object.freeze({ value: 3, label: "3rd Inversion (4/2)" }),
   ]);
 
 const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label: string }[] =
@@ -214,6 +225,13 @@ export function PianoPerformanceInspector({
   const handleVoicingModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const mode = e.target.value as "auto" | "manual";
     onPerformanceChange({ voicingMode: mode });
+  };
+
+  const handleInversionChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    onPerformanceChange({
+      inversion: val === "auto" ? "auto" : (Number(val) as 0 | 1 | 2 | 3),
+    });
   };
 
   const handleBassChoiceChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -487,7 +505,17 @@ export function PianoPerformanceInspector({
                 Voicing mode
               </span>
               <span className="disclosure-status">
-                {perf.voicingMode === "manual" ? "Manual" : "Auto"}
+                {perf.voicingMode === "manual"
+                  ? "Manual"
+                  : perf.inversion === 0
+                    ? "Root (I)"
+                    : perf.inversion === 1
+                      ? "1st Inv (⁶)"
+                      : perf.inversion === 2
+                        ? "2nd Inv (⁶₄)"
+                        : perf.inversion === 3
+                          ? "3rd Inv (⁴₂)"
+                          : "Auto"}
               </span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -502,6 +530,73 @@ export function PianoPerformanceInspector({
                   <option value="auto">Auto Voicing</option>
                   <option value="manual">Manual Exact Voicing</option>
                 </select>
+
+                {!isManual && (
+                  <div className="subgroup inversion-subgroup" role="group" aria-label="Chord Inversion">
+                    <label htmlFor="inversion-select">Chord Inversion</label>
+                    <select
+                      id="inversion-select"
+                      value={perf.inversion ?? "auto"}
+                      onChange={handleInversionChange}
+                      aria-label="Chord Inversion"
+                      data-testid="inversion-select"
+                    >
+                      {INVERSION_CHOICES.map((choice) => (
+                        <option key={choice.value} value={choice.value}>
+                          {choice.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="inversion-pills" role="radiogroup" aria-label="Quick Inversion Buttons">
+                      <button
+                        type="button"
+                        className={`inversion-pill ${(perf.inversion ?? "auto") === "auto" ? "is-active" : ""}`}
+                        onClick={() => onPerformanceChange({ inversion: "auto" })}
+                        aria-label="Auto voice leading"
+                        data-testid="inversion-pill-auto"
+                      >
+                        Auto
+                      </button>
+                      <button
+                        type="button"
+                        className={`inversion-pill ${perf.inversion === 0 ? "is-active" : ""}`}
+                        onClick={() => onPerformanceChange({ inversion: 0 })}
+                        aria-label="Root position"
+                        data-testid="inversion-pill-root"
+                      >
+                        Root
+                      </button>
+                      <button
+                        type="button"
+                        className={`inversion-pill ${perf.inversion === 1 ? "is-active" : ""}`}
+                        onClick={() => onPerformanceChange({ inversion: 1 })}
+                        aria-label="First inversion"
+                        data-testid="inversion-pill-1"
+                      >
+                        1st (⁶)
+                      </button>
+                      <button
+                        type="button"
+                        className={`inversion-pill ${perf.inversion === 2 ? "is-active" : ""}`}
+                        onClick={() => onPerformanceChange({ inversion: 2 })}
+                        aria-label="Second inversion"
+                        data-testid="inversion-pill-2"
+                      >
+                        2nd (⁶₄)
+                      </button>
+                      <button
+                        type="button"
+                        className={`inversion-pill ${perf.inversion === 3 ? "is-active" : ""}`}
+                        onClick={() => onPerformanceChange({ inversion: 3 })}
+                        aria-label="Third inversion"
+                        data-testid="inversion-pill-3"
+                      >
+                        3rd (⁴₂)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={onOpenVoicingEditor}
@@ -557,6 +652,27 @@ export function PianoPerformanceInspector({
                       </option>
                     ))}
                   </select>
+                  <div className="bass-choice-pills" role="radiogroup" aria-label="Quick Bass Note Buttons">
+                    {BASS_CHOICES.filter((b) => b.value !== "custom").map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`bass-choice-pill ${perf.bass.choice === opt.value ? "is-active" : ""}`}
+                        onClick={() =>
+                          onPerformanceChange({
+                            bass: {
+                              ...perf.bass,
+                              choice: opt.value,
+                            },
+                          })
+                        }
+                        aria-label={`Bass ${opt.label}`}
+                        data-testid={`bass-pill-${opt.value}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {perf.bass.choice === "custom" ? (
