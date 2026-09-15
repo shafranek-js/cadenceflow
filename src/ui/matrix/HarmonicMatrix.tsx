@@ -44,6 +44,7 @@ export function HarmonicMatrix({
   onClearSelection,
   onOpenMatrixMenu,
   onGenreFocusChange,
+  onOpenPresets,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -62,6 +63,7 @@ export function HarmonicMatrix({
   readonly onClearSelection?: () => void;
   readonly onOpenMatrixMenu?: (anchor: HTMLElement, position: { x: number; y: number }) => void;
   readonly onGenreFocusChange?: (genre: GenreFocusId) => void;
+  readonly onOpenPresets?: () => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -234,6 +236,19 @@ export function HarmonicMatrix({
           onChange={onGenreFocusChange ?? (() => {})}
         />
         <div className="matrix-toolbar-actions">
+          {onOpenPresets && (
+            <button
+              type="button"
+              className="matrix-formulas-btn"
+              onClick={onOpenPresets}
+              data-testid="matrix-formulas-trigger"
+              title="Open Presets & Cadence Formulas"
+              aria-label="Open Presets and Cadence Formulas"
+            >
+              <span className="btn-bolt" aria-hidden="true">⚡</span>
+              <span className="btn-label">Formulas</span>
+            </button>
+          )}
           <ViewModeToggle
             currentView={project.presentation.globalMatrixCardView}
             onChangeView={onGlobalView}

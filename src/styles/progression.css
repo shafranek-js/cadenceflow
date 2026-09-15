@@ -1565,6 +1565,73 @@
   font-size: 0.78rem;
 }
 
+.quick-starters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.quick-starters-label {
+  font-size: 0.76rem !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #facc15 !important;
+}
+
+.quick-starters-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-starter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-3, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text, #e2e8f0);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-starter-pill:hover {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: #facc15;
+  color: #fef08a;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.quick-starter-pill .pill-bolt {
+  color: #facc15;
+  font-size: 0.85rem;
+}
+
+.quick-starter-pill .pill-title {
+  color: inherit !important;
+}
+
+.quick-starter-more-btn {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-muted, #94a3b8);
+}
+
+.quick-starter-more-btn:hover {
+  border-color: var(--accent, #38bdf8);
+  color: var(--accent, #38bdf8);
+  background: rgba(56, 189, 248, 0.1);
+}
+
 .progression-drag-item {
   position: relative;
   border-radius: 11px;

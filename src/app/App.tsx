@@ -38,6 +38,7 @@ import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/modul
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
 import { realizeChord } from "../domain/harmony/realization";
 import { formatChordSymbol } from "../domain/harmony/chord";
+import type { HarmonicContext } from "../domain/harmony/modules/types";
 import { branchRecommendationPath, type CompositionIntent } from "../domain/progression/branch";
 import {
   snapshotStepPerformance,
@@ -73,7 +74,7 @@ import {
   type MelodyPreparationResult,
 } from "../audio/soundfont/melodyProvider";
 import type { AudioProviderState } from "../audio/contracts";
-import { realizeStepAudioEvents } from "../audio/eventRealizer";
+import { realizeStepAudioEvents, realizeProgressionAudioEvents } from "../audio/eventRealizer";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
 import { PlaybackSupportControls, TempoControls } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
@@ -173,7 +174,11 @@ import {
   type DeleteCustomPresetCommand,
   type ApplyPresetCommand,
 } from "./commands/presetCommands";
-import type { FunctionalPreset, PresetApplyMode } from "../domain/progression/presets";
+import {
+  realizePresetSteps,
+  type FunctionalPreset,
+  type PresetApplyMode,
+} from "../domain/progression/presets";
 import { PresetsPanel } from "../ui/progression/PresetsPanel";
 import { PresetApplyDialog } from "../ui/progression/PresetApplyDialog";
 import { SavePresetDialog } from "../ui/progression/SavePresetDialog";
@@ -284,6 +289,8 @@ export function App() {
   const [presetsPanelOpen, setPresetsPanelOpen] = useState(false);
   const [savePresetDialogOpen, setSavePresetDialogOpen] = useState(false);
   const [applyDialogPreset, setApplyDialogPreset] = useState<FunctionalPreset | null>(null);
+  const [auditioningPresetId, setAuditioningPresetId] = useState<string | null>(null);
+  const presetAuditionStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progressionMenu, setProgressionMenu] = useState<{
     anchor?: HTMLElement | undefined;
     position: { x: number; y: number };
@@ -373,6 +380,18 @@ export function App() {
     }
     return melodyPreviewAuditionControllerRef.current;
   }, [ensureMelodyProvider]);
+
+  const getPreviewAuditionController = useCallback(() => {
+    if (!audioProviderRef.current) return null;
+    if (!previewAuditionControllerRef.current) {
+      const clock = audioProviderRef.current.clock;
+      previewAuditionControllerRef.current = new PreviewAuditionController({
+        provider: audioProviderRef.current,
+        clock,
+      });
+    }
+    return previewAuditionControllerRef.current;
+  }, []);
 
   const applyMelodyPreparationResult = useCallback((result: MelodyPreparationResult) => {
     setMelodyAudioError(formatMelodyPreparationNotice(result));
@@ -1003,6 +1022,54 @@ export function App() {
     setProgressionSelection(stepId);
     auditionProgressionStep(stepId);
   };
+
+  const stopAuditionPreset = useCallback(() => {
+    if (presetAuditionStopTimerRef.current !== null) {
+      clearTimeout(presetAuditionStopTimerRef.current);
+      presetAuditionStopTimerRef.current = null;
+    }
+    getPreviewAuditionController()?.stop();
+    setAuditioningPresetId(null);
+  }, [getPreviewAuditionController]);
+
+  const auditionPreset = useCallback(
+    (preset: FunctionalPreset) => {
+      stopAuditionPreset();
+      const currentProject = store.project;
+      const mode = getHarmonicModule(currentProject.activeModule).mode;
+      const context: HarmonicContext = {
+        tonic: currentProject.tonic,
+        mode,
+        moduleId: currentProject.activeModule,
+        spellingContext: { tonic: currentProject.tonic, mode },
+      };
+      const realization = realizePresetSteps(preset, context, currentProject.defaults);
+      if (realization.kind !== "success" || realization.steps.length === 0) return;
+
+      const audioEvents = realizeProgressionAudioEvents({
+        steps: realization.steps,
+        tonic: currentProject.tonic,
+        context,
+        tempoBpm: currentProject.globalTiming.tempoBpm,
+        ...(currentProject.groove ? { groove: currentProject.groove } : {}),
+      });
+
+      const controller = getPreviewAuditionController();
+      const scheduled = controller?.audition(audioEvents);
+      if (scheduled) {
+        setAuditioningPresetId(preset.id);
+        const totalDurationSeconds = audioEvents.reduce(
+          (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
+          0,
+        );
+        presetAuditionStopTimerRef.current = setTimeout(() => {
+          presetAuditionStopTimerRef.current = null;
+          setAuditioningPresetId((current) => (current === preset.id ? null : current));
+        }, Math.max(1, Math.ceil(totalDurationSeconds * 1000)));
+      }
+    },
+    [getPreviewAuditionController, stopAuditionPreset],
+  );
   const editProgressionPerformance = (stepId: string, performance: Partial<StepPerformance>) => {
     const command: EditStepPerformanceCommand = {
       type: "progression/edit-performance",
@@ -1911,18 +1978,6 @@ export function App() {
     return playbackControllerRef.current;
   };
 
-  const getPreviewAuditionController = () => {
-    if (!audioProviderRef.current) return null;
-    if (!previewAuditionControllerRef.current) {
-      const clock = audioProviderRef.current.clock;
-      previewAuditionControllerRef.current = new PreviewAuditionController({
-        provider: audioProviderRef.current,
-        clock,
-      });
-    }
-    return previewAuditionControllerRef.current;
-  };
-
   const stopMelodyPreview = useCallback(() => {
     melodyPreviewRequestRef.current += 1;
     melodyPreviewAuditionControllerRef.current?.stop();
@@ -2268,6 +2323,7 @@ export function App() {
   };
 
   const handleApplyPreset = (preset: FunctionalPreset, mode: PresetApplyMode) => {
+    stopAuditionPreset();
     const command: ApplyPresetCommand = {
       type: "presets/apply",
       payload: { preset, mode, nowIso: new Date().toISOString() },
@@ -2493,6 +2549,7 @@ export function App() {
           onClearSelection={clearMatrixSelection}
           onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
           onGenreFocusChange={changeGenreFocus}
+          onOpenPresets={() => setPresetsPanelOpen(true)}
         />
       }
       inspector={
@@ -2763,6 +2820,8 @@ export function App() {
             onClearMelodySystem={clearMelodySystem}
             onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
             onToggleSuzukiColors={() => changeSuzukiColors(!(project.presentation.suzukiColors ?? false))}
+            onApplyPreset={handleApplyPreset}
+            onOpenPresets={() => setPresetsPanelOpen(true)}
           />
           <BranchComparison
             project={project}
@@ -2810,14 +2869,22 @@ export function App() {
             isOpen={presetsPanelOpen}
             isTopmost={!applyDialogPreset && !savePresetDialogOpen}
             project={project}
-            onClose={() => setPresetsPanelOpen(false)}
+            onClose={() => {
+              stopAuditionPreset();
+              setPresetsPanelOpen(false);
+            }}
             onOpenApplyDialog={(preset) => {
+              stopAuditionPreset();
               setApplyDialogPreset(preset);
             }}
             onOpenSaveDialog={() => {
+              stopAuditionPreset();
               setSavePresetDialogOpen(true);
             }}
             onDeleteCustomPreset={handleDeleteCustomPreset}
+            onAuditionPreset={auditionPreset}
+            onStopAudition={stopAuditionPreset}
+            auditioningPresetId={auditioningPresetId}
           />
           <PresetApplyDialog
             isOpen={Boolean(applyDialogPreset)}

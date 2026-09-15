@@ -1,5 +1,14 @@
+import { useState } from "react";
 import type { FunctionalPreset } from "../../domain/progression/presets";
 import { BUILT_IN_PRESETS } from "../../domain/progression/builtInPresets";
+import {
+  getFormulasForModule,
+  type CadenceFormula,
+} from "../../domain/progression/cadenceFormulas";
+import {
+  GENRE_FOCUS_OPTIONS,
+  type GenreFocusId,
+} from "../../domain/harmony/functionSemantics";
 import type { Project } from "../../domain/project/project";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
@@ -17,6 +26,9 @@ export interface PresetsPanelProps {
   readonly onOpenApplyDialog: (preset: FunctionalPreset) => void;
   readonly onOpenSaveDialog: () => void;
   readonly onDeleteCustomPreset: (presetId: string) => void;
+  readonly onAuditionPreset?: ((preset: FunctionalPreset) => void) | undefined;
+  readonly onStopAudition?: (() => void) | undefined;
+  readonly auditioningPresetId?: string | null | undefined;
 }
 
 export function PresetsPanel({
@@ -27,6 +39,9 @@ export function PresetsPanel({
   onOpenApplyDialog,
   onOpenSaveDialog,
   onDeleteCustomPreset,
+  onAuditionPreset,
+  onStopAudition,
+  auditioningPresetId,
 }: PresetsPanelProps) {
   const dialogRef = useModalFocus<HTMLElement>({
     isOpen,
@@ -34,10 +49,46 @@ export function PresetsPanel({
     onClose,
   });
 
+  const [formulaGenre, setFormulaGenre] = useState<GenreFocusId | "all">(
+    () => project.presentation.genreFocus ?? "all",
+  );
+
   if (!isOpen) return null;
 
   const contextLabel = formatContextLabel(project);
   const customPresets = project.customPresets;
+
+  const moduleFormulas = getFormulasForModule(project.activeModule);
+  const displayedFormulas =
+    formulaGenre === "all"
+      ? moduleFormulas
+      : moduleFormulas.filter(
+          (f) => f.genre === formulaGenre || f.tags.includes(formulaGenre),
+        );
+
+  const renderAuditionButton = (preset: FunctionalPreset) => {
+    if (!onAuditionPreset) return null;
+    const isPlaying = auditioningPresetId === preset.id;
+    return (
+      <button
+        type="button"
+        className={`secondary-btn preset-audition-btn ${isPlaying ? "is-auditioning" : ""}`}
+        onClick={() => {
+          if (isPlaying) {
+            onStopAudition?.();
+          } else {
+            onAuditionPreset(preset);
+          }
+        }}
+        aria-label={isPlaying ? `Stop auditioning ${preset.name}` : `Audition ${preset.name}`}
+        data-testid={`audition-preset-${preset.id}`}
+        title={isPlaying ? "Stop audio preview" : "Hear progression in current key"}
+      >
+        <Icon name={isPlaying ? "stop" : "play"} />
+        <span>{isPlaying ? "Stop" : "Audition"}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="dialog-backdrop" role="presentation" onClick={isTopmost ? onClose : undefined}>
@@ -53,9 +104,9 @@ export function PresetsPanel({
       >
         <header className="presets-panel-header">
           <div>
-            <h2 id="presets-panel-title">Presets</h2>
+            <h2 id="presets-panel-title">Presets &amp; Cadence Formulas</h2>
             <span className="presets-panel-subtitle">
-              Reusable functional progressions ({contextLabel})
+              Reusable functional progressions &amp; canonical patterns ({contextLabel})
             </span>
           </div>
           <div className="presets-panel-header-actions">
@@ -82,8 +133,124 @@ export function PresetsPanel({
         <div className="presets-panel-body">
           <p className="presets-info-text">
             Presets store harmonic functions and durations only. Performance settings are
-            instantiated from your current Piano defaults when applied.
+            instantiated from your current Piano defaults when applied. Click <strong>Audition</strong> to preview any progression in the current key.
           </p>
+
+          {/* Cadence Formulas & Quick Starters Section */}
+          <section
+            className="presets-section cadence-formulas-section"
+            aria-labelledby="cadence-formulas-heading"
+            data-testid="cadence-formulas-section"
+          >
+            <div className="section-header formulas-section-header">
+              <div className="section-title-wrap">
+                <h3 id="cadence-formulas-heading">⚡ Cadence Formulas &amp; Quick Starters</h3>
+                <span className="section-badge formula-badge">ChordFiles Canonical Patterns</span>
+              </div>
+              <div className="formula-genre-pills" role="tablist" aria-label="Filter formulas by genre">
+                {GENRE_FOCUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={formulaGenre === opt.id}
+                    className={`formula-genre-pill ${formulaGenre === opt.id ? "is-active" : ""}`}
+                    onClick={() => setFormulaGenre(opt.id)}
+                    data-testid={`formula-filter-${opt.id}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {displayedFormulas.length === 0 ? (
+              <div className="formulas-empty-hint" data-testid="formulas-empty-hint">
+                <p>No formulas for &quot;{formulaGenre}&quot; in the current harmonic mode.</p>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setFormulaGenre("all")}
+                >
+                  Show all formulas
+                </button>
+              </div>
+            ) : (
+              <div className="preset-card-grid" data-testid="cadence-formulas-grid">
+                {displayedFormulas.map((formula) => {
+                  const realization = getPresetRealizationSummary(formula, project);
+                  const isPlaying = auditioningPresetId === formula.id;
+                  return (
+                    <article
+                      key={formula.id}
+                      className={`preset-card formula-card ${isPlaying ? "is-auditioning" : ""}`}
+                      data-testid={`preset-card-${formula.id}`}
+                    >
+                      <div className="preset-card-main">
+                        <div className="preset-card-header">
+                          <h4 className="preset-name">{formula.name}</h4>
+                          <div className="formula-tags-wrap">
+                            <span className="source-tag formula-genre-tag">{formula.genre}</span>
+                            <span className="source-tag formula-cat-tag">{formula.category}</span>
+                          </div>
+                        </div>
+
+                        {formula.description && (
+                          <p className="preset-description">{formula.description}</p>
+                        )}
+
+                        <div className="formula-rationale-box">
+                          <span className="rationale-heading">Theory Rationale:</span>
+                          <p className="rationale-text">{formula.theoreticalRationale}</p>
+                        </div>
+
+                        <div className="preset-functions-row">
+                          <span className="functions-label">Functions:</span>
+                          <span className="functional-sequence">
+                            {formula.steps.map((s) => s.harmonicFunction.functionId).join(" · ")}
+                          </span>
+                        </div>
+
+                        <div className="preset-durations-row">
+                          <span className="durations-label">Durations:</span>
+                          <span className="duration-sequence">
+                            {formula.steps
+                              .map((s) => formatPresetStepDuration(s.duration))
+                              .join(" · ")}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`preset-preview-row ${
+                            realization.kind === "success"
+                              ? "preview-success"
+                              : realization.kind === "ambiguous"
+                                ? "preview-ambiguous"
+                                : "preview-incompatible"
+                          }`}
+                        >
+                          <span className="preview-label">Context ({contextLabel}): </span>
+                          <span className="preview-text">{realization.text}</span>
+                        </div>
+                      </div>
+
+                      <div className="preset-card-actions">
+                        {renderAuditionButton(formula)}
+                        <button
+                          type="button"
+                          className="primary-btn apply-preset-btn"
+                          onClick={() => onOpenApplyDialog(formula)}
+                          data-testid={`apply-preset-${formula.id}`}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
 
           {/* Built-in Presets Section */}
           <section className="presets-section" aria-labelledby="builtin-presets-heading">
@@ -142,6 +309,7 @@ export function PresetsPanel({
                     </div>
 
                     <div className="preset-card-actions">
+                      {renderAuditionButton(preset)}
                       <button
                         type="button"
                         className="primary-btn apply-preset-btn"
@@ -232,6 +400,7 @@ export function PresetsPanel({
                         >
                           Delete
                         </button>
+                        {renderAuditionButton(preset)}
                         <button
                           type="button"
                           className="primary-btn apply-preset-btn"

@@ -530,4 +530,30 @@
   filter: grayscale(0%);
 }
 
+.matrix-formulas-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: var(--radius-button, 6px);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.matrix-formulas-btn:hover {
+  background: rgba(234, 179, 8, 0.25);
+  border-color: #facc15;
+  color: #fef08a;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+}
+
+.matrix-formulas-btn .btn-bolt {
+  font-size: 0.85rem;
+}
+
 

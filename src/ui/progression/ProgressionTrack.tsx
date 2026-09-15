@@ -44,6 +44,8 @@ import type {
 } from "../../domain/melody/types";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
 import { canShiftPerformanceOctave } from "../staff/staffOctave";
+import { getQuickStartersForModule } from "../../domain/progression/cadenceFormulas";
+import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
 
 function segmentStyle(
   durationBeats: MusicalDuration["beats"],
@@ -106,6 +108,8 @@ export function ProgressionTrack({
   onClearMelodySystem,
   onOpenProgressionMenu,
   onToggleSuzukiColors,
+  onApplyPreset,
+  onOpenPresets,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -174,6 +178,8 @@ export function ProgressionTrack({
   readonly onOpenProgressionMenu?:
     ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
+  readonly onApplyPreset?: ((preset: FunctionalPreset, mode: PresetApplyMode) => void) | undefined;
+  readonly onOpenPresets?: (() => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -640,7 +646,39 @@ export function ProgressionTrack({
             <strong className="progression-first-use-guidance">
               Choose key → explore Matrix → click to hear → + to add
             </strong>
-            <span>Preview a chord in the Matrix, then press + to add it.</span>
+            <span>Preview a chord in the Matrix, then press + to add it. Or kickstart with a canonical formula:</span>
+            {onApplyPreset && (
+              <div className="quick-starters-container" data-testid="quick-starters-container">
+                <span className="quick-starters-label">⚡ Quick Starters:</span>
+                <div className="quick-starters-pills">
+                  {getQuickStartersForModule(project.activeModule, project.presentation.genreFocus)
+                    .slice(0, 5)
+                    .map((formula) => (
+                      <button
+                        key={formula.id}
+                        type="button"
+                        className="quick-starter-pill"
+                        onClick={() => onApplyPreset(formula, "replace")}
+                        data-testid={`quick-starter-${formula.id}`}
+                        title={`${formula.name}: ${formula.description}`}
+                      >
+                        <span className="pill-bolt">⚡</span>
+                        <span className="pill-title">{formula.name}</span>
+                      </button>
+                    ))}
+                  {onOpenPresets && (
+                    <button
+                      type="button"
+                      className="quick-starter-pill quick-starter-more-btn"
+                      onClick={onOpenPresets}
+                      data-testid="quick-starter-more-btn"
+                    >
+                      More...
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
         {usesStaffSystems ? (

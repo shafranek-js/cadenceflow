@@ -946,4 +946,94 @@ describe("T117 — Presets UI Components", () => {
       expect(onDeleteSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("6. Cadence Formulas & Audition in PresetsPanel", () => {
+    it("renders Cadence Formulas & Quick Starters section with canonical ChordFiles formulas and rationale", () => {
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const dom = renderToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      const formulaSection = dom.querySelector('[data-testid="cadence-formulas-section"]');
+      expect(formulaSection).not.toBeNull();
+      expect(dom.textContent).toContain("Cadence Formulas & Quick Starters");
+
+      // Verify canonical formulas rendered
+      expect(dom.textContent).toContain("Gospel Lift");
+      expect(dom.textContent).toContain("Neo-Soul Turnaround");
+      expect(dom.textContent).toContain("Backdoor Cadence");
+      expect(dom.textContent).toContain("Cinematic Hero");
+
+      // Verify rationale callout
+      expect(dom.textContent).toContain("Theory Rationale:");
+      expect(dom.textContent).toContain("tonicizes the subdominant via V7/IV");
+    });
+
+    it("triggers onAuditionPreset when Audition button is clicked", () => {
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const auditionSpy = vi.fn();
+      const { container, unmount } = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+          onAuditionPreset: auditionSpy,
+        }),
+      );
+
+      const auditionBtn = container.querySelector<HTMLButtonElement>(
+        '[data-testid="audition-preset-formula-gospel-lift"]',
+      );
+      expect(auditionBtn).not.toBeNull();
+
+      act(() => {
+        auditionBtn?.click();
+      });
+
+      expect(auditionSpy).toHaveBeenCalledTimes(1);
+      expect(auditionSpy.mock.calls[0]?.[0]?.name).toBe("Gospel Lift");
+      unmount();
+    });
+
+    it("filters formula cards by genre when pill is clicked", () => {
+      const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
+      const { container, unmount } = mountToDom(
+        el(PresetsPanel, {
+          isOpen: true,
+          project,
+          onClose: vi.fn(),
+          onOpenApplyDialog: vi.fn(),
+          onOpenSaveDialog: vi.fn(),
+          onDeleteCustomPreset: vi.fn(),
+        }),
+      );
+
+      const gospelPill = container.querySelector<HTMLButtonElement>(
+        '[data-testid="formula-filter-gospel"]',
+      );
+      expect(gospelPill).not.toBeNull();
+
+      act(() => {
+        gospelPill?.click();
+      });
+
+      const formulaGrid = container.querySelector('[data-testid="cadence-formulas-grid"]');
+      expect(formulaGrid).not.toBeNull();
+      const cards = formulaGrid?.querySelectorAll(".formula-card");
+      expect(cards?.length).toBe(1);
+      expect(container.textContent).toContain("Gospel Lift");
+      expect(container.textContent).not.toContain("Backdoor Cadence");
+      unmount();
+    });
+  });
 });
