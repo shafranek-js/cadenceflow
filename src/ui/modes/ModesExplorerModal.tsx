@@ -273,187 +273,206 @@ export function ModesExplorerModal({
           </div>
         </section>
 
-        {/* Scale Details & Characteristic Banner */}
-        <section className="modes-details-banner" aria-label="Scale Characteristics">
-          <div className="modes-banner-main">
-            <div className="modes-banner-header">
-              <h3 className="modes-banner-title">
-                {currentTonicLabel} {scaleDef.name}
-              </h3>
-              <div className="modes-banner-formula">
-                <span className="formula-badge">{scaleDef.formulaTextRu}</span>
-                <span className="formula-en">({scaleDef.formulaTextEn})</span>
-              </div>
-            </div>
-            <p className="modes-banner-desc">{scaleDef.characterRu}</p>
-            {scaleDef.characteristicInterval && (
-              <div className="modes-characteristic-callout">
-                <span className="callout-star" aria-hidden="true">★</span>
-                <div className="callout-body">
-                  <strong>Характерный признак лада ({scaleDef.characteristicInterval}):</strong>{" "}
-                  <span>{scaleDef.characteristicDescriptionRu}</span>
+        {/* Modal 2-Column Split Body */}
+        <div className="modes-content-body">
+          {/* Left Column: Scale details & Diatonic chords */}
+          <div className="modes-content-left">
+            {/* Scale Details & Characteristic Banner */}
+            <section className="modes-details-banner" aria-label="Scale Characteristics">
+              <div className="modes-banner-main">
+                <div className="modes-banner-header">
+                  <h3 className="modes-banner-title">
+                    {currentTonicLabel} {scaleDef.name}
+                  </h3>
+                  <div className="modes-banner-formula">
+                    <span className="formula-badge">{scaleDef.formulaTextRu}</span>
+                    <span className="formula-en">({scaleDef.formulaTextEn})</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="modes-genre-tags">
-              <span className="genre-label">Стили и примеры:</span>
-              {scaleDef.genreExamples.map((genre) => (
-                <span key={genre} className="genre-pill">
-                  {genre}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="modes-banner-actions">
-            <button
-              type="button"
-              className="modes-play-scale-btn"
-              onClick={handlePlayScale}
-              title="Play scale ascending and descending"
-            >
-              <span className="play-icon" aria-hidden="true">▶</span>
-              <span>Play Scale</span>
-            </button>
-          </div>
-        </section>
-
-        {/* Scale Degrees & Pitch Representation */}
-        <section className="modes-scale-pitches" aria-label="Scale notes">
-          <div className="modes-pitches-list">
-            {scalePitches.map((p) => {
-              const noteName = formatPitchSpelling(p.spelling);
-              return (
-                <div
-                  key={p.degree}
-                  className={`modes-pitch-item ${p.isCharacteristic ? "is-characteristic" : ""}`}
-                >
-                  <span className="degree-num">{p.degree}</span>
-                  <strong className="pitch-name">{noteName}</strong>
-                  <span className="semitone-offset">+{p.intervalFromTonic}st</span>
-                  {p.isCharacteristic && <span className="char-badge">★ Char</span>}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Modal Chords Strip (7 Diatonic Chords) */}
-        {modalChords.length > 0 && (
-          <section className="modes-chords-section" aria-label="Modal Diatonic Chords">
-            <div className="modes-chords-header">
-              <div className="chords-title-group">
-                <h4>Диатонические аккорды лада</h4>
-                <span className="chords-subtitle">
-                  Кликните на карточку для аудио-прослушивания
-                </span>
-              </div>
-              <div className="modes-view-toggle">
-                <button
-                  type="button"
-                  className={`view-btn ${cardVisualView === "piano" ? "is-active" : ""}`}
-                  onClick={() => setCardVisualView("piano")}
-                  title="Piano Keyboard View"
-                >
-                  Piano [P]
-                </button>
-                <button
-                  type="button"
-                  className={`view-btn ${cardVisualView === "guitar" ? "is-active" : ""}`}
-                  onClick={() => setCardVisualView("guitar")}
-                  title="Guitar Fretboard View"
-                >
-                  Guitar [G]
-                </button>
-              </div>
-            </div>
-
-            <div className="modes-chords-strip">
-              {modalChords.map((chordDef) => {
-                return (
-                  <button
-                    key={chordDef.degree}
-                    type="button"
-                    className={`modal-chord-card ${chordDef.isCharacteristicChord ? "is-characteristic-chord" : ""}`}
-                    onClick={() => handlePlayChord(chordDef)}
-                    title={`Click to play ${chordDef.chordSymbol}`}
-                  >
-                    <div className="modal-chord-top">
-                      <strong className="modal-chord-numeral">{chordDef.romanNumeral}</strong>
-                      <span className="modal-chord-symbol">{chordDef.chordSymbol}</span>
-                    </div>
-
-                    {chordDef.isCharacteristicChord && (
-                      <span className="modal-chord-badge">★ Modal</span>
-                    )}
-
-                    <div className="modal-chord-visual">
-                      {cardVisualView === "piano" ? (
-                        <PianoCardView
-                          chordPitches={chordDef.pitches}
-                          chordLabel={chordDef.chordSymbol}
-                        />
-                      ) : (
-                        <GuitarCardView
-                          chord={chordDef.chord}
-                          chordLabel={chordDef.chordSymbol}
-                          scalePitchClasses={scalePitchClasses}
-                          showScaleTones={true}
-                        />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Canonical Modal Cadences & Progressions */}
-        {modalFormulas.length > 0 && (
-          <section className="modes-formulas-section" aria-label="Modal Cadence Formulas">
-            <h4 className="formulas-title">
-              <span className="formulas-icon" aria-hidden="true">⚡</span>
-              Канонические ладовые каденции и последовательности
-            </h4>
-            <div className="modes-formulas-grid">
-              {modalFormulas.map((formula) => {
-                return (
-                  <div key={formula.id} className="modes-formula-card">
-                    <div className="formula-header">
-                      <div className="formula-title-row">
-                        <strong>{formula.title}</strong>
-                        <span className="formula-genre-badge">{formula.genreTag}</span>
-                      </div>
-                      <span className="formula-roman">{formula.romanProgression}</span>
-                    </div>
-                    <p className="formula-description">{formula.description}</p>
-                    <div className="formula-actions">
-                      {onAuditionFormula && (
-                        <button
-                          type="button"
-                          className="formula-audition-btn"
-                          onClick={() => onAuditionFormula(formula, selectedTonic)}
-                          title="Audition progression audio"
-                        >
-                          <span aria-hidden="true">▶</span> Play
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="formula-apply-btn"
-                        onClick={() => handleApplyFormula(formula)}
-                        title="Apply this progression to My Progression"
-                      >
-                        <span aria-hidden="true">➕</span> Apply to Progression
-                      </button>
+                <p className="modes-banner-desc">{scaleDef.characterRu}</p>
+                {scaleDef.characteristicInterval && (
+                  <div className="modes-characteristic-callout">
+                    <span className="callout-star" aria-hidden="true">★</span>
+                    <div className="callout-body">
+                      <strong>Характерный признак лада ({scaleDef.characteristicInterval}):</strong>{" "}
+                      <span>{scaleDef.characteristicDescriptionRu}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                )}
+                <div className="modes-genre-tags">
+                  <span className="genre-label">Стили и примеры:</span>
+                  {scaleDef.genreExamples.map((genre) => (
+                    <span key={genre} className="genre-pill">
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="modes-banner-actions">
+                <button
+                  type="button"
+                  className="modes-play-scale-btn"
+                  onClick={handlePlayScale}
+                  title="Play scale ascending and descending"
+                >
+                  <span className="play-icon" aria-hidden="true">▶</span>
+                  <span>Play Scale</span>
+                </button>
+              </div>
+            </section>
+
+            {/* Scale Degrees & Pitch Representation */}
+            <section className="modes-scale-pitches" aria-label="Scale notes">
+              <div className="modes-pitches-list">
+                {scalePitches.map((p) => {
+                  const noteName = formatPitchSpelling(p.spelling);
+                  return (
+                    <div
+                      key={p.degree}
+                      className={`modes-pitch-item ${p.isCharacteristic ? "is-characteristic" : ""}`}
+                    >
+                      <span className="degree-num">{p.degree}</span>
+                      <strong className="pitch-name">{noteName}</strong>
+                      <span className="semitone-offset">+{p.intervalFromTonic}st</span>
+                      {p.isCharacteristic && <span className="char-badge">★ Char</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Modal Chords Strip (7 Diatonic Chords) */}
+            {modalChords.length > 0 && (
+              <section className="modes-chords-section" aria-label="Modal Diatonic Chords">
+                <div className="modes-chords-header">
+                  <div className="chords-title-group">
+                    <h4>Диатонические аккорды лада</h4>
+                    <span className="chords-subtitle">
+                      Кликните на карточку для аудио-прослушивания
+                    </span>
+                  </div>
+                  <div className="modes-view-toggle">
+                    <button
+                      type="button"
+                      className={`view-btn ${cardVisualView === "piano" ? "is-active" : ""}`}
+                      onClick={() => setCardVisualView("piano")}
+                      title="Piano Keyboard View"
+                    >
+                      Piano [P]
+                    </button>
+                    <button
+                      type="button"
+                      className={`view-btn ${cardVisualView === "guitar" ? "is-active" : ""}`}
+                      onClick={() => setCardVisualView("guitar")}
+                      title="Guitar Fretboard View"
+                    >
+                      Guitar [G]
+                    </button>
+                  </div>
+                </div>
+
+                <div className="modes-chords-strip">
+                  {modalChords.map((chordDef) => {
+                    return (
+                      <button
+                        key={chordDef.degree}
+                        type="button"
+                        className={`modal-chord-card ${chordDef.isCharacteristicChord ? "is-characteristic-chord" : ""}`}
+                        onClick={() => handlePlayChord(chordDef)}
+                        title={`Click to play ${chordDef.chordSymbol}`}
+                      >
+                        <div className="modal-chord-top">
+                          <strong className="modal-chord-numeral">{chordDef.romanNumeral}</strong>
+                          <span className="modal-chord-symbol">{chordDef.chordSymbol}</span>
+                        </div>
+
+                        {chordDef.isCharacteristicChord && (
+                          <span className="modal-chord-badge">★ Modal</span>
+                        )}
+
+                        <div className="modal-chord-visual">
+                          {cardVisualView === "piano" ? (
+                            <PianoCardView
+                              chordPitches={chordDef.pitches}
+                              chordLabel={chordDef.chordSymbol}
+                            />
+                          ) : (
+                            <GuitarCardView
+                              chord={chordDef.chord}
+                              chordLabel={chordDef.chordSymbol}
+                              scalePitchClasses={scalePitchClasses}
+                              showScaleTones={true}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* Right Column: Canonical Modal Cadences & Progressions */}
+          <div className="modes-content-right">
+            <section className="modes-formulas-section" aria-label="Modal Cadence Formulas">
+              <div className="modes-formulas-header">
+                <h4 className="formulas-title">
+                  <span className="formulas-icon" aria-hidden="true">⚡</span>
+                  Канонические каденции и ходы
+                </h4>
+                {modalFormulas.length > 0 && (
+                  <span className="formulas-count-badge">{modalFormulas.length}</span>
+                )}
+              </div>
+
+              {modalFormulas.length > 0 ? (
+                <div className="modes-formulas-list">
+                  {modalFormulas.map((formula) => {
+                    return (
+                      <div key={formula.id} className="modes-formula-card">
+                        <div className="formula-header">
+                          <div className="formula-title-row">
+                            <strong>{formula.title}</strong>
+                            <span className="formula-genre-badge">{formula.genreTag}</span>
+                          </div>
+                          <span className="formula-roman">{formula.romanProgression}</span>
+                        </div>
+                        <p className="formula-description">{formula.description}</p>
+                        <div className="formula-actions">
+                          {onAuditionFormula && (
+                            <button
+                              type="button"
+                              className="formula-audition-btn"
+                              onClick={() => onAuditionFormula(formula, selectedTonic)}
+                              title="Audition progression audio"
+                            >
+                              <span aria-hidden="true">▶</span> Play
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="formula-apply-btn"
+                            onClick={() => handleApplyFormula(formula)}
+                            title="Apply this progression to My Progression"
+                          >
+                            <span aria-hidden="true">➕</span> Apply to Progression
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="modes-formulas-empty">
+                  <span className="empty-icon" aria-hidden="true">🎼</span>
+                  <p>Для этого лада нет предустановленных каденций. Вы можете составить свою последовательность из аккордов слева.</p>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="modal-footer modes-footer">
