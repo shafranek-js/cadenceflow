@@ -279,8 +279,8 @@ export function ModesExplorerModal({
 
             {/* Scale Details & Characteristic Banner */}
             <section className="modes-details-banner" aria-label="Scale Characteristics">
-              <div className="modes-banner-main">
-                <div className="modes-banner-header">
+              <div className="modes-banner-header">
+                <div className="modes-banner-header-left">
                   <h3 className="modes-banner-title">
                     {currentTonicLabel} {scaleDef.name}
                   </h3>
@@ -289,36 +289,38 @@ export function ModesExplorerModal({
                     <span className="formula-en">({scaleDef.formulaTextEn})</span>
                   </div>
                 </div>
-                <p className="modes-banner-desc">{scaleDef.characterRu}</p>
-                {scaleDef.characteristicInterval && (
-                  <div className="modes-characteristic-callout">
-                    <span className="callout-star" aria-hidden="true">★</span>
-                    <div className="callout-body">
-                      <strong>Характерный признак лада ({scaleDef.characteristicInterval}):</strong>{" "}
-                      <span>{scaleDef.characteristicDescriptionRu}</span>
-                    </div>
-                  </div>
-                )}
-                <div className="modes-genre-tags">
-                  <span className="genre-label">Стили и примеры:</span>
-                  {scaleDef.genreExamples.map((genre) => (
-                    <span key={genre} className="genre-pill">
-                      {genre}
-                    </span>
-                  ))}
+                <div className="modes-banner-actions">
+                  <button
+                    type="button"
+                    className="modes-play-scale-btn"
+                    onClick={handlePlayScale}
+                    title="Play scale ascending and descending"
+                  >
+                    <span className="play-icon" aria-hidden="true">▶</span>
+                    <span>Play Scale</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="modes-banner-actions">
-                <button
-                  type="button"
-                  className="modes-play-scale-btn"
-                  onClick={handlePlayScale}
-                  title="Play scale ascending and descending"
-                >
-                  <span className="play-icon" aria-hidden="true">▶</span>
-                  <span>Play Scale</span>
-                </button>
+              <p className="modes-banner-desc">{scaleDef.characterRu}</p>
+
+              {scaleDef.characteristicInterval && (
+                <div className="modes-characteristic-callout">
+                  <span className="callout-star" aria-hidden="true">★</span>
+                  <div className="callout-body">
+                    <strong>Характерный признак лада ({scaleDef.characteristicInterval}):</strong>{" "}
+                    <span>{scaleDef.characteristicDescriptionRu}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="modes-genre-tags">
+                <span className="genre-label">Стили и примеры:</span>
+                {scaleDef.genreExamples.map((genre) => (
+                  <span key={genre} className="genre-pill">
+                    {genre}
+                  </span>
+                ))}
               </div>
             </section>
 
