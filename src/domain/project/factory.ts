@@ -50,6 +50,7 @@ export function createDefaultProject(
       measuresPerSystem: "auto",
       showBassInStaff: false,
       suzukiColors: false,
+      resolutionArrows: true,
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,

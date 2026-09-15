@@ -184,3 +184,33 @@ export function setSuzukiColors(
   };
 }
 
+export interface SetResolutionArrowsPayload {
+  readonly enabled: boolean;
+  readonly nowIso: string;
+}
+
+export type SetResolutionArrowsCommand = ProjectCommand<SetResolutionArrowsPayload> & {
+  readonly type: "presentation/set-resolution-arrows";
+};
+
+export function setResolutionArrows(
+  project: Project,
+  command: SetResolutionArrowsCommand,
+): AppliedCommand {
+  const previous = project.presentation.resolutionArrows ?? true;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        resolutionArrows: command.payload.enabled,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-resolution-arrows",
+      payload: { enabled: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+

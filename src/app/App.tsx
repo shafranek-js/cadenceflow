@@ -215,12 +215,14 @@ import {
   setProgressionView,
   setMeasuresPerSystem,
   setSuzukiColors,
+  setResolutionArrows,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetProgressionViewCommand,
   type SetMeasuresPerSystemCommand,
   type SetSuzukiColorsCommand,
+  type SetResolutionArrowsCommand,
 } from "./commands/presentationCommands";
 import type {
   MeasuresPerSystem,
@@ -1795,6 +1797,14 @@ export function App() {
     };
     store.dispatch(command, setSuzukiColors);
   };
+  const changeResolutionArrows = (enabled: boolean) => {
+    if (enabled === (project.presentation.resolutionArrows !== false)) return;
+    const command: SetResolutionArrowsCommand = {
+      type: "presentation/set-resolution-arrows",
+      payload: { enabled, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setResolutionArrows);
+  };
   const applyModuleSwitch = (
     destinationModule: HarmonicModuleId,
     resolutions: Readonly<Record<string, HarmonicFunctionIdentity | "keep-original">>,
@@ -2416,6 +2426,8 @@ export function App() {
                 onShowBassInStaffChange={changeStaffBassVisibility}
                 suzukiColors={project.presentation.suzukiColors ?? false}
                 onSuzukiColorsChange={changeSuzukiColors}
+                resolutionArrows={project.presentation.resolutionArrows !== false}
+                onResolutionArrowsChange={changeResolutionArrows}
               />
               {globalSettingsVisibility.showThemeControl ? (
                 <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
@@ -2880,6 +2892,10 @@ export function App() {
               suzukiColors={project.presentation.suzukiColors ?? false}
               onToggleSuzukiColors={() =>
                 changeSuzukiColors(!(project.presentation.suzukiColors ?? false))
+              }
+              resolutionArrows={project.presentation.resolutionArrows !== false}
+              onToggleResolutionArrows={() =>
+                changeResolutionArrows(!(project.presentation.resolutionArrows !== false))
               }
               onSetArticulation={(articulation) => patchTemplatePerformance({ articulation })}
               onSetRegister={(register) => patchTemplatePerformance({ register })}

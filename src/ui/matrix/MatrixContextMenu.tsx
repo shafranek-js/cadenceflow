@@ -29,6 +29,7 @@ export interface MatrixContextMenuProps {
   readonly globalView: CardViewId;
   readonly showBassInStaff: boolean;
   readonly suzukiColors?: boolean | undefined;
+  readonly resolutionArrows?: boolean | undefined;
   readonly currentArticulation?: PianoArticulation | undefined;
   readonly currentRegister?: RegisterOffset | undefined;
   readonly hasPreviewSelection?: boolean | undefined;
@@ -44,6 +45,7 @@ export interface MatrixContextMenuProps {
   readonly onSetView?: ((view: CardViewId) => void) | undefined;
   readonly onToggleBassInStaff?: (() => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
+  readonly onToggleResolutionArrows?: (() => void) | undefined;
   readonly onSetArticulation?: ((articulation: PianoArticulation) => void) | undefined;
   readonly onSetRegister?: ((register: RegisterOffset) => void) | undefined;
   readonly onToggleRecommendations?: (() => void) | undefined;
@@ -83,6 +85,7 @@ export function MatrixContextMenu({
   globalView,
   showBassInStaff,
   suzukiColors = false,
+  resolutionArrows = true,
   currentArticulation = "humanized",
   currentRegister = "auto",
   hasPreviewSelection = false,
@@ -96,6 +99,7 @@ export function MatrixContextMenu({
   onSetView,
   onToggleBassInStaff,
   onToggleSuzukiColors,
+  onToggleResolutionArrows,
   onSetArticulation,
   onSetRegister,
   onToggleRecommendations,
@@ -433,6 +437,22 @@ export function MatrixContextMenu({
           <span className="score-system-menu-item-row">
             <span>Suzuki Note Colors</span>
             {suzukiColors ? <span className="score-system-menu-check">✓</span> : null}
+          </span>
+        </button>
+        <button
+          ref={registerRef(btnIndex++)}
+          type="button"
+          role="menuitem"
+          className="score-system-menu-item"
+          data-testid="matrix-menu-toggle-resolution-arrows"
+          onClick={() => {
+            onToggleResolutionArrows?.();
+            onClose();
+          }}
+        >
+          <span className="score-system-menu-item-row">
+            <span>Resolution Arrows</span>
+            {resolutionArrows ? <span className="score-system-menu-check">✓</span> : null}
           </span>
         </button>
 

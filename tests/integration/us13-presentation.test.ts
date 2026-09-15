@@ -3,6 +3,7 @@ import { AppStore } from "../../src/app/appStore";
 import {
   setMeasuresPerSystem,
   setProgressionView,
+  setResolutionArrows,
   type SetMeasuresPerSystemCommand,
   type SetProgressionViewCommand,
 } from "../../src/app/commands/presentationCommands";
@@ -57,11 +58,16 @@ describe("US13 global presentation state", () => {
       type: "presentation/set-measures-per-system",
       payload: { measuresPerSystem: 3, nowIso: "2026-09-11T12:04:00.000Z" },
     }).project;
+    const arrowsDisabled = setResolutionArrows(updated, {
+      type: "presentation/set-resolution-arrows",
+      payload: { enabled: false, nowIso: "2026-09-11T12:05:00.000Z" },
+    }).project;
 
-    const restored = decodePortableProject(encodePortableProject(updated));
+    const restored = decodePortableProject(encodePortableProject(arrowsDisabled));
 
     expect(restored.presentation.progressionView).toBe("piano");
     expect(restored.presentation.measuresPerSystem).toBe(3);
+    expect(restored.presentation.resolutionArrows).toBe(false);
     expect(restored).not.toHaveProperty("history");
     expect(restored.progression).toEqual(updated.progression);
   });

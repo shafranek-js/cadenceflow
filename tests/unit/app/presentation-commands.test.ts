@@ -5,10 +5,12 @@ import {
   setExpertiseMode,
   setStaffBassVisibility,
   setSuzukiColors,
+  setResolutionArrows,
   setTheme,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetSuzukiColorsCommand,
+  type SetResolutionArrowsCommand,
   type SetThemeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
@@ -104,6 +106,31 @@ describe("US10 presentation commands", () => {
     const inverseResult = setSuzukiColors(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
     expect(undone.presentation.suzukiColors).toBe(false);
+  });
+
+  it("enables resolution arrows by default and supports toggling, undo/redo, and inverse", () => {
+    const initial = createDefaultProject("presentation-arrows", "Arrows Project");
+    const store = new AppStore(initial);
+    const command: SetResolutionArrowsCommand = {
+      type: "presentation/set-resolution-arrows",
+      payload: { enabled: false, nowIso },
+    };
+
+    expect(initial.presentation.resolutionArrows).toBe(true);
+    store.dispatch(command, setResolutionArrows);
+    expect(store.project.presentation.resolutionArrows).toBe(false);
+    expect(store.project.progression).toBe(initial.progression);
+    expect(store.project.defaults).toBe(initial.defaults);
+    expect(store.project.tonic).toBe(initial.tonic);
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.resolutionArrows).toBe(true);
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.resolutionArrows).toBe(false);
+
+    const inverseResult = setResolutionArrows(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.resolutionArrows).toBe(true);
   });
 
   it("provides three distinct explanation representations without changing recommendation data", () => {

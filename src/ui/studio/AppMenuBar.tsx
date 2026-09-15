@@ -25,6 +25,8 @@ export interface AppMenuBarProps {
   readonly onShowBassInStaffChange: (visible: boolean) => void;
   readonly suzukiColors?: boolean;
   readonly onSuzukiColorsChange?: (enabled: boolean) => void;
+  readonly resolutionArrows?: boolean;
+  readonly onResolutionArrowsChange?: (enabled: boolean) => void;
 }
 
 export function AppMenuBar({
@@ -42,6 +44,8 @@ export function AppMenuBar({
   onShowBassInStaffChange,
   suzukiColors = false,
   onSuzukiColorsChange,
+  resolutionArrows = true,
+  onResolutionArrowsChange,
 }: AppMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
@@ -285,6 +289,20 @@ export function AppMenuBar({
             >
               <span>Suzuki note colors</span>
               {suzukiColors ? <span aria-hidden="true">✓</span> : null}
+            </button>
+            <div className="app-menu-section-label">Matrix presentation</div>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={resolutionArrows}
+              data-testid="toggle-resolution-arrows"
+              onClick={() => {
+                onResolutionArrowsChange?.(!resolutionArrows);
+                closeMenu("view");
+              }}
+            >
+              <span>Resolution arrows</span>
+              {resolutionArrows ? <span aria-hidden="true">✓</span> : null}
             </button>
           </div>
         ) : null}

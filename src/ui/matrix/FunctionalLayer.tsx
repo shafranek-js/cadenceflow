@@ -1,18 +1,41 @@
 import type { ReactNode } from "react";
+import type { MatrixZoneInfo } from "../../domain/harmony/tendencyArrows";
 
 export function FunctionalLayer({
   label,
   children,
   expanded,
+  zone,
 }: {
   readonly label: string;
   readonly children: ReactNode;
   readonly expanded?: ReactNode;
+  readonly zone?: MatrixZoneInfo;
 }) {
   return (
-    <section className="matrix-layer" aria-label={label} data-layer={label}>
+    <section
+      className={`matrix-layer ${zone ? `matrix-layer-${zone.id}` : ""}`.trim()}
+      aria-label={label}
+      data-layer={label}
+      data-zone={zone?.id}
+    >
       <div className="matrix-layer-heading">
-        <h3>{label}</h3>
+        <div className="matrix-layer-title-group">
+          <h3>{label}</h3>
+          {zone ? (
+            <span
+              className={`matrix-zone-badge matrix-zone-${zone.id}`}
+              title={`${zone.badge} (${zone.symbol}) — ${zone.tooltip}`}
+              aria-label={`${zone.badge}: ${zone.tooltip}`}
+              data-testid={`matrix-zone-badge-${zone.id}`}
+            >
+              <span className="matrix-zone-symbol" aria-hidden="true">
+                {zone.symbol}
+              </span>
+              <span className="matrix-zone-name">{zone.badge}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="matrix-layer-cards">{children}</div>
       {expanded ? (

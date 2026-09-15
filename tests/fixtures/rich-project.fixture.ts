@@ -198,6 +198,7 @@ export function createRichProjectFixture(): Project {
       measuresPerSystem: "auto",
       showBassInStaff: false,
       suzukiColors: false,
+      resolutionArrows: true,
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: Object.freeze({

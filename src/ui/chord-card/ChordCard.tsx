@@ -15,6 +15,11 @@ export function ChordCard({
   customizedCount,
   showBassInStaff = false,
   suzukiColors = false,
+  resolutionTargetSymbol,
+  isResolutionTarget,
+  onMouseEnter,
+  onMouseLeave,
+  onClickResolutionTarget,
   onSelect,
   onCtrlClickAdd,
   onAltClickReset,
@@ -26,6 +31,11 @@ export function ChordCard({
   readonly customizedCount: number;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
+  readonly resolutionTargetSymbol?: string | undefined;
+  readonly isResolutionTarget?: boolean | undefined;
+  readonly onMouseEnter?: (() => void) | undefined;
+  readonly onMouseLeave?: (() => void) | undefined;
+  readonly onClickResolutionTarget?: (() => void) | undefined;
   readonly onSelect: () => void;
   readonly onCtrlClickAdd: () => void;
   readonly onAltClickReset: () => void;
@@ -51,12 +61,32 @@ export function ChordCard({
 
   return (
     <article
-      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""}`}
+      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""}`.trim()}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
       data-recommendation={model.recommendationStatus}
       data-customized={customizedCount > 0 ? customizedCount : undefined}
+      data-resolution-target={isResolutionTarget ? "true" : undefined}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className="chord-card-status-row">
+        {resolutionTargetSymbol ? (
+          <button
+            type="button"
+            className="chord-resolution-badge"
+            title={`Resolves to ${resolutionTargetSymbol} (${model.chord.harmonicFunction.targetFunctionId ?? ""})`}
+            aria-label={`Resolves to ${resolutionTargetSymbol}`}
+            onClick={(e) => {
+              if (onClickResolutionTarget) {
+                e.stopPropagation();
+                onClickResolutionTarget();
+              }
+            }}
+          >
+            <span className="chord-resolution-arrow" aria-hidden="true">↓</span>
+            <span className="chord-resolution-name">{resolutionTargetSymbol}</span>
+          </button>
+        ) : null}
         {model.recommendationStatus !== "none" && (
           <span
             className={`recommendation-badge recommendation-${model.recommendationStatus}-badge`}

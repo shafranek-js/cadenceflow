@@ -460,6 +460,7 @@ export function encodePortableProject(project: Project): string {
       measuresPerSystem: project.presentation.measuresPerSystem,
       showBassInStaff: project.presentation.showBassInStaff,
       suzukiColors: project.presentation.suzukiColors === true,
+      resolutionArrows: project.presentation.resolutionArrows !== false,
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
@@ -701,6 +702,7 @@ export function decodePortableProject(jsonString: string): Project {
         // Portable projects created before this preference default to chord notes only.
         showBassInStaff: presentation["showBassInStaff"] === true,
         suzukiColors: presentation["suzukiColors"] === true,
+        resolutionArrows: presentation["resolutionArrows"] !== false,
       });
     })(),
     harmonyTrack,

@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { matrixCardOverrideCount, type Project } from "../../domain/project/project";
 import type { CardViewId } from "../../domain/progression/step";
 import {
@@ -8,10 +8,13 @@ import {
 } from "../../domain/harmony/functions";
 import { getHarmonicModule } from "../../domain/harmony/moduleRegistry";
 import { expandedStripEntries } from "../../domain/harmony/topology";
+import { getZoneForLayer, getResolutionTarget } from "../../domain/harmony/tendencyArrows";
+import { formatChordSymbol } from "../../domain/harmony/chord";
 import type { RecommendationResult } from "../../domain/recommendations/engine";
 import { realizeMatrixCardPreview, resolvePreviousHarmonicContext } from "./previewRealization";
 import { ChordCard } from "../chord-card/ChordCard";
 import { FunctionalLayer } from "./FunctionalLayer";
+import { MatrixResolutionArrows } from "./MatrixResolutionArrows";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
 import { ViewModeToggle } from "../common/ViewModeToggle";
@@ -64,8 +67,27 @@ export function HarmonicMatrix({
     contextualByLayer.set("secondary-diminished", contextualFunctionIds);
   }
 
+  const workbenchRef = useRef<HTMLDivElement>(null);
+  const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
+
   const previousHarmonicContext = resolvePreviousHarmonicContext(project);
   const hasRecommendation = Boolean(best || alternatives.size > 0);
+
+  const activeSourceFunctionId = hoveredFunctionId ?? previewFunctionId ?? null;
+  const targetFunctionId = activeSourceFunctionId
+    ? getResolutionTarget(activeSourceFunctionId, project.activeModule)
+    : null;
+
+  const targetSymbol = targetFunctionId
+    ? (() => {
+        try {
+          const preview = realizeMatrixCardPreview(project, targetFunctionId, previousHarmonicContext);
+          return formatChordSymbol(preview.chord);
+        } catch {
+          return undefined;
+        }
+      })()
+    : undefined;
 
   const renderCard = (identity: HarmonicFunctionIdentity) => {
     const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
@@ -75,6 +97,19 @@ export function HarmonicMatrix({
       recommendations?.bestMatch?.functionId === identity.functionId
         ? recommendations.bestMatch
         : recommendations?.alternatives.find((item) => item.functionId === identity.functionId);
+
+    const targetIdForCard = getResolutionTarget(identity.functionId, project.activeModule);
+    const cardResolutionTargetSymbol = targetIdForCard
+      ? (() => {
+          try {
+            const targetPreview = realizeMatrixCardPreview(project, targetIdForCard, previousHarmonicContext);
+            return formatChordSymbol(targetPreview.chord);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+
     return (
       <ChordCard
         key={cardKey(identity)}
@@ -98,6 +133,18 @@ export function HarmonicMatrix({
         suzukiColors={project.presentation.suzukiColors ?? false}
         selected={previewFunctionId === identity.functionId}
         customizedCount={matrixCardOverrideCount(template)}
+        resolutionTargetSymbol={cardResolutionTargetSymbol}
+        isResolutionTarget={Boolean(targetFunctionId && identity.functionId === targetFunctionId)}
+        onMouseEnter={() => setHoveredFunctionId(identity.functionId)}
+        onMouseLeave={() => setHoveredFunctionId((curr) => (curr === identity.functionId ? null : curr))}
+        onClickResolutionTarget={
+          targetIdForCard
+            ? () => {
+                onPreview(targetIdForCard);
+                onTemplateOpen(targetIdForCard);
+              }
+            : undefined
+        }
         onSelect={() => {
           onPreview(identity.functionId);
           onTemplateOpen(identity.functionId);
@@ -177,7 +224,14 @@ export function HarmonicMatrix({
           No strong recommendation for this context. Passive choices remain available.
         </p>
       ) : null}
-      <div className="matrix-workbench">
+      <div className="matrix-workbench" ref={workbenchRef}>
+        <MatrixResolutionArrows
+          containerRef={workbenchRef}
+          sourceFunctionId={activeSourceFunctionId}
+          targetFunctionId={targetFunctionId}
+          targetSymbol={targetSymbol}
+          enabled={project.presentation.resolutionArrows !== false}
+        />
         <div className="matrix-grid">
           {module.layers.map((layer) => {
             const baselineEntries = module.topology.cards.filter(
@@ -189,6 +243,7 @@ export function HarmonicMatrix({
               <FunctionalLayer
                 key={layer.id}
                 label={layer.label}
+                zone={getZoneForLayer(layer.id)}
                 expanded={
                   expandedEntries.length > 0
                     ? expandedEntries.map((entry) => renderCard(entry.identity))

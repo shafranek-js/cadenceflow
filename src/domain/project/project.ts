@@ -32,6 +32,8 @@ export interface PresentationState {
   readonly showBassInStaff: boolean;
   /** Whether notation surfaces display decorative pitch-colored Suzuki noteheads. */
   readonly suzukiColors?: boolean;
+  /** Whether the Harmonic Matrix displays resolution tendency arrows and targets. */
+  readonly resolutionArrows?: boolean;
 }
 
 export interface MatrixCardTemplateState {
