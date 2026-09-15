@@ -116,6 +116,7 @@ export function ProgressionTrack({
   onApplyPreset,
   onOpenPresets,
   onApplySubstitution,
+  onOpenModulation,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -189,6 +190,7 @@ export function ProgressionTrack({
   readonly onApplySubstitution?:
     | ((stepId: string, substitution: ChordSubstitution) => void)
     | undefined;
+  readonly onOpenModulation?: ((stepId?: string) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -767,6 +769,9 @@ export function ProgressionTrack({
                 substitutions={subs}
                 onApplySubstitution={
                   onApplySubstitution ? (sub) => onApplySubstitution(step.id, sub) : undefined
+                }
+                onOpenModulation={
+                  onOpenModulation ? () => onOpenModulation(step.id) : undefined
                 }
                 onCreate={() => {
                   setMelodyMenu(null);

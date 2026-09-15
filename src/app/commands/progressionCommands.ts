@@ -552,6 +552,23 @@ export function insertStepsBefore(
   );
 }
 
+export interface AppendStepsPayload {
+  readonly steps: readonly ProgressionStep[];
+  readonly nowIso: string;
+}
+export type AppendStepsCommand = ProjectCommand<AppendStepsPayload> & {
+  readonly type: "progression/append-steps";
+};
+/** Appends arbitrary steps to the end of the progression. */
+export function appendSteps(project: Project, command: AppendStepsCommand): AppliedCommand {
+  const current = [...project.progression.steps, ...command.payload.steps];
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(current) }),
+    command.payload.nowIso,
+  );
+}
+
 export interface StepPatch {
   readonly performance?: Partial<StepPerformance>;
   readonly melody?: ChordMelodyRecipe | null;

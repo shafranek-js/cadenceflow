@@ -31,6 +31,7 @@ export interface MelodyContextMenuProps {
   readonly selectedMatrixChordName?: string | undefined;
   readonly substitutions?: readonly ChordSubstitution[] | undefined;
   readonly onApplySubstitution?: ((substitution: ChordSubstitution) => void) | undefined;
+  readonly onOpenModulation?: (() => void) | undefined;
   readonly onDeleteStep?: (() => void) | undefined;
   readonly onClose: () => void;
 }
@@ -57,6 +58,7 @@ export function MelodyContextMenu({
   selectedMatrixChordName,
   substitutions,
   onApplySubstitution,
+  onOpenModulation,
   onDeleteStep,
   onClose,
 }: MelodyContextMenuProps) {
@@ -294,7 +296,28 @@ export function MelodyContextMenu({
         </>
       ) : null}
 
-      {/* 4. Delete Action */}
+      {/* 4. Modulation Action */}
+      {onOpenModulation ? (
+        <>
+          <div className="melody-context-menu-separator" role="separator" />
+          <button
+            ref={(node) => {
+              itemRefs.current[btnIndex++] = node;
+            }}
+            type="button"
+            role="menuitem"
+            data-testid="step-menu-modulate"
+            onClick={() => {
+              onClose();
+              onOpenModulation();
+            }}
+          >
+            🧭 Modulate from here...
+          </button>
+        </>
+      ) : null}
+
+      {/* 5. Delete Action */}
       {onDeleteStep ? (
         <>
           <div className="melody-context-menu-separator" role="separator" />

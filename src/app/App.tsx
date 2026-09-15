@@ -61,6 +61,8 @@ import { CompositionIntentControl } from "../ui/inspector/CompositionIntentContr
 import { BranchComparison } from "../ui/progression/BranchComparison";
 import { BranchControls } from "../ui/progression/BranchControls";
 import { VoiceLeadingMenu } from "../ui/progression/VoiceLeadingMenu";
+import { ModulationModal } from "../ui/modulation/ModulationModal";
+import type { ModulationPath } from "../domain/harmony/modulation";
 import {
   optimizeProgressionVoiceLeading,
   type VoiceLeadingStrategy,
@@ -156,6 +158,7 @@ import {
   reorderSteps,
   insertStepsAfter,
   insertStepsBefore,
+  appendSteps,
   batchPatchSteps,
   type AddRestStepCommand,
   type BatchEditStepPerformanceCommand,
@@ -173,6 +176,7 @@ import {
   type ReorderStepsCommand,
   type InsertStepsAfterCommand,
   type InsertStepsBeforeCommand,
+  type AppendStepsCommand,
   type BatchPatchStepsCommand,
   type StepPatch,
 } from "./commands/progressionCommands";
@@ -1228,6 +1232,146 @@ export function App() {
       store.dispatch(command, insertStepsBefore);
     }
   };
+
+  const [isModulationModalOpen, setIsModulationModalOpen] = useState(false);
+  const [auditioningModPathId, setAuditioningModPathId] = useState<string | null>(null);
+  const modAuditionStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopAuditioningModulation = useCallback(() => {
+    if (modAuditionStopTimerRef.current !== null) {
+      clearTimeout(modAuditionStopTimerRef.current);
+      modAuditionStopTimerRef.current = null;
+    }
+    getPreviewAuditionController()?.stop();
+    setAuditioningModPathId(null);
+  }, [getPreviewAuditionController]);
+
+  const handleAuditionModulationPath = useCallback(
+    (path: ModulationPath) => {
+      if (auditioningModPathId === path.id) {
+        stopAuditioningModulation();
+        return;
+      }
+      stopAuditioningModulation();
+
+      const currentProject = store.project;
+      const allEvents: import("../audio/contracts").AudioNoteEvent[] = [];
+      const tempoBpm = currentProject.globalTiming.tempoBpm;
+      const stepDurationSeconds = 1.0;
+
+      for (let i = 0; i < path.bridgeSteps.length; i++) {
+        const bridgeStep = path.bridgeSteps[i]!;
+        const stepModule = bridgeStep.targetFunction.moduleId;
+        const tonic = path.targetTonic;
+        const stepId = `mod-audition-step-${i}`;
+        const baseStep = createMatrixChordStep(
+          currentProject,
+          bridgeStep.targetFunction.functionId,
+          stepId,
+          stepModule,
+        );
+        const mode = getHarmonicModule(stepModule).mode;
+        const context: HarmonicContext = {
+          tonic,
+          mode,
+          moduleId: stepModule,
+          spellingContext: { tonic, mode },
+        };
+        const realization = realizeStepAudioEvents({
+          step: baseStep,
+          tonic,
+          context,
+          tempoBpm,
+          stepStartSeconds: i * stepDurationSeconds,
+        });
+        allEvents.push(...realization.events);
+      }
+
+      const scheduled = getPreviewAuditionController()?.audition(allEvents);
+      if (scheduled) {
+        setAuditioningModPathId(path.id);
+        const totalDuration = allEvents.reduce(
+          (latest, ev) => Math.max(latest, ev.startSeconds + ev.durationSeconds),
+          0,
+        );
+        modAuditionStopTimerRef.current = setTimeout(() => {
+          modAuditionStopTimerRef.current = null;
+          setAuditioningModPathId((curr) => (curr === path.id ? null : curr));
+        }, Math.max(1, Math.ceil(totalDuration * 1000)));
+      }
+    },
+    [auditioningModPathId, getPreviewAuditionController, stopAuditioningModulation, store],
+  );
+
+  const handleApplyModulationBridge = useCallback(
+    (path: ModulationPath, insertMode: "append" | "insert", switchKey: boolean) => {
+      const currentProject = store.project;
+      const nowIso = new Date().toISOString();
+      const newSteps: ChordStep[] = path.bridgeSteps.map((bridgeStep, idx) => {
+        const fnRef = switchKey ? bridgeStep.targetFunction : bridgeStep.sourceFunction;
+        const stepId = `step-mod-${Date.now().toString(36)}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
+        return createMatrixChordStep(
+          currentProject,
+          fnRef.functionId,
+          stepId,
+          fnRef.moduleId,
+        );
+      });
+
+      if (
+        insertMode === "insert" &&
+        currentProject.progression.selectedStepId &&
+        currentProject.progression.steps.some((s) => s.id === currentProject.progression.selectedStepId)
+      ) {
+        const command: InsertStepsAfterCommand = {
+          type: "progression/insert-steps-after",
+          payload: {
+            afterStepId: currentProject.progression.selectedStepId,
+            steps: newSteps,
+            nowIso,
+          },
+        };
+        store.dispatch(command, insertStepsAfter);
+      } else {
+        const command: AppendStepsCommand = {
+          type: "progression/append-steps",
+          payload: {
+            steps: newSteps,
+            nowIso,
+          },
+        };
+        store.dispatch(command, appendSteps);
+      }
+
+      if (switchKey) {
+        if (currentProject.tonic !== path.targetTonic) {
+          const tonicCommand: SetTonicCommand = {
+            type: "harmony/set-tonic",
+            payload: { tonic: path.targetTonic, nowIso },
+          };
+          store.dispatch(tonicCommand, setTonic);
+        }
+        if (currentProject.activeModule !== path.targetModule) {
+          const plan = planModuleSwitch(store.project.progression.steps, path.targetModule);
+          const resolutions: Record<string, HarmonicFunctionIdentity | "keep-original"> = {};
+          for (const item of plan.resolutions) {
+            resolutions[item.stepId] = item.automaticTarget ?? "keep-original";
+          }
+          const switchModuleCommand: SwitchModuleCommand = {
+            type: "harmony/switch-module",
+            payload: {
+              destinationModule: path.targetModule,
+              resolutions,
+              nowIso,
+            },
+          };
+          store.dispatch(switchModuleCommand, switchModule);
+        }
+      }
+    },
+    [store],
+  );
+
   const resetProgressionStep = (stepId: string) => {
     const command: ResetStepPerformanceCommand = {
       type: "progression/reset-performance",
@@ -2882,6 +3026,16 @@ export function App() {
               </div>
             </div>
             <div className="progression-heading-actions">
+              <button
+                type="button"
+                className="btn-modulation-trigger"
+                onClick={() => setIsModulationModalOpen(true)}
+                title="Modulation Master & Key Transitions"
+                data-testid="progression-modulate-trigger"
+              >
+                <span className="btn-modulation-icon" aria-hidden="true">🧭</span>
+                <span>Modulate</span>
+              </button>
               <VoiceLeadingMenu
                 onApplyVoiceLeading={handleApplyVoiceLeading}
                 disabled={project.progression.steps.length === 0}
@@ -2981,6 +3135,7 @@ export function App() {
             onApplyPreset={handleApplyPreset}
             onOpenPresets={() => setPresetsPanelOpen(true)}
             onApplySubstitution={handleApplySubstitution}
+            onOpenModulation={() => setIsModulationModalOpen(true)}
           />
           <BranchComparison
             project={project}
@@ -3057,6 +3212,19 @@ export function App() {
             project={project}
             onClose={() => setSavePresetDialogOpen(false)}
             onSave={handleSaveCustomPreset}
+          />
+          <ModulationModal
+            isOpen={isModulationModalOpen}
+            project={project}
+            onClose={() => {
+              stopAuditioningModulation();
+              setIsModulationModalOpen(false);
+            }}
+            onAuditionPath={handleAuditionModulationPath}
+            onStopAudition={stopAuditioningModulation}
+            auditioningPathId={auditioningModPathId}
+            onApplyBridge={handleApplyModulationBridge}
+            selectedStepId={project.progression.selectedStepId}
           />
           {progressionMenu ? (
             <ProgressionContextMenu
