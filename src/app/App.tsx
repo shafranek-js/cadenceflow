@@ -84,6 +84,8 @@ import { ProgressionGlobalInspector } from "../ui/inspector/ProgressionGlobalIns
 import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
+import { AcousticGuitarProvider } from "../audio/guitar/AcousticGuitarProvider";
+import { resolveGuitarChordVoicing } from "../domain/instruments/guitar/voicings";
 import {
   formatMelodyPreparationNotice,
   MelodySoundFontProvider,
@@ -334,6 +336,8 @@ export function App() {
   );
   const playbackControllerRef = useRef<PlaybackController | null>(null);
   const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
+  const guitarProviderRef = useRef<AcousticGuitarProvider | null>(null);
+  const guitarPreviewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
   const melodyPreviewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
   const melodyPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const melodyPreviewRequestRef = useRef(0);
@@ -414,6 +418,28 @@ export function App() {
     }
     return previewAuditionControllerRef.current;
   }, []);
+
+  const ensureGuitarProvider = useCallback(() => {
+    if (!guitarProviderRef.current) {
+      const sharedContext = sharedAudioContextRef.current;
+      guitarProviderRef.current = new AcousticGuitarProvider({
+        ...(sharedContext ? { audioContext: sharedContext } : {}),
+      });
+      void guitarProviderRef.current.prepare();
+    }
+    return guitarProviderRef.current;
+  }, []);
+
+  const getGuitarPreviewAuditionController = useCallback(() => {
+    const provider = ensureGuitarProvider();
+    if (!guitarPreviewAuditionControllerRef.current) {
+      guitarPreviewAuditionControllerRef.current = new PreviewAuditionController({
+        provider,
+        clock: provider.clock,
+      });
+    }
+    return guitarPreviewAuditionControllerRef.current;
+  }, [ensureGuitarProvider]);
 
   const applyMelodyPreparationResult = useCallback((result: MelodyPreparationResult) => {
     setMelodyAudioError(formatMelodyPreparationNotice(result));
@@ -592,6 +618,7 @@ export function App() {
     return () => {
       playbackControllerRef.current?.stop();
       previewAuditionControllerRef.current?.dispose();
+      guitarPreviewAuditionControllerRef.current?.dispose();
       melodyPreviewAuditionControllerRef.current?.dispose();
       if (melodyPreviewStopTimerRef.current !== null) {
         clearTimeout(melodyPreviewStopTimerRef.current);
@@ -602,6 +629,8 @@ export function App() {
       melodyHighlightTimerRefs.current.forEach((timer) => clearTimeout(timer));
       melodyProviderRef.current?.stop();
       void melodyProviderRef.current?.dispose();
+      guitarProviderRef.current?.stop();
+      void guitarProviderRef.current?.dispose();
     };
   }, []);
 
@@ -783,14 +812,39 @@ export function App() {
   };
   const auditionMatrixCard = (functionId: string) => {
     const currentProject = store.project;
+    const isGuitar = currentProject.presentation.globalMatrixCardView === "guitar";
     const previousContext = resolvePreviousHarmonicContext(currentProject);
     const previewRealization = realizeMatrixCardPreview(
       currentProject,
       functionId,
       previousContext,
     );
-    const auditionController = getPreviewAuditionController();
-    auditionController?.audition(previewRealization.events);
+
+    if (isGuitar) {
+      const isSeventh =
+        previewRealization.chord.baseQuality === "dominant" ||
+        previewRealization.chord.variant?.seventh !== undefined;
+      const isMajor7 = previewRealization.chord.variant?.seventh === "major7";
+      const guitarVoicing = resolveGuitarChordVoicing({
+        rootPitchClass: previewRealization.chord.rootPitchClass,
+        baseQuality: previewRealization.chord.baseQuality,
+        spelling: previewRealization.chord.spelling,
+        isSeventh,
+        isMajor7,
+      });
+      const events: import("../audio/contracts").AudioNoteEvent[] = guitarVoicing.pitches.map((p) => ({
+        pitch: p.midiNumber,
+        channelRole: "upper",
+        velocity: 82,
+        startSeconds: 0,
+        durationSeconds: 1.8,
+      }));
+      const auditionController = getGuitarPreviewAuditionController();
+      auditionController?.audition(events);
+    } else {
+      const auditionController = getPreviewAuditionController();
+      auditionController?.audition(previewRealization.events);
+    }
   };
 
   const preview = (functionId: string) => {
@@ -961,13 +1015,40 @@ export function App() {
       },
       tempoBpm: currentProject.globalTiming.tempoBpm,
     });
-    const chordPlayback = getPreviewAuditionController()?.audition(realization.events);
-    if (chordPlayback) {
-      setPreviewPlayingStepId(stepId);
-      const chordDurationSeconds = realization.events.reduce(
+    const isGuitar = currentProject.presentation.progressionView === "guitar";
+    let chordPlayback: import("../audio/contracts").ScheduledPlayback | null = null;
+    let chordDurationSeconds = 1.8;
+
+    if (isGuitar) {
+      const chord = realizeChord(step.harmonicFunction, currentProject.tonic);
+      const isSeventh =
+        chord.baseQuality === "dominant" || step.harmonicVariant?.seventh !== undefined;
+      const isMajor7 = step.harmonicVariant?.seventh === "major7";
+      const guitarVoicing = resolveGuitarChordVoicing({
+        rootPitchClass: chord.rootPitchClass,
+        baseQuality: chord.baseQuality,
+        spelling: chord.spelling,
+        isSeventh,
+        isMajor7,
+      });
+      const guitarEvents: import("../audio/contracts").AudioNoteEvent[] = guitarVoicing.pitches.map((p) => ({
+        pitch: p.midiNumber,
+        channelRole: "upper",
+        velocity: 82,
+        startSeconds: 0,
+        durationSeconds: 1.8,
+      }));
+      chordPlayback = getGuitarPreviewAuditionController()?.audition(guitarEvents) ?? null;
+    } else {
+      chordPlayback = getPreviewAuditionController()?.audition(realization.events) ?? null;
+      chordDurationSeconds = realization.events.reduce(
         (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
         0,
       );
+    }
+
+    if (chordPlayback) {
+      setPreviewPlayingStepId(stepId);
       stepPreviewStopTimerRef.current = setTimeout(
         () => {
           stepPreviewStopTimerRef.current = null;
@@ -1386,44 +1467,57 @@ export function App() {
       modesAuditionStopTimerRef.current = null;
     }
     getPreviewAuditionController()?.stop();
-  }, [getPreviewAuditionController]);
+    getGuitarPreviewAuditionController()?.stop();
+  }, [getGuitarPreviewAuditionController, getPreviewAuditionController]);
 
   const handleAuditionScaleNotes = useCallback(
-    (pitches: readonly { midiNumber: number }[]) => {
+    (pitches: readonly { midiNumber: number }[], instrument?: "piano" | "guitar") => {
       stopAuditioningModes();
-      const noteDuration = 0.22;
+      const noteDuration = 0.24;
       const events: import("../audio/contracts").AudioNoteEvent[] = pitches.map((p, idx) => ({
         pitch: p.midiNumber,
         channelRole: "upper",
-        velocity: 78,
+        velocity: 82,
         startSeconds: idx * noteDuration,
         durationSeconds: noteDuration * 0.95,
       }));
-      getPreviewAuditionController()?.audition(events);
+      const controller =
+        instrument === "guitar"
+          ? getGuitarPreviewAuditionController()
+          : getPreviewAuditionController();
+      controller?.audition(events);
       modesAuditionStopTimerRef.current = setTimeout(() => {
         modesAuditionStopTimerRef.current = null;
       }, Math.ceil((pitches.length * noteDuration + 0.5) * 1000));
     },
-    [getPreviewAuditionController, stopAuditioningModes],
+    [getGuitarPreviewAuditionController, getPreviewAuditionController, stopAuditioningModes],
   );
 
   const handleAuditionModalChord = useCallback(
-    (pitches: readonly { midiNumber: number }[]) => {
+    (pitches: readonly { midiNumber: number }[], instrument?: "piano" | "guitar") => {
       stopAuditioningModes();
       const events: import("../audio/contracts").AudioNoteEvent[] = pitches.map((p) => ({
         pitch: p.midiNumber,
         channelRole: "upper",
-        velocity: 80,
+        velocity: 82,
         startSeconds: 0,
-        durationSeconds: 1.2,
+        durationSeconds: 1.8,
       }));
-      getPreviewAuditionController()?.audition(events);
+      const controller =
+        instrument === "guitar"
+          ? getGuitarPreviewAuditionController()
+          : getPreviewAuditionController();
+      controller?.audition(events);
     },
-    [getPreviewAuditionController, stopAuditioningModes],
+    [getGuitarPreviewAuditionController, getPreviewAuditionController, stopAuditioningModes],
   );
 
   const handleAuditionModalFormula = useCallback(
-    (formula: ModalCadenceFormula, modalTonic: PitchClassIdentity) => {
+    (
+      formula: ModalCadenceFormula,
+      modalTonic: PitchClassIdentity,
+      instrument?: "piano" | "guitar",
+    ) => {
       stopAuditioningModes();
       const currentProject = store.project;
       const allEvents: import("../audio/contracts").AudioNoteEvent[] = [];
@@ -1446,17 +1540,46 @@ export function App() {
           moduleId,
           spellingContext: { tonic: parentTonic, mode },
         };
-        const realization = realizeStepAudioEvents({
-          step: baseStep,
-          tonic: parentTonic,
-          context,
-          tempoBpm,
-          stepStartSeconds: i * stepDurationSeconds,
-        });
-        allEvents.push(...realization.events);
+
+        if (instrument === "guitar") {
+          const chord = realizeChord(baseStep.harmonicFunction, parentTonic);
+          const isSeventh =
+            chord.baseQuality === "dominant" || baseStep.harmonicVariant?.seventh !== undefined;
+          const isMajor7 = baseStep.harmonicVariant?.seventh === "major7";
+          const guitarVoicing = resolveGuitarChordVoicing({
+            rootPitchClass: chord.rootPitchClass,
+            baseQuality: chord.baseQuality,
+            spelling: chord.spelling,
+            isSeventh,
+            isMajor7,
+          });
+          const chordEvents: import("../audio/contracts").AudioNoteEvent[] = guitarVoicing.pitches.map(
+            (p) => ({
+              pitch: p.midiNumber,
+              channelRole: "upper",
+              velocity: 82,
+              startSeconds: i * stepDurationSeconds,
+              durationSeconds: stepDurationSeconds * 0.95,
+            }),
+          );
+          allEvents.push(...chordEvents);
+        } else {
+          const realization = realizeStepAudioEvents({
+            step: baseStep,
+            tonic: parentTonic,
+            context,
+            tempoBpm,
+            stepStartSeconds: i * stepDurationSeconds,
+          });
+          allEvents.push(...realization.events);
+        }
       }
 
-      const scheduled = getPreviewAuditionController()?.audition(allEvents);
+      const controller =
+        instrument === "guitar"
+          ? getGuitarPreviewAuditionController()
+          : getPreviewAuditionController();
+      const scheduled = controller?.audition(allEvents);
       if (scheduled) {
         const totalDuration = allEvents.reduce(
           (latest, ev) => Math.max(latest, ev.startSeconds + ev.durationSeconds),
@@ -1467,7 +1590,12 @@ export function App() {
         }, Math.max(1, Math.ceil(totalDuration * 1000)));
       }
     },
-    [getPreviewAuditionController, stopAuditioningModes, store],
+    [
+      getGuitarPreviewAuditionController,
+      getPreviewAuditionController,
+      stopAuditioningModes,
+      store,
+    ],
   );
 
   const handleApplyModalFormulaToProgression = useCallback(

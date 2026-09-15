@@ -24,6 +24,7 @@ import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
 import { PianoCardView } from "../piano/PianoCardView";
 import { GuitarCardView } from "../guitar/GuitarCardView";
+import { resolveGuitarChordVoicing } from "../../domain/instruments/guitar/voicings";
 
 const TONIC_PITCH_CLASSES: readonly { pc: PitchClassIdentity; label: string }[] = Object.freeze([
   { pc: 0, label: "C" },
@@ -45,9 +46,19 @@ export interface ModesExplorerModalProps {
   readonly project: Project;
   readonly restoreFocusRef?: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
-  readonly onAuditionScaleNotes?: (pitches: readonly { midiNumber: number }[]) => void;
-  readonly onAuditionChord?: (pitches: readonly { midiNumber: number }[]) => void;
-  readonly onAuditionFormula?: (formula: ModalCadenceFormula, tonic: PitchClassIdentity) => void;
+  readonly onAuditionScaleNotes?: (
+    pitches: readonly { midiNumber: number }[],
+    instrument?: "piano" | "guitar",
+  ) => void;
+  readonly onAuditionChord?: (
+    pitches: readonly { midiNumber: number }[],
+    instrument?: "piano" | "guitar",
+  ) => void;
+  readonly onAuditionFormula?: (
+    formula: ModalCadenceFormula,
+    tonic: PitchClassIdentity,
+    instrument?: "piano" | "guitar",
+  ) => void;
   readonly onStopAudition?: () => void;
   readonly onApplyFormulaToProgression?: (
     formula: ModalCadenceFormula,
@@ -109,22 +120,37 @@ export function ModesExplorerModal({
   // Audio audition for scale notes
   const handlePlayScale = useCallback(() => {
     if (!onAuditionScaleNotes) return;
-    const baseMidi = 60 + selectedTonic; // Middle octave
+    const baseMidi = cardVisualView === "guitar" ? 48 + selectedTonic : 60 + selectedTonic;
     const pitches = scalePitches.map((p) => ({
       midiNumber: baseMidi + p.intervalFromTonic,
     }));
     // Add octave return at the end
     pitches.push({ midiNumber: baseMidi + 12 });
-    onAuditionScaleNotes(pitches);
-  }, [onAuditionScaleNotes, scalePitches, selectedTonic]);
+    onAuditionScaleNotes(pitches, cardVisualView);
+  }, [onAuditionScaleNotes, scalePitches, selectedTonic, cardVisualView]);
 
   const handlePlayChord = useCallback(
     (chordDef: ModalChordDefinition) => {
       if (!onAuditionChord) return;
-      const pitches = chordDef.pitches.map((p) => ({ midiNumber: p.midiNumber }));
-      onAuditionChord(pitches);
+      if (cardVisualView === "guitar") {
+        const isSeventh =
+          chordDef.chord.baseQuality === "dominant" || chordDef.chord.variant?.seventh !== undefined;
+        const isMajor7 = chordDef.chord.variant?.seventh === "major7";
+        const voicing = resolveGuitarChordVoicing({
+          rootPitchClass: chordDef.chord.rootPitchClass,
+          baseQuality: chordDef.chord.baseQuality,
+          spelling: chordDef.chord.spelling,
+          isSeventh,
+          isMajor7,
+        });
+        const pitches = voicing.pitches.map((p) => ({ midiNumber: p.midiNumber }));
+        onAuditionChord(pitches, "guitar");
+      } else {
+        const pitches = chordDef.pitches.map((p) => ({ midiNumber: p.midiNumber }));
+        onAuditionChord(pitches, "piano");
+      }
     },
-    [onAuditionChord],
+    [onAuditionChord, cardVisualView],
   );
 
   const handleApplyFormula = useCallback(
@@ -451,7 +477,7 @@ export function ModesExplorerModal({
                             <button
                               type="button"
                               className="formula-audition-btn"
-                              onClick={() => onAuditionFormula(formula, selectedTonic)}
+                              onClick={() => onAuditionFormula(formula, selectedTonic, cardVisualView)}
                               title="Audition progression audio"
                             >
                               <span aria-hidden="true">▶</span> Play
