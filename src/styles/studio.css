@@ -1174,7 +1174,8 @@
   font-size: 0.58rem;
 }
 .card-template-inspector,
-.progression-global-inspector {
+.progression-global-inspector,
+.harmonic-style-inspector {
   display: grid;
   gap: 10px;
   padding: var(--panel-padding);
@@ -1189,7 +1190,8 @@
   gap: 8px;
 }
 .card-template-inspector h3,
-.progression-global-inspector h3 {
+.progression-global-inspector h3,
+.harmonic-style-inspector h3 {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
@@ -3806,8 +3808,66 @@ summary:focus-visible,
   color: var(--text-muted);
 }
 
-.harmony-details .inspector-context-kicker {
+.harmony-details .inspector-context-kicker,
+.harmonic-style-inspector .inspector-context-kicker {
   margin-bottom: 3px;
+}
+
+/* --- Harmonic Style Focus Inspector Card --- */
+.harmonic-style-inspector {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.harmonic-style-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.harmonic-style-header > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.style-active-badge {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--primary, #38bdf8) 18%, transparent);
+  color: var(--primary, #38bdf8);
+  border: 1px solid color-mix(in srgb, var(--primary, #38bdf8) 40%, transparent);
+  white-space: nowrap;
+}
+
+.harmonic-style-body {
+  display: grid;
+  gap: 8px;
+}
+
+.harmonic-style-inspector .genre-focus-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.harmonic-style-inspector .genre-focus-pill {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+}
+
+.harmonic-style-description {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  border-left: 2px solid var(--primary, #38bdf8);
+  padding-left: 8px;
 }
 
 .piano-voicing-editor-modal {

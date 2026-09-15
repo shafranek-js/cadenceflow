@@ -18,7 +18,6 @@ import { MatrixResolutionArrows } from "./MatrixResolutionArrows";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
 import { ViewModeToggle } from "../common/ViewModeToggle";
-import { GenreFocusSelector } from "./GenreFocusSelector";
 import { isFunctionRelevantToGenre, type GenreFocusId } from "../../domain/harmony/functionSemantics";
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
@@ -230,10 +229,6 @@ export function HarmonicMatrix({
           tonic={project.tonic}
           mode={modeForModule(project.activeModule)}
           onChange={onTonicChange}
-        />
-        <GenreFocusSelector
-          value={project.presentation.genreFocus ?? "all"}
-          onChange={onGenreFocusChange ?? (() => {})}
         />
         <div className="matrix-toolbar-actions">
           {onOpenPresets && (

@@ -73,6 +73,7 @@ import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu
 import { MatrixContextMenu } from "../ui/matrix/MatrixContextMenu";
 import { ViewModeToggle } from "../ui/common/ViewModeToggle";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
+import { HarmonicStyleInspector } from "../ui/inspector/HarmonicStyleInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
 import { RestStepInspector } from "../ui/inspector/RestStepInspector";
 import { ProgressionGlobalInspector } from "../ui/inspector/ProgressionGlobalInspector";
@@ -2864,6 +2865,10 @@ export function App() {
           {globalSettingsVisibility.showPreviewHarmony ? (
             <HarmonyDetails chord={previewChord} />
           ) : null}
+          <HarmonicStyleInspector
+            value={project.presentation.genreFocus ?? "all"}
+            onChange={changeGenreFocus}
+          />
           <CardTemplateInspector
             project={project}
             functionId={settingsFunctionId}
