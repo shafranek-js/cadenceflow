@@ -178,6 +178,7 @@ describe("useReorderableSections", () => {
       "cadenceflow:inspector:selected_step:sections_order",
     );
     expect(DEFAULT_SELECTED_STEP_SECTIONS).toEqual([
+      "reharmonization",
       "register",
       "articulation",
       "duration",

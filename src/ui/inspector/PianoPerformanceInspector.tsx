@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState, useMemo, type ChangeEvent } from "react";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import {
   exactPitch,
@@ -42,6 +42,11 @@ import type { MelodyTrackSettings } from "../../domain/melody/types";
 import type { AudioProviderState } from "../../audio/contracts";
 import { Icon } from "../common/Icon";
 import { useReorderableSections } from "./useReorderableSections";
+import {
+  getAvailableSubstitutions,
+  getSubstitutionKindBadge,
+  type ChordSubstitution,
+} from "../../domain/harmony/reharmonization";
 
 const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
   Object.freeze([
@@ -72,6 +77,7 @@ const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label:
 const MUSICAL_DYNAMICS: readonly MusicalDynamicLabel[] = ["pp", "p", "mp", "mf", "f", "ff"];
 
 export type SelectedStepSectionId =
+  | "reharmonization"
   | "register"
   | "articulation"
   | "duration"
@@ -81,6 +87,7 @@ export type SelectedStepSectionId =
   | "progression";
 
 export const DEFAULT_SELECTED_STEP_SECTIONS: readonly SelectedStepSectionId[] = Object.freeze([
+  "reharmonization",
   "register",
   "articulation",
   "duration",
@@ -93,6 +100,7 @@ export const DEFAULT_SELECTED_STEP_SECTIONS: readonly SelectedStepSectionId[] = 
 export const SELECTED_STEP_SECTION_ORDER_STORAGE_KEY =
   "cadenceflow:inspector:selected_step:sections_order";
 
+const REHARMONIZATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.reharmonization-disclosure-open";
 const DYNAMICS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.dynamics-disclosure-open";
 const PER_NOTE_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.per-note-disclosure-open";
 const BASS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.bass-disclosure-open";
@@ -153,6 +161,9 @@ export interface PianoPerformanceInspectorProps {
   readonly steps?: readonly ProgressionStep[];
   readonly onSetLoopMode?: (mode: LoopMode) => void;
   readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
+  readonly onApplySubstitution?: (substitution: ChordSubstitution) => void;
+  readonly onAuditionSubstitution?: (substitution: ChordSubstitution) => void;
+  readonly auditioningSubstitutionId?: string | null;
 }
 
 export function PianoPerformanceInspector({
@@ -182,12 +193,18 @@ export function PianoPerformanceInspector({
   steps,
   onSetLoopMode,
   onSetLoopRange,
+  onApplySubstitution,
+  onAuditionSubstitution,
+  auditioningSubstitutionId,
 }: PianoPerformanceInspectorProps) {
   const perf = step.performance;
   const isManual = perf.voicingMode === "manual";
   const overrideCount = Object.keys(perf.perNoteVelocityOverrides || {}).length;
 
   const [customBassError, setCustomBassError] = useState<string | null>(null);
+  const [reharmonizationOpen, setReharmonizationOpen] = useState(() =>
+    readDisclosureState(REHARMONIZATION_DISCLOSURE_STORAGE_KEY, true),
+  );
   const [registerOpen, setRegisterOpen] = useState(() =>
     readDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, true),
   );
@@ -208,6 +225,11 @@ export function PianoPerformanceInspector({
   );
   const [voicingOpen, setVoicingOpen] = useState(() =>
     readDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, true),
+  );
+
+  const availableSubstitutions = useMemo(
+    () => getAvailableSubstitutions(step, context.moduleId, tonic),
+    [step, context.moduleId, tonic],
   );
 
   const persistDisclosureState = (key: string, open: boolean) => {
@@ -362,6 +384,130 @@ export function PianoPerformanceInspector({
 
   const renderSectionContent = (sectionId: SelectedStepSectionId) => {
     switch (sectionId) {
+      case "reharmonization":
+        return (
+          <details
+            className="inspector-disclosure reharmonization-disclosure"
+            open={reharmonizationOpen}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setReharmonizationOpen(open);
+              persistDisclosureState(REHARMONIZATION_DISCLOSURE_STORAGE_KEY, open);
+            }}
+          >
+            <summary>
+              <span>
+                <span
+                  {...getDragHandleProps("reharmonization", "Reharmonization")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  ⋮⋮
+                </span>
+                Reharmonization
+              </span>
+              <span className="disclosure-status">
+                {availableSubstitutions.length} suggestion{availableSubstitutions.length === 1 ? "" : "s"}
+              </span>
+            </summary>
+            <div className="inspector-disclosure-body">
+              <div
+                className="inspector-group reharmonization-group"
+                role="group"
+                aria-label="Reharmonization suggestions"
+              >
+                <div className="reharmonization-header">
+                  <h4>Chord Substitutions</h4>
+                  <p className="reharmonization-subtitle">
+                    Contextual harmonic substitutions for {step.harmonicFunction.functionId}
+                  </p>
+                </div>
+                {availableSubstitutions.length === 0 ? (
+                  <div className="reharmonization-empty" data-testid="reharmonization-empty">
+                    No automatic substitutions found for this chord.
+                  </div>
+                ) : (
+                  <div
+                    className="reharmonization-list"
+                    role="list"
+                    data-testid="reharmonization-list"
+                  >
+                    {availableSubstitutions.map((sub) => {
+                      const badge = getSubstitutionKindBadge(sub.kind);
+                      const isAuditioning = auditioningSubstitutionId === sub.id;
+                      return (
+                        <div
+                          key={sub.id}
+                          className="reharmonization-card"
+                          data-testid={`reharmonization-card-${sub.id}`}
+                          role="listitem"
+                        >
+                          <div className="reharmonization-card-header">
+                            <span className={`sub-badge ${badge.badgeClass}`}>
+                              {badge.label}
+                            </span>
+                            <span className={`sub-op-tag sub-op-${sub.operation}`}>
+                              {sub.operation === "replace" ? "Swap" : "Insert Before"}
+                            </span>
+                          </div>
+                          <div className="reharmonization-card-title-row">
+                            <div className="sub-title-chord">
+                              <span className="sub-target-symbol">{sub.chordSymbol}</span>
+                              <span className="sub-title">{sub.title}</span>
+                            </div>
+                            <div className="sub-actions">
+                              {onAuditionSubstitution && (
+                                <button
+                                  type="button"
+                                  className={`sub-audition-btn ${isAuditioning ? "is-playing" : ""}`}
+                                  onClick={() => onAuditionSubstitution(sub)}
+                                  aria-label={
+                                    isAuditioning
+                                      ? `Stop auditioning ${sub.chordSymbol}`
+                                      : `Audition ${sub.chordSymbol}`
+                                  }
+                                  title={isAuditioning ? "Stop Preview" : "Audition (Play)"}
+                                  data-testid={`sub-audition-btn-${sub.id}`}
+                                >
+                                  <Icon name={isAuditioning ? "stop" : "play"} />
+                                </button>
+                              )}
+                              {onApplySubstitution && (
+                                <button
+                                  type="button"
+                                  className="sub-apply-btn"
+                                  onClick={() => onApplySubstitution(sub)}
+                                  aria-label={`Apply ${sub.title}`}
+                                  data-testid={`sub-apply-btn-${sub.id}`}
+                                >
+                                  Apply
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="sub-description">{sub.description}</p>
+                          <div className="sub-rationale-box">
+                            <span className="sub-rationale-label">Why it works</span>
+                            <span className="sub-rationale-text">{sub.theoreticalRationale}</span>
+                          </div>
+                          {sub.tags.length > 0 && (
+                            <div className="sub-tags-row">
+                              {sub.tags.map((tag) => (
+                                <span key={tag} className="sub-tag">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </details>
+        );
+
       case "register":
         return (
           <details

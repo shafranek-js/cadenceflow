@@ -108,6 +108,10 @@ import {
   realizeMelodyStepAudition,
   realizeProgressionMelodyPerformance,
 } from "../audio/melodyPerformance";
+import {
+  getAvailableSubstitutions,
+  type ChordSubstitution,
+} from "../domain/harmony/reharmonization";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
@@ -1079,6 +1083,86 @@ export function App() {
     },
     [getPreviewAuditionController, stopAuditionPreset],
   );
+
+  const [auditioningSubId, setAuditioningSubId] = useState<string | null>(null);
+  const subAuditionStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopAuditioningSubstitution = useCallback(() => {
+    if (subAuditionStopTimerRef.current !== null) {
+      clearTimeout(subAuditionStopTimerRef.current);
+      subAuditionStopTimerRef.current = null;
+    }
+    getPreviewAuditionController()?.stop();
+    setAuditioningSubId(null);
+  }, [getPreviewAuditionController]);
+
+  const handleAuditionSubstitution = useCallback(
+    (substitution: ChordSubstitution) => {
+      if (auditioningSubId === substitution.id) {
+        stopAuditioningSubstitution();
+        return;
+      }
+      stopAuditioningSubstitution();
+
+      const currentProject = store.project;
+      const targetModule = substitution.targetModuleId ?? currentProject.activeModule;
+      const targetStep =
+        selectedChordStep ??
+        createMatrixChordStep(
+          currentProject,
+          substitution.targetFunctionId,
+          "preview-sub-step",
+          targetModule,
+        );
+      const subStep: ChordStep = Object.freeze({
+        ...createMatrixChordStep(
+          currentProject,
+          substitution.targetFunctionId,
+          "preview-sub-step",
+          targetModule,
+        ),
+        cardView: targetStep.cardView,
+        duration: targetStep.duration,
+        harmonicVariant: substitution.harmonicVariant ?? targetStep.harmonicVariant,
+        performance: targetStep.performance,
+      });
+
+      const mode = getHarmonicModule(targetModule).mode;
+      const context: HarmonicContext = {
+        tonic: currentProject.tonic,
+        mode,
+        moduleId: targetModule,
+        spellingContext: { tonic: currentProject.tonic, mode },
+      };
+      const realization = realizeStepAudioEvents({
+        step: subStep,
+        tonic: currentProject.tonic,
+        context,
+        tempoBpm: currentProject.globalTiming.tempoBpm,
+      });
+
+      const scheduled = getPreviewAuditionController()?.audition(realization.events);
+      if (scheduled) {
+        setAuditioningSubId(substitution.id);
+        const durationSeconds = realization.events.reduce(
+          (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
+          0,
+        );
+        subAuditionStopTimerRef.current = setTimeout(() => {
+          subAuditionStopTimerRef.current = null;
+          setAuditioningSubId((curr) => (curr === substitution.id ? null : curr));
+        }, Math.max(1, Math.ceil(durationSeconds * 1000)));
+      }
+    },
+    [
+      auditioningSubId,
+      getPreviewAuditionController,
+      selectedChordStep,
+      stopAuditioningSubstitution,
+      store,
+    ],
+  );
+
   const editProgressionPerformance = (stepId: string, performance: Partial<StepPerformance>) => {
     const command: EditStepPerformanceCommand = {
       type: "progression/edit-performance",
@@ -1100,6 +1184,49 @@ export function App() {
       payload: { stepId, functionId, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, replaceStep);
+  };
+  const handleApplySubstitution = (stepId: string, substitution: ChordSubstitution) => {
+    const targetStep = project.progression.steps.find((s) => s.id === stepId);
+    if (!targetStep || targetStep.kind !== "chord") return;
+
+    if (substitution.operation === "replace") {
+      const command: ReplaceStepCommand = {
+        type: "progression/replace-step",
+        payload: {
+          stepId,
+          functionId: substitution.targetFunctionId,
+          ...(substitution.targetModuleId ? { moduleId: substitution.targetModuleId } : {}),
+          ...(substitution.harmonicVariant ? { harmonicVariant: substitution.harmonicVariant } : {}),
+          nowIso: new Date().toISOString(),
+        },
+      };
+      store.dispatch(command, replaceStep);
+    } else {
+      const targetModule = substitution.targetModuleId ?? project.activeModule;
+      const newStepId = `step-sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const baseNewStep = createMatrixChordStep(
+        project,
+        substitution.targetFunctionId,
+        newStepId,
+        targetModule,
+      );
+      const newStep: ChordStep = Object.freeze({
+        ...baseNewStep,
+        duration: targetStep.duration,
+        cardView: targetStep.cardView,
+        harmonicVariant: substitution.harmonicVariant ?? baseNewStep.harmonicVariant,
+        performance: snapshotStepPerformance(targetStep.performance),
+      });
+      const command: InsertStepsBeforeCommand = {
+        type: "progression/insert-steps-before",
+        payload: {
+          beforeStepId: stepId,
+          steps: [newStep],
+          nowIso: new Date().toISOString(),
+        },
+      };
+      store.dispatch(command, insertStepsBefore);
+    }
   };
   const resetProgressionStep = (stepId: string) => {
     const command: ResetStepPerformanceCommand = {
@@ -2653,6 +2780,9 @@ export function App() {
             steps={project.progression.steps}
             onSetLoopMode={handleSetLoopMode}
             onSetLoopRange={handleSetLoopRange}
+            onApplySubstitution={(sub) => handleApplySubstitution(selectedChordStep.id, sub)}
+            onAuditionSubstitution={handleAuditionSubstitution}
+            auditioningSubstitutionId={auditioningSubId}
           />
         ) : selectedProgressionStep?.kind === "rest" ? (
           <RestStepInspector
@@ -2850,6 +2980,7 @@ export function App() {
             onToggleSuzukiColors={() => changeSuzukiColors(!(project.presentation.suzukiColors ?? false))}
             onApplyPreset={handleApplyPreset}
             onOpenPresets={() => setPresetsPanelOpen(true)}
+            onApplySubstitution={handleApplySubstitution}
           />
           <BranchComparison
             project={project}

@@ -182,6 +182,17 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     position: { column: 4, row: 2 },
     baseline: true,
   },
+  {
+    id: "subV7",
+    layerId: "secondary-dominants",
+    category: "secondary-dominant",
+    degree: 2,
+    chromaticAlter: -1,
+    quality: "dominant",
+    targetFunctionId: "I",
+    position: { column: 6, row: 0 },
+    baseline: false,
+  },
 ];
 
 function identity(spec: FunctionSpec): HarmonicFunctionIdentity {
@@ -231,8 +242,25 @@ export const PROGRESSIONS_MODULE = {
 export function getProgressionsFunction(functionId: string): FunctionSpec {
   const normalizedId = functionId === "V7/I" ? "V7" : functionId;
   const spec = PROGRESSIONS_FUNCTIONS.find((candidate) => candidate.id === normalizedId);
-  if (!spec) throw new RangeError(`Unsupported Progressions function: ${functionId}`);
-  return spec;
+  if (spec) return spec;
+  if (functionId.startsWith("subV7/")) {
+    const targetId = functionId.slice("subV7/".length);
+    const targetSpec = PROGRESSIONS_FUNCTIONS.find((c) => c.id === targetId);
+    if (targetSpec) {
+      return {
+        id: functionId,
+        layerId: "secondary-dominants",
+        category: "secondary-dominant",
+        degree: 2,
+        chromaticAlter: -1,
+        quality: "dominant",
+        targetFunctionId: targetId,
+        position: { column: targetSpec.position.column, row: 0 },
+        baseline: false,
+      };
+    }
+  }
+  throw new RangeError(`Unsupported Progressions function: ${functionId}`);
 }
 
 export function realizeProgressionsChord(
@@ -241,7 +269,11 @@ export function realizeProgressionsChord(
 ): ChordDefinition {
   const spec = getProgressionsFunction(functionId);
   let rootSpelling;
-  if (spec.category === "secondary-dominant") {
+  if (spec.id === "subV7" || spec.id.startsWith("subV7/")) {
+    const target = getProgressionsFunction(spec.targetFunctionId ?? "I");
+    const targetRoot = normalizePitchClass(tonic + [0, 2, 4, 5, 7, 9, 11][target.degree - 1]!);
+    rootSpelling = spellScaleDegree(targetRoot, "major", 2, -1);
+  } else if (spec.category === "secondary-dominant") {
     const target = getProgressionsFunction(spec.targetFunctionId!);
     const targetRoot = normalizePitchClass(tonic + [0, 2, 4, 5, 7, 9, 11][target.degree - 1]!);
     rootSpelling = spellScaleDegree(targetRoot, "major", 5);

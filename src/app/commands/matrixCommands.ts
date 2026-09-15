@@ -1,6 +1,6 @@
 import { realizeChord } from "../../domain/harmony/realization";
-import type { HarmonicFunctionIdentity } from "../../domain/harmony/functions";
-import { recommendationVocabulary } from "../../domain/harmony/moduleRegistry";
+import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../../domain/harmony/functions";
+import { getHarmonicModule, recommendationVocabulary } from "../../domain/harmony/moduleRegistry";
 import type { Project, MatrixCardTemplateState } from "../../domain/project/project";
 import { resolveStepCreationDefaults } from "../../domain/project/defaults";
 import { snapshotStepPerformance, type ChordStep } from "../../domain/progression/step";
@@ -19,27 +19,31 @@ export type AddMatrixPreviewCommand = ProjectCommand<AddMatrixPreviewPayload> & 
 export function identityForMatrixFunction(
   project: Project,
   functionId: string,
+  moduleId: HarmonicModuleId = project.activeModule,
 ): HarmonicFunctionIdentity {
-  const identity = recommendationVocabulary(project.activeModule).find(
-    (candidate) => candidate.functionId === functionId,
+  const vocabulary = recommendationVocabulary(moduleId);
+  const found = vocabulary.find((candidate) => candidate.functionId === functionId);
+  if (found) return found;
+  const card = getHarmonicModule(moduleId).topology.cards.find(
+    (c) => c.identity.functionId === functionId,
   );
-  if (!identity)
-    throw new RangeError(`Unsupported ${project.activeModule} function: ${functionId}`);
-  return identity;
+  if (card) return card.identity;
+  throw new RangeError(`Unsupported ${moduleId} function: ${functionId}`);
 }
 
-function templateFor(project: Project, functionId: string): MatrixCardTemplateState | undefined {
-  return project.moduleTemplateStates[project.activeModule].cards[functionId];
+function templateFor(project: Project, functionId: string, moduleId: HarmonicModuleId = project.activeModule): MatrixCardTemplateState | undefined {
+  return project.moduleTemplateStates[moduleId]?.cards[functionId];
 }
 
 export function createMatrixChordStep(
   project: Project,
   functionId: string,
   stepId: string,
+  moduleId: HarmonicModuleId = project.activeModule,
 ): ChordStep {
-  const identity = identityForMatrixFunction(project, functionId);
+  const identity = identityForMatrixFunction(project, functionId, moduleId);
   const chord = realizeChord(identity, project.tonic);
-  const template = templateFor(project, functionId);
+  const template = templateFor(project, functionId, moduleId);
   const resolved = resolveStepCreationDefaults(project.defaults.piano, template?.explicitOverrides);
   const performance = snapshotStepPerformance(
     Object.freeze({

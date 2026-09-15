@@ -26,6 +26,10 @@ import {
 } from "../../domain/timing/measureLayout";
 import { rationalToNumber, subtractRational } from "../../domain/timing/rational";
 import type { LoopState } from "../transport/loopState";
+import {
+  getAvailableSubstitutions,
+  type ChordSubstitution,
+} from "../../domain/harmony/reharmonization";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
@@ -111,6 +115,7 @@ export function ProgressionTrack({
   onToggleSuzukiColors,
   onApplyPreset,
   onOpenPresets,
+  onApplySubstitution,
 }: {
   readonly project: Project;
   readonly currentPlayingStepIndex?: number | null;
@@ -181,6 +186,9 @@ export function ProgressionTrack({
   readonly onToggleSuzukiColors?: (() => void) | undefined;
   readonly onApplyPreset?: ((preset: FunctionalPreset, mode: PresetApplyMode) => void) | undefined;
   readonly onOpenPresets?: (() => void) | undefined;
+  readonly onApplySubstitution?:
+    | ((stepId: string, substitution: ChordSubstitution) => void)
+    | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
@@ -746,12 +754,20 @@ export function ProgressionTrack({
               (candidate) => candidate.id === melodyMenu.stepId,
             );
             if (!step) return null;
+            const subs =
+              step.kind === "chord"
+                ? getAvailableSubstitutions(step, project.activeModule, project.tonic)
+                : undefined;
             return (
               <MelodyContextMenu
                 step={step}
                 position={melodyMenu.position}
                 invoker={melodyMenu.invoker}
                 tonic={project.tonic}
+                substitutions={subs}
+                onApplySubstitution={
+                  onApplySubstitution ? (sub) => onApplySubstitution(step.id, sub) : undefined
+                }
                 onCreate={() => {
                   setMelodyMenu(null);
                   setMelodyEditorStepId(step.id);

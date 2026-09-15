@@ -10,6 +10,7 @@ import type { ProgressionStep } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
+import type { ChordSubstitution } from "../../domain/harmony/reharmonization";
 
 export interface MelodyMenuPosition {
   readonly x: number;
@@ -28,6 +29,8 @@ export interface MelodyContextMenuProps {
   readonly onInsertSelectedBefore?: (() => void) | null | undefined;
   readonly onInsertSelectedAfter?: (() => void) | null | undefined;
   readonly selectedMatrixChordName?: string | undefined;
+  readonly substitutions?: readonly ChordSubstitution[] | undefined;
+  readonly onApplySubstitution?: ((substitution: ChordSubstitution) => void) | undefined;
   readonly onDeleteStep?: (() => void) | undefined;
   readonly onClose: () => void;
 }
@@ -52,6 +55,8 @@ export function MelodyContextMenu({
   onInsertSelectedBefore,
   onInsertSelectedAfter,
   selectedMatrixChordName,
+  substitutions,
+  onApplySubstitution,
   onDeleteStep,
   onClose,
 }: MelodyContextMenuProps) {
@@ -251,7 +256,45 @@ export function MelodyContextMenu({
         </>
       ) : null}
 
-      {/* 3. Delete Action */}
+      {/* 3. Reharmonization Section */}
+      {isChord && substitutions && substitutions.length > 0 && onApplySubstitution ? (
+        <>
+          <div className="melody-context-menu-separator" role="separator" />
+          <div
+            className="context-menu-subheading"
+            role="presentation"
+            style={{
+              padding: "4px 8px",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Reharmonize
+          </div>
+          {substitutions.slice(0, 4).map((sub) => (
+            <button
+              key={sub.id}
+              ref={(node) => {
+                itemRefs.current[btnIndex++] = node;
+              }}
+              type="button"
+              role="menuitem"
+              data-testid={`step-menu-reharmonize-${sub.id}`}
+              onClick={() => {
+                onApplySubstitution(sub);
+                onClose();
+              }}
+            >
+              {sub.operation === "replace" ? "Swap to" : "Insert"} {sub.chordSymbol} ({sub.title})
+            </button>
+          ))}
+        </>
+      ) : null}
+
+      {/* 4. Delete Action */}
       {onDeleteStep ? (
         <>
           <div className="melody-context-menu-separator" role="separator" />

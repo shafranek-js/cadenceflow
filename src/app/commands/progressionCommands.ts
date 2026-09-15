@@ -13,6 +13,8 @@ import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
 import { snapshotChordMelodyRecipe, type ChordMelodyRecipe } from "../../domain/melody/types";
+import type { HarmonicModuleId } from "../../domain/harmony/functions";
+import type { HarmonicVariant } from "../../domain/harmony/chord";
 import type { AppliedCommand, ProjectCommand } from ".";
 
 function updateProgression(project: Project, progression: Progression, nowIso: string): Project {
@@ -256,6 +258,8 @@ export function resetAllStepPerformance(
 export interface ReplaceStepPayload {
   readonly stepId: string;
   readonly functionId: string;
+  readonly moduleId?: HarmonicModuleId;
+  readonly harmonicVariant?: HarmonicVariant;
   readonly nowIso: string;
 }
 export type ReplaceStepCommand = ProjectCommand<ReplaceStepPayload> & {
@@ -266,6 +270,7 @@ export function replaceStep(project: Project, command: ReplaceStepCommand): Appl
     project,
     command.payload.functionId,
     command.payload.stepId,
+    command.payload.moduleId,
   );
   let found = false;
   const steps = project.progression.steps.map((step) => {
@@ -276,7 +281,7 @@ export function replaceStep(project: Project, command: ReplaceStepCommand): Appl
     const next: ChordStep = Object.freeze({
       ...withoutSpelling,
       harmonicFunction: replacement.harmonicFunction,
-      harmonicVariant: replacement.harmonicVariant,
+      harmonicVariant: command.payload.harmonicVariant ?? replacement.harmonicVariant,
     });
     return next;
   });
