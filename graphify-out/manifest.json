@@ -1,0 +1,1587 @@
+{
+  ".specify/init-options.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "211c5e5e2bc1ed9bdaaba1392508de42",
+    "semantic_hash": "211c5e5e2bc1ed9bdaaba1392508de42"
+  },
+  ".specify/integration.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "e2fd5930486cae7e03913897e0d3dbde",
+    "semantic_hash": "e2fd5930486cae7e03913897e0d3dbde"
+  },
+  ".specify/integrations/codex.manifest.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "ef7580d60ea98c69f51c99a5094bafc8",
+    "semantic_hash": "ef7580d60ea98c69f51c99a5094bafc8"
+  },
+  ".specify/integrations/speckit.manifest.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "d857dee3cd116b8d1aeb298fc10642c9",
+    "semantic_hash": "d857dee3cd116b8d1aeb298fc10642c9"
+  },
+  ".specify/memory/.constitution-template.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "7e3332a78cec1722b4351c6bf52dfc51",
+    "semantic_hash": "7e3332a78cec1722b4351c6bf52dfc51"
+  },
+  ".specify/scripts/bash/check-prerequisites.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "a53b260111e6e22737f4fd028c5b6614",
+    "semantic_hash": "a53b260111e6e22737f4fd028c5b6614"
+  },
+  ".specify/scripts/bash/common.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "0108b5c4e7cf420ddd8d8b86989635ad",
+    "semantic_hash": "0108b5c4e7cf420ddd8d8b86989635ad"
+  },
+  ".specify/scripts/bash/create-new-feature.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "a95a08c0ea47a9a753afb325738f5295",
+    "semantic_hash": "a95a08c0ea47a9a753afb325738f5295"
+  },
+  ".specify/scripts/bash/resolve-template.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "8e3dfe574895c76bb9cd555fea0ce54d",
+    "semantic_hash": "8e3dfe574895c76bb9cd555fea0ce54d"
+  },
+  ".specify/scripts/bash/setup-plan.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "be48ee5a34eca6b5065a8f1fcfae4ff6",
+    "semantic_hash": "be48ee5a34eca6b5065a8f1fcfae4ff6"
+  },
+  ".specify/scripts/bash/setup-tasks.sh": {
+    "mtime": 1788516377.0,
+    "ast_hash": "118b0eb1b68c6bd3e9afb4734cd08ef8",
+    "semantic_hash": "118b0eb1b68c6bd3e9afb4734cd08ef8"
+  },
+  ".specify/workflows/workflow-registry.json": {
+    "mtime": 1788516377.0,
+    "ast_hash": "694d5923d24ebde43ff92035a55a8def",
+    "semantic_hash": "694d5923d24ebde43ff92035a55a8def"
+  },
+  "eslint.config.js": {
+    "mtime": 1788546604.9711232,
+    "ast_hash": "45c29d3eb37d1f539958b96d54dcaff4",
+    "semantic_hash": "45c29d3eb37d1f539958b96d54dcaff4"
+  },
+  "package.json": {
+    "mtime": 1789070789.7225742,
+    "ast_hash": "00349a7814bda2d530a635dff3e8c2f5",
+    "semantic_hash": "00349a7814bda2d530a635dff3e8c2f5"
+  },
+  "playwright.config.ts": {
+    "mtime": 1788596786.193592,
+    "ast_hash": "d10ebfb1de490b5b2c10b98fec17c00e",
+    "semantic_hash": "d10ebfb1de490b5b2c10b98fec17c00e"
+  },
+  "public/audio/melody/FluidR3_GM/cello-mp3.js": {
+    "mtime": 1789069453.5981855,
+    "ast_hash": "685dc1bd9062a84a61ebeb4c243242bc",
+    "semantic_hash": "685dc1bd9062a84a61ebeb4c243242bc"
+  },
+  "public/audio/melody/FluidR3_GM/clarinet-mp3.js": {
+    "mtime": 1789069459.076083,
+    "ast_hash": "7852c36930a41b59de35732f65ee62d6",
+    "semantic_hash": "7852c36930a41b59de35732f65ee62d6"
+  },
+  "public/audio/melody/FluidR3_GM/flute-mp3.js": {
+    "mtime": 1789069461.7977622,
+    "ast_hash": "4e2055c60383989e570b9897ef3e7b49",
+    "semantic_hash": "4e2055c60383989e570b9897ef3e7b49"
+  },
+  "public/audio/melody/FluidR3_GM/lead_1_square-mp3.js": {
+    "mtime": 1789069465.91267,
+    "ast_hash": "1a2af7eff86d6777e62ec52305693b1d",
+    "semantic_hash": "1a2af7eff86d6777e62ec52305693b1d"
+  },
+  "public/audio/melody/FluidR3_GM/oboe-mp3.js": {
+    "mtime": 1789069456.2366045,
+    "ast_hash": "ec847850fad1fe8446aa81c2d6efde81",
+    "semantic_hash": "ec847850fad1fe8446aa81c2d6efde81"
+  },
+  "public/audio/melody/FluidR3_GM/violin-mp3.js": {
+    "mtime": 1789069448.5157454,
+    "ast_hash": "f529ba35f7f5d5b5b4c2dc12401eaa23",
+    "semantic_hash": "f529ba35f7f5d5b5b4c2dc12401eaa23"
+  },
+  "public/audio/melody/manifest.json": {
+    "mtime": 1789070789.7205703,
+    "ast_hash": "6902f7cb2e9c526761c15d131baf171b",
+    "semantic_hash": "6902f7cb2e9c526761c15d131baf171b"
+  },
+  "public/audio/piano-hq/manifest.json": {
+    "mtime": 1788604789.1335373,
+    "ast_hash": "f2fe7c2b84a04e5e5126710c8c99ab06",
+    "semantic_hash": "f2fe7c2b84a04e5e5126710c8c99ab06"
+  },
+  "scripts/capture-us6-batch-c-evidence.ts": {
+    "mtime": 1788630530.0290241,
+    "ast_hash": "4a794024064c91db727ba0190231309d",
+    "semantic_hash": "4a794024064c91db727ba0190231309d"
+  },
+  "scripts/capture-us6-final-evidence.ts": {
+    "mtime": 1788632113.7489307,
+    "ast_hash": "9b588c92af2415e5c84aa70ba1c5ead0",
+    "semantic_hash": "9b588c92af2415e5c84aa70ba1c5ead0"
+  },
+  "scripts/capture-us7-batch-c.ts": {
+    "mtime": 1788638101.1106288,
+    "ast_hash": "de28f60837cdbc65b441950480a9adec",
+    "semantic_hash": "de28f60837cdbc65b441950480a9adec"
+  },
+  "scripts/capture-us7-final.ts": {
+    "mtime": 1788639457.7268465,
+    "ast_hash": "3d5b50272272b9b8a97a7355b38f49bb",
+    "semantic_hash": "3d5b50272272b9b8a97a7355b38f49bb"
+  },
+  "scripts/foundation-smoke.ts": {
+    "mtime": 1788551378.35534,
+    "ast_hash": "de7383eb9c72714251f5f013db8804ad",
+    "semantic_hash": "de7383eb9c72714251f5f013db8804ad"
+  },
+  "scripts/prepare-piano-bank.ts": {
+    "mtime": 1788603845.7152169,
+    "ast_hash": "819b4a4b19db5c172001c876e376a489",
+    "semantic_hash": "819b4a4b19db5c172001c876e376a489"
+  },
+  "scripts/validate-musicxml.ts": {
+    "mtime": 1788810125.5385263,
+    "ast_hash": "553ad35d8a6ddf25335efd54584168d6",
+    "semantic_hash": "553ad35d8a6ddf25335efd54584168d6"
+  },
+  "scripts/verify-fixtures.ts": {
+    "mtime": 1788551378.8012395,
+    "ast_hash": "bbb2071411be3576552391eed1e49b42",
+    "semantic_hash": "bbb2071411be3576552391eed1e49b42"
+  },
+  "scripts/verify-melody-assets.ts": {
+    "mtime": 1789071614.3910284,
+    "ast_hash": "2d556c5df761384210d24b83c77c1de2",
+    "semantic_hash": "2d556c5df761384210d24b83c77c1de2"
+  },
+  "specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json": {
+    "mtime": 1789045997.8701248,
+    "ast_hash": "4f8631a1a7b367ec010ba8832c754744",
+    "semantic_hash": "4f8631a1a7b367ec010ba8832c754744"
+  },
+  "src/app/App.tsx": {
+    "mtime": 1789106746.7679014,
+    "ast_hash": "29d5c5a20c70839920a2eb529c6c71c6",
+    "semantic_hash": "29d5c5a20c70839920a2eb529c6c71c6"
+  },
+  "src/app/appStore.ts": {
+    "mtime": 1788890308.3661952,
+    "ast_hash": "9f11390f663288e8164f6e5b9c08dcce",
+    "semantic_hash": "9f11390f663288e8164f6e5b9c08dcce"
+  },
+  "src/app/commands/branchCommands.ts": {
+    "mtime": 1788547342.6001806,
+    "ast_hash": "da898e0e70388effc9e57cee244cbfb4",
+    "semantic_hash": "da898e0e70388effc9e57cee244cbfb4"
+  },
+  "src/app/commands/dispatcher.ts": {
+    "mtime": 1789044716.1623595,
+    "ast_hash": "132b2ea6a8a90f20cb0385239fba3af9",
+    "semantic_hash": "132b2ea6a8a90f20cb0385239fba3af9"
+  },
+  "src/app/commands/harmonyContextCommands.ts": {
+    "mtime": 1788547342.6130543,
+    "ast_hash": "34d4e78ae347d46ba026cb24f783bba0",
+    "semantic_hash": "34d4e78ae347d46ba026cb24f783bba0"
+  },
+  "src/app/commands/index.ts": {
+    "mtime": 1788636048.001757,
+    "ast_hash": "ffd2073139cb54e40df08d359c25e9ba",
+    "semantic_hash": "ffd2073139cb54e40df08d359c25e9ba"
+  },
+  "src/app/commands/matrixCommands.ts": {
+    "mtime": 1788547342.6266766,
+    "ast_hash": "409b098768ff2e55eddd0db38704b753",
+    "semantic_hash": "409b098768ff2e55eddd0db38704b753"
+  },
+  "src/app/commands/matrixTemplateCommands.ts": {
+    "mtime": 1788547342.6458712,
+    "ast_hash": "499ad605ccc449f7d100083149dda5ce",
+    "semantic_hash": "499ad605ccc449f7d100083149dda5ce"
+  },
+  "src/app/commands/matrixViewCommands.ts": {
+    "mtime": 1788547342.6566432,
+    "ast_hash": "18797f39886ae54886632c9872a2a612",
+    "semantic_hash": "18797f39886ae54886632c9872a2a612"
+  },
+  "src/app/commands/melodyCommands.ts": {
+    "mtime": 1789067691.5338461,
+    "ast_hash": "fd6924422f25585ef72e0cdffbad60f8",
+    "semantic_hash": "fd6924422f25585ef72e0cdffbad60f8"
+  },
+  "src/app/commands/presentationCommands.ts": {
+    "mtime": 1788959053.319779,
+    "ast_hash": "9fde5b0e3e50b3515b1d22669bf08efb",
+    "semantic_hash": "9fde5b0e3e50b3515b1d22669bf08efb"
+  },
+  "src/app/commands/presetCommands.ts": {
+    "mtime": 1788636055.61823,
+    "ast_hash": "929eb47557fb3c3ffcf905ee27f4c45c",
+    "semantic_hash": "929eb47557fb3c3ffcf905ee27f4c45c"
+  },
+  "src/app/commands/progressionCommands.ts": {
+    "mtime": 1789044872.3657033,
+    "ast_hash": "a4b7b48c9f9b2b1dacedd02e9ee9345d",
+    "semantic_hash": "a4b7b48c9f9b2b1dacedd02e9ee9345d"
+  },
+  "src/app/commands/projectCommands.ts": {
+    "mtime": 1788788149.4479055,
+    "ast_hash": "4674348d1cd6254e0431483acad872e9",
+    "semantic_hash": "4674348d1cd6254e0431483acad872e9"
+  },
+  "src/app/commands/timingCommands.ts": {
+    "mtime": 1788786904.5490885,
+    "ast_hash": "acaf13283fb592f7f3962e318ec85b7f",
+    "semantic_hash": "acaf13283fb592f7f3962e318ec85b7f"
+  },
+  "src/app/history/history.ts": {
+    "mtime": 1788547342.6878946,
+    "ast_hash": "710854ee8dbcb6e5ed5ed2e744cc6227",
+    "semantic_hash": "710854ee8dbcb6e5ed5ed2e744cc6227"
+  },
+  "src/app/projectController.ts": {
+    "mtime": 1788868380.8355162,
+    "ast_hash": "f4d3d365f01d0e764634a2d650df12b4",
+    "semantic_hash": "f4d3d365f01d0e764634a2d650df12b4"
+  },
+  "src/audio/contracts.ts": {
+    "mtime": 1789063895.3250775,
+    "ast_hash": "4807e97413c475bb8256cb9bed214793",
+    "semantic_hash": "4807e97413c475bb8256cb9bed214793"
+  },
+  "src/audio/eventRealizer.ts": {
+    "mtime": 1789063895.326043,
+    "ast_hash": "b310d98252cde0aa5e2174004a9915c2",
+    "semantic_hash": "b310d98252cde0aa5e2174004a9915c2"
+  },
+  "src/audio/hq-sample-piano/manifest.ts": {
+    "mtime": 1788555355.529108,
+    "ast_hash": "c26561b657906e5f0de2961b71e1f0b6",
+    "semantic_hash": "c26561b657906e5f0de2961b71e1f0b6"
+  },
+  "src/audio/hq-sample-piano/provider.ts": {
+    "mtime": 1788629433.0980735,
+    "ast_hash": "fa454069c92b2b15e56dc696cbac643e",
+    "semantic_hash": "fa454069c92b2b15e56dc696cbac643e"
+  },
+  "src/audio/hq-sample-piano/sampleCache.ts": {
+    "mtime": 1788555046.8466098,
+    "ast_hash": "d941d06a3bb71970f1584919334faab4",
+    "semantic_hash": "d941d06a3bb71970f1584919334faab4"
+  },
+  "src/audio/hq-sample-piano/velocityLayers.ts": {
+    "mtime": 1788594551.1183207,
+    "ast_hash": "3b6f5c8809fb19b240313ba51bb0e7d4",
+    "semantic_hash": "3b6f5c8809fb19b240313ba51bb0e7d4"
+  },
+  "src/audio/melodyPerformance.ts": {
+    "mtime": 1789106203.2871678,
+    "ast_hash": "ce5e3530b6e1784da26a3a8039692fe6",
+    "semantic_hash": "ce5e3530b6e1784da26a3a8039692fe6"
+  },
+  "src/audio/metronome.ts": {
+    "mtime": 1788629555.899664,
+    "ast_hash": "ea4cf58445eb558f5a24494b6c4fa11d",
+    "semantic_hash": "ea4cf58445eb558f5a24494b6c4fa11d"
+  },
+  "src/audio/playbackController.ts": {
+    "mtime": 1789065183.8344386,
+    "ast_hash": "c9e4c3e63c41244eb76ece93ed6870af",
+    "semantic_hash": "c9e4c3e63c41244eb76ece93ed6870af"
+  },
+  "src/audio/previewAudition.ts": {
+    "mtime": 1789064032.6785283,
+    "ast_hash": "e21ecde3f439e751bb6d948425cbc0ac",
+    "semantic_hash": "e21ecde3f439e751bb6d948425cbc0ac"
+  },
+  "src/audio/scheduler.ts": {
+    "mtime": 1789063305.4637728,
+    "ast_hash": "2bbc882573079ac73048a3c6dc157a91",
+    "semantic_hash": "2bbc882573079ac73048a3c6dc157a91"
+  },
+  "src/audio/soundfont/melodyProvider.ts": {
+    "mtime": 1789070831.9804585,
+    "ast_hash": "0b113cef77fd1e77f2f14c907e4fa43d",
+    "semantic_hash": "0b113cef77fd1e77f2f14c907e4fa43d"
+  },
+  "src/audio/soundfont/spessaProvider.ts": {
+    "mtime": 1789069931.1108441,
+    "ast_hash": "ade5868a156734740a9a043660480aa6",
+    "semantic_hash": "ade5868a156734740a9a043660480aa6"
+  },
+  "src/audio/testHooks.ts": {
+    "mtime": 1788642683.7435288,
+    "ast_hash": "d151b9d4ad12e418d0ea0d7aa565c0cd",
+    "semantic_hash": "d151b9d4ad12e418d0ea0d7aa565c0cd"
+  },
+  "src/domain/harmony/chord.ts": {
+    "mtime": 1788638182.1592326,
+    "ast_hash": "1afd194ab53506e5b5c717e1b2a040c8",
+    "semantic_hash": "1afd194ab53506e5b5c717e1b2a040c8"
+  },
+  "src/domain/harmony/functions.ts": {
+    "mtime": 1788538206.0,
+    "ast_hash": "e0d6544fed2f2eb7c1e752d94b934460",
+    "semantic_hash": "e0d6544fed2f2eb7c1e752d94b934460"
+  },
+  "src/domain/harmony/moduleRegistry.ts": {
+    "mtime": 1788547342.713192,
+    "ast_hash": "d1979fd4cb466b817b00cf69387b3af1",
+    "semantic_hash": "d1979fd4cb466b817b00cf69387b3af1"
+  },
+  "src/domain/harmony/moduleSwitch.ts": {
+    "mtime": 1788547342.7875266,
+    "ast_hash": "bb21ed53566fc858e40bb9f135840059",
+    "semantic_hash": "bb21ed53566fc858e40bb9f135840059"
+  },
+  "src/domain/harmony/modules/darkHarmony.ts": {
+    "mtime": 1788547342.738664,
+    "ast_hash": "fc3098e9410d96bbda3c92a038ed0934",
+    "semantic_hash": "fc3098e9410d96bbda3c92a038ed0934"
+  },
+  "src/domain/harmony/modules/progressions.ts": {
+    "mtime": 1788547342.7644157,
+    "ast_hash": "b09c7d897f11c7fe042a60a56e58c052",
+    "semantic_hash": "b09c7d897f11c7fe042a60a56e58c052"
+  },
+  "src/domain/harmony/modules/types.ts": {
+    "mtime": 1788538206.0,
+    "ast_hash": "cb1818dca231003ff357a3cb26394300",
+    "semantic_hash": "cb1818dca231003ff357a3cb26394300"
+  },
+  "src/domain/harmony/pitch.ts": {
+    "mtime": 1788538206.0,
+    "ast_hash": "6a0bc29ba295aa4e8e7e1ce3a3c3ed91",
+    "semantic_hash": "6a0bc29ba295aa4e8e7e1ce3a3c3ed91"
+  },
+  "src/domain/harmony/realization.ts": {
+    "mtime": 1788547342.7969103,
+    "ast_hash": "ef3b6921305c5dfa31765b115cbfcc01",
+    "semantic_hash": "ef3b6921305c5dfa31765b115cbfcc01"
+  },
+  "src/domain/harmony/spelling.ts": {
+    "mtime": 1788547342.8122582,
+    "ast_hash": "6a89618ad91028d807a8dc494c4007e1",
+    "semantic_hash": "6a89618ad91028d807a8dc494c4007e1"
+  },
+  "src/domain/harmony/topology.ts": {
+    "mtime": 1788547342.8223944,
+    "ast_hash": "d28ec8666259be821ddbd61eaa2dd842",
+    "semantic_hash": "d28ec8666259be821ddbd61eaa2dd842"
+  },
+  "src/domain/melody/patterns.ts": {
+    "mtime": 1789067691.535352,
+    "ast_hash": "7d35ccbdff95a470cd416e05ccf148fa",
+    "semantic_hash": "7d35ccbdff95a470cd416e05ccf148fa"
+  },
+  "src/domain/melody/projection.ts": {
+    "mtime": 1789063914.4058733,
+    "ast_hash": "1a2c70f3965cddb7ac48addffa9e1fdf",
+    "semantic_hash": "1a2c70f3965cddb7ac48addffa9e1fdf"
+  },
+  "src/domain/melody/types.ts": {
+    "mtime": 1789063914.3602,
+    "ast_hash": "0aa23ba4d83ea10a8f8dddcc55cc7fdb",
+    "semantic_hash": "0aa23ba4d83ea10a8f8dddcc55cc7fdb"
+  },
+  "src/domain/progression/branch.ts": {
+    "mtime": 1788547342.8411443,
+    "ast_hash": "f5c98e001211737a1e7c01a5e4c38492",
+    "semantic_hash": "f5c98e001211737a1e7c01a5e4c38492"
+  },
+  "src/domain/progression/builtInPresets.ts": {
+    "mtime": 1788635491.7344573,
+    "ast_hash": "acc665bf663571667a90d585926057b7",
+    "semantic_hash": "acc665bf663571667a90d585926057b7"
+  },
+  "src/domain/progression/presets.ts": {
+    "mtime": 1788635519.038842,
+    "ast_hash": "5f2eb2f33a3c58b3278577249fa49148",
+    "semantic_hash": "5f2eb2f33a3c58b3278577249fa49148"
+  },
+  "src/domain/progression/progression.ts": {
+    "mtime": 1788538206.0,
+    "ast_hash": "1d6ca7c385c3a7cf88f3057d0ca7bec9",
+    "semantic_hash": "1d6ca7c385c3a7cf88f3057d0ca7bec9"
+  },
+  "src/domain/progression/reset.ts": {
+    "mtime": 1788547342.8536599,
+    "ast_hash": "a9db0e7b9833d9bea5a52c856fb472b4",
+    "semantic_hash": "a9db0e7b9833d9bea5a52c856fb472b4"
+  },
+  "src/domain/progression/step.ts": {
+    "mtime": 1789043981.296941,
+    "ast_hash": "2cdc0cbef210b47ef98237639438504f",
+    "semantic_hash": "2cdc0cbef210b47ef98237639438504f"
+  },
+  "src/domain/project/defaults.ts": {
+    "mtime": 1788547342.8693824,
+    "ast_hash": "9010791435584aa3f0fafe463eadee88",
+    "semantic_hash": "9010791435584aa3f0fafe463eadee88"
+  },
+  "src/domain/project/factory.ts": {
+    "mtime": 1789043981.2999365,
+    "ast_hash": "3e12d3bedb349aad39d28dabc9588b9a",
+    "semantic_hash": "3e12d3bedb349aad39d28dabc9588b9a"
+  },
+  "src/domain/project/migrations.ts": {
+    "mtime": 1789045390.624484,
+    "ast_hash": "78c4a5289dd407b93f66de2a9fe41114",
+    "semantic_hash": "78c4a5289dd407b93f66de2a9fe41114"
+  },
+  "src/domain/project/name.ts": {
+    "mtime": 1788787519.4557796,
+    "ast_hash": "5066812045cb0e39f6286e6bf43ba61b",
+    "semantic_hash": "5066812045cb0e39f6286e6bf43ba61b"
+  },
+  "src/domain/project/project.ts": {
+    "mtime": 1789043981.298942,
+    "ast_hash": "a77b4a447b907fda3a00e8d6335f3a4e",
+    "semantic_hash": "a77b4a447b907fda3a00e8d6335f3a4e"
+  },
+  "src/domain/recommendations/engine.ts": {
+    "mtime": 1788547342.8961349,
+    "ast_hash": "a9c0965e9d7a1327dba3a1b696cede61",
+    "semantic_hash": "a9c0965e9d7a1327dba3a1b696cede61"
+  },
+  "src/domain/recommendations/explanations.ts": {
+    "mtime": 1788935165.947318,
+    "ast_hash": "61def4e351614358cfd06e33f3df5d2e",
+    "semantic_hash": "61def4e351614358cfd06e33f3df5d2e"
+  },
+  "src/domain/recommendations/intents.ts": {
+    "mtime": 1788547342.910378,
+    "ast_hash": "b2be73518dc7dbf1371d9a82873c3f24",
+    "semantic_hash": "b2be73518dc7dbf1371d9a82873c3f24"
+  },
+  "src/domain/recommendations/scoring.ts": {
+    "mtime": 1788539029.0,
+    "ast_hash": "ba3af9cc35f1271dbf4ef483fcbdb934",
+    "semantic_hash": "ba3af9cc35f1271dbf4ef483fcbdb934"
+  },
+  "src/domain/timing/duration.ts": {
+    "mtime": 1788627567.7466035,
+    "ast_hash": "563929687cbd80e70ed01875c06e777b",
+    "semantic_hash": "563929687cbd80e70ed01875c06e777b"
+  },
+  "src/domain/timing/measureLayout.ts": {
+    "mtime": 1788978807.2163627,
+    "ast_hash": "0aee5e25266d0107da5498e48d696740",
+    "semantic_hash": "0aee5e25266d0107da5498e48d696740"
+  },
+  "src/domain/timing/meter.ts": {
+    "mtime": 1788628517.4371111,
+    "ast_hash": "d61c3723d9409bc9683edc0e631fbc0c",
+    "semantic_hash": "d61c3723d9409bc9683edc0e631fbc0c"
+  },
+  "src/domain/timing/rational.ts": {
+    "mtime": 1788547342.941203,
+    "ast_hash": "e488275274393eb6fc6fe8bbcb7f464d",
+    "semantic_hash": "e488275274393eb6fc6fe8bbcb7f464d"
+  },
+  "src/domain/timing/swing.ts": {
+    "mtime": 1788628464.6853497,
+    "ast_hash": "3ed0626c1458bab4155809a0cd378508",
+    "semantic_hash": "3ed0626c1458bab4155809a0cd378508"
+  },
+  "src/domain/timing/timeline.ts": {
+    "mtime": 1788628490.526978,
+    "ast_hash": "1ba74ae4a8469c56af482bdcb0944b0f",
+    "semantic_hash": "1ba74ae4a8469c56af482bdcb0944b0f"
+  },
+  "src/export/midi/eventProjection.ts": {
+    "mtime": 1789072453.6227124,
+    "ast_hash": "eba4dc23b6533d7792ed9c9a7aa16e7e",
+    "semantic_hash": "eba4dc23b6533d7792ed9c9a7aa16e7e"
+  },
+  "src/export/midi/writer.ts": {
+    "mtime": 1789072400.541902,
+    "ast_hash": "3aae09f9e671867f1223461357b4000c",
+    "semantic_hash": "3aae09f9e671867f1223461357b4000c"
+  },
+  "src/export/musicxml/mapping.ts": {
+    "mtime": 1788811306.2038045,
+    "ast_hash": "e8412aa9b1f40120611fa530ce0c39cb",
+    "semantic_hash": "e8412aa9b1f40120611fa530ce0c39cb"
+  },
+  "src/export/musicxml/projection.ts": {
+    "mtime": 1789107608.6866357,
+    "ast_hash": "64f603c246e676056644785f46b0853b",
+    "semantic_hash": "64f603c246e676056644785f46b0853b"
+  },
+  "src/export/musicxml/writer.ts": {
+    "mtime": 1789107669.4984622,
+    "ast_hash": "08166b08dadb69d81fd1ac9c0caa57c7",
+    "semantic_hash": "08166b08dadb69d81fd1ac9c0caa57c7"
+  },
+  "src/instruments/contracts.ts": {
+    "mtime": 1788552251.5678895,
+    "ast_hash": "7c8fcac2a9a801dfb0613621a0427a0d",
+    "semantic_hash": "7c8fcac2a9a801dfb0613621a0427a0d"
+  },
+  "src/instruments/piano/articulation.ts": {
+    "mtime": 1788552286.686564,
+    "ast_hash": "5776c51b179d9a168e4d040e0841ce76",
+    "semantic_hash": "5776c51b179d9a168e4d040e0841ce76"
+  },
+  "src/instruments/piano/bass.ts": {
+    "mtime": 1788552262.753663,
+    "ast_hash": "f83586691d969fd61b8656e09f883c5f",
+    "semantic_hash": "f83586691d969fd61b8656e09f883c5f"
+  },
+  "src/instruments/piano/dynamics.ts": {
+    "mtime": 1788552274.4648857,
+    "ast_hash": "68d8ba571ab746d4ea48a283a133bf0b",
+    "semantic_hash": "68d8ba571ab746d4ea48a283a133bf0b"
+  },
+  "src/instruments/piano/profile.ts": {
+    "mtime": 1788552256.5437553,
+    "ast_hash": "dc9684fbbcb02226ac624f222aff50dc",
+    "semantic_hash": "dc9684fbbcb02226ac624f222aff50dc"
+  },
+  "src/instruments/piano/progressionRealization.ts": {
+    "mtime": 1789062829.3895273,
+    "ast_hash": "1adb45c012964414c65c10908e0c3d5f",
+    "semantic_hash": "1adb45c012964414c65c10908e0c3d5f"
+  },
+  "src/instruments/piano/voiceLeading.ts": {
+    "mtime": 1788550416.496336,
+    "ast_hash": "7969f4801d977dfcdf8a6732585b6e41",
+    "semantic_hash": "7969f4801d977dfcdf8a6732585b6e41"
+  },
+  "src/instruments/piano/voicing.ts": {
+    "mtime": 1788550557.7525778,
+    "ast_hash": "f2f6239c53388261b3b489872d82eb4b",
+    "semantic_hash": "f2f6239c53388261b3b489872d82eb4b"
+  },
+  "src/main.tsx": {
+    "mtime": 1788850661.1487203,
+    "ast_hash": "8483914b5988c041ed25674ad0c8a711",
+    "semantic_hash": "8483914b5988c041ed25674ad0c8a711"
+  },
+  "src/notation/melodyStaffProjection.ts": {
+    "mtime": 1789067691.535352,
+    "ast_hash": "2b2427a43cd4ac8c5360c7bee83dc65b",
+    "semantic_hash": "2b2427a43cd4ac8c5360c7bee83dc65b"
+  },
+  "src/notation/staffProjection.ts": {
+    "mtime": 1788547342.9699736,
+    "ast_hash": "343e2349bf3b5dac7f351d946418a953",
+    "semantic_hash": "343e2349bf3b5dac7f351d946418a953"
+  },
+  "src/notation/vexflowAdapter.ts": {
+    "mtime": 1789105649.5785239,
+    "ast_hash": "77b9c151d68f7b8fb9bee9527b2d9ad1",
+    "semantic_hash": "77b9c151d68f7b8fb9bee9527b2d9ad1"
+  },
+  "src/persistence/autosave.ts": {
+    "mtime": 1788803896.1738436,
+    "ast_hash": "053bec407689ab4d8d1f54e4a63c5dd4",
+    "semantic_hash": "053bec407689ab4d8d1f54e4a63c5dd4"
+  },
+  "src/persistence/db.ts": {
+    "mtime": 1788949275.7357252,
+    "ast_hash": "3a5ac551d93d4a391f499b37b4514c66",
+    "semantic_hash": "3a5ac551d93d4a391f499b37b4514c66"
+  },
+  "src/persistence/portableProject.ts": {
+    "mtime": 1789044031.6268198,
+    "ast_hash": "17baa925846ad6ee583f56012d0681a8",
+    "semantic_hash": "17baa925846ad6ee583f56012d0681a8"
+  },
+  "src/persistence/projectRepository.ts": {
+    "mtime": 1788950396.9797907,
+    "ast_hash": "2c6083475f4e4b8eb785a195a4e1b80e",
+    "semantic_hash": "2c6083475f4e4b8eb785a195a4e1b80e"
+  },
+  "src/persistence/testHooks.ts": {
+    "mtime": 1788804009.2081711,
+    "ast_hash": "1acc30b4f49dd16c39df1b9e2cc8e764",
+    "semantic_hash": "1acc30b4f49dd16c39df1b9e2cc8e764"
+  },
+  "src/types/soundfont-player.d.ts": {
+    "mtime": 1789069580.2955441,
+    "ast_hash": "30e3fc9d051e3e0e401f58db7706b1a7",
+    "semantic_hash": "30e3fc9d051e3e0e401f58db7706b1a7"
+  },
+  "src/ui/chord-card/ChordCard.tsx": {
+    "mtime": 1788976260.0830097,
+    "ast_hash": "2779ff44cf02f2f011406bd0e3d75c9e",
+    "semantic_hash": "2779ff44cf02f2f011406bd0e3d75c9e"
+  },
+  "src/ui/chord-card/ChordCardSettingsButton.tsx": {
+    "mtime": 1788936396.0089238,
+    "ast_hash": "ed4b08eb5339f24d9c0f30a481f66a65",
+    "semantic_hash": "ed4b08eb5339f24d9c0f30a481f66a65"
+  },
+  "src/ui/chord-card/CustomizedIndicator.tsx": {
+    "mtime": 1788934047.5528073,
+    "ast_hash": "e62079e56204bd71986e06aa079d6444",
+    "semantic_hash": "e62079e56204bd71986e06aa079d6444"
+  },
+  "src/ui/chord-card/views/types.ts": {
+    "mtime": 1788976036.6913166,
+    "ast_hash": "8bf61c0afb0589211560034010623379",
+    "semantic_hash": "8bf61c0afb0589211560034010623379"
+  },
+  "src/ui/common/Icon.tsx": {
+    "mtime": 1788988401.300136,
+    "ast_hash": "a500cb25655315b17eb604f82fababdd",
+    "semantic_hash": "a500cb25655315b17eb604f82fababdd"
+  },
+  "src/ui/common/useModalFocus.ts": {
+    "mtime": 1788854462.940959,
+    "ast_hash": "e8418658f018095c1eff49ba26bc4856",
+    "semantic_hash": "e8418658f018095c1eff49ba26bc4856"
+  },
+  "src/ui/header/PianoAudioStatus.tsx": {
+    "mtime": 1788937724.7014003,
+    "ast_hash": "f4cb18baf88df3708dd89e3ff5886939",
+    "semantic_hash": "f4cb18baf88df3708dd89e3ff5886939"
+  },
+  "src/ui/inspector/ArticulationControl.tsx": {
+    "mtime": 1788986063.646814,
+    "ast_hash": "1a5a4604b6de08b314780a10f77c79af",
+    "semantic_hash": "1a5a4604b6de08b314780a10f77c79af"
+  },
+  "src/ui/inspector/CardTemplateInspector.tsx": {
+    "mtime": 1788985878.6712,
+    "ast_hash": "dc79e0665269b872f56e37deca8fca7e",
+    "semantic_hash": "dc79e0665269b872f56e37deca8fca7e"
+  },
+  "src/ui/inspector/CompositionIntentControl.tsx": {
+    "mtime": 1788983653.6984923,
+    "ast_hash": "43439041d24b4fedf96de7b0c04dff3c",
+    "semantic_hash": "43439041d24b4fedf96de7b0c04dff3c"
+  },
+  "src/ui/inspector/HarmonyDetails.tsx": {
+    "mtime": 1788983880.1811578,
+    "ast_hash": "bc6f65bf260a80f8dadd2473f7d0e0b1",
+    "semantic_hash": "bc6f65bf260a80f8dadd2473f7d0e0b1"
+  },
+  "src/ui/inspector/PianoPerformanceInspector.tsx": {
+    "mtime": 1788985588.6919334,
+    "ast_hash": "b582a55eb0984202af35bf5e7b5082f6",
+    "semantic_hash": "b582a55eb0984202af35bf5e7b5082f6"
+  },
+  "src/ui/inspector/RecommendationInspector.tsx": {
+    "mtime": 1788983724.4513483,
+    "ast_hash": "2b51f71c3e585d7db2ee7883e9e68872",
+    "semantic_hash": "2b51f71c3e585d7db2ee7883e9e68872"
+  },
+  "src/ui/inspector/RegisterControl.tsx": {
+    "mtime": 1788985579.6788166,
+    "ast_hash": "913e632c7bfc34d0888d3fdaeedf898b",
+    "semantic_hash": "913e632c7bfc34d0888d3fdaeedf898b"
+  },
+  "src/ui/inspector/RestStepInspector.tsx": {
+    "mtime": 1788984766.0011272,
+    "ast_hash": "5fadac26dac6b600088c4988527a4cba",
+    "semantic_hash": "5fadac26dac6b600088c4988527a4cba"
+  },
+  "src/ui/matrix/FunctionalLayer.tsx": {
+    "mtime": 1788934047.5528073,
+    "ast_hash": "f76259d66aade74e42492ef1962bf96c",
+    "semantic_hash": "f76259d66aade74e42492ef1962bf96c"
+  },
+  "src/ui/matrix/HarmonicMatrix.tsx": {
+    "mtime": 1788978528.1354709,
+    "ast_hash": "41dc5b4e2a2e79ab400e038c368ac9b3",
+    "semantic_hash": "41dc5b4e2a2e79ab400e038c368ac9b3"
+  },
+  "src/ui/matrix/ModuleSelector.tsx": {
+    "mtime": 1788547343.1425276,
+    "ast_hash": "4c5ef83aacb85c2081e4304c4d36dba2",
+    "semantic_hash": "4c5ef83aacb85c2081e4304c4d36dba2"
+  },
+  "src/ui/matrix/ModuleSwitchDialog.tsx": {
+    "mtime": 1788937724.7039144,
+    "ast_hash": "724838eafe04d0f369cd92231dc43fa5",
+    "semantic_hash": "724838eafe04d0f369cd92231dc43fa5"
+  },
+  "src/ui/matrix/TonicSelector.tsx": {
+    "mtime": 1788547343.1552372,
+    "ast_hash": "e9830342763e8f4f6b634dc4a35d103d",
+    "semantic_hash": "e9830342763e8f4f6b634dc4a35d103d"
+  },
+  "src/ui/matrix/previewRealization.ts": {
+    "mtime": 1788953381.377239,
+    "ast_hash": "b07c7d411569b744a8a1e45e7e0eaead",
+    "semantic_hash": "b07c7d411569b744a8a1e45e7e0eaead"
+  },
+  "src/ui/melody/MelodyContextMenu.tsx": {
+    "mtime": 1789048922.1525052,
+    "ast_hash": "387fcc9ec5f7087cf630033e0d45f7fb",
+    "semantic_hash": "387fcc9ec5f7087cf630033e0d45f7fb"
+  },
+  "src/ui/melody/MelodyEditorDialog.tsx": {
+    "mtime": 1789071521.9976056,
+    "ast_hash": "270a081a0bfc11687cbba6daa16d5b23",
+    "semantic_hash": "270a081a0bfc11687cbba6daa16d5b23"
+  },
+  "src/ui/melody/MelodyStaffView.tsx": {
+    "mtime": 1789067691.536871,
+    "ast_hash": "76d1aa5b8ba1d9fd0e7f96a0607a29f2",
+    "semantic_hash": "76d1aa5b8ba1d9fd0e7f96a0607a29f2"
+  },
+  "src/ui/melody/MelodyTrackControls.tsx": {
+    "mtime": 1789067018.1128373,
+    "ast_hash": "416c2bafb7c372b10a152febfeee0134",
+    "semantic_hash": "416c2bafb7c372b10a152febfeee0134"
+  },
+  "src/ui/melody/labels.ts": {
+    "mtime": 1789048687.3749807,
+    "ast_hash": "5d3d2328ce82a4867b557d8f3816f7ce",
+    "semantic_hash": "5d3d2328ce82a4867b557d8f3816f7ce"
+  },
+  "src/ui/piano/PianoCardView.tsx": {
+    "mtime": 1788956847.4359708,
+    "ast_hash": "b132be5e4e27af6cb4315e36a308a652",
+    "semantic_hash": "b132be5e4e27af6cb4315e36a308a652"
+  },
+  "src/ui/piano/PianoVoicingEditor.tsx": {
+    "mtime": 1788937724.7039144,
+    "ast_hash": "691eeaa97a5ebcc4703e51d89669d40c",
+    "semantic_hash": "691eeaa97a5ebcc4703e51d89669d40c"
+  },
+  "src/ui/piano/pianoKeyboard.ts": {
+    "mtime": 1788955983.7126322,
+    "ast_hash": "747be59c91561629671d96a48100a24e",
+    "semantic_hash": "747be59c91561629671d96a48100a24e"
+  },
+  "src/ui/progression/BranchComparison.tsx": {
+    "mtime": 1788934047.5881302,
+    "ast_hash": "c63e86b2457a27cbde9e9f65b52a7376",
+    "semantic_hash": "c63e86b2457a27cbde9e9f65b52a7376"
+  },
+  "src/ui/progression/BranchControls.tsx": {
+    "mtime": 1788936452.726766,
+    "ast_hash": "226d18a12837e6449d7faf1b888768f2",
+    "semantic_hash": "226d18a12837e6449d7faf1b888768f2"
+  },
+  "src/ui/progression/PresetApplyDialog.tsx": {
+    "mtime": 1788936704.046688,
+    "ast_hash": "f746fb3624f5c6b6ae344777ca7f4f3f",
+    "semantic_hash": "f746fb3624f5c6b6ae344777ca7f4f3f"
+  },
+  "src/ui/progression/PresetsPanel.tsx": {
+    "mtime": 1788936452.728767,
+    "ast_hash": "5e1d6a95e668498e1e114e98365a5cea",
+    "semantic_hash": "5e1d6a95e668498e1e114e98365a5cea"
+  },
+  "src/ui/progression/ProgressionStepCard.tsx": {
+    "mtime": 1789054493.428838,
+    "ast_hash": "64b7754e9c5123b65078a2a4417b1d52",
+    "semantic_hash": "64b7754e9c5123b65078a2a4417b1d52"
+  },
+  "src/ui/progression/ProgressionStepRemoveButton.tsx": {
+    "mtime": 1788936396.0079238,
+    "ast_hash": "ecb55ef03f347f60341815addbb4368f",
+    "semantic_hash": "ecb55ef03f347f60341815addbb4368f"
+  },
+  "src/ui/progression/ProgressionTrack.tsx": {
+    "mtime": 1789108128.6999226,
+    "ast_hash": "6b402edd9e70583427673ca954193362",
+    "semantic_hash": "6b402edd9e70583427673ca954193362"
+  },
+  "src/ui/progression/ProgressionTransportControls.tsx": {
+    "mtime": 1788936747.3288367,
+    "ast_hash": "35b7b9db3dba42aae22ceac1508d4f67",
+    "semantic_hash": "35b7b9db3dba42aae22ceac1508d4f67"
+  },
+  "src/ui/progression/SavePresetDialog.tsx": {
+    "mtime": 1788936704.1363983,
+    "ast_hash": "9730dcb9eeea98d3f20afc2273c327b1",
+    "semantic_hash": "9730dcb9eeea98d3f20afc2273c327b1"
+  },
+  "src/ui/progression/StepActions.tsx": {
+    "mtime": 1788936396.0059147,
+    "ast_hash": "2d5b0739e60aac26cabd5a4fba0c5fed",
+    "semantic_hash": "2d5b0739e60aac26cabd5a4fba0c5fed"
+  },
+  "src/ui/progression/StepDurationControl.tsx": {
+    "mtime": 1788691779.2495904,
+    "ast_hash": "07e8e9daac05b62f3dca4281b1d6d3f5",
+    "semantic_hash": "07e8e9daac05b62f3dca4281b1d6d3f5"
+  },
+  "src/ui/progression/presetUtils.ts": {
+    "mtime": 1788637637.4306915,
+    "ast_hash": "8d1775882db0a1d49e47d5ee62c5a476",
+    "semantic_hash": "8d1775882db0a1d49e47d5ee62c5a476"
+  },
+  "src/ui/progression/stepDuration.ts": {
+    "mtime": 1788691482.6371126,
+    "ast_hash": "3818ffac94ea00716dd53cba4a31533c",
+    "semantic_hash": "3818ffac94ea00716dd53cba4a31533c"
+  },
+  "src/ui/projects/ExportActions.tsx": {
+    "mtime": 1788813596.4320705,
+    "ast_hash": "fa3e7a6ebb178728af3c2fd66a3d73c6",
+    "semantic_hash": "fa3e7a6ebb178728af3c2fd66a3d73c6"
+  },
+  "src/ui/projects/PortableProjectActions.tsx": {
+    "mtime": 1788948266.7836914,
+    "ast_hash": "e9da29ae80b4835311bc86c68d99ac39",
+    "semantic_hash": "e9da29ae80b4835311bc86c68d99ac39"
+  },
+  "src/ui/projects/ProjectManager.tsx": {
+    "mtime": 1788947133.9430163,
+    "ast_hash": "11042f69e0bba570fad9ebe4ffdf2897",
+    "semantic_hash": "11042f69e0bba570fad9ebe4ffdf2897"
+  },
+  "src/ui/projects/ProjectTabs.tsx": {
+    "mtime": 1788948102.2096188,
+    "ast_hash": "b82a2e80df20be96927c018f4599ba3f",
+    "semantic_hash": "b82a2e80df20be96927c018f4599ba3f"
+  },
+  "src/ui/projects/exportActionSupport.ts": {
+    "mtime": 1789026484.1294556,
+    "ast_hash": "dcf65405fe0b108b3b17e1c0b45de4a2",
+    "semantic_hash": "dcf65405fe0b108b3b17e1c0b45de4a2"
+  },
+  "src/ui/projects/projectTabsState.ts": {
+    "mtime": 1788950396.9807992,
+    "ast_hash": "feb55684dd2dc15de9f2655fa040bf30",
+    "semantic_hash": "feb55684dd2dc15de9f2655fa040bf30"
+  },
+  "src/ui/settings/ExpertiseModeControl.tsx": {
+    "mtime": 1788942373.626582,
+    "ast_hash": "cbdb080472fc63ccf09e743107914128",
+    "semantic_hash": "cbdb080472fc63ccf09e743107914128"
+  },
+  "src/ui/settings/GlobalSettingsControl.tsx": {
+    "mtime": 1788985958.364817,
+    "ast_hash": "11e1fcc6531969d86b23201c57f5e4c5",
+    "semantic_hash": "11e1fcc6531969d86b23201c57f5e4c5"
+  },
+  "src/ui/settings/MatrixResetMenu.tsx": {
+    "mtime": 1788939513.3962774,
+    "ast_hash": "d10284dc31c82bf183c06e0a823e1601",
+    "semantic_hash": "d10284dc31c82bf183c06e0a823e1601"
+  },
+  "src/ui/settings/ThemeControl.tsx": {
+    "mtime": 1788942290.476186,
+    "ast_hash": "093a2b90399d1a068b1e7e3e7bb0af4d",
+    "semantic_hash": "093a2b90399d1a068b1e7e3e7bb0af4d"
+  },
+  "src/ui/settings/globalSettings.ts": {
+    "mtime": 1788985958.3638065,
+    "ast_hash": "91e2a4203ecce68cc7be072ef2cf2277",
+    "semantic_hash": "91e2a4203ecce68cc7be072ef2cf2277"
+  },
+  "src/ui/staff/MeasureStaffView.tsx": {
+    "mtime": 1789108128.70092,
+    "ast_hash": "04d12321a4e4d4a8733b59e16a822db0",
+    "semantic_hash": "04d12321a4e4d4a8733b59e16a822db0"
+  },
+  "src/ui/staff/StaffCardView.tsx": {
+    "mtime": 1789048371.8150086,
+    "ast_hash": "88382ecd6eac21a1edea0e729613a225",
+    "semantic_hash": "88382ecd6eac21a1edea0e729613a225"
+  },
+  "src/ui/staff/staffOctave.ts": {
+    "mtime": 1789023562.8901067,
+    "ast_hash": "592c8c1bfe8bf5a3015bb79a2996b273",
+    "semantic_hash": "592c8c1bfe8bf5a3015bb79a2996b273"
+  },
+  "src/ui/studio/AppMenuBar.tsx": {
+    "mtime": 1788980464.7193065,
+    "ast_hash": "642c5d306a2a3c68c5f8d6a20700cd4e",
+    "semantic_hash": "642c5d306a2a3c68c5f8d6a20700cd4e"
+  },
+  "src/ui/studio/StudioWorkspace.tsx": {
+    "mtime": 1788983354.0987678,
+    "ast_hash": "db0db0e622826131bf1c43dc528d5a7f",
+    "semantic_hash": "db0db0e622826131bf1c43dc528d5a7f"
+  },
+  "src/ui/studio/focusManagement.ts": {
+    "mtime": 1788864814.4370136,
+    "ast_hash": "3e98c99dcd1dab2daeaffa2abbe420d4",
+    "semantic_hash": "3e98c99dcd1dab2daeaffa2abbe420d4"
+  },
+  "src/ui/timing/StepDurationControl.tsx": {
+    "mtime": 1788986249.401263,
+    "ast_hash": "ceafff34b6ee8045e05ce1a70dfc4d04",
+    "semantic_hash": "ceafff34b6ee8045e05ce1a70dfc4d04"
+  },
+  "src/ui/timing/stepDuration.ts": {
+    "mtime": 1788691785.5884838,
+    "ast_hash": "64850d5f4506543eb5584479926e0d16",
+    "semantic_hash": "64850d5f4506543eb5584479926e0d16"
+  },
+  "src/ui/transport/HistoryControls.tsx": {
+    "mtime": 1788942862.1371152,
+    "ast_hash": "5f6b1432656ff8b8ca907789eb155db5",
+    "semantic_hash": "5f6b1432656ff8b8ca907789eb155db5"
+  },
+  "src/ui/transport/MetronomeControls.tsx": {
+    "mtime": 1788936418.6994698,
+    "ast_hash": "09dda5ad51b9f9e765d8611f6790b95a",
+    "semantic_hash": "09dda5ad51b9f9e765d8611f6790b95a"
+  },
+  "src/ui/transport/TransportBar.tsx": {
+    "mtime": 1788989468.0852556,
+    "ast_hash": "2907e2c56cedda2264b592077d7d183f",
+    "semantic_hash": "2907e2c56cedda2264b592077d7d183f"
+  },
+  "src/ui/transport/loopState.ts": {
+    "mtime": 1788629624.280467,
+    "ast_hash": "f1bd713101d922fb56b0010d029be0f8",
+    "semantic_hash": "f1bd713101d922fb56b0010d029be0f8"
+  },
+  "src/ui/transport/transportStore.ts": {
+    "mtime": 1789064044.7037745,
+    "ast_hash": "0b7ab11e047c24853adaff6c53bfab40",
+    "semantic_hash": "0b7ab11e047c24853adaff6c53bfab40"
+  },
+  "src/vite-env.d.ts": {
+    "mtime": 1788546152.7913978,
+    "ast_hash": "0352474ba2918efe13895edbc3780d94",
+    "semantic_hash": "0352474ba2918efe13895edbc3780d94"
+  },
+  "tests/e2e/app-chrome.spec.ts": {
+    "mtime": 1788980892.9026453,
+    "ast_hash": "b54ec3baae63b15a4d9fa0f930e9dfe7",
+    "semantic_hash": "b54ec3baae63b15a4d9fa0f930e9dfe7"
+  },
+  "tests/e2e/test-helpers/global-settings.ts": {
+    "mtime": 1788986051.0888252,
+    "ast_hash": "04a3782bf734ca245ea9e297094c4016",
+    "semantic_hash": "04a3782bf734ca245ea9e297094c4016"
+  },
+  "tests/e2e/us1-build-progression.spec.ts": {
+    "mtime": 1788945418.900337,
+    "ast_hash": "6ce7febd3735e5c1f441aa2a3d03a044",
+    "semantic_hash": "6ce7febd3735e5c1f441aa2a3d03a044"
+  },
+  "tests/e2e/us10-accessibility.spec.ts": {
+    "mtime": 1788988462.689421,
+    "ast_hash": "69fba98ab0abaa7b76cdbfc558126a81",
+    "semantic_hash": "69fba98ab0abaa7b76cdbfc558126a81"
+  },
+  "tests/e2e/us10-desktop-layout.spec.ts": {
+    "mtime": 1788983396.6690466,
+    "ast_hash": "7c894de372e3eab435051edf25ceaeaf",
+    "semantic_hash": "7c894de372e3eab435051edf25ceaeaf"
+  },
+  "tests/e2e/us10-global-settings.spec.ts": {
+    "mtime": 1788986051.091829,
+    "ast_hash": "540b47ab96249ed67868530dc8d6e653",
+    "semantic_hash": "540b47ab96249ed67868530dc8d6e653"
+  },
+  "tests/e2e/us10-global-ui-system.spec.ts": {
+    "mtime": 1788989162.5799468,
+    "ast_hash": "8158865506df31070da6ad18580e69c0",
+    "semantic_hash": "8158865506df31070da6ad18580e69c0"
+  },
+  "tests/e2e/us10-inspector-step-editor.spec.ts": {
+    "mtime": 1788986051.0908265,
+    "ast_hash": "355621c1eb2d57e643fd07239995da1e",
+    "semantic_hash": "355621c1eb2d57e643fd07239995da1e"
+  },
+  "tests/e2e/us10-matrix-card-width.spec.ts": {
+    "mtime": 1788979749.5180333,
+    "ast_hash": "be6181e60cf04aa581ef8a857a383c41",
+    "semantic_hash": "be6181e60cf04aa581ef8a857a383c41"
+  },
+  "tests/e2e/us10-piano-view.spec.ts": {
+    "mtime": 1788981728.761524,
+    "ast_hash": "54d398ad537bbdc96780bceaf360f61d",
+    "semantic_hash": "54d398ad537bbdc96780bceaf360f61d"
+  },
+  "tests/e2e/us10-progression-dismissal.spec.ts": {
+    "mtime": 1788984860.6269565,
+    "ast_hash": "fb8b809d7f8997f5fb8319dbb3dc7464",
+    "semantic_hash": "fb8b809d7f8997f5fb8319dbb3dc7464"
+  },
+  "tests/e2e/us10-progression-remove.spec.ts": {
+    "mtime": 1788982297.567391,
+    "ast_hash": "79253cf927472ead6be28d29fb95e082",
+    "semantic_hash": "79253cf927472ead6be28d29fb95e082"
+  },
+  "tests/e2e/us10-progression-transport.spec.ts": {
+    "mtime": 1789019852.1410062,
+    "ast_hash": "d593ba7c83f22e2caa27c936fe7845b9",
+    "semantic_hash": "d593ba7c83f22e2caa27c936fe7845b9"
+  },
+  "tests/e2e/us10-staff-view.spec.ts": {
+    "mtime": 1788976949.585837,
+    "ast_hash": "43aa423056a95a8838d576f99e2663d5",
+    "semantic_hash": "43aa423056a95a8838d576f99e2663d5"
+  },
+  "tests/e2e/us10-themes-accessibility-polish.spec.ts": {
+    "mtime": 1788984888.7324264,
+    "ast_hash": "f591c98241ed7799cf4aac95f1b29a0e",
+    "semantic_hash": "f591c98241ed7799cf4aac95f1b29a0e"
+  },
+  "tests/e2e/us10-visual-polish.spec.ts": {
+    "mtime": 1788982095.6791306,
+    "ast_hash": "cc6b16722ec6b2fb1c5eb88c6a5b8d30",
+    "semantic_hash": "cc6b16722ec6b2fb1c5eb88c6a5b8d30"
+  },
+  "tests/e2e/us11-measure-cards.spec.ts": {
+    "mtime": 1789025951.0244436,
+    "ast_hash": "ea27efc83256c9b90b03c3831a51baf2",
+    "semantic_hash": "ea27efc83256c9b90b03c3831a51baf2"
+  },
+  "tests/e2e/us12-final-acceptance.spec.ts": {
+    "mtime": 1789123775.6664307,
+    "ast_hash": "d2e27efaafc47adc0f01d13732b852f0",
+    "semantic_hash": "d2e27efaafc47adc0f01d13732b852f0"
+  },
+  "tests/e2e/us12-melody-editor-staff.spec.ts": {
+    "mtime": 1789108142.508942,
+    "ast_hash": "5d29f0145fefb4cb0e6c342c1defbd85",
+    "semantic_hash": "5d29f0145fefb4cb0e6c342c1defbd85"
+  },
+  "tests/e2e/us2-branching.spec.ts": {
+    "mtime": 1788984178.0713887,
+    "ast_hash": "ad029dae90732b1c4428b452c5f0e116",
+    "semantic_hash": "ad029dae90732b1c4428b452c5f0e116"
+  },
+  "tests/e2e/us3-step-independence.spec.ts": {
+    "mtime": 1788984888.733931,
+    "ast_hash": "21c36846232ddb12b78b7783915190da",
+    "semantic_hash": "21c36846232ddb12b78b7783915190da"
+  },
+  "tests/e2e/us4-major-minor.spec.ts": {
+    "mtime": 1788944055.4814773,
+    "ast_hash": "6da4f9e1e0cc254aeee9bfcb289dceee",
+    "semantic_hash": "6da4f9e1e0cc254aeee9bfcb289dceee"
+  },
+  "tests/e2e/us4a-modules.spec.ts": {
+    "mtime": 1788944055.482484,
+    "ast_hash": "cd37fbb15e027417faf40a74ab62fdcb",
+    "semantic_hash": "cd37fbb15e027417faf40a74ab62fdcb"
+  },
+  "tests/e2e/us5-audio-playback.spec.ts": {
+    "mtime": 1788555220.4070265,
+    "ast_hash": "eb1c0f4b7ef3efaa2b2966a823b6fde6",
+    "semantic_hash": "eb1c0f4b7ef3efaa2b2966a823b6fde6"
+  },
+  "tests/e2e/us5-piano-performance.spec.ts": {
+    "mtime": 1788984932.6811635,
+    "ast_hash": "5e0d8e339dc046c180ff0f3b53f1d910",
+    "semantic_hash": "5e0d8e339dc046c180ff0f3b53f1d910"
+  },
+  "tests/e2e/us6-timing-transport.spec.ts": {
+    "mtime": 1788984932.6284623,
+    "ast_hash": "663d608442e9f02027a4f68dd2dea509",
+    "semantic_hash": "663d608442e9f02027a4f68dd2dea509"
+  },
+  "tests/e2e/us7-presets.spec.ts": {
+    "mtime": 1788984932.7467444,
+    "ast_hash": "1fd95e5effb78be7b0df5d9412ee827e",
+    "semantic_hash": "1fd95e5effb78be7b0df5d9412ee827e"
+  },
+  "tests/e2e/us8-project-actions.spec.ts": {
+    "mtime": 1788985708.258798,
+    "ast_hash": "626e51312067f6ad8b6c496235ca0711",
+    "semantic_hash": "626e51312067f6ad8b6c496235ca0711"
+  },
+  "tests/e2e/us9-export.spec.ts": {
+    "mtime": 1789027324.4528136,
+    "ast_hash": "b4eb0cf85b7755002126ef229a314081",
+    "semantic_hash": "b4eb0cf85b7755002126ef229a314081"
+  },
+  "tests/fixtures/harmony/a-tonal-minor.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "5115ea3daf34dfd6b0ec588fedfada26",
+    "semantic_hash": "5115ea3daf34dfd6b0ec588fedfada26"
+  },
+  "tests/fixtures/harmony/ambiguous-module-conversion.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "ecc858bf543a3885fc43785a29a5a1d1",
+    "semantic_hash": "ecc858bf543a3885fc43785a29a5a1d1"
+  },
+  "tests/fixtures/harmony/c-major-progressions.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "d5344ec4ed61cec6d3e0f9f4563c27e3",
+    "semantic_hash": "d5344ec4ed61cec6d3e0f9f4563c27e3"
+  },
+  "tests/fixtures/harmony/d-major-transposition.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "56c63b4423dbe015454f5ef2cde0e907",
+    "semantic_hash": "56c63b4423dbe015454f5ef2cde0e907"
+  },
+  "tests/fixtures/harmony/neapolitan-sixth.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "3ce7e1eec25f1ee211f7afa17fbf241b",
+    "semantic_hash": "3ce7e1eec25f1ee211f7afa17fbf241b"
+  },
+  "tests/fixtures/harmony/secondary-diminished-baseline.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "13cf9bdb9d9a424fe896684a3b291105",
+    "semantic_hash": "13cf9bdb9d9a424fe896684a3b291105"
+  },
+  "tests/fixtures/harmony/secondary-dominant.json": {
+    "mtime": 1788538248.0,
+    "ast_hash": "5023d0ae1cf66849365401d3fdf6912f",
+    "semantic_hash": "5023d0ae1cf66849365401d3fdf6912f"
+  },
+  "tests/fixtures/rich-project.fixture.ts": {
+    "mtime": 1789044042.6891873,
+    "ast_hash": "0315e630f51f2e6a999fb227e69147f7",
+    "semantic_hash": "0315e630f51f2e6a999fb227e69147f7"
+  },
+  "tests/integration/architecture-boundaries.test.ts": {
+    "mtime": 1788547343.284458,
+    "ast_hash": "b8b1ed381f97f5c083b5cc53794b4e3e",
+    "semantic_hash": "b8b1ed381f97f5c083b5cc53794b4e3e"
+  },
+  "tests/integration/audio-provider-contract.test.ts": {
+    "mtime": 1788548778.0217705,
+    "ast_hash": "3c4e6fd2e9f11327dad486c530292bec",
+    "semantic_hash": "3c4e6fd2e9f11327dad486c530292bec"
+  },
+  "tests/integration/autosave-recovery.test.ts": {
+    "mtime": 1789044191.0229423,
+    "ast_hash": "1e1242ef40794f179ddc22fcf940c7f8",
+    "semantic_hash": "1e1242ef40794f179ddc22fcf940c7f8"
+  },
+  "tests/integration/branch-undo.test.ts": {
+    "mtime": 1788547343.2915044,
+    "ast_hash": "50206c4e18e9b689679c04f8cacc4b7d",
+    "semantic_hash": "50206c4e18e9b689679c04f8cacc4b7d"
+  },
+  "tests/integration/export-projection-consistency.test.ts": {
+    "mtime": 1789027324.4513083,
+    "ast_hash": "9eed213abec7d37b8c0c5743ab548e9f",
+    "semantic_hash": "9eed213abec7d37b8c0c5743ab548e9f"
+  },
+  "tests/integration/key-mode-rerealization.test.ts": {
+    "mtime": 1788547343.295691,
+    "ast_hash": "2dd76758b76f0c4e26f8fd038e2b3234",
+    "semantic_hash": "2dd76758b76f0c4e26f8fd038e2b3234"
+  },
+  "tests/integration/matrix-card-audition.test.ts": {
+    "mtime": 1788976433.0451581,
+    "ast_hash": "16807f3838d604b30f63a8fb6c89e086",
+    "semantic_hash": "16807f3838d604b30f63a8fb6c89e086"
+  },
+  "tests/integration/matrix-preview-add.test.ts": {
+    "mtime": 1788944420.4767175,
+    "ast_hash": "c588992aec543a872d6b2d28b8f84e1f",
+    "semantic_hash": "c588992aec543a872d6b2d28b8f84e1f"
+  },
+  "tests/integration/matrix-template-state.test.ts": {
+    "mtime": 1788547343.310295,
+    "ast_hash": "bba96b9eb82b33e27970f48eeadb4f81",
+    "semantic_hash": "bba96b9eb82b33e27970f48eeadb4f81"
+  },
+  "tests/integration/measure-card-export-alignment.test.ts": {
+    "mtime": 1788980342.3272176,
+    "ast_hash": "91b20728199cb4383990a953ed78a1fe",
+    "semantic_hash": "91b20728199cb4383990a953ed78a1fe"
+  },
+  "tests/integration/piano-projection.test.ts": {
+    "mtime": 1788953986.210313,
+    "ast_hash": "62cda860a95121eae7f16a080e8e711a",
+    "semantic_hash": "62cda860a95121eae7f16a080e8e711a"
+  },
+  "tests/integration/pitch-projection-consistency.test.ts": {
+    "mtime": 1788953381.3802476,
+    "ast_hash": "355e106a2d2e35cc9ae3edf906a269db",
+    "semantic_hash": "355e106a2d2e35cc9ae3edf906a269db"
+  },
+  "tests/integration/presentation-persistence.test.ts": {
+    "mtime": 1788959244.8679733,
+    "ast_hash": "3fdd349e9861d5b8e814583bec56d67e",
+    "semantic_hash": "3fdd349e9861d5b8e814583bec56d67e"
+  },
+  "tests/integration/preset-history.test.ts": {
+    "mtime": 1788636204.430488,
+    "ast_hash": "fc36080069b53c0513284e71ae38fd95",
+    "semantic_hash": "fc36080069b53c0513284e71ae38fd95"
+  },
+  "tests/integration/project-controller.test.ts": {
+    "mtime": 1788890308.369185,
+    "ast_hash": "2347e13b27c239f8277fb8d13032b336",
+    "semantic_hash": "2347e13b27c239f8277fb8d13032b336"
+  },
+  "tests/integration/timing-audio-projection.test.ts": {
+    "mtime": 1788632758.8021598,
+    "ast_hash": "a0afe191718ac86cec1ded5520d01ea6",
+    "semantic_hash": "a0afe191718ac86cec1ded5520d01ea6"
+  },
+  "tests/integration/us12-melody-acceptance.test.ts": {
+    "mtime": 1789123947.5265274,
+    "ast_hash": "7ed9dcc9ee44210cdb97817a96286bef",
+    "semantic_hash": "7ed9dcc9ee44210cdb97817a96286bef"
+  },
+  "tests/unit/app/history.test.ts": {
+    "mtime": 1788538225.0,
+    "ast_hash": "0cef8887522a361946a749d2277e39ef",
+    "semantic_hash": "0cef8887522a361946a749d2277e39ef"
+  },
+  "tests/unit/app/melody-commands.test.ts": {
+    "mtime": 1789045997.8731258,
+    "ast_hash": "b659506762cb58de5c479f359b6583a1",
+    "semantic_hash": "b659506762cb58de5c479f359b6583a1"
+  },
+  "tests/unit/app/presentation-commands.test.ts": {
+    "mtime": 1788959244.866469,
+    "ast_hash": "790595a1b4b8e9a805e15b9d58c9092f",
+    "semantic_hash": "790595a1b4b8e9a805e15b9d58c9092f"
+  },
+  "tests/unit/app/preset-commands.test.ts": {
+    "mtime": 1788636142.166198,
+    "ast_hash": "b19301184145f72051fb0f4ca03b561a",
+    "semantic_hash": "b19301184145f72051fb0f4ca03b561a"
+  },
+  "tests/unit/app/timing-commands.test.ts": {
+    "mtime": 1788786968.2132478,
+    "ast_hash": "114444d7b6ff99a3c414c4ac76375a3a",
+    "semantic_hash": "114444d7b6ff99a3c414c4ac76375a3a"
+  },
+  "tests/unit/audio/event-realizer.test.ts": {
+    "mtime": 1788552430.2352686,
+    "ast_hash": "568ee798f84eeb8bae4ab1d4b8ab8e86",
+    "semantic_hash": "568ee798f84eeb8bae4ab1d4b8ab8e86"
+  },
+  "tests/unit/audio/hq-sample-piano/manifest.test.ts": {
+    "mtime": 1788555137.337031,
+    "ast_hash": "b63cfadcdb767e336ed7c32c921d2c04",
+    "semantic_hash": "b63cfadcdb767e336ed7c32c921d2c04"
+  },
+  "tests/unit/audio/hq-sample-piano/provider.test.ts": {
+    "mtime": 1788555355.5903983,
+    "ast_hash": "db57a28eb87f7a4a12b84759b86c5d4b",
+    "semantic_hash": "db57a28eb87f7a4a12b84759b86c5d4b"
+  },
+  "tests/unit/audio/hq-sample-piano/sample-cache.test.ts": {
+    "mtime": 1788555061.6949584,
+    "ast_hash": "dbf12bb54101da51516c67838fe657ec",
+    "semantic_hash": "dbf12bb54101da51516c67838fe657ec"
+  },
+  "tests/unit/audio/hq-sample-piano/velocity-layers.test.ts": {
+    "mtime": 1788554979.3017316,
+    "ast_hash": "47bd2207f5c3228ae03b2262437777b3",
+    "semantic_hash": "47bd2207f5c3228ae03b2262437777b3"
+  },
+  "tests/unit/audio/melody-performance.test.ts": {
+    "mtime": 1789106203.2901573,
+    "ast_hash": "99a88893a8ef3be29bf7b42de47e90d9",
+    "semantic_hash": "99a88893a8ef3be29bf7b42de47e90d9"
+  },
+  "tests/unit/audio/melody-playback-controller.test.ts": {
+    "mtime": 1789071079.3384562,
+    "ast_hash": "d1c86fcce40af611b7a48fb5158d12c0",
+    "semantic_hash": "d1c86fcce40af611b7a48fb5158d12c0"
+  },
+  "tests/unit/audio/metronome.test.ts": {
+    "mtime": 1788629585.0918727,
+    "ast_hash": "f45c94668fd5953e8375e828c444f123",
+    "semantic_hash": "f45c94668fd5953e8375e828c444f123"
+  },
+  "tests/unit/audio/playback-controller.test.ts": {
+    "mtime": 1788980054.1101384,
+    "ast_hash": "f2451ef788a6559a5c06a156724c26ac",
+    "semantic_hash": "f2451ef788a6559a5c06a156724c26ac"
+  },
+  "tests/unit/audio/prepare-piano-bank.test.ts": {
+    "mtime": 1788603431.3459585,
+    "ast_hash": "b788c80f6dcce45b1b451a809ef166bd",
+    "semantic_hash": "b788c80f6dcce45b1b451a809ef166bd"
+  },
+  "tests/unit/audio/scheduler.test.ts": {
+    "mtime": 1788980034.1201253,
+    "ast_hash": "8f19f5d197da9821f04477d826c9da60",
+    "semantic_hash": "8f19f5d197da9821f04477d826c9da60"
+  },
+  "tests/unit/audio/soundfont/melody-provider.test.ts": {
+    "mtime": 1789070924.4717896,
+    "ast_hash": "12d2ca591f553c2ab3fe6d62465f32f6",
+    "semantic_hash": "12d2ca591f553c2ab3fe6d62465f32f6"
+  },
+  "tests/unit/audio/soundfont/spessa-provider.test.ts": {
+    "mtime": 1788553822.7283247,
+    "ast_hash": "3a166bfcc6c02d47b57118abf284fc62",
+    "semantic_hash": "3a166bfcc6c02d47b57118abf284fc62"
+  },
+  "tests/unit/export/midi.test.ts": {
+    "mtime": 1789072453.7807105,
+    "ast_hash": "40e41bb977b9ea16553a120cd5274ae4",
+    "semantic_hash": "40e41bb977b9ea16553a120cd5274ae4"
+  },
+  "tests/unit/export/musicxml.test.ts": {
+    "mtime": 1789107669.6079926,
+    "ast_hash": "6f071a01bd1c5668e0e1aee2ff67e401",
+    "semantic_hash": "6f071a01bd1c5668e0e1aee2ff67e401"
+  },
+  "tests/unit/harmony/dark-harmony.test.ts": {
+    "mtime": 1788547343.3230186,
+    "ast_hash": "30303c1077497e40c870d9dfff49435f",
+    "semantic_hash": "30303c1077497e40c870d9dfff49435f"
+  },
+  "tests/unit/harmony/module-conversion.test.ts": {
+    "mtime": 1788547343.3275948,
+    "ast_hash": "116f5e38a620b0af6521baa63d2e55bb",
+    "semantic_hash": "116f5e38a620b0af6521baa63d2e55bb"
+  },
+  "tests/unit/harmony/pitch.test.ts": {
+    "mtime": 1788538225.0,
+    "ast_hash": "53d90100f61e5e76e355241b755dec0a",
+    "semantic_hash": "53d90100f61e5e76e355241b755dec0a"
+  },
+  "tests/unit/harmony/progressions.test.ts": {
+    "mtime": 1788547343.3350701,
+    "ast_hash": "afcf7b51c6ab6802d247db3783e74882",
+    "semantic_hash": "afcf7b51c6ab6802d247db3783e74882"
+  },
+  "tests/unit/harmony/secondary-diminished.test.ts": {
+    "mtime": 1788547343.3401163,
+    "ast_hash": "1f4405031febb1b84dd4ec592d993689",
+    "semantic_hash": "1f4405031febb1b84dd4ec592d993689"
+  },
+  "tests/unit/harmony/tonal-minor.test.ts": {
+    "mtime": 1788538834.0,
+    "ast_hash": "88f66ca0a987cc061247ea64172b2ee1",
+    "semantic_hash": "88f66ca0a987cc061247ea64172b2ee1"
+  },
+  "tests/unit/instruments/piano/articulation.test.ts": {
+    "mtime": 1788552416.7848375,
+    "ast_hash": "6f7e58292196a4af80193ad3b2c1119a",
+    "semantic_hash": "6f7e58292196a4af80193ad3b2c1119a"
+  },
+  "tests/unit/instruments/piano/performance.test.ts": {
+    "mtime": 1788552402.6680229,
+    "ast_hash": "b5db45705a4e19f7858a02b5a12dba63",
+    "semantic_hash": "b5db45705a4e19f7858a02b5a12dba63"
+  },
+  "tests/unit/instruments/piano/realization.test.ts": {
+    "mtime": 1788552388.7270331,
+    "ast_hash": "455576845d26a7950ec78059db2930d3",
+    "semantic_hash": "455576845d26a7950ec78059db2930d3"
+  },
+  "tests/unit/instruments/piano/voice-leading.test.ts": {
+    "mtime": 1788549995.775226,
+    "ast_hash": "bee289b346b72d7589a3a09154f3aa90",
+    "semantic_hash": "bee289b346b72d7589a3a09154f3aa90"
+  },
+  "tests/unit/melody/projection.test.ts": {
+    "mtime": 1789043033.434392,
+    "ast_hash": "0e2baece9ab1646af03ba7f24f455f1b",
+    "semantic_hash": "0e2baece9ab1646af03ba7f24f455f1b"
+  },
+  "tests/unit/notation/melody-staff-projection.test.ts": {
+    "mtime": 1789051441.298248,
+    "ast_hash": "190cc1390d305b6fe0a1a5885a2bd61e",
+    "semantic_hash": "190cc1390d305b6fe0a1a5885a2bd61e"
+  },
+  "tests/unit/notation/vexflow-adapter.test.ts": {
+    "mtime": 1789105774.9923208,
+    "ast_hash": "a1391c06a36843eb0d58e20ac84f8512",
+    "semantic_hash": "a1391c06a36843eb0d58e20ac84f8512"
+  },
+  "tests/unit/persistence/codec-mapping.test.ts": {
+    "mtime": 1789044190.9981692,
+    "ast_hash": "d50110a42b3b0decda80bf7177f3ee61",
+    "semantic_hash": "d50110a42b3b0decda80bf7177f3ee61"
+  },
+  "tests/unit/persistence/melody-project.test.ts": {
+    "mtime": 1789067738.2874336,
+    "ast_hash": "a034287790b086aec61caee2630ab5e0",
+    "semantic_hash": "a034287790b086aec61caee2630ab5e0"
+  },
+  "tests/unit/persistence/portable-project.test.ts": {
+    "mtime": 1789044190.9769697,
+    "ast_hash": "1112a2e3ce2a866f86c6280765aa147d",
+    "semantic_hash": "1112a2e3ce2a866f86c6280765aa147d"
+  },
+  "tests/unit/persistence/project-name.test.ts": {
+    "mtime": 1788788149.9055207,
+    "ast_hash": "4dd4adc1b9266eb97c3d8c937fb39dcb",
+    "semantic_hash": "4dd4adc1b9266eb97c3d8c937fb39dcb"
+  },
+  "tests/unit/progression/branch.test.ts": {
+    "mtime": 1788547343.3528132,
+    "ast_hash": "60d5b5ffca57941992a97ba5984790a9",
+    "semantic_hash": "60d5b5ffca57941992a97ba5984790a9"
+  },
+  "tests/unit/progression/built-in-presets.test.ts": {
+    "mtime": 1788635539.9183657,
+    "ast_hash": "806682160dcfd18e2f8384243ca3f372",
+    "semantic_hash": "806682160dcfd18e2f8384243ca3f372"
+  },
+  "tests/unit/progression/measure-gap-commands.test.ts": {
+    "mtime": 1788980342.3084853,
+    "ast_hash": "f521b70160f5904764cee6ba792028f5",
+    "semantic_hash": "f521b70160f5904764cee6ba792028f5"
+  },
+  "tests/unit/progression/presets.test.ts": {
+    "mtime": 1788634504.4055822,
+    "ast_hash": "94e148cc2b4e283a789c6127b1ff36c4",
+    "semantic_hash": "94e148cc2b4e283a789c6127b1ff36c4"
+  },
+  "tests/unit/progression/selection-dismissal.test.ts": {
+    "mtime": 1788982329.5524192,
+    "ast_hash": "89a1fcdd26298933a4b68584c93c9f6a",
+    "semantic_hash": "89a1fcdd26298933a4b68584c93c9f6a"
+  },
+  "tests/unit/progression/step-duration-editing.test.ts": {
+    "mtime": 1788982337.202499,
+    "ast_hash": "580a37351973c14e0033a88722cba595",
+    "semantic_hash": "580a37351973c14e0033a88722cba595"
+  },
+  "tests/unit/progression/step-independence.test.ts": {
+    "mtime": 1788547343.3654563,
+    "ast_hash": "775fb7618fc6c75a2db03a70910f105e",
+    "semantic_hash": "775fb7618fc6c75a2db03a70910f105e"
+  },
+  "tests/unit/project/factory.test.ts": {
+    "mtime": 1788951976.850748,
+    "ast_hash": "70109831e2a68223da6f7c70ef014ccd",
+    "semantic_hash": "70109831e2a68223da6f7c70ef014ccd"
+  },
+  "tests/unit/recommendations/branch-context.test.ts": {
+    "mtime": 1788547343.6224751,
+    "ast_hash": "380df2d8fb6d1cb2b2100df9bd1cfb36",
+    "semantic_hash": "380df2d8fb6d1cb2b2100df9bd1cfb36"
+  },
+  "tests/unit/recommendations/engine.test.ts": {
+    "mtime": 1788547343.6277227,
+    "ast_hash": "b9f4ffc102727af11cac8c6838ec0b3c",
+    "semantic_hash": "b9f4ffc102727af11cac8c6838ec0b3c"
+  },
+  "tests/unit/timing/duration.test.ts": {
+    "mtime": 1788627396.2006946,
+    "ast_hash": "c0d7800b2c805cb15903ad956124e6a6",
+    "semantic_hash": "c0d7800b2c805cb15903ad956124e6a6"
+  },
+  "tests/unit/timing/measure-layout.test.ts": {
+    "mtime": 1788980342.0049465,
+    "ast_hash": "6315a02ae80dc3dee17ba649a5fa3717",
+    "semantic_hash": "6315a02ae80dc3dee17ba649a5fa3717"
+  },
+  "tests/unit/timing/meter.test.ts": {
+    "mtime": 1788628457.8163633,
+    "ast_hash": "183c487292099bc92e82479dd49be3b9",
+    "semantic_hash": "183c487292099bc92e82479dd49be3b9"
+  },
+  "tests/unit/timing/rational.test.ts": {
+    "mtime": 1788547343.6327348,
+    "ast_hash": "6b7d7f105dfb47fa7fcab02825ec097d",
+    "semantic_hash": "6b7d7f105dfb47fa7fcab02825ec097d"
+  },
+  "tests/unit/timing/swing.test.ts": {
+    "mtime": 1788628517.5023532,
+    "ast_hash": "817ba502f89035ff6fcdb4c503cc6bda",
+    "semantic_hash": "817ba502f89035ff6fcdb4c503cc6bda"
+  },
+  "tests/unit/timing/timeline.test.ts": {
+    "mtime": 1788628497.252949,
+    "ast_hash": "47a1ea01f7e23a2fa0bb5b41ec06b425",
+    "semantic_hash": "47a1ea01f7e23a2fa0bb5b41ec06b425"
+  },
+  "tests/unit/transport/loopState.test.ts": {
+    "mtime": 1788629595.877525,
+    "ast_hash": "18578ad104ec8a7ca7837bb8dad5bd57",
+    "semantic_hash": "18578ad104ec8a7ca7837bb8dad5bd57"
+  },
+  "tests/unit/transport/step-duration-controls.test.ts": {
+    "mtime": 1788691817.4776788,
+    "ast_hash": "01abb1e3b4fd304d6d4f38a14caebe04",
+    "semantic_hash": "01abb1e3b4fd304d6d4f38a14caebe04"
+  },
+  "tests/unit/transport/transportStore.test.ts": {
+    "mtime": 1788630317.253312,
+    "ast_hash": "4a9bdc5c00bc9c19200bee39b96af83a",
+    "semantic_hash": "4a9bdc5c00bc9c19200bee39b96af83a"
+  },
+  "tests/unit/ui/export-actions.test.ts": {
+    "mtime": 1789026578.3671327,
+    "ast_hash": "16fa7fe99f154f075e859106c305d909",
+    "semantic_hash": "16fa7fe99f154f075e859106c305d909"
+  },
+  "tests/unit/ui/melody-ui.test.ts": {
+    "mtime": 1789051810.7654345,
+    "ast_hash": "638896723e39a449706adbdf13823e9d",
+    "semantic_hash": "638896723e39a449706adbdf13823e9d"
+  },
+  "tests/unit/ui/piano-card-view.test.ts": {
+    "mtime": 1788956807.1303742,
+    "ast_hash": "17c977e00afab9122a73b58d3b04cf77",
+    "semantic_hash": "17c977e00afab9122a73b58d3b04cf77"
+  },
+  "tests/unit/ui/presets-ui.test.ts": {
+    "mtime": 1788638218.204991,
+    "ast_hash": "e555b4ab565075c1f6b455df69bb0fc3",
+    "semantic_hash": "e555b4ab565075c1f6b455df69bb0fc3"
+  },
+  "tests/unit/ui/staff-octave.test.ts": {
+    "mtime": 1789025332.6340594,
+    "ast_hash": "791517507ba896da85a67e887b69ed4f",
+    "semantic_hash": "791517507ba896da85a67e887b69ed4f"
+  },
+  "tsconfig.app.json": {
+    "mtime": 1788538104.0,
+    "ast_hash": "cf8f194039b36f164cd79fbe30b0b8f8",
+    "semantic_hash": "cf8f194039b36f164cd79fbe30b0b8f8"
+  },
+  "tsconfig.domain.json": {
+    "mtime": 1788538104.0,
+    "ast_hash": "4fc3c930381186ab52293af8ffac5711",
+    "semantic_hash": "4fc3c930381186ab52293af8ffac5711"
+  },
+  "tsconfig.foundation.json": {
+    "mtime": 1788538225.0,
+    "ast_hash": "f47d67301371c6ebc93d17301d321017",
+    "semantic_hash": "f47d67301371c6ebc93d17301d321017"
+  },
+  "tsconfig.json": {
+    "mtime": 1788547343.642794,
+    "ast_hash": "cebcd0aef9a53b9c724ac53266f03437",
+    "semantic_hash": "cebcd0aef9a53b9c724ac53266f03437"
+  },
+  "tsconfig.node.json": {
+    "mtime": 1788538104.0,
+    "ast_hash": "868a9ebb0ee0e832ad4e19257342be0f",
+    "semantic_hash": "868a9ebb0ee0e832ad4e19257342be0f"
+  },
+  "vite.config.ts": {
+    "mtime": 1788538104.0,
+    "ast_hash": "de957b4a56073a5857a3972f46453e80",
+    "semantic_hash": "de957b4a56073a5857a3972f46453e80"
+  },
+  "vitest.config.ts": {
+    "mtime": 1788594505.3998907,
+    "ast_hash": "9d78ca12620b10554737a43e153528cf",
+    "semantic_hash": "9d78ca12620b10554737a43e153528cf"
+  },
+  "public/audio/piano-hq/samples/C4v10.ogg": {
+    "mtime": 1788555174.804198,
+    "ast_hash": "e2b64436ecc6da2b78e09a9b39679df8",
+    "semantic_hash": "e2b64436ecc6da2b78e09a9b39679df8"
+  },
+  "public/audio/piano-hq/samples/C4v14.ogg": {
+    "mtime": 1788555175.2849898,
+    "ast_hash": "c00f062cd9d441629ca1e39f9a956278",
+    "semantic_hash": "c00f062cd9d441629ca1e39f9a956278"
+  },
+  "public/audio/piano-hq/samples/C4v2.ogg": {
+    "mtime": 1788555173.5213869,
+    "ast_hash": "ec69c66e3abbe853798cc1da230793be",
+    "semantic_hash": "ec69c66e3abbe853798cc1da230793be"
+  },
+  "review-artifacts/us5-batch-c/hq-piano-demo.webm": {
+    "mtime": 1788555459.8466647,
+    "ast_hash": "062c4bd3e96e2409f5471c2f7cec2ea3",
+    "semantic_hash": "062c4bd3e96e2409f5471c2f7cec2ea3"
+  },
+  "review-artifacts/us5-final/hq-final-demo.webm": {
+    "mtime": 1788597643.0528195,
+    "ast_hash": "85ac06a2ab8a4983de841757e2a95ad7",
+    "semantic_hash": "85ac06a2ab8a4983de841757e2a95ad7"
+  },
+  "review-artifacts/us6-final/us6-final-demo.webm": {
+    "mtime": 1788632660.3709776,
+    "ast_hash": "1624e8d9cd81722cbeada4bf136cce7c",
+    "semantic_hash": "1624e8d9cd81722cbeada4bf136cce7c"
+  }
+}

@@ -1,0 +1,1861 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CadenceFlow Master Developer Reference: Реверс-инжиниринг ChordFiles, математическая модель и архитектурная спецификация</title>
+<style>
+:root {
+  --bg: #0b0d13;
+  --bg-subtle: #11151f;
+  --panel: #161b26;
+  --panel-elevated: #1e2433;
+  --panel-border: #283144;
+  --line: #242c3d;
+  --text: #edf2f9;
+  --text-muted: #9aa5b8;
+  --text-dim: #64748b;
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.18);
+  --accent-purple: #c084fc;
+  --good: #4ade80;
+  --good-bg: rgba(74, 222, 128, 0.12);
+  --warn: #facc15;
+  --warn-bg: rgba(250, 204, 21, 0.12);
+  --bad: #f87171;
+  --bad-bg: rgba(248, 113, 113, 0.14);
+  --gold: #fbbf24;
+  --radius: 12px;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14.5px/1.6 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { text-decoration: underline; color: #7dd3fc; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 24px 18px;
+  border-right: 1px solid var(--panel-border);
+  background: rgba(13, 17, 25, 0.95);
+  backdrop-filter: blur(14px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.brand span { color: var(--accent); }
+.brand small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+.search-box {
+  position: relative;
+}
+.search-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  padding: 9px 12px 9px 34px;
+  border-radius: 9px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.filter-btn {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn:hover { color: #fff; border-color: var(--accent); }
+.filter-btn.active {
+  background: var(--accent);
+  color: #08101a;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-category {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin: 12px 8px 4px;
+}
+.nav a {
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.nav a:hover {
+  background: var(--panel);
+  color: #fff;
+  text-decoration: none;
+}
+.nav a.active {
+  background: var(--panel-elevated);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Main Content */
+.main {
+  padding: 40px 52px 100px;
+  max-width: 1440px;
+  width: 100%;
+}
+
+.hero {
+  padding: 36px 40px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.15), transparent 45%),
+              radial-gradient(circle at 10% 90%, rgba(192, 132, 252, 0.12), transparent 40%),
+              var(--panel);
+  box-shadow: var(--shadow);
+  margin-bottom: 40px;
+}
+.hero h1 {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 14px;
+  color: #fff;
+}
+.hero p.lead {
+  font-size: 16px;
+  color: #cbd5e1;
+  max-width: 980px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Section styling */
+section {
+  margin-top: 48px;
+  scroll-margin-top: 24px;
+}
+.section-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 22px;
+  gap: 16px;
+}
+.section-title h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.section-title p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+/* Epistemic Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.badge-fact {
+  background: var(--good-bg);
+  color: var(--good);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.badge-infer {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+}
+.badge-proposal {
+  background: rgba(192, 132, 252, 0.14);
+  color: var(--accent-purple);
+  border: 1px solid rgba(192, 132, 252, 0.3);
+}
+.badge-audit {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+/* Grid & Cards */
+.grid { display: grid; gap: 16px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+.card h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.card p {
+  margin: 8px 0;
+  color: #cbd5e1;
+  font-size: 13.5px;
+}
+.card ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: #cbd5e1;
+  font-size: 13.5px;
+}
+.card li { margin: 4px 0; }
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 18px 0;
+  color: #d1d5db;
+  font-size: 14px;
+}
+.callout.warn {
+  border-left-color: var(--warn);
+  background: rgba(250, 204, 21, 0.06);
+}
+.callout.danger {
+  border-left-color: var(--bad);
+  background: rgba(248, 113, 113, 0.08);
+}
+.callout strong { color: #fff; }
+
+/* Tables */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  margin: 18px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  min-width: 720px;
+  font-size: 13.5px;
+}
+th, td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #1c2333;
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+/* Code and Diagrams */
+pre.code {
+  font: 12.5px/1.55 "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: #090c12;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+  color: #e2e8f0;
+}
+.diagram {
+  font: 12.5px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: #090c12;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+  white-space: pre;
+  color: #38bdf8;
+}
+
+/* =========================================================================
+   INTERACTIVE WORKBENCH STYLES
+   ========================================================================= */
+.workbench {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin: 24px 0;
+}
+.wb-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.wb-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wb-control-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.wb-select {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+.wb-btn {
+  background: var(--panel-elevated);
+  border: 1px solid var(--panel-border);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wb-btn:hover { background: var(--accent); color: #08101a; border-color: var(--accent); }
+.wb-btn.active { background: var(--accent); color: #08101a; border-color: var(--accent); }
+
+/* Matrix Canvas with 6 Columns */
+.matrix-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.matrix-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  position: relative;
+}
+
+.matrix-row-label {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.label-tension { color: #f59e0b; background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; }
+.label-core { color: #38bdf8; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; }
+.label-color { color: #c084fc; background: rgba(192, 132, 252, 0.08); border-left: 3px solid #c084fc; }
+
+.chord-tile {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  user-select: none;
+}
+.chord-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.2);
+}
+.chord-tile.highlighted {
+  border-color: var(--good) !important;
+  background: rgba(74, 222, 128, 0.12) !important;
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.35);
+}
+.chord-tile.active {
+  border-color: var(--accent);
+  background: var(--panel-elevated);
+}
+.chord-tile .symbol {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  display: block;
+}
+.chord-tile .roman {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: block;
+  margin-top: 2px;
+}
+.chord-tile .arrow-tag {
+  font-size: 9.5px;
+  color: #f59e0b;
+  display: block;
+  margin-top: 4px;
+}
+
+/* Modal interchange row (4 items mapped across columns) */
+.matrix-row-modal {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+.empty-cell { visibility: hidden; }
+
+/* SVG Overlay for arrows */
+.svg-arrow-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Dual Instrument Inspector (Piano / Fretboard) */
+.inspector-panel {
+  margin-top: 20px;
+  background: #090c12;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+.inspector-meta h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #fff;
+}
+.inspector-meta p {
+  margin: 6px 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.legend-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 11.5px;
+}
+.dot-sample {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.dot-chord { background: #38bdf8; }
+.dot-scale { background: var(--gold); }
+.dot-root { background: #f43f5e; }
+
+.instrument-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Keyboard mini SVG */
+.piano-keyboard-svg {
+  width: 100%;
+  height: 80px;
+  background: #0f131a;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+
+/* Fretboard mini SVG */
+.guitar-fretboard-svg {
+  width: 100%;
+  height: 110px;
+  background: #14110f;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+
+@media(max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }
+  .main { padding: 24px 18px 60px; }
+  .g2, .g3, .g4 { grid-template-columns: 1fr; }
+  .matrix-row, .matrix-row-modal { grid-template-columns: repeat(3, 1fr); }
+  .inspector-panel { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <div class="brand">
+      Cadence<span>Flow</span>
+      <small>Master Developer Reference · 2026</small>
+    </div>
+
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" class="search-input" placeholder="Поиск по спецификации..." />
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all">Все</button>
+      <button class="filter-btn" data-filter="fact">Факты</button>
+      <button class="filter-btn" data-filter="infer">Выводы</button>
+      <button class="filter-btn" data-filter="audit">Аудит багов</button>
+      <button class="filter-btn" data-filter="proposal">Архитектура</button>
+    </div>
+
+    <nav class="nav" id="sidebarNav">
+      <div class="nav-category">I. Фундамент и методология</div>
+      <a href="#section-executive" class="active">1. Исполнительное резюме</a>
+      <a href="#section-epistemic">2. Эпистемическая модель</a>
+      <a href="#section-philosophy">3. Философия ChordFiles</a>
+
+      <div class="nav-category">II. Реверс-инжиниринг линейки</div>
+      <a href="#section-progressions">4. Progressions II (Мажор)</a>
+      <a href="#section-dark-harmony">5. Dark Harmony II (Минор)</a>
+      <a href="#section-scales-blues">6. Scales & Blues (2D навигация)</a>
+
+      <div class="nav-category">III. Критический аудит кода</div>
+      <a href="#section-audit-bugs">7. Топологический аудит CadenceFlow</a>
+      <a href="#section-voice-leading">8. Аудит голосоведения и звука</a>
+
+      <div class="nav-category">IV. Интерактивная мастер-модель</div>
+      <a href="#section-interactive-workbench">9. Живая песочница матрицы</a>
+      <a href="#section-instrument-layers">10. Слой Chord & Scale Tones</a>
+
+      <div class="nav-category">V. Спецификация для разработки</div>
+      <a href="#section-contracts">11. TypeScript контракты ядра</a>
+      <a href="#section-recommendations">12. Движок тяготений (Ruleset)</a>
+      <a href="#section-anti-patterns">13. UX-заповеди и антипаттерны</a>
+      <a href="#section-roadmap">14. Фазовый Roadmap</a>
+      <a href="#section-legal">15. Legal & IP Boundaries</a>
+    </nav>
+  </aside>
+
+  <!-- MAIN ARTICLE CONTENT -->
+  <main class="main">
+
+    <!-- HERO HEADER -->
+    <div class="hero">
+      <h1>CadenceFlow Master Developer Reference</h1>
+      <p class="lead">
+        Полное техническое руководство по деконструкции физической системы <b>ChordFiles</b>, 
+        математической формализации функциональной гармонии и архитектурной спецификации веб-студии <b>CadenceFlow</b>. 
+        Документ объединяет патентные исследования, анализ официальных мануалов, строгий аудит существующей кодовой базы и готовые к внедрению TypeScript-модели.
+      </p>
+      <div class="hero-badges">
+        <span class="chip">🏛 Чистый Domain-Driven Design</span>
+        <span class="chip">🎛 Встроенная Web Audio песочница</span>
+        <span class="chip">🎯 6-колоночная топология</span>
+        <span class="chip">🎸 Fretboard & Piano Dual-Layer</span>
+        <span class="chip">🛡 Защита от регрессий</span>
+      </div>
+    </div>
+
+    <!-- 1. ИСПОЛНИТЕЛЬНОЕ РЕЗЮМЕ -->
+    <section id="section-executive">
+      <div class="section-title">
+        <div>
+          <h2>1. Исполнительное резюме и ключевой тезис</h2>
+          <p>В чем истинная ценность ChordFiles и почему CadenceFlow не должен быть очередной DAW</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Главная архитектурная формула:</strong><br>
+        ChordFiles — это не база данных аккордов. ChordFiles — это <b>параметризованная пространственная система поиска (spatial lookup engine) + ориентированный граф функциональных тяготений с жестким ограничением когнитивной нагрузки</b>.
+      </div>
+
+      <div class="grid g3">
+        <div class="card">
+          <h3><span class="badge badge-fact">Факт</span> 1. Ограничение выбора</h3>
+          <p>Физическая карточка показывает ровно <b>12–16 аккордов</b> в выбранной тональности, исключая «каталожный паралич» (choice overload). Пользователь застрахован от взятия немузыкальных случайных нот.</p>
+        </div>
+        <div class="card">
+          <h3><span class="badge badge-fact">Факт</span> 2. Геометрия = Смысл</h3>
+          <p>Вертикаль и горизонталь несут строгий музыкальный смысл: Core (центр), Tension (верх со стрелками вниз), Color (низ со связями в I, IV, V). Глаз музыканта запоминает топологию, а не абстрактные формулы.</p>
+        </div>
+        <div class="card">
+          <h3><span class="badge badge-proposal">Цель</span> 3. Цифровое превосходство</h3>
+          <p>CadenceFlow должен не просто скопировать карточку, но преодолеть её физические ограничения: добавить <b>акустический отклик (Web Audio Salamander)</b>, <b>рациональный ритмический транспорт</b>, <b>умное голосоведение</b> и <b>экспорт в DAW (MIDI/XML)</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ЭПИСТЕМИЧЕСКАЯ МОДЕЛЬ -->
+    <section id="section-epistemic">
+      <div class="section-title">
+        <div>
+          <h2>2. Эпистемическая модель классификации информации</h2>
+          <p>Четкое разделение фактов первоисточников, логических реконструкций и продуктовых предложений</p>
+        </div>
+      </div>
+
+      <p>Чтобы исключить разногласия внутри команды разработки, вся информация в настоящем руководстве маркируется четырьмя уровнями достоверности:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Маркер</th>
+              <th>Категория</th>
+              <th>Критерий истинности</th>
+              <th>Пример в документе</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-fact">FACT</span></td>
+              <td><b>Документированный факт</b></td>
+              <td>Явно подтверждено официальными PDF (`Guitar_PRO_EN`, `Piano_PRO_EN` и др.), текстом буклетов или фото продукта.</td>
+              <td>Наличие сноски об аккорде $V_7$ над $I$; 6 основных колонок мажора.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-infer">INFER</span></td>
+              <td><b>Логическая реконструкция</b></td>
+              <td>Выведено математически или теоретически на основе механики слайдера и взаимосвязей слоев.</td>
+              <td>Алгоритм расчета позиций окон при сдвиге внутренней полосы на 1 полутон.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-audit">AUDIT</span></td>
+              <td><b>Аудит дефекта / расхождения</b></td>
+              <td>Несоответствие между задумкой ChordFiles и текущей реализацией в кодовой базе `cadenceflow`.</td>
+              <td>Неверная колонка `column: 1` для `V7/ii` в файле `progressions.ts`.</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-proposal">PROPOSAL</span></td>
+              <td><b>Архитектурное предложение</b></td>
+              <td>Новое софтверное расширение для CadenceFlow, превосходящее физический оригинал.</td>
+              <td>Режим «Focus Mode», автоматический расчет голосоведения, экспорт шпаргалки А4 в PDF.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. ФИЛОСОФИЯ CHORDFILES -->
+    <section id="section-philosophy">
+      <div class="section-title">
+        <div>
+          <h2>3. Философия ChordFiles: 3 базовых закона</h2>
+          <p>Почему музыканты выбирают карточку вместо сложных плагинов</p>
+        </div>
+      </div>
+
+      <div class="grid g3">
+        <div class="card">
+          <h3>Закон 1: «Front / Back Spatial Identity»</h3>
+          <p><span class="badge badge-fact">FACT</span> Лицевая сторона (Теория) и оборотная сторона (Практика инструмента) имеют <b>абсолютно одинаковые пространственные координаты</b>.</p>
+          <p>Если аккорд $F$ находится в 3-м столбце центрального ряда на лицевой стороне, то на обороте аппликатура $F$ для гитары или пианино находится в том же 3-м столбце. Музыкант просто переворачивает карту, не теряя объект из виду.</p>
+        </div>
+
+        <div class="card">
+          <h3>Закон 2: «Mix» vs «Don't Mix»</h3>
+          <p><span class="badge badge-fact">FACT</span> Символы бесконечности $\infty$ и перечёркнутой бесконечности $\cancel{\infty}$ кодируют гармоническую безопасность:</p>
+          <ul>
+            <li><b>$\infty$ (Mix Chords):</b> в зоне Main Chords разрешена свободная комбинаторика — любые цепочки звучат благозвучно.</li>
+            <li><b>$\cancel{\infty}$ (Don't Mix):</b> в зоне напряжений аккорды нельзя брать подряд; необходимо следовать стрелке в целевую ступень.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>Закон 3: «Chord + Scale in Position»</h3>
+          <p><span class="badge badge-fact">FACT</span> Оборот инструмента показывает не просто аккорд, а <b>одновременный сплав гармонии и мелодии</b>.</p>
+          <p>Черные точки показывают костяк аккорда под пальцами, а золотые точки — звуки гаммы для мелодии и солирования прямо в этой же позиции руки, без смещения по грифу или клавиатуре.</p>
+        </div>
+      </div>
+
+      <!-- ВЕБ-ИССЛЕДОВАНИЕ: ОРИГИНАЛЬНАЯ ИСТОРИЯ И МАТЕРИАЛЫ -->
+      <div class="card" style="margin-top: 16px;">
+        <h3><span class="badge badge-fact">FACT</span> Живые данные веб-исследования: Автор, материалы и сообщество (45,000+ музыкантов)</h3>
+        <p>Прямой анализ данных официального сайта <code>chordfiles.com</code> (разделы <i>/story</i>, <i>/shop</i>, <i>/upcoming</i>) раскрывает инженерные и антропологические истоки инструмента:</p>
+        <div class="grid g2" style="margin-top: 12px;">
+          <div>
+            <ul>
+              <li><b>Автор и происхождение:</b> Яка Залетель (<i>Jaka Zaletelj</i>), выпускник отделения музыковедения Люблянского университета (Словения) и джазовой гитары в Консерватории Клагенфурта (Австрия). Идея родилась из желания избавить самоучек и студентов от запутанной академической рутины.</li>
+              <li><b>Первые прототипы:</b> Тестировались на его девушке Ксении (без музыкального образования) и студентах; ручная сборка в Словении с использованием местных типографий.</li>
+              <li><b>Аудитория продукта:</b> Более <b>45 000 музыкантов по всему миру</b> используют инструмент в студиях и на репетициях.</li>
+            </ul>
+          </div>
+          <div>
+            <ul>
+              <li><b>Физическая конструкция:</b> Бумага высокой плотности с пластиковым ламинированием, прецизионные металлические ручки-слайдеры, прозрачные полимерные окна и <b>неодимовые магниты</b> для тактильной фиксации тональности с характерным мягким кликом.</li>
+              <li><b>Философия «Screen-Free Focus»:</b> Автор сознательно отказался от смартфона: <i>«Телефоны с бесконечными уведомлениями крадут фокус. Для настоящего музыкального погружения нужен тактильный инструмент, возвращающий внимание к звуку и струнам»</i>.</li>
+              <li><b>Унификация строя:</b> Все диаграммы рассчитаны под стандартный строй (Standard EADGBE для гитары, GCEA для укулеле).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. PROGRESSIONS II -->
+    <section id="section-progressions">
+      <div class="section-title">
+        <div>
+          <h2>4. Деконструкция: Progressions II (Мажорная модель)</h2>
+          <p>Строгая 6-колоночная архитектура и направленные разрешения</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="badge badge-fact">FACT</span> В ChordFiles Progressions центральный ряд содержит <b>ровно 6 аккордов</b>, сгруппированных в 3 гармонические пары (Мажорная ступень + её параллельный минор). 
+        Уменьшенное трезвучие $vii^\circ$ намеренно исключено из базового ряда.
+      </div>
+
+      <div class="diagram">Топология Progressions II (Тональность C Major):
+
+[ V7 (G7) ]     [ V7/vi (E7) ]  [ V7/IV (C7) ]  [ V7/ii (A7) ]  [ V7/V (D7) ]   [ V7/iii (B7) ]  <-- SECONDARY DOMINANTS (Don't Mix)
+     │                │               │               │               │               │
+     ↓                ↓               ↓               ↓               ↓               ↓
+[ I  (C) ]      [ vi (Am) ]     [ IV (F) ]      [ ii (Dm) ]     [ V  (G) ]      [ iii (Em) ]     <-- MAIN CHORDS (Mix Freely)
+     │                │               │               │               │               │
+     └────────────────┴───────────────┼───────────────┴───────────────┴───────────────┘
+                                      │ (Переход только из I, IV, V)
+                                      ↓
+      [ ♭III (Eb) ]             [ ♭VI (Ab) ]    [ iv (Fm) ]     [ ♭VII (Bb) ]                    <-- MODAL INTERCHANGE (From Parallel Minor)
+            │                         │               │               │
+            └─────────────────────────┴───────────────┴───────────────┘
+                                      │ (Возврат только в I, IV, V)
+                                      ↓
+                                 [ I, IV, V ]</div>
+
+      <div class="card" style="margin-top: 16px;">
+        <h3><span class="badge badge-fact">FACT</span> Правило коридора Modal Interchange</h3>
+        <p>Инструкция ChordFiles формулирует однозначный алгоритм взаимодействия с параллельным минором:</p>
+        <ul>
+          <li><b>Вход («Down to any of four»):</b> переходить в модальный ряд ($\flat III, \flat VI, iv, \flat VII$) разрешено только из устойчивых ступеней: <b>$I, IV$ или $V$</b>.</li>
+          <li><b>Выход («Up to any of three»):</b> разрешаться из заимствованного аккорда обратно в основной ряд разрешено строго через <b>$I, IV$ или $V$</b>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 5. DARK HARMONY II -->
+    <section id="section-dark-harmony">
+      <div class="section-title">
+        <div>
+          <h2>5. Деконструкция: Dark Harmony II (Минорная модель)</h2>
+          <p>Два гравитационных полюса: Доминантовый верх и Субдоминантовый низ</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="badge badge-fact">FACT</span> В Dark Harmony гармония не разбросана случайно. Она поляризована на два вектора тяготения:
+        <b>Верхняя зона тяготеет к Доминанте ($V$)</b>, а <b>Нижняя зона тяготеет к Субдоминантам ($iv$ и $VI$)</b>.
+      </div>
+
+      <div class="diagram">Топология Dark Harmony II (Тональность A Minor):
+
+┌─────────────────────────────────────────────────────────┐  ┌───────────────────┐
+│     ВТОРИЧНЫЕ УМЕНЬШЕННЫЕ К ДОМИНАНТЕ (vii°7/V)        │  │ НЕАПОЛИТАНСКИЙ    │
+│  [ D#° / Eb° ]   [ F#° / Gb° ]   [ A° ]   [ C° ]        │  │ [ Bb / D ] (N6)   │  <-- ВЕРХНИЙ СЕКТОР (Тяготение к V)
+└────────────────────────────┬────────────────────────────┘  └─────────┬─────────┘
+                             │                                         │
+                             └───────────────────┬─────────────────────┘
+                                                 ↓
+[ i (Am) ]    [ III (C) ]    [ iv (Dm) ]   [ VI (F) ]   [ V (E/E7) ]   [ vii° (G#°) ]   [ ii° (B°) ] <-- MAIN MINOR CHORDS
+                                ↑              ↑
+                                └──────┬───────┘
+                                       │
+┌──────────────────────────────────────┴──────────────────────────────────┐
+│              ВТОРИЧНЫЕ УМЕНЬШЕННЫЕ К СУБДОМИНАНТАМ                      │
+│            [ G° ]     [ A#° / Bb° ]     [ C#° / Db° ]     [ E° ]        │  <-- НИЖНИЙ СЕКТОР (Тяготение к iv и VI)
+└─────────────────────────────────────────────────────────────────────────┘</div>
+
+      <div class="grid g2" style="margin-top: 16px;">
+        <div class="card">
+          <h3><span class="badge badge-fact">FACT</span> Природа уменьшенного септаккорда</h3>
+          <p>Уменьшенный септаккорд ($^\circ 7$) состоит из трех малых терций и делит октаву на 4 равные части. Поэтому $D\#^\circ, F\#^\circ, A^\circ, C^\circ$ — это <b>один и тот же аккорд в разных обращениях</b>. ChordFiles отображает все 4 энгармонических корня, чтобы музыканту было удобно найти ближайший на грифе или клавиатуре.</p>
+        </div>
+        <div class="card">
+          <h3><span class="badge badge-fact">FACT</span> Неаполитанский секстаккорд ($N^6$)</h3>
+          <p>В ChordFiles он обозначен как <b>$B\flat/D$</b> — первое обращение (бас на 4-й ступени). Это принципиально: бас $D$ делает мягкий полутоновый шаг в бас доминанты $E$. Также поддерживается классическая связка: $N^6 \to vii^{\circ 7}/V \to V$.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. SCALES & BLUES -->
+    <section id="section-scales-blues">
+      <div class="section-title">
+        <div>
+          <h2>6. Деконструкция: Scales & Blues (2D навигация)</h2>
+          <p>Многопараметрические модели и концепция «Target Notes»</p>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3><span class="badge badge-fact">FACT</span> ChordFiles Scales: 2D State Machine</h3>
+          <p>Продукт использует два независимых физических ползунка:</p>
+          <ul>
+            <li><b>Вертикальный слайдер:</b> выбор ладового семейства (Major, Natural Minor, Harmonic Minor, Melodic Minor).</li>
+            <li><b>Горизонтальный слайдер:</b> тонический центр ($C, C\#, D \dots$).</li>
+          </ul>
+          <p>На пересечении слайдеров открываются все 7 ладов народной музыки (Dorian, Phrygian, Lydian и др.), их характерные ступени ($\sharp 4, \flat 2, \natural 6$) и диатонические септаккорды.</p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge badge-fact">FACT</span> ChordFiles Blues: Доминантовая тоника и Target Notes</h3>
+          <p>Блюзовая модель ломает рамки классической диатоники:</p>
+          <ul>
+            <li>Аккорды $I^7, IV^7, V^7$ — устойчивые, опорные тоники/субдоминанты, а не доминанты к разрешению.</li>
+            <li><b>Target Notes:</b> руководство по импровизации — наведение мелодических линий на терции и септимы наступающего аккорда на сильных долях такта.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. АУДИТ БАГОВ CADENCEFLOW -->
+    <section id="section-audit-bugs">
+      <div class="section-title">
+        <div>
+          <h2>7. Критический аудит: Дефекты и расхождения в CadenceFlow</h2>
+          <p>Точный перечень расхождений существующего кода с оригинальной моделью ChordFiles</p>
+        </div>
+      </div>
+
+      <div class="callout danger">
+        <strong>Внимание разработчикам ядра:</strong> в модулях `progressions.ts` и `darkHarmony.ts` были допущены топологические ошибки, разрушившие вертикальное выравнивание колонок и логику тяготений.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Область дефекта</th>
+              <th>Как сделано сейчас в CadenceFlow</th>
+              <th>Как задумано в ChordFiles (Норматив)</th>
+              <th>Файл в кодовой базе</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><b>Смещение колонок (Column Misalignment)</b></td>
+              <td>`V7/ii` стоит в колонке 1 (над $vi$!), `V7/iii` в кол. 2 (над $IV$!), `V7/IV` в кол. 3 (над $ii$!), `V7/vi` в кол. 5 (над $iii$!). Вертикаль сломана.</td>
+              <td>Каждая доминанта расположена <b>строго над своим целевым аккордом</b>: $V_7 \to I$, $V^7/vi \to vi$, $V^7/IV \to IV$, $V^7/ii \to ii$, $V^7/V \to V$, $V^7/iii \to iii$.</td>
+              <td>[`progressions.ts:20-64`](file:///c:/Projects/cadenceflow/src/domain/harmony/modules/progressions.ts)</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><b>Пропуск аккорда $V_7 \to I$</b></td>
+              <td>В слое `secondary-dominants` только 5 аккордов. Доминантсептаккорд к тонике отсутствует.</td>
+              <td>Верхний ряд содержит <b>6 аккордов</b>. Первый аккорд — $V_7$ ($G^7$), разрешающийся стрелкой вниз в тонику $I$ ($C$).</td>
+              <td>[`progressions.ts:18-64`](file:///c:/Projects/cadenceflow/src/domain/harmony/modules/progressions.ts)</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><b>Лишний аккорд $vii^\circ$ в Main Chords</b></td>
+              <td>В `diatonic-core` зашито 7 колонок, включая $vii^\circ$ на 6-й позиции. Это разрушило симметрию 6 столбцов.</td>
+              <td>Ряд Main Chords содержит <b>ровно 6 аккордов</b> (3 пары: $I/vi, IV/ii, V/iii$). Уменьшенное трезвучие $vii^\circ$ намеренно убрано.</td>
+              <td>[`progressions.ts:115-121`](file:///c:/Projects/cadenceflow/src/domain/harmony/modules/progressions.ts)</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><b>Искажение структуры Dark Harmony</b></td>
+              <td>Модуль перегружен абстрактными хроматическими медиантами (`ChrMed+M3`, `ChrMed-m3↓`) и проходящими вводными (`CT°7`, `Pass°7`). Потеряны 2 полюса.</td>
+              <td>Строгая архитектура: Верхний ряд = $vii^{\circ 7}/V$ (4 корня) + $N^6 \to V$. Нижний ряд = $vii^{\circ 7}/iv$ и $vii^{\circ 7}/VI \to iv, VI$.</td>
+              <td>[`darkHarmony.ts:124-175`](file:///c:/Projects/cadenceflow/src/domain/harmony/modules/darkHarmony.ts)</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><b>Игнорирование правила «Don't Mix» ($\cancel{\infty}$)</b></td>
+              <td>Пользователь может безнаказанно выстраивать цепочки из вторичных доминант подряд ($V^7/ii \to V^7/iii \to V^7/IV$), нет предупреждений.</td>
+              <td>Вторичная доминанта обязана следовать по стрелке в свою цель. Цепочки из побочных доминант запрещены правилом $\cancel{\infty}$.</td>
+              <td>[`engine.ts`](file:///c:/Projects/cadenceflow/src/domain/recommendations/engine.ts)</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><b>Коридор входа/выхода Modal Interchange</b></td>
+              <td>Модальные аккорды ($\flat III, \flat VI, iv, \flat VII$) предлагаются произвольно без привязки к главным ступеням.</td>
+              <td>Вход в модальные аккорды — только из $I, IV, V$. Выход из них — только обратно в $I, IV, V$.</td>
+              <td>[`engine.ts`](file:///c:/Projects/cadenceflow/src/domain/recommendations/engine.ts)</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td><b>Бас Неаполитанского аккорда ($N^6$)</b></td>
+              <td>$N^6$ синтезируется как прима в басу ($\flat II$), если пользователь вручную не полезет в редактор воисингов.</td>
+              <td>$N^6$ — это секстаккорд с обязательным басом на 4-й ступени ($B\flat/D$ в Am), обеспечивающим плавный ход в бас доминанты $E$.</td>
+              <td>[`previewRealization.ts`](file:///c:/Projects/cadenceflow/src/ui/matrix/previewRealization.ts)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. АУДИТ ГОЛОСОВЕДЕНИЯ И ЗВУКА -->
+    <section id="section-voice-leading">
+      <div class="section-title">
+        <div>
+          <h2>8. Аудит голосоведения, звука и исполнительской практики</h2>
+          <p>Почему приложение сейчас звучит роботизированно и как это исправить</p>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3><span class="badge badge-audit">AUDIT</span> Параллельные скачки октав (No Voice Leading)</h3>
+          <p>В CadenceFlow по умолчанию все аккорды строятся в основном виде (Root Position). При воспроизведении прогрессии $C \to Am \to F \to G$ рука виртуального пианиста хаотично скачет параллельными квинтами через всю клавиатуру.</p>
+          <p><b>Норматив ChordFiles Piano:</b> ноты на обороте карточки зафиксированы в обращениях с минимальным движением голосов (Smooth Voice Leading) — общие ноты остаются на месте, остальные шагают на полтона-тон.</p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge badge-audit">AUDIT</span> «Пулемётный» блок-аккорд (No Strumming)</h3>
+          <p>Все ноты аккорда вызываются сэмплером в одну абсолютную миллисекунду с идентичным velocity. Это лишает рояль Salamander дыхания и делает звук механическим.</p>
+          <p><b>Норматив живого инструмента:</b> разброс щипка струн (Guitar Strum spread) составляет 20–45 мс, а клавишного арпеджио — 10–25 мс с микродинамикой верхнего голоса.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. ИНТЕРАКТИВНЫЙ WORKBENCH -->
+    <section id="section-interactive-workbench">
+      <div class="section-title">
+        <div>
+          <h2>9. Интерактивная мастер-модель матрицы (Live Prototype)</h2>
+          <p>Исправленная 6-колоночная топология со стрелками тяготения и Web Audio синтезом</p>
+        </div>
+      </div>
+
+      <div class="workbench">
+        <div class="wb-controls">
+          <div class="wb-control-group">
+            <label for="wbTonic">Тональность:</label>
+            <select id="wbTonic" class="wb-select">
+              <option value="0">C</option>
+              <option value="1">Db</option>
+              <option value="2">D</option>
+              <option value="3">Eb</option>
+              <option value="4">E</option>
+              <option value="5">F</option>
+              <option value="6">F# / Gb</option>
+              <option value="7">G</option>
+              <option value="8">Ab</option>
+              <option value="9">A</option>
+              <option value="10">Bb</option>
+              <option value="11">B</option>
+            </select>
+          </div>
+
+          <div class="wb-control-group">
+            <label for="wbModule">Модуль:</label>
+            <select id="wbModule" class="wb-select">
+              <option value="progressions">Progressions II (Major)</option>
+              <option value="dark">Dark Harmony II (Minor)</option>
+            </select>
+          </div>
+
+          <div class="wb-control-group">
+            <button id="wbAudioToggle" class="wb-btn active">🔊 Звук: Вкл</button>
+            <button id="wbStrumToggle" class="wb-btn active">🎸 Strum: Вкл (30ms)</button>
+          </div>
+
+          <span id="wbStatus" style="margin-left: auto; font-size: 12px; color: var(--text-muted);">
+            Кликните по аккорду для прослушивания и подсветки тяготений
+          </span>
+        </div>
+
+        <!-- MATRIX RENDERING AREA -->
+        <div class="matrix-container" id="matrixContainer">
+          <svg class="svg-arrow-overlay" id="arrowSvg"></svg>
+          
+          <!-- Lane 1: Tension -->
+          <div class="matrix-row-label label-tension" id="lane1Label">
+            <span>Вторичные доминанты (Don't Mix · Следуйте стрелке)</span>
+            <span>⊘ DON'T MIX</span>
+          </div>
+          <div class="matrix-row" id="lane1Row"></div>
+
+          <!-- Lane 2: Core -->
+          <div class="matrix-row-label label-core" id="lane2Label">
+            <span>Основные аккорды тональности (Свободная комбинаторика)</span>
+            <span>∞ MIX CHORDS</span>
+          </div>
+          <div class="matrix-row" id="lane2Row"></div>
+
+          <!-- Lane 3: Modal / Colors -->
+          <div class="matrix-row-label label-color" id="lane3Label">
+            <span>Модальный обмен (Параллельный минор · Вход и выход через I, IV, V)</span>
+            <span>COLOR ACCENTS</span>
+          </div>
+          <div class="matrix-row-modal" id="lane3Row"></div>
+        </div>
+
+        <!-- DUAL INSTRUMENT INSPECTOR -->
+        <div class="inspector-panel" id="inspectorPanel">
+          <div class="inspector-meta">
+            <h4 id="inspChordName">C Major</h4>
+            <p id="inspFunction">Ступень: <b>I (Tonic)</b></p>
+            <p id="inspNotes">Ноты аккорда: <b>C4 · E4 · G4</b></p>
+            <p id="inspRule">Правило: <i>Главная опора мажорной тональности.</i></p>
+
+            <div class="legend-dots">
+              <div><span class="dot-sample dot-root"></span> Опорная тоника (Root)</div>
+              <div><span class="dot-sample dot-chord"></span> Аккордовые звуки (Chord Tones)</div>
+              <div><span class="dot-sample dot-scale"></span> Гаммовые звуки в позиции (Scale Tones)</div>
+            </div>
+          </div>
+
+          <div class="instrument-canvas-wrap">
+            <div>
+              <small style="color: var(--text-dim); display: block; margin-bottom: 4px;">КЛАВИАТУРА ФОРТЕПИАНО (Двойной слой нот в позиции)</small>
+              <svg class="piano-keyboard-svg" id="pianoSvg" viewBox="0 0 420 80"></svg>
+            </div>
+            <div>
+              <small style="color: var(--text-dim); display: block; margin-bottom: 4px;">ГИТАРНЫЙ ГРИФ (Fretboard Diagram · Лады I–V)</small>
+              <svg class="guitar-fretboard-svg" id="fretSvg" viewBox="0 0 420 110"></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. СЛОЙ CHORD & SCALE TONES -->
+    <section id="section-instrument-layers">
+      <div class="section-title">
+        <div>
+          <h2>10. Спецификация слоя «Scale Tones» поверх инструмента</h2>
+          <p>Как подружить аппликатуру аккорда с импровизацией и Melody Track</p>
+        </div>
+      </div>
+
+      <div class="grid g3">
+        <div class="card">
+          <h3>1. Семантика Черных точек</h3>
+          <p><span class="badge badge-fact">FACT</span> <b>Chord Tones:</b> ноты, физически зажимаемые пальцами в данной аппликатуре (прима, терция, квинта, септима). Они создают акустическую опору на сильных долях такта ($1$ и $3$).</p>
+        </div>
+        <div class="card">
+          <h3>2. Семантика Золотых точек</h3>
+          <p><span class="badge badge-fact">FACT</span> <b>Scale Tones:</b> разрешенные ладовые звуки, находящиеся непосредственно под пальцами вокруг зажатого аккорда. Служат для проходящих интонаций и мелодических фраз без смещения руки.</p>
+        </div>
+        <div class="card">
+          <h3>3. Интеграция в Melody Track</h3>
+          <p><span class="badge badge-proposal">PROPOSAL</span> В нотном стане `Melody Track` ноты раскрашиваются: если нота совпадает с аккордом под ней — она черная/акцентная; если она из гаммы — золотая; если альтерированная — пурпурная.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11. TYPESCRIPT КОНТРАКТЫ -->
+    <section id="section-contracts">
+      <div class="section-title">
+        <div>
+          <h2>11. Канонические TypeScript контракты ядра</h2>
+          <p>Строгие интерфейсы для чистой архитектуры `src/domain/harmony/`</p>
+        </div>
+      </div>
+
+      <pre class="code"><code>/**
+ * Каноническая спецификация гармонического узла ChordFiles
+ */
+export type PitchClass = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+export type FunctionalLayerType = 
+  | "directed-tension"      // Верхняя полоса (Don't Mix, обязательное разрешение)
+  | "diatonic-core"          // Центральная полоса (Mix Chords, 6 колонок)
+  | "color-interchange";     // Нижняя полоса (Modal interchange, вход/выход через I, IV, V)
+
+export interface HarmonicNode {
+  readonly id: string;                     // e.g. "V7/ii" или "N6"
+  readonly displaySymbol: string;          // e.g. "A7"
+  readonly romanNumeral: string;           // e.g. "V⁷/ii"
+  readonly layer: FunctionalLayerType;
+  readonly column: 0 | 1 | 2 | 3 | 4 | 5;  // Строго 6 колонок для вертикального выравнивания!
+  readonly mixPolicy: "mix-freely" | "must-resolve";
+  readonly targetId?: string;              // Целевой узел разрешения по стрелке вниз
+  readonly bassScaleDegree?: number;       // e.g. 4 для N6 (B♭/D в Ля миноре)
+  readonly chordFormula: readonly number[]; // Полутоновые интервалы от примы [0, 4, 7, 10]
+}
+
+export interface VoicingRealization {
+  readonly rootPitchClass: PitchClass;
+  readonly bassPitch: number;              // MIDI нота баса (e.g. D3 = 50)
+  readonly upperPitches: readonly number[]; // MIDI ноты правой руки / верхних струн
+  readonly chordTones: readonly PitchClass[];
+  readonly scaleTonesInPosition: readonly PitchClass[];
+}
+
+export interface VoiceLeadingCost {
+  readonly totalSemitoneDistance: number;
+  readonly parallelFifthPenalty: number;
+  readonly commonToneBonus: number;
+}</code></pre>
+    </section>
+
+    <!-- 12. ДВИЖОК ТЯГОТЕНИЙ -->
+    <section id="section-recommendations">
+      <div class="section-title">
+        <div>
+          <h2>12. Архитектура движка тяготений (ChordFiles Ruleset)</h2>
+          <p>Формальные математические правила для рекомендательной системы</p>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3>Правило 1: Безусловное следование стрелке</h3>
+          <p><span class="badge badge-proposal">PROPOSAL</span> Если текущий шаг $S_n \in \text{TensionLane}$, то для шага $S_{n+1}$:</p>
+          <div class="diagram">Score(Target(S_n)) = 1.0 (BEST MATCH)
+Score(AnyOtherTension) = 0.0 (BLOCKED BY DON'T MIX)</div>
+        </div>
+
+        <div class="card">
+          <h3>Правило 2: Коридор модального обмена</h3>
+          <p><span class="badge badge-proposal">PROPOSAL</span> Для перехода в слой параллельного минора $\flat III, \flat VI, iv, \flat VII$:</p>
+          <div class="diagram">AllowedEntryFrom = { I, IV, V }
+AllowedReturnTo = { I, IV, V }</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. UX-ЗАПОВЕДИ -->
+    <section id="section-anti-patterns">
+      <div class="section-title">
+        <div>
+          <h2>13. UX-заповеди и антипаттерны</h2>
+          <p>Свод фундаментальных ограничений: чего в CadenceFlow делать категорически нельзя</p>
+        </div>
+      </div>
+
+      <div class="grid g3">
+        <div class="card">
+          <h3>❌ 1. Каталожный паралич</h3>
+          <p>Никогда не заменять пространственную карту выпадающим списком из 200 аккордовых символов. Музыкант мыслит топологией и отношениями, а не списком.</p>
+        </div>
+        <div class="card">
+          <h3>❌ 2. «Висячие» напряжения</h3>
+          <p>Не позволять интерфейсу бросать пользователя после выбора вторичной доминанты: стрелка и рекомендация обязаны направить его к разрешению.</p>
+        </div>
+        <div class="card">
+          <h3>❌ 3. Разрыв аккорда и гаммы</h3>
+          <p>Никогда не показывать аккорд без гаммового контекста под пальцами. Мелодия должна естественно вырастать из гармонической формы.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14. ROADMAP -->
+    <section id="section-roadmap">
+      <div class="section-title">
+        <div>
+          <h2>14. Фазовый Roadmap реализации улучшений</h2>
+          <p>Пошаговый инженерный план устранения расхождений</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Фаза</th>
+              <th>Ключевой фокус</th>
+              <th>Инженерные задачи</th>
+              <th>Результат</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Фаза 1</b></td>
+              <td><b>Исправление топологии матрицы</b></td>
+              <td>
+                1. Переписать `progressions.ts`: строго 6 колонок ($I/vi, IV/ii, V/iii$).<br>
+                2. Добавить $V_7$ в колонку 0 над $I$. Выровнять `V7/ii`, `V7/iii`, `V7/IV`, `V7/vi` строго над их целями.<br>
+                3. Удалить $vii^\circ$ из основного ряда. Пересобрать `Dark Harmony` в два полюса ($V$ и $iv/VI$).
+              </td>
+              <td>Полное восстановление истинной пространственной логики ChordFiles.</td>
+            </tr>
+            <tr>
+              <td><b>Фаза 2</b></td>
+              <td><b>Интерактивные стрелки и правила «Mix»</b></td>
+              <td>
+                1. Добавить SVG-стрелки тяготений между рядами с подсветкой при наведении.<br>
+                2. Оснастить ряды бейджами $\infty$ (Mix Chords) и $\cancel{\infty}$ (Don't Mix).<br>
+                3. Обучить движок рекомендаций безусловному приоритету стрелок.
+              </td>
+              <td>Интерфейс сам направляет композитора и обучает голосоведению.</td>
+            </tr>
+            <tr>
+              <td><b>Фаза 3</b></td>
+              <td><b>Гитарный гриф и слой Scale Tones</b></td>
+              <td>
+                1. Создать компонент `GuitarFretboardView` (открытые струны, лады, баррэ).<br>
+                2. Добавить золотые точки гаммовых звуков на клавишах фортепиано и ладах гитары.<br>
+                3. Внедрить 3D Flip анимацию на карточках для быстрого подглядывания аппликатуры.
+              </td>
+              <td>Привлечение огромной гитарной аудитории к CadenceFlow.</td>
+            </tr>
+            <tr>
+              <td><b>Фаза 4</b></td>
+              <td><b>Плавное голосоведение и Strumming</b></td>
+              <td>
+                1. Алгоритм Voice Leading Optimizer (минимизация полутоновых скачков октав).<br>
+                2. Секстаккордный бас для $N^6$ ($B\flat/D$).<br>
+                3. Strumming spread (20–40 мс) в сэмплере для живого звучания.
+              </td>
+              <td>Акустическое звучание рояля и гитары студийного уровня.</td>
+            </tr>
+            <tr>
+              <td><b>Фаза 5</b></td>
+              <td><b>Печатная шпаргалка А4 и Focus Mode</b></td>
+              <td>
+                1. Генератор красивого 1-страничного Printable PDF с сеткой аккордов и диаграммами.<br>
+                2. Минималистичный полноэкранный «Focus Mode» для игры за инструментом.
+              </td>
+              <td>Связь цифровой веб-студии с физической реальностью репетиций.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 15. LEGAL & IP BOUNDARIES -->
+    <section id="section-legal">
+      <div class="section-title">
+        <div>
+          <h2>15. Юридические границы и интеллектуальная собственность</h2>
+          <p>Анализ Safe Harbor и защита авторских прав</p>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3>Что защищено ChordFiles (Запрещено копировать)</h3>
+          <ul>
+            <li>Товарный знак «ChordFiles» и оригинальные логотипы.</li>
+            <li>Прямые графические ассеты, векторные файлы и фотографии из буклетов.</li>
+            <li>Патентные конструкции физических пластиковых рамок и магнитных защёлок.</li>
+            <li>Дословный текст инструкций на английском языке.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Что является общественным достоянием (Public Domain)</h3>
+          <ul>
+            <li>Вся теория функциональной гармонии и ладов.</li>
+            <li>Римские обозначения ступеней ($I, IV, V, V^7/ii, N^6$).</li>
+            <li>Круг квинт, энгармоническая орфография нот и интервалы.</li>
+            <li>Математическая идея ориентированного графа связей между аккордами.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- =========================================================================
+     JAVASCRIPT LOGIC & WEB AUDIO ENGINE
+     ========================================================================= -->
+<script>
+(function() {
+  // 1. Audio Context & Simple Synthesizer
+  let audioCtx = null;
+  let isAudioEnabled = true;
+  let isStrumEnabled = true;
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playChord(pitches) {
+    if (!isAudioEnabled) return;
+    initAudio();
+    if (!audioCtx) return;
+
+    const now = audioCtx.currentTime;
+    pitches.forEach((midi, index) => {
+      const freq = 440 * Math.pow(2, (midi - 69) / 12);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = index === 0 ? "triangle" : "sine"; // Bass warmer
+      osc.frequency.setValueAtTime(freq, now);
+
+      const delay = isStrumEnabled ? index * 0.028 : 0; // 28ms strum
+      const noteStart = now + delay;
+      const duration = 1.4;
+
+      gain.gain.setValueAtTime(0.0001, noteStart);
+      gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.28 : 0.16, noteStart + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(noteStart);
+      osc.stop(noteStart + duration);
+    });
+  }
+
+  // 2. Music Theory Data (12 keys, 6-column topology)
+  const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+  const NOTE_NAMES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+  function getNoteName(pc, preferFlats = true) {
+    const norm = ((pc % 12) + 12) % 12;
+    return preferFlats ? NOTE_NAMES_FLAT[norm] : NOTE_NAMES[norm];
+  }
+
+  // Column definitions for Progressions II (Major)
+  // Col 0: I (Tonic), Col 1: vi, Col 2: IV, Col 3: ii, Col 4: V, Col 5: iii
+  const PROGRESSIONS_MODEL = {
+    tensions: [
+      { id: "V7",    name: "V7",    roman: "V⁷",    targetCol: 0, interval: 7, formula: [0, 4, 7, 10], desc: "Первичный доминантсептаккорд к тонике I" },
+      { id: "V7/vi", name: "V7/vi", roman: "V⁷/vi", targetCol: 1, interval: 4, formula: [0, 4, 7, 10], desc: "Вторичная доминанта к параллельному минору vi" },
+      { id: "V7/IV", name: "V7/IV", roman: "V⁷/IV", targetCol: 2, interval: 0, formula: [0, 4, 7, 10], desc: "Вторичная доминанта к субдоминанте IV" },
+      { id: "V7/ii", name: "V7/ii", roman: "V⁷/ii", targetCol: 3, interval: 9, formula: [0, 4, 7, 10], desc: "Вторичная доминанта ко второй ступени ii" },
+      { id: "V7/V",  name: "V7/V",  roman: "V⁷/V",  targetCol: 4, interval: 2, formula: [0, 4, 7, 10], desc: "Двойная доминанта (доминанта к V)" },
+      { id: "V7/iii",name: "V7/iii",roman: "V⁷/iii",targetCol: 5, interval: 11,formula: [0, 4, 7, 10], desc: "Вторичная доминанта к третьей ступени iii" }
+    ],
+    core: [
+      { id: "I",   name: "I",   roman: "I",   quality: "M", interval: 0, formula: [0, 4, 7], desc: "Главная тоническая опора мажора" },
+      { id: "vi",  name: "vi",  roman: "vi",  quality: "m", interval: 9, formula: [0, 3, 7], desc: "Параллельный минор тоники" },
+      { id: "IV",  name: "IV",  roman: "IV",  quality: "M", interval: 5, formula: [0, 4, 7], desc: "Субдоминанта (гармонический подъем)" },
+      { id: "ii",  name: "ii",  roman: "ii",  quality: "m", interval: 2, formula: [0, 3, 7], desc: "Параллельный минор субдоминанты" },
+      { id: "V",   name: "V",   roman: "V",   quality: "M", interval: 7, formula: [0, 4, 7], desc: "Доминанта (максимальное тяготение в I)" },
+      { id: "iii", name: "iii", roman: "iii", quality: "m", interval: 4, formula: [0, 3, 7], desc: "Параллельный минор доминанты" }
+    ],
+    modal: [
+      { id: "bIII", name: "bIII", roman: "♭III", col: 1, interval: 3, formula: [0, 4, 7], desc: "Заимствование из параллельного минора (эпический подъем)" },
+      { id: "bVI",  name: "bVI",  roman: "♭VI",  col: 2, interval: 8, formula: [0, 4, 7], desc: "Заимствование из параллельного минора (драматический оттенок)" },
+      { id: "iv",   name: "iv",   roman: "iv",   col: 3, interval: 5, formula: [0, 3, 7], desc: "Минорная субдоминанта (ностальгический окрас)" },
+      { id: "bVII", name: "bVII", roman: "♭VII", col: 4, interval: 10,formula: [0, 4, 7], desc: "Миксолидийская седьмая ступень (рок-гармония)" }
+    ]
+  };
+
+  // Dark Harmony II Model (A minor standard)
+  const DARK_MODEL = {
+    tensions: [
+      { id: "vii0/V_1", name: "vii°7/V (1)", roman: "vii°7/V", targetCol: 4, interval: 6, formula: [0, 3, 6, 9], desc: "Уменьшенный вводный септаккорд к V (корень 1)" },
+      { id: "vii0/V_2", name: "vii°7/V (2)", roman: "vii°7/V", targetCol: 4, interval: 9, formula: [0, 3, 6, 9], desc: "Уменьшенный вводный септаккорд к V (корень 2)" },
+      { id: "vii0/V_3", name: "vii°7/V (3)", roman: "vii°7/V", targetCol: 4, interval: 0, formula: [0, 3, 6, 9], desc: "Уменьшенный вводный септаккорд к V (корень 3)" },
+      { id: "vii0/V_4", name: "vii°7/V (4)", roman: "vii°7/V", targetCol: 4, interval: 3, formula: [0, 3, 6, 9], desc: "Уменьшенный вводный септаккорд к V (корень 4)" },
+      { id: "N6",       name: "N6 (bII/4)",  roman: "N⁶",     targetCol: 4, interval: 1, formula: [0, 4, 7], bassOffset: 5, desc: "Неаполитанский секстаккорд с басом на 4-й ступени -> V" },
+      { id: "empty",    name: "—",           roman: "",       targetCol: -1, interval: 0, formula: [], empty: true }
+    ],
+    core: [
+      { id: "i",   name: "i",   roman: "i",   quality: "m", interval: 0, formula: [0, 3, 7], desc: "Тоническая опора минора" },
+      { id: "III", name: "III", roman: "III", quality: "M", interval: 3, formula: [0, 4, 7], desc: "Параллельный мажор тоники" },
+      { id: "iv",  name: "iv",  roman: "iv",  quality: "m", interval: 5, formula: [0, 3, 7], desc: "Субдоминанта минора" },
+      { id: "VI",  name: "VI",  roman: "VI",  quality: "M", interval: 8, formula: [0, 4, 7], desc: "Субдоминантовая параллель" },
+      { id: "V",   name: "V",   roman: "V",   quality: "M", interval: 7, formula: [0, 4, 7], desc: "Гармоническая мажорная доминанта" },
+      { id: "ii0", name: "ii°", roman: "ii°", quality: "d", interval: 2, formula: [0, 3, 6], desc: "Уменьшенное трезвучие второй ступени" }
+    ],
+    modal: [
+      { id: "vii0/iv_1", name: "vii°/iv (1)", roman: "vii°/iv", col: 1, interval: 4, formula: [0, 3, 6, 9], desc: "Уменьшенный септаккорд к субдоминанте iv" },
+      { id: "vii0/iv_2", name: "vii°/iv (2)", roman: "vii°/iv", col: 2, interval: 7, formula: [0, 3, 6, 9], desc: "Уменьшенный септаккорд к субдоминанте iv" },
+      { id: "vii0/iv_3", name: "vii°/iv (3)", roman: "vii°/iv", col: 3, interval: 10, formula: [0, 3, 6, 9], desc: "Уменьшенный септаккорд к субдоминанте iv" },
+      { id: "vii0/iv_4", name: "vii°/iv (4)", roman: "vii°/iv", col: 4, interval: 1, formula: [0, 3, 6, 9], desc: "Уменьшенный септаккорд к субдоминанте iv" }
+    ]
+  };
+
+  // State
+  let currentTonic = 0; // C
+  let currentModule = "progressions";
+  let activeChordData = null;
+
+  // DOM elements
+  const tonicSelect = document.getElementById("wbTonic");
+  const moduleSelect = document.getElementById("wbModule");
+  const audioBtn = document.getElementById("wbAudioToggle");
+  const strumBtn = document.getElementById("wbStrumToggle");
+  const lane1Row = document.getElementById("lane1Row");
+  const lane2Row = document.getElementById("lane2Row");
+  const lane3Row = document.getElementById("lane3Row");
+  const arrowSvg = document.getElementById("arrowSvg");
+  const wbStatus = document.getElementById("wbStatus");
+
+  // Inspector DOM
+  const inspName = document.getElementById("inspChordName");
+  const inspFunction = document.getElementById("inspFunction");
+  const inspNotes = document.getElementById("inspNotes");
+  const inspRule = document.getElementById("inspRule");
+  const pianoSvg = document.getElementById("pianoSvg");
+  const fretSvg = document.getElementById("fretSvg");
+
+  function getActiveModel() {
+    return currentModule === "progressions" ? PROGRESSIONS_MODEL : DARK_MODEL;
+  }
+
+  function renderMatrix() {
+    const model = getActiveModel();
+    lane1Row.innerHTML = "";
+    lane2Row.innerHTML = "";
+    lane3Row.innerHTML = "";
+    arrowSvg.innerHTML = "";
+
+    // 1. Render Tensions (Lane 1)
+    model.tensions.forEach((item, colIdx) => {
+      if (item.empty) {
+        const div = document.createElement("div");
+        div.className = "chord-tile empty-cell";
+        lane1Row.appendChild(div);
+        return;
+      }
+
+      const rootPc = (currentTonic + item.interval) % 12;
+      const rootName = getNoteName(rootPc);
+      const is7th = item.formula.includes(10) || item.formula.includes(9);
+      const symbol = is7th ? `${rootName}7` : rootName;
+
+      const tile = document.createElement("div");
+      tile.className = "chord-tile";
+      tile.dataset.col = colIdx;
+      tile.dataset.targetCol = item.targetCol;
+      tile.innerHTML = `
+        <span class="symbol">${symbol}</span>
+        <span class="roman">${item.roman}</span>
+        <span class="arrow-tag">↓ к ${model.core[item.targetCol]?.roman || "цели"}</span>
+      `;
+
+      tile.addEventListener("click", () => {
+        selectChord(item, rootPc, symbol);
+        highlightResolution(colIdx, item.targetCol);
+      });
+
+      tile.addEventListener("mouseenter", () => {
+        highlightResolution(colIdx, item.targetCol);
+      });
+
+      tile.addEventListener("mouseleave", () => {
+        clearHighlights();
+      });
+
+      lane1Row.appendChild(tile);
+    });
+
+    // 2. Render Core (Lane 2)
+    model.core.forEach((item, colIdx) => {
+      const rootPc = (currentTonic + item.interval) % 12;
+      const rootName = getNoteName(rootPc);
+      const suffix = item.quality === "m" ? "m" : (item.quality === "d" ? "°" : "");
+      const symbol = rootName + suffix;
+
+      const tile = document.createElement("div");
+      tile.className = "chord-tile";
+      tile.dataset.col = colIdx;
+      tile.innerHTML = `
+        <span class="symbol">${symbol}</span>
+        <span class="roman">${item.roman}</span>
+      `;
+
+      tile.addEventListener("click", () => {
+        selectChord(item, rootPc, symbol);
+      });
+
+      lane2Row.appendChild(tile);
+    });
+
+    // 3. Render Modal / Colors (Lane 3)
+    for (let c = 0; c < 6; c++) {
+      const modalItem = model.modal.find(m => m.col === c);
+      if (!modalItem) {
+        const empty = document.createElement("div");
+        empty.className = "chord-tile empty-cell";
+        lane3Row.appendChild(empty);
+      } else {
+        const rootPc = (currentTonic + modalItem.interval) % 12;
+        const rootName = getNoteName(rootPc);
+        const suffix = modalItem.quality === "m" ? "m" : "";
+        const symbol = rootName + suffix;
+
+        const tile = document.createElement("div");
+        tile.className = "chord-tile";
+        tile.dataset.col = c;
+        tile.innerHTML = `
+          <span class="symbol">${symbol}</span>
+          <span class="roman">${modalItem.roman}</span>
+        `;
+
+        tile.addEventListener("click", () => {
+          selectChord(modalItem, rootPc, symbol);
+        });
+
+        lane3Row.appendChild(tile);
+      }
+    }
+
+    // Default select first core chord
+    if (!activeChordData) {
+      const first = model.core[0];
+      selectChord(first, currentTonic, getNoteName(currentTonic) + (first.quality === "m" ? "m" : ""));
+    }
+  }
+
+  function highlightResolution(fromCol, toCol) {
+    if (toCol < 0) return;
+    const coreTiles = lane2Row.querySelectorAll(".chord-tile");
+    coreTiles.forEach(t => {
+      if (parseInt(t.dataset.col) === toCol) {
+        t.classList.add("highlighted");
+      } else {
+        t.classList.remove("highlighted");
+      }
+    });
+
+    wbStatus.textContent = `Тяготение: аккорд колонки ${fromCol + 1} обязан разрешиться в колонку ${toCol + 1}!`;
+  }
+
+  function clearHighlights() {
+    lane2Row.querySelectorAll(".chord-tile").forEach(t => t.classList.remove("highlighted"));
+    wbStatus.textContent = "Кликните по аккорду для прослушивания и подсветки тяготений";
+  }
+
+  function selectChord(spec, rootPc, symbol) {
+    activeChordData = { spec, rootPc, symbol };
+
+    // Calculate MIDI pitches
+    const bassMidi = 48 + rootPc; // C3 register
+    const upperPitches = spec.formula.map(semi => 60 + ((rootPc + semi) % 12));
+    const allPitches = [bassMidi, ...upperPitches];
+
+    playChord(allPitches);
+
+    // Update inspector
+    inspName.textContent = symbol;
+    inspFunction.innerHTML = `Ступень: <b>${spec.roman}</b> (${spec.name})`;
+    const noteNames = spec.formula.map(s => getNoteName((rootPc + s) % 12));
+    inspNotes.innerHTML = `Ноты аккорда: <b>${noteNames.join(" · ")}</b>`;
+    inspRule.innerHTML = `Правило: <i>${spec.desc}</i>`;
+
+    renderPianoInspector(rootPc, spec.formula);
+    renderFretboardInspector(rootPc, spec.formula);
+  }
+
+  // 3. Piano Inspector Renderer
+  function renderPianoInspector(rootPc, formula) {
+    pianoSvg.innerHTML = "";
+    const whiteKeys = [0, 2, 4, 5, 7, 9, 11];
+    const totalWhites = 14; // 2 octaves
+    const kw = 420 / totalWhites;
+    const kh = 75;
+
+    const chordPcs = new Set(formula.map(f => (rootPc + f) % 12));
+    // Major scale degrees for scale dots
+    const scalePcs = new Set([0, 2, 4, 5, 7, 9, 11].map(d => (currentTonic + d) % 12));
+
+    // Draw white keys
+    let wIdx = 0;
+    for (let oct = 0; oct < 2; oct++) {
+      for (let i = 0; i < whiteKeys.length; i++) {
+        const pc = whiteKeys[i];
+        const x = wIdx * kw;
+        const isChord = chordPcs.has(pc);
+        const isRoot = pc === rootPc;
+        const isScale = scalePcs.has(pc) && !isChord;
+
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x);
+        rect.setAttribute("y", 0);
+        rect.setAttribute("width", kw - 1);
+        rect.setAttribute("height", kh);
+        rect.setAttribute("fill", "#1e2433");
+        rect.setAttribute("stroke", "#0f131a");
+        rect.setAttribute("rx", "3");
+        pianoSvg.appendChild(rect);
+
+        if (isChord || isScale) {
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("cx", x + kw / 2);
+          circle.setAttribute("cy", kh - 14);
+          circle.setAttribute("r", isRoot ? "5.5" : "4.5");
+          circle.setAttribute("fill", isRoot ? "#f43f5e" : (isChord ? "#38bdf8" : "#fbbf24"));
+          pianoSvg.appendChild(circle);
+        }
+        wIdx++;
+      }
+    }
+
+    // Draw black keys
+    const blackOffsets = [1, 3, 6, 8, 10];
+    wIdx = 0;
+    for (let oct = 0; oct < 2; oct++) {
+      for (let i = 0; i < whiteKeys.length; i++) {
+        const pc = whiteKeys[i];
+        const nextPc = (pc + 1) % 12;
+        if (blackOffsets.includes(nextPc)) {
+          const bx = (wIdx * kw) + (kw * 0.65);
+          const bw = kw * 0.7;
+          const bh = kh * 0.6;
+          const isChord = chordPcs.has(nextPc);
+          const isRoot = nextPc === rootPc;
+          const isScale = scalePcs.has(nextPc) && !isChord;
+
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", bx);
+          rect.setAttribute("y", 0);
+          rect.setAttribute("width", bw);
+          rect.setAttribute("height", bh);
+          rect.setAttribute("fill", "#090c12");
+          rect.setAttribute("stroke", "#283144");
+          rect.setAttribute("rx", "2");
+          pianoSvg.appendChild(rect);
+
+          if (isChord || isScale) {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", bx + bw / 2);
+            circle.setAttribute("cy", bh - 10);
+            circle.setAttribute("r", isRoot ? "5" : "4");
+            circle.setAttribute("fill", isRoot ? "#f43f5e" : (isChord ? "#38bdf8" : "#fbbf24"));
+            pianoSvg.appendChild(circle);
+          }
+        }
+        wIdx++;
+      }
+    }
+  }
+
+  // 4. Guitar Fretboard Renderer (Standard tuning: E A D G B E)
+  function renderFretboardInspector(rootPc, formula) {
+    fretSvg.innerHTML = "";
+    const strings = [4, 11, 7, 2, 9, 4]; // high E to low E (pc)
+    const numFrets = 5;
+    const fw = 420 / (numFrets + 1); // fret width
+    const sh = 100 / 5; // string spacing
+
+    const chordPcs = new Set(formula.map(f => (rootPc + f) % 12));
+    const scalePcs = new Set([0, 2, 4, 5, 7, 9, 11].map(d => (currentTonic + d) % 12));
+
+    // Draw fret lines
+    for (let f = 0; f <= numFrets; f++) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const x = (f + 1) * fw;
+      line.setAttribute("x1", x);
+      line.setAttribute("y1", 6);
+      line.setAttribute("x2", x);
+      line.setAttribute("y2", 6 + 5 * sh);
+      line.setAttribute("stroke", f === 0 ? "#94a3b8" : "#334155");
+      line.setAttribute("stroke-width", f === 0 ? "4" : "1.5");
+      fretSvg.appendChild(line);
+    }
+
+    // Draw strings
+    strings.forEach((openPc, sIdx) => {
+      const y = 6 + sIdx * sh;
+      const strLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      strLine.setAttribute("x1", fw);
+      strLine.setAttribute("y1", y);
+      strLine.setAttribute("x2", (numFrets + 1) * fw);
+      strLine.setAttribute("y2", y);
+      strLine.setAttribute("stroke", "#64748b");
+      strLine.setAttribute("stroke-width", (1 + sIdx * 0.4).toString());
+      fretSvg.appendChild(strLine);
+
+      // Notes on this string
+      for (let f = 0; f <= numFrets; f++) {
+        const notePc = (openPc + f) % 12;
+        const isChord = chordPcs.has(notePc);
+        const isRoot = notePc === rootPc;
+        const isScale = scalePcs.has(notePc) && !isChord;
+
+        if (isChord || isScale) {
+          const cx = f === 0 ? fw * 0.5 : (f * fw) + (fw * 0.5);
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("cx", cx);
+          circle.setAttribute("cy", y);
+          circle.setAttribute("r", isRoot ? "5.5" : "4.5");
+          circle.setAttribute("fill", isRoot ? "#f43f5e" : (isChord ? "#38bdf8" : "#fbbf24"));
+          fretSvg.appendChild(circle);
+        }
+      }
+    });
+  }
+
+  // 5. Event Listeners
+  tonicSelect.addEventListener("change", (e) => {
+    currentTonic = parseInt(e.target.value);
+    renderMatrix();
+  });
+
+  moduleSelect.addEventListener("change", (e) => {
+    currentModule = e.target.value;
+    document.getElementById("lane1Label").children[0].textContent = 
+      currentModule === "progressions" ? "Вторичные доминанты (Don't Mix · Следуйте стрелке)" : "Вторичные уменьшенные к доминанте V (vii°7/V & N6)";
+    document.getElementById("lane2Label").children[0].textContent = 
+      currentModule === "progressions" ? "Основные аккорды тональности (Свободная комбинаторика)" : "Основные минорные аккорды (Main Minor Core)";
+    document.getElementById("lane3Label").children[0].textContent = 
+      currentModule === "progressions" ? "Модальный обмен (Параллельный минор · Вход и выход через I, IV, V)" : "Вторичные уменьшенные к субдоминантам (vii°7/iv & vii°7/VI)";
+    renderMatrix();
+  });
+
+  audioBtn.addEventListener("click", () => {
+    isAudioEnabled = !isAudioEnabled;
+    audioBtn.textContent = isAudioEnabled ? "🔊 Звук: Вкл" : "🔇 Звук: Выкл";
+    audioBtn.classList.toggle("active", isAudioEnabled);
+  });
+
+  strumBtn.addEventListener("click", () => {
+    isStrumEnabled = !isStrumEnabled;
+    strumBtn.textContent = isStrumEnabled ? "🎸 Strum: Вкл (30ms)" : "🎹 Block: Прямой";
+    strumBtn.classList.toggle("active", isStrumEnabled);
+  });
+
+  // Filter Buttons
+  const filterBtns = document.querySelectorAll(".filter-btn");
+  filterBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      filterBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const f = btn.dataset.filter;
+      // Highlighting logic for cards
+      document.querySelectorAll(".badge").forEach(badge => {
+        const card = badge.closest(".card") || badge.closest("tr");
+        if (!card) return;
+        if (f === "all") {
+          card.style.opacity = "1";
+        } else if (badge.classList.contains(`badge-${f}`)) {
+          card.style.opacity = "1";
+        } else {
+          card.style.opacity = "0.28";
+        }
+      });
+    });
+  });
+
+  // Search Filter
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    document.querySelectorAll("section, .card, tr").forEach(el => {
+      if (!q) {
+        el.style.display = "";
+        return;
+      }
+      const text = el.textContent.toLowerCase();
+      if (text.includes(q)) {
+        el.style.display = "";
+      } else if (el.tagName === "SECTION" || el.classList.contains("card") || el.tagName === "TR") {
+        // keep section visible if children match
+        const hasChildMatch = Array.from(el.querySelectorAll(".card, p, h2, h3, td")).some(c => c.textContent.toLowerCase().includes(q));
+        el.style.display = hasChildMatch ? "" : "none";
+      }
+    });
+  });
+
+  // Init
+  renderMatrix();
+})();
+</script>
+
+</body>
+</html>

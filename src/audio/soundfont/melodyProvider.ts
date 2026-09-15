@@ -11,7 +11,8 @@ import type {
 import type { MelodyInstrument, MelodyTrackSettings } from "../../domain/melody/types";
 import {
   getMelodyInstrument,
-  isRealtimeMelodyInstrument,
+  FLUID_R3_NAMES,
+  FLUID_R3_CDN_BASE,
   type MelodyInstrumentId,
 } from "../../domain/melody/instrumentCatalog";
 
@@ -65,14 +66,13 @@ export interface MelodyPreparationResult {
 }
 
 /**
- * Stable user-facing summary for instruments which cannot be played by the
- * bundled realtime provider. This is also used for mixed preparation so the
- * playable lanes can continue while every unavailable lane remains identified.
+ * Stable user-facing summary for instruments which failed to load in the
+ * realtime provider. Used so other Melody lanes can continue while the
+ * failed lane is identified.
  */
 export function formatMelodyPreparationNotice(
   result: Pick<MelodyPreparationResult, "unavailable" | "failed">,
 ): string | null {
-  const unavailable = new Set(result.unavailable);
   const failed = new Set(result.failed);
   const instruments = [...new Set([...result.unavailable, ...result.failed])].sort(
     (a, b) => getMelodyInstrument(a).program - getMelodyInstrument(b).program || a.localeCompare(b),
@@ -82,7 +82,6 @@ export function formatMelodyPreparationNotice(
     .map((instrument) => {
       const entry = getMelodyInstrument(instrument);
       const prefix = `GM ${String(entry.program).padStart(3, "0")} · ${entry.label} ·`;
-      if (unavailable.has(instrument)) return `${prefix} Export only / no bundled realtime sample`;
       if (failed.has(instrument)) return `${prefix} Realtime sample failed to load`;
       return `${prefix} Realtime sample unavailable`;
     })
@@ -188,10 +187,6 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
 
     await Promise.all(
       requested.map(async (instrument) => {
-        if (!isRealtimeMelodyInstrument(instrument)) {
-          unavailable.push(instrument);
-          return;
-        }
         try {
           await this.loadPlayer(instrument);
           ready.push(instrument);
@@ -226,10 +221,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     if (instrumentChanged) this.cancelPlaybacks(this.livePlaybacks);
     this.liveInstrument = settings.instrument;
     this.liveVolume = clampMidi(settings.volume);
-    if (!isRealtimeMelodyInstrument(this.liveInstrument)) {
-      this.preparationError = new Error(this.unavailableMessage([this.liveInstrument]));
-      this.setProviderState("error");
-    } else if (!this.players.has(this.liveInstrument)) {
+    if (!this.players.has(this.liveInstrument)) {
       this.preparationError = null;
       this.setProviderState("idle");
     }
@@ -284,11 +276,20 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     const context = this.ensureAudioContext();
     const destination = this.destinationNode ?? context.destination;
     const entry = getMelodyInstrument(instrument);
-    if (entry.realtimeAvailability !== "available" || !entry.sampleAsset) {
-      throw new Error(this.unavailableMessage([instrument]));
+
+    // Locally bundled instruments (the original 6) use the local asset bundle.
+    // All other GM programs are loaded on-demand from the FluidR3_GM CDN.
+    let url: string;
+    if (entry.sampleAsset) {
+      url = `${this.assetBaseUrl}${entry.sampleAsset}`;
+    } else {
+      const fluidName = FLUID_R3_NAMES[entry.program];
+      if (!fluidName) {
+        throw new Error(`No FluidR3 name mapping for GM program ${entry.program}`);
+      }
+      url = `${FLUID_R3_CDN_BASE}${fluidName}-mp3.js`;
     }
-    const fileName = entry.sampleAsset;
-    const url = `${this.assetBaseUrl}${fileName}`;
+
     const loading = this.loadInstrument(context, instrument, url, destination)
       .then((player) => {
         this.players.set(instrument, player);
@@ -333,17 +334,10 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
         const instrument =
           (event.instrument as MelodyInstrument | undefined) ??
           (scope === "preview" ? this.previewInstrument : this.liveInstrument);
-        const entry = getMelodyInstrument(instrument);
         const player = this.players.get(instrument);
-        // Export-only programs are intentionally silent in realtime while the
-        // rest of a mixed Melody remains playable; the UI reports the status.
-        if (
-          !player &&
-          (entry.realtimeAvailability === "export-only" ||
-            this.unavailableInstruments.includes(instrument) ||
-            this.failedInstruments.includes(instrument))
-        )
-          continue;
+        // Silently skip notes for instruments that failed to load so the rest
+        // of a mixed Melody can still play. The UI reports the failed state.
+        if (!player && this.failedInstruments.includes(instrument)) continue;
         if (!player) throw new Error(`${instrument} samples are not ready`);
         const node = player.play(event.pitch, baseTime + event.startSeconds, {
           duration: event.durationSeconds,

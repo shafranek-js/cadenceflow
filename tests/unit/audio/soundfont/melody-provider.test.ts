@@ -115,38 +115,54 @@ describe("T172 — local sampled Melody provider", () => {
     });
   });
 
-  it("reports export-only programs explicitly and keeps realtime loading lazy", async () => {
-    const violin = createPlayer();
-    const loader = vi.fn(async () => violin);
+  it("loads non-bundled instruments from the FluidR3_GM CDN", async () => {
+    const trumpetPlayer = createPlayer();
+    const loader = vi.fn(async () => trumpetPlayer);
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
-      instrument: "gm-081",
+      instrument: "gm-056", // trumpet, program 56
     });
 
-    const unavailable = await provider.prepareForInstruments(["gm-081"]);
-    expect(unavailable).toMatchObject({ ready: [], unavailable: ["gm-081"], failed: [] });
-    expect(loader).not.toHaveBeenCalled();
-    expect(provider.state).toBe("error");
-    expect(provider.lastError?.message).toContain("Export only");
+    await provider.prepare();
 
-    const mixed = await provider.prepareForInstruments(["gm-081", "violin"]);
-    expect(mixed.unavailable).toEqual(["gm-081"]);
-    expect(mixed.ready).toEqual(["violin"]);
     expect(provider.state).toBe("ready");
-    expect(formatMelodyPreparationNotice(mixed)).toBe(
-      "GM 081 · Lead 2 (sawtooth) · Export only / no bundled realtime sample",
-    );
     expect(loader).toHaveBeenCalledTimes(1);
-    const playback = provider.schedule(
-      [
-        { ...event, instrument: "gm-081" },
-        { ...event, instrument: "violin", startSeconds: 1 },
-      ],
-      { now: () => 10 },
+    // gm-056 has no local sampleAsset, so it uses the CDN URL
+    expect(loader.mock.calls[0]?.[2]).toBe(
+      "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3.js",
     );
-    expect(violin.play).toHaveBeenCalledTimes(1);
+
+    const playback = provider.schedule([event], { now: () => 8 });
+    expect(playback.id).toMatch(/^melody-live-/);
+    expect(trumpetPlayer.play).toHaveBeenCalledTimes(1);
     playback.cancel();
+  });
+
+  it("mixes CDN-loaded and locally-bundled instruments in one preparation", async () => {
+    const violin = createPlayer();
+    const trumpet = createPlayer();
+    const loader = vi.fn(async (_context, instrument) =>
+      instrument === "violin" ? violin : trumpet,
+    );
+    const provider = new MelodySoundFontProvider({
+      audioContext: createContext(),
+      loadInstrument: loader,
+      instrument: "violin",
+    });
+
+    const result = await provider.prepareForInstruments(["violin", "gm-056"]);
+    expect(result.ready).toEqual(["gm-056", "violin"]); // sorted
+    expect(result.unavailable).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(provider.state).toBe("ready");
+    // violin uses local path, gm-056 uses CDN
+    expect(loader.mock.calls.find((c) => c[1] === "violin")?.[2]).toBe(
+      `/audio/melody/FluidR3_GM/${MELODY_SAMPLE_FILES.violin}`,
+    );
+    expect(loader.mock.calls.find((c) => c[1] === "gm-056")?.[2]).toBe(
+      "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3.js",
+    );
   });
 
   it("keeps available playback running when another realtime lane fails to load", async () => {

@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ChordFiles → CanenceFlow — механика, музыкальная модель и расширение концепции</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1e232c;--text:#edf1f7;--muted:#aab3c2;
+  --line:#2d3440;--accent:#7dd3fc;--accent2:#c4b5fd;--good:#86efac;--warn:#fde68a;--bad:#fca5a5;
+  --chip:#252b36;--shadow:0 12px 34px rgba(0,0,0,.28)
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#0c0f14,#11151c 32%,#0f1115);color:var(--text);font:15px/1.58 Inter,Segoe UI,Arial,sans-serif}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.app{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;padding:22px 18px;border-right:1px solid var(--line);background:rgba(13,16,22,.93);backdrop-filter:blur(10px);overflow:auto}
+.brand{font-size:22px;font-weight:800;letter-spacing:.2px}.brand small{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
+.search{width:100%;margin:18px 0 12px;background:#0c0f14;border:1px solid var(--line);color:var(--text);padding:10px 12px;border-radius:10px;outline:none}.search:focus{border-color:var(--accent)}
+.filter-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 16px}.filter{border:1px solid var(--line);background:var(--chip);color:var(--muted);padding:6px 8px;border-radius:999px;font-size:12px;cursor:pointer}.filter.active{color:#0b1220;background:var(--accent);border-color:var(--accent)}
+.nav a{display:block;padding:8px 10px;border-radius:8px;color:var(--muted);margin:2px 0}.nav a:hover,.nav a.active{background:var(--panel2);color:var(--text);text-decoration:none}
+.main{padding:36px 44px 80px;max-width:1500px;width:100%}
+.hero{padding:30px;border:1px solid var(--line);border-radius:18px;background:radial-gradient(circle at 90% 10%,rgba(124,58,237,.16),transparent 30%),radial-gradient(circle at 10% 0%,rgba(14,165,233,.14),transparent 34%),var(--panel);box-shadow:var(--shadow)}
+h1{font-size:38px;line-height:1.12;margin:0 0 12px}.lead{font-size:18px;color:#dbe4ef;max-width:1000px}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.chip{display:inline-flex;gap:6px;align-items:center;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px}
+section{scroll-margin-top:20px;margin-top:38px}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:18px}.section-head h2{margin:0;font-size:25px}.section-head p{margin:0;color:var(--muted);max-width:760px}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 6px 18px rgba(0,0,0,.12)}.card h3{margin:0 0 9px;font-size:17px}.card p{margin:8px 0;color:#d3dae6}.card ul{margin:8px 0;padding-left:20px}.card li{margin:4px 0;color:#d3dae6}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;margin-right:6px}.fact{background:rgba(34,197,94,.12);color:var(--good);border:1px solid rgba(34,197,94,.28)}.infer{background:rgba(250,204,21,.10);color:var(--warn);border:1px solid rgba(250,204,21,.25)}.proposal{background:rgba(168,85,247,.12);color:var(--accent2);border:1px solid rgba(168,85,247,.27)}
+.callout{border-left:4px solid var(--accent);background:#111823;border-radius:10px;padding:14px 16px;margin:14px 0;color:#dce7f5}.callout strong{color:white}
+.diagram{font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;background:#0c0f14;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;white-space:pre}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel);min-width:760px}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{position:sticky;top:0;background:#202631;color:white;font-size:12px}td{color:#d4dbe6}.small{font-size:12px;color:var(--muted)}
+.kpi{font-size:29px;font-weight:800}.kpi-label{font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:7px 10px;border-radius:8px;cursor:pointer}.tab.active{background:var(--accent);color:#06121c;border-color:var(--accent)}
+.demo{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.controls{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.controls label{display:block;margin:10px 0 6px;color:var(--muted);font-size:12px}.controls select{width:100%;background:#0c0f14;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px}.result{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.lanes{display:grid;gap:12px}.lane{border:1px solid var(--line);border-radius:12px;padding:12px}.lane h4{margin:0 0 8px}.chords{display:flex;flex-wrap:wrap;gap:8px}.chord{min-width:74px;border:1px solid var(--line);background:#11151c;border-radius:10px;padding:8px 10px;cursor:pointer}.chord:hover{border-color:var(--accent)}.chord b{display:block;font-size:17px}.chord small{color:var(--muted)}.tensionLane{border-color:rgba(251,191,36,.24)}.coreLane{border-color:rgba(125,211,252,.28)}.colorLane{border-color:rgba(196,181,253,.24)}
+.arrow-note{margin-top:10px;color:var(--muted);font-size:12px}.progression{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.prog-step{border:1px solid var(--line);border-radius:9px;background:#10151d;padding:8px 10px}.prog-step b{font-size:16px}.prog-step span{display:block;font-size:11px;color:var(--muted)}
+.details{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:10px;background:#0f141c;color:#d8e0ea;min-height:62px}
+.grammar-builder{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px}.builder-output{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.layer-stack{display:grid;gap:8px;margin:12px 0}.layer-item{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;background:#11151c;padding:10px 12px}.layer-item b{display:block}.layer-item small{color:var(--muted)}.tag-row{display:flex;gap:6px;flex-wrap:wrap}.metric{display:grid;grid-template-columns:120px 1fr 42px;gap:10px;align-items:center;margin:8px 0}.bar{height:8px;background:#0c0f14;border:1px solid var(--line);border-radius:999px;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px}.family-title{margin:26px 0 10px;font-size:19px}.pill-title{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--chip);font-size:11px;color:var(--muted);margin-bottom:8px}
+.code{font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;background:#0c0f14;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;white-space:pre}
+details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:9px 0}summary{cursor:pointer;font-weight:700}.source-list li{margin:7px 0}.note{font-size:12px;color:var(--muted)}
+.hidden-by-filter{display:none!important}.search-hidden{display:none!important}
+.footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+@media(max-width:1050px){.app{grid-template-columns:1fr}.sidebar{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}.nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.main{padding:26px 20px 60px}.g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.demo,.grammar-builder{grid-template-columns:1fr}}
+@media(max-width:650px){h1{font-size:30px}.g2,.g3,.g4{grid-template-columns:1fr}.nav{grid-template-columns:1fr}.main{padding:20px 12px 50px}.hero{padding:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand">ChordFiles → CanenceFlow <small>developer reference · 2026-09-10</small></div>
+  <input id="search" class="search" placeholder="Поиск по базе знаний…" />
+  <div class="filter-row">
+    <button class="filter active" data-filter="all">Все</button>
+    <button class="filter" data-filter="fact">Факты</button>
+    <button class="filter" data-filter="infer">Реконструкция</button>
+    <button class="filter" data-filter="proposal">Для приложения</button>
+  </div>
+  <nav class="nav" id="nav">
+    <a href="#summary">1. Краткая модель</a>
+    <a href="#products">2. Продуктовая линейка</a>
+    <a href="#mechanics">3. Физическая механика</a>
+    <a href="#theory">4. Музыкальная логика</a>
+    <a href="#progressions">5. Progressions</a>
+    <a href="#dark">6. Dark Harmony</a>
+    <a href="#scales-blues">7. Scales & Blues</a>
+    <a href="#demo">8. Интерактивная реконструкция</a>
+    <a href="#software">9. Software-модель</a>
+    <a href="#mapping">10. Что переносить</a>
+    <a href="#ux">11. UX-принципы</a>
+    <a href="#expansion">12. Расширение CanenceFlow</a>
+    <a href="#grammars">13. Harmony Grammars</a>
+    <a href="#architecture">14. Composable architecture</a>
+    <a href="#concept-builder">15. Интерактивный concept builder</a>
+    <a href="#roadmap">16. Roadmap</a>
+    <a href="#risks">17. Ограничения и риски</a>
+    <a href="#ip">18. IP / юридические границы</a>
+    <a href="#sources">19. Источники</a>
+  </nav>
+</aside>
+<main class="main">
+
+<div class="hero searchable" data-kind="fact infer proposal">
+  <h1>ChordFiles → CanenceFlow: механика, гармоническая модель и расширение концепции</h1>
+  <p class="lead">Консолидированная техническая база знаний для разработчика. Она объединяет официальный сайт ChordFiles, публичные материалы, четыре инструкции Progressions/Dark Harmony для Guitar и Piano и отдельный анализ того, как физическую систему можно абстрагировать и расширить в архитектуре <b>CanenceFlow</b>.</p>
+  <div class="meta"><span class="chip">Standalone HTML</span><span class="chip">Без внешних библиотек</span><span class="chip">Интерактивный demo</span><span class="chip">Факты отделены от выводов</span></div>
+</div>
+
+<section id="summary" class="searchable" data-kind="fact infer proposal">
+<div class="section-head"><div><h2>1. Краткая модель</h2><p>Суть системы в одном экране.</p></div></div>
+<div class="grid g4">
+  <div class="card"><div class="kpi">1</div><div class="kpi-label">глобальный контекст</div><p><span class="badge fact">факт</span>Пользователь задаёт тональность/режим слайдером, а набор видимых аккордов и диаграмм перестраивается.</p></div>
+  <div class="card"><div class="kpi">3</div><div class="kpi-label">семантические зоны</div><p><span class="badge fact">факт</span>Core/Main, расширяющие/напряжённые функции и borrowed/color material разделены пространственно.</p></div>
+  <div class="card"><div class="kpi">→</div><div class="kpi-label">направленные связи</div><p><span class="badge fact">факт</span>Стрелки кодируют ожидаемое разрешение, например secondary dominant → target chord.</p></div>
+  <div class="card"><div class="kpi">↔</div><div class="kpi-label">несколько представлений</div><p><span class="badge fact">факт</span>Front показывает гармонические названия/отношения, back — инструментальные диаграммы и scale tones в том же порядке.</p></div>
+</div>
+<div class="callout"><strong>Главная техническая формула:</strong> ChordFiles можно понимать как <em>параметризованную физическую lookup-систему + ориентированный граф гармонических отношений</em>. Физический носитель ничего не «вычисляет» электронно: вычисление заранее закодировано относительным расположением слоёв, окон, названий и стрелок.</div>
+<div class="diagram">GLOBAL CONTEXT (key / scale family)
+        ↓
+relative harmonic model
+        ↓
+┌───────────────┬──────────────┬───────────────┐
+│ CORE / MAIN   │ TENSION      │ COLOR/BORROWED│
+│ stable choices│ directed pull│ alternate hue │
+└───────────────┴──────────────┴───────────────┘
+        ↓
+selected harmonic object
+        ↓
+Theory ↔ Guitar/Piano ↔ Chord tones ↔ Scale tones</div>
+</section>
+
+<section id="products" class="searchable" data-kind="fact">
+<div class="section-head"><div><h2>2. Продуктовая линейка и роль каждого продукта</h2><p>Что делает каждый тип ChordFiles и какой аспект общей модели он проявляет.</p></div></div>
+<div class="table-wrap"><table><thead><tr><th>Продукт</th><th>Основная задача</th><th>Механика/контекст</th><th>Что важно для software</th></tr></thead><tbody>
+<tr><td><b>Progressions II</b> (Guitar / Piano; также Ukulele)</td><td>Построение мажорных прогрессий и мелодических идей</td><td>Main Chords + Secondary Dominants + Modal Interchange; key slider; front/back correspondence</td><td>Harmony graph, глобальная транспозиция, progressive disclosure</td></tr>
+<tr><td><b>Dark Harmony II</b> (Guitar / Piano; также Ukulele)</td><td>Минорная/хроматическая гармония</td><td>Main minor area + secondary diminished + Neapolitan; направленные разрешения</td><td>Тот же engine, но другой набор rule families</td></tr>
+<tr><td><b>Scales</b> (Guitar)</td><td>Исследование гамм, аккордов и modes на грифе</td><td>Два независимых параметра: tonic и scale family (Major, Natural Minor, Harmonic Minor, Melodic Minor)</td><td>Двумерный state machine: output = f(root, scaleType)</td></tr>
+<tr><td><b>Blues</b> (Guitar)</td><td>Major/minor blues, scales, arpeggios, target notes</td><td>Связь аккордовой прогрессии с гаммовым/импровизационным материалом</td><td>Target-note layer поверх harmony; переход от chord assistant к composition assistant</td></tr>
+</tbody></table></div>
+<p class="note">Продуктовые страницы 2026 также показывают bundles/packs, но архитектурно они комбинируют перечисленные функциональные семейства, а не создают отдельный музыкальный движок.</p>
+</section>
+
+<section id="mechanics" class="searchable" data-kind="fact infer">
+<div class="section-head"><div><h2>3. Физическая механика</h2><p>Что пользователь двигает и почему это работает.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3><span class="badge fact">факт</span>Слоёная конструкция</h3><p>Официальные материалы описывают внутреннюю скользящую карту/слой, металлические ручки и неодимовые магниты. Progressions II построен как бумажно-пластиковая многослойная карточка; новые Scales/Blues используют две ручки и больше магнитных элементов.</p><p class="small">Размер Progressions II в публичном описании — около 295 × 260 мм.</p></div>
+<div class="card"><h3><span class="badge infer">реконструкция</span>Что именно зафиксировано, а что движется</h3><p>Неподвижная оболочка несёт смысловую геометрию: зоны, окна, подписи и стрелки. Внутренний слой несёт конкретные данные для тональности/режима. Движение слоя совмещает «правильный набор значений» с фиксированной схемой.</p><p class="small">Exploded view / CAD в открытых источниках не обнаружены, поэтому точная геометрия внутренних деталей — реконструкция.</p></div>
+</div>
+<div class="diagram">Fixed semantic layer                Sliding data layer
+────────────────────               ─────────────────────
+Main Chords                         C / Dm / Em / F / G ...
+Secondary Dominants                A7 / B7 / C7 / D7 ...
+Modal Interchange                  Fm / Eb / Ab / Bb ...
+Arrows / targets                   concrete chord names
+Windows                            chord/scale diagrams
+
+USER ACTION: move slider → align a new absolute dataset with the same relative functions</div>
+<div class="callout"><strong>Ключевой UX-паттерн:</strong> пользователь меняет один физический параметр, а десятки зависимых значений обновляются одновременно. В software это должно быть единым реактивным `KeyContext`, а не набором независимых контролов.</div>
+</section>
+
+<section id="theory" class="searchable" data-kind="fact infer proposal">
+<div class="section-head"><div><h2>4. Музыкальная логика за механикой</h2><p>Почему «аккорд как node, отношение как edge» — более точная модель, чем база аккордов.</p></div></div>
+<div class="grid g3">
+<div class="card"><h3><span class="badge fact">факт</span>Main/Core</h3><p>В Progressions инструкция предлагает начать с Main Chords и свободно собирать прогрессии. Это «безопасная» базовая зона выбранной тональности.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Directed tension</h3><p>Secondary Dominants и часть diminished material показаны не как свободный список. Стрелка сообщает, к какому аккорду должен/обычно должен прийти выбранный аккорд.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Color/Borrowed</h3><p>Modal Interchange предоставляет аккорды параллельного лада как альтернативный гармонический цвет; они менее «направлены», чем secondary dominants.</p></div>
+</div>
+<div class="diagram">Example in C major
+
+B7  ─────→  Em
+V/iii       iii
+
+node        target node
+│           │
+└─ edge = secondary-dominant resolution
+
+Contrast:
+C → Ab
+I   ♭VI (borrowed from C minor)
+
+Here the relation is better modelled as COLOR / OPTION, not a mandatory resolution.</div>
+<div class="callout"><strong>Developer implication:</strong> `Transition` не должен быть boolean `allowed`. Нужны тип, направление, сила тенденции и объяснение.</div>
+</section>
+
+<section id="progressions" class="searchable" data-kind="fact proposal">
+<div class="section-head"><div><h2>5. Progressions: восстановленный workflow</h2><p>По Guitar_PRO_EN.pdf и Piano_PRO_EN.pdf.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3><span class="badge fact">факт</span>Шаг 1 — выбрать key</h3><p>Инструкция прямо говорит установить тональность слайдером и начать с секции Main Chords.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Шаг 2 — собрать базовую progression</h3><p>В Main Chords можно начать с любого аккорда; I, IV и V визуально выделяются как опорные функции.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Шаг 3 — добавить secondary dominant</h3><p>Пользователь идёт «вверх» от выбранного target chord к соответствующему secondary dominant, затем следует стрелке обратно к target.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Шаг 4 — добавить modal interchange</h3><p>Пользователь идёт «вниз» к аккорду параллельного минора. В этой зоне комбинации свободнее, чем в secondary-dominant lane.</p></div>
+</div>
+<details open><summary>Документированный пример поведения</summary><p>Для secondary dominant принцип можно выразить как `V/x → x`. В официальном примере встречается последовательность типа `I → V/iii → iii → V`, т.е. в C major это может рендериться как `C → B7 → Em → G`.</p></details>
+<details><summary>Front / Back</summary><p>На лицевой стороне находятся названия и функциональные отношения. На обороте — соответствующие инструментальные диаграммы и scale tones в том же порядке. Это позволяет сохранять spatial identity одного и того же гармонического объекта между представлениями.</p></details>
+<details><summary>Melody support</summary><p>Вторая страница инструкции показывает, как chord tones и scale tones используются для составления мелодической последовательности поверх progression. Следовательно, продукт связывает harmony → playable shape → melodic note pool.</p></details>
+</section>
+
+<section id="dark" class="searchable" data-kind="fact proposal">
+<div class="section-head"><div><h2>6. Dark Harmony: тот же интерфейс, другой rule set</h2><p>По Guitar_DARK_EN.pdf и Piano_DARK_EN.pdf.</p></div></div>
+<div class="grid g3">
+<div class="card"><h3><span class="badge fact">факт</span>Core minor</h3><p>Центральная зона содержит основные аккорды минорной тональности. Инструкция рекомендует начинать с устойчивых функций.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Secondary diminished</h3><p>Дополнительные diminished chords имеют направленные target chords. Верхняя и нижняя зоны обслуживают разные типы разрешений.</p></div>
+<div class="card"><h3><span class="badge fact">факт</span>Neapolitan</h3><p>Neapolitan выделен отдельно и направляется к Dominant (V). В guitar manual дополнительно указано типичное использование в первом обращении.</p></div>
+</div>
+<div class="callout"><strong>Архитектурный вывод:</strong> Progressions и Dark Harmony логичнее реализовывать не отдельными алгоритмами, а как presets одного Harmony Graph Engine: разные семьи nodes/edges, общий renderer и общий `KeyContext`.</div>
+</section>
+
+<section id="scales-blues" class="searchable" data-kind="fact infer proposal">
+<div class="section-head"><div><h2>7. Scales & Blues: расширение модели</h2><p>Как продукты переходят от «одного слайдера» к многопараметрическому state machine.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3><span class="badge fact">факт</span>Scales</h3><p>Официальное описание использует вертикальный slider для выбора семейства гаммы (Major, Natural Minor, Harmonic Minor, Melodic Minor) и горизонтальный для транспонирования root/key. Оборот показывает note names, chords, extensions и modes.</p><div class="code">Output = f(root, scaleFamily)</div></div>
+<div class="card"><h3><span class="badge fact">факт</span>Blues</h3><p>Продукт объединяет major/minor blues progressions, scales, arpeggios и target notes. Идея target note важна: система связывает не только «какой аккорд», но и «на какую ноту можно целиться в импровизации».</p><div class="code">Harmony → scale context → target notes → phrase</div></div>
+</div>
+<div class="callout"><strong>Для приложения:</strong> target-note concept можно распространить на всю harmony map и показывать голосоведение между текущим и следующим аккордом, а не только scale membership.</div>
+</section>
+
+<section id="demo" class="searchable" data-kind="infer proposal">
+<div class="section-head"><div><h2>8. Интерактивная software-реконструкция принципа</h2><p>Это не копия таблиц ChordFiles, а независимая демонстрация их базовой идеи: relative model + global key context + directed relations.</p></div></div>
+<div class="demo">
+  <div class="controls">
+    <label>Тональность (Major)</label>
+    <select id="keySelect"></select>
+    <label>Preset</label>
+    <select id="presetSelect"><option value="progressions">Progressions-like</option><option value="dark">Dark-like</option></select>
+    <label>Функциональная progression</label>
+    <select id="progSelect"><option value="p1">I – V/iii – iii – V</option><option value="p2">I – V/V – V – I</option><option value="p3">I – vi – IV – V</option></select>
+    <div class="details" id="demoDetails">Нажмите на аккорд справа, чтобы увидеть его роль.</div>
+  </div>
+  <div class="result">
+    <div class="lanes" id="lanes"></div>
+    <h4 style="margin:18px 0 6px">Транспонированная progression</h4>
+    <div class="progression" id="progression"></div>
+    <div class="arrow-note">Смена key не меняет Roman-numeral / functional identity; меняется только абсолютный рендеринг.</div>
+  </div>
+</div>
+</section>
+
+<section id="software" class="searchable" data-kind="proposal">
+<div class="section-head"><div><h2>9. Рекомендуемая software-модель</h2><p>Каноническая domain model, независимая от конкретного UI и инструмента.</p></div></div>
+<div class="code">type PitchClass = 0|1|2|3|4|5|6|7|8|9|10|11;
+
+interface KeyContext {
+  tonic: PitchClass;
+  mode: "major" | "minor";
+  spelling: "auto" | "sharps" | "flats";
+}
+
+interface HarmonyNode {
+  id: string;                 // e.g. "V/iii"
+  roman: string;
+  family: "diatonic" | "secondaryDominant" | "secondaryDiminished"
+        | "borrowed" | "neapolitan" | "blues";
+  function: "tonic" | "predominant" | "dominant" | "color" | "chromatic";
+  chordFormula: number[];     // intervals from root
+}
+
+interface HarmonyEdge {
+  from: string;
+  to: string;
+  relationship: "free" | "functional" | "resolution" | "borrowed" | "voiceLeading";
+  tendency: number;           // 0..1, app-defined — NOT ChordFiles data
+  explanationKey: string;
+}
+
+interface ProgressionEvent {
+  nodeId: string;
+  beats: number;
+  inversion?: number;
+  voicing?: number[];
+}</div>
+<div class="grid g3" style="margin-top:14px">
+<div class="card"><h3>Theory Engine</h3><p>Отвечает за key/scale, Roman numerals, chord formulas, enharmonic spelling и graph relations.</p></div>
+<div class="card"><h3>Instrument Renderers</h3><p>Получают pitch set и проецируют его на piano, guitar, melodica, ukulele и т. д. Harmony Engine не должен знать геометрию инструмента.</p></div>
+<div class="card"><h3>Presentation Layer</h3><p>Решает, что показывать: C / I / tonic / notes / diagram / explanation. Это позволяет менять UX без переписывания music theory engine.</p></div>
+</div>
+<div class="callout"><strong>Не хранить отдельные C-major/D-major экраны.</strong> Хранить относительные шаблоны и применять `KeyContext`. Именно это является программным эквивалентом механического сдвига.</div>
+</section>
+
+<section id="mapping" class="searchable" data-kind="proposal infer">
+<div class="section-head"><div><h2>10. Физический механизм → программный паттерн</h2><p>Практическая матрица переноса идей.</p></div></div>
+<div class="table-wrap"><table><thead><tr><th>Механизм ChordFiles</th><th>Software-паттерн</th><th>Потенциальная функция</th><th>Приоритет</th></tr></thead><tbody>
+<tr><td>Key slider</td><td>Global reactive context</td><td>Мгновенная транспозиция map, progression, diagrams и playback</td><td><b>Высокий</b></td></tr>
+<tr><td>Main Chords area</td><td>Core lane / Safe layer</td><td>Ограничить choice overload</td><td><b>Высокий</b></td></tr>
+<tr><td>Secondary Dominants + arrows</td><td>Directed graph edges</td><td>Explainable next-chord suggestions</td><td><b>Критический</b></td></tr>
+<tr><td>Modal Interchange area</td><td>Color/Borrowed lane</td><td>Контролируемое расширение гармонии</td><td><b>Высокий</b></td></tr>
+<tr><td>Front/back same order</td><td>Synchronized views</td><td>Theory ↔ Guitar/Piano ↔ Notes/Melody</td><td><b>Высокий</b></td></tr>
+<tr><td>Scale/chord tones</td><td>Layered note semantics</td><td>Root/chord/scale/target highlighting</td><td><b>Высокий</b></td></tr>
+<tr><td>Scales two sliders</td><td>2D state model</td><td>Root × scale family explorer</td><td>Средний</td></tr>
+<tr><td>Blues target notes</td><td>Target-note engine</td><td>Voice-leading / melodic guidance</td><td><b>Высокий</b></td></tr>
+<tr><td>Physical focus-first</td><td>Focus/Practice mode</td><td>Минимум отвлекающих controls во время игры</td><td>Средний</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="ux" class="searchable" data-kind="proposal fact">
+<div class="section-head"><div><h2>11. UX-принципы, которые стоит заимствовать</h2><p>Заимствовать принцип взаимодействия, а не графическое оформление.</p></div></div>
+<div class="grid g3">
+<div class="card"><h3>1. Ограничить пространство выбора</h3><p>Показывать 5–15 содержательно разных вариантов, а не каталог из сотен symbols.</p></div>
+<div class="card"><h3>2. Сделать отношения видимыми</h3><p>Стрелка/edge должна быть элементом первого класса: она объясняет «куда ведёт» выбранный chord.</p></div>
+<div class="card"><h3>3. Геометрия = смысл</h3><p>Core, tension и color должны жить в разных пространственных слоях, чтобы пользователь учился карте без чтения теории.</p></div>
+<div class="card"><h3>4. Один объект — много views</h3><p>Выбранный chord не теряется при переключении Theory/Guitar/Piano/Melody.</p></div>
+<div class="card"><h3>5. Exploration, не enforcement</h3><p>Не красный «wrong». Лучше: Safe / Strong resolution / Color / Surprise + объяснение.</p></div>
+<div class="card"><h3>6. Слышать сразу</h3><p>Digital version должна компенсировать отсутствие тактильности мгновенным audition и A/B сравнением.</p></div>
+</div>
+</section>
+
+
+<section id="expansion" class="searchable" data-kind="proposal infer">
+<div class="section-head"><div><h2>12. Расширение концепции для CanenceFlow</h2><p>Главный шаг за пределы физических ChordFiles: не плодить отдельные карточки/экраны, а представить музыкальные стили и техники как комбинируемые rule sets одного движка.</p></div></div>
+<div class="callout"><strong>Ключевая гипотеза CanenceFlow:</strong> ChordFiles можно абстрагировать как <code>global context → harmonic vocabulary → typed relations → playable representation</code>. В software это позволяет заменить фиксированные «серии» на <b>Harmony Grammars</b>, которые комбинируются между собой.</div>
+<div class="table-wrap"><table><thead><tr><th>Family</th><th>На какой вопрос отвечает</th><th>Примеры</th><th>Архитектурный смысл</th></tr></thead><tbody>
+<tr><td><b>Harmony Systems</b></td><td>Какие гармонические правила действуют?</td><td>Major, Minor/Dark, Modal, Jazz</td><td>Определяют базовый vocabulary, функции и допустимые edge types</td></tr>
+<tr><td><b>Styles</b></td><td>Какой звуковой характер нужен?</td><td>Neo-Soul, Cinematic, Synthwave, Gospel, Ambient</td><td>Добавляют/перевзвешивают vocabulary, voicings и progression families</td></tr>
+<tr><td><b>Transformations</b></td><td>Что пользователь хочет сделать?</td><td>Modulation, Reharmonization, Voice Leading</td><td>Не отдельные экраны, а операции над graph/progression</td></tr>
+<tr><td><b>Experimental</b></td><td>Насколько далеко выйти за функциональную гармонию?</td><td>Polytonality, Quartal/Quintal, Chromatic systems</td><td>Разрешают multiple tonal centers и low-stability relations</td></tr>
+<tr><td><b>Melodic Systems</b></td><td>Какие ноты доступны поверх гармонии?</td><td>Modes, Pentatonics, Bebop, Altered, World scales</td><td>Pitch collections + target-note rules поверх chord graph</td></tr>
+<tr><td><b>Voicing / Performance</b></td><td>Как фактически сыграть материал?</td><td>Shell, Drop-2, spread voicings, guitar shapes, arpeggios</td><td>Instrument renderer + voicing optimizer, отдельно от harmony engine</td></tr>
+</tbody></table></div>
+<div class="grid g3" style="margin-top:14px">
+<div class="card"><h3>Не «серия = экран»</h3><p>Физический продукт вынужден печатать отдельные карты. CanenceFlow может генерировать карту из данных, поэтому `Jazz`, `Dark`, `Cinematic` и `Neo-Soul` лучше хранить как presets/rules.</p></div>
+<div class="card"><h3>Слои можно сочетать</h3><p>Пример: <code>Minor + Cinematic + Smooth Voice Leading + Piano</code>. Это создаёт карту, которой физически потребовалась бы отдельная карточка.</p></div>
+<div class="card"><h3>От каталога к навигации</h3><p>Целевая модель — не «покажи все аккорды», а «покажи пространство музыкальных возможностей вокруг текущего объекта и объясни отношения».</p></div>
+</div>
+</section>
+
+<section id="grammars" class="searchable" data-kind="proposal infer">
+<div class="section-head"><div><h2>13. Кандидаты Harmony Grammars / специализированных серий</h2><p>Расширения, которые естественно продолжают принцип ChordFiles. Это проектные идеи для CanenceFlow, а не функции ChordFiles.</p></div></div>
+
+<h3 class="family-title">Harmony systems & modal vocabularies</h3>
+<div class="grid g2">
+<div class="card"><span class="pill-title">Harmony System</span><h3>Jazz & Blues Fusion</h3><p><b>Ядро:</b> ii–V–I, secondary ii–V, altered dominants, tritone substitutions, extensions 9/11/13, diminished passing harmony.</p><p><b>Graph:</b> различать обычное V→I, substituted dominant→I, ii→V и backdoor/secondary paths. Одному target можно показывать несколько конкурирующих путей.</p><p><b>UI:</b> lanes `DIATONIC 7TH → SECONDARY ii–V → ALTERED/SUBSTITUTIONS`; клик по G7 раскрывает G7♭9/G7♯9/G13/G7alt и соответствующие scale options.</p></div>
+<div class="card"><span class="pill-title">Modal / World</span><h3>Modal & World Scales</h3><p><b>Ядро:</b> Western modes, Phrygian Dominant, Double Harmonic, Hungarian Minor, Insen и другие pitch collections.</p><p><b>Важно:</b> отделять <em>scale membership</em> от исторически аутентичной гармонической практики. Pitch collection сама по себе не гарантирует функциональную grammar.</p><p><b>UI:</b> root × collection × harmonization strategy; отдельные пометки для характерных ступеней и melodic target tones.</p></div>
+<div class="card"><span class="pill-title">Genre / Modal</span><h3>Flamenco / Spanish</h3><p><b>Ядро:</b> Phrygian/Phrygian-dominant center, Andalusian-style descending chains, strong ♭II/I pull, pedal tones.</p><p><b>Graph:</b> выразительные нисходящие связи и dominant-like tonicization вокруг Phrygian center; отображать directionality не только по classical major/minor semantics.</p><p><b>UI:</b> вертикальная descending lane, characteristic tones и guitar-oriented voicings.</p></div>
+<div class="card"><span class="pill-title">Genre / Functional</span><h3>Gospel</h3><p><b>Ядро:</b> secondary dominants, passing diminished chords, chromatic approaches, IV→iv→I, dominant chains, turnarounds.</p><p><b>Graph:</b> это хороший пример композиции уже известных rule families: Standard + Dark + chromatic passing vocabulary.</p><p><b>UI:</b> показывать substitution/approach edges и голосоведение к target chord.</p></div>
+</div>
+
+<h3 class="family-title">Style grammars</h3>
+<div class="grid g2">
+<div class="card"><span class="pill-title">Style</span><h3>Cinematic Epic</h3><p><b>Ядро:</b> chromatic mediants, borrowed major/minor colors, pedal-tone harmony, dramatic dominant/non-functional jumps.</p><p><b>CanenceFlow:</b> хранить не только relation type, но и heuristic descriptors: brightness, tension, stability, surprise. Эмоциональные labels — подсказки, не строгие законы теории.</p><p><b>UI:</b> пространство `dark ↔ bright`, `stable ↔ adventurous`, где геометрия помогает выбирать harmonic color.</p></div>
+<div class="card"><span class="pill-title">Style</span><h3>Neo-Soul & Lo-Fi</h3><p><b>Ядро:</b> maj7/maj9, m9/m11, dominant extensions, passing diminished, chromatic approach chords.</p><p><b>Критически важно:</b> жанр задаётся не только chord symbols. Основная ценность — voicing и smooth voice leading.</p><p><b>UI:</b> переключатель поиска `Functional / Smoothest / Most colorful / Most unexpected`; показывать voice-leading cost между voicings.</p></div>
+<div class="card"><span class="pill-title">Style</span><h3>Synthwave / Retro</h3><p><b>Ядро:</b> minor-centered progression families, ♭VI/♭VII/v, mode mixture, repeating ostinato/pedal behavior, относительно простые voicings.</p><p><b>Data model:</b> хранить Roman-numeral patterns, а не конкретные C/Am sequences, чтобы стиль автоматически транспонировался.</p><p><b>UI:</b> curated progression families + audition, а затем переход в обычный graph explorer.</p></div>
+<div class="card"><span class="pill-title">Style</span><h3>Ambient / Dream / Shoegaze</h3><p><b>Ядро:</b> add9, sus2, maj7/maj9, open fifths, common-tone harmony, planing, pedal tones.</p><p><b>Graph:</b> edge может основываться не на function, а на common-tone retention или minimal upper-voice movement.</p><p><b>UI:</b> команда «найти аккорды, сохраняющие выбранную pedal note» и visual common-tone highlighting.</p></div>
+<div class="card"><span class="pill-title">Style</span><h3>Metal / Heavy / Darker</h3><p><b>Ядро:</b> Phrygian/Locrian colors, tritone movement, ♭II/♭VI/♭VII, chromatic mediants, pedal-riff vocabulary.</p><p><b>Расширение:</b> HarmonyNode может иметь power-chord/riff projection, а melodic layer — suggested riff tones.</p><p><b>UI:</b> harmony + guitar position + pedal tone + riff-note lane.</p></div>
+<div class="card"><span class="pill-title">Style / Songwriting</span><h3>Pop Songwriter</h3><p><b>Ядро:</b> function-level progression families и form-aware continuation.</p><p><b>Новый уровень:</b> пользователь спрашивает не только «что после V?», а «какой Chorus после этого Verse?». Song-form context становится ещё одним global context.</p><p><b>UI:</b> Verse / Pre-Chorus / Chorus / Bridge suggestions с объяснением lift, contrast и continuity.</p></div>
+</div>
+
+<h3 class="family-title">Transformations & experimental systems</h3>
+<div class="grid g2">
+<div class="card"><span class="pill-title">Transformation</span><h3>Modulation Master</h3><p><b>Задача:</b> найти путь из Key A в Key B через pivot chords, dominant chains, parallel major/minor, chromatic relations и другие поддерживаемые strategies.</p><p><b>Алгоритм:</b> graph pathfinding (Dijkstra/A* или bounded search), где edge cost может учитывать harmonic distance, voice-leading distance, длину пути, stylistic fit и tension.</p><p><b>UI:</b> режимы `Shortest / Smooth / Classical / Jazz / Dramatic / Surprising`, показывающие несколько explainable routes.</p></div>
+<div class="card"><span class="pill-title">Transformation</span><h3>Reharmonization</h3><p><b>Задача:</b> заменить один chord/event так, чтобы сохранить или намеренно изменить функцию.</p><p><b>Relation families:</b> common-tone substitution, relative/parallel relation, secondary dominant, chromatic approach, diminished connector, modal interchange.</p><p><b>UI:</b> команда `Reharmonize this chord` → ranked alternatives + «Why does this work?».</p></div>
+<div class="card"><span class="pill-title">Cross-cutting technique</span><h3>Voice Leading</h3><p><b>Задача:</b> найти конкретные voicings с минимальным или контролируемым движением голосов.</p><p><b>Model:</b> отделить abstract chord node от `VoicingInstance`; считать movement cost, common tones, contrary/parallel motion и instrument constraints.</p><p><b>UI:</b> линии между голосами, ноты-anchors и варианты `smooth / open / dramatic`.</p></div>
+<div class="card"><span class="pill-title">Experimental</span><h3>Polytonality / Avant-garde</h3><p><b>Задача:</b> одновременно работать с несколькими tonal centers или сознательно низко-функциональными отношениями.</p><p><b>Model:</b> HarmonyContext перестаёт быть одним `KeyContext`; возможен массив centers/collections с weights.</p><p><b>UI:</b> показывать provenance каждой ноты/аккорда по tonal center и степень conflict/common-tone overlap.</p></div>
+</div>
+</section>
+
+<section id="architecture" class="searchable" data-kind="proposal">
+<div class="section-head"><div><h2>14. CanenceFlow как composable Harmony Graph Engine</h2><p>Архитектура должна позволять добавлять новый стиль в основном как данные и правила, а не как новый экран с собственной логикой.</p></div></div>
+<div class="diagram">                CANENCEFLOW HARMONY ENGINE
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+     Harmony Base        Style         Transformation
+          │                │                │
+     Major / Minor     Neo-Soul        Voice Leading
+     Modal / Jazz      Cinematic        Reharmonize
+          │                │             Modulate
+          └────────────────┼────────────────┘
+                           ↓
+                  GENERATED HARMONY GRAPH
+                           ↓
+          Theory / Piano / Guitar / Melodica / Melody
+</div>
+<div class="code">interface HarmonyPack {
+  id: string;
+  name: string;
+  family: "system" | "style" | "transformation" | "experimental";
+
+  vocabulary: HarmonyRule[];
+  transitions: HarmonyTransition[];
+  preferredScales?: ScaleRule[];
+  voicingRules?: VoicingRule[];
+  progressionFamilies?: ProgressionTemplate[];
+
+  descriptors?: {
+    tension?: number;       // heuristic 0..1
+    brightness?: number;    // heuristic 0..1
+    stability?: number;     // heuristic 0..1
+    complexity?: number;    // heuristic 0..1
+  };
+}
+
+interface HarmonyTransition {
+  from: HarmonicRole;
+  to: HarmonicRole;
+  relation:
+    | "functional"
+    | "resolution"
+    | "borrowed"
+    | "chromatic-mediant"
+    | "tritone-sub"
+    | "voice-leading"
+    | "common-tone"
+    | "modulation"
+    | "style-pattern";
+  directionality: "directed" | "undirected";
+  strength: number;         // engine/rule weight, not universal truth
+  tags: string[];
+  explanationKey: string;
+}
+
+interface VoicingInstance {
+  chordNodeId: string;
+  pitches: number[];
+  bassPitch?: number;
+  instrumentId: string;
+  position?: unknown;
+  movementCostFromPrevious?: number;
+}</div>
+<div class="grid g3" style="margin-top:14px">
+<div class="card"><h3>Layer composition</h3><p>Например `Minor + Cinematic + Voice Leading + Piano` добавляет chromatic-mediant edges и затем reranks конкретные voicings по movement cost.</p></div>
+<div class="card"><h3>Explainability first</h3><p>Каждый suggested edge хранит provenance: rule family, target, strength и explanation. AI/ranking может менять порядок, но не должен подменять теоретическую модель.</p></div>
+<div class="card"><h3>Separate pitch from spelling</h3><p>Pitch class, notation spelling, Roman function и instrument shape — разные representations. Это необходимо для модуляций, enharmonics и multi-view consistency.</p></div>
+</div>
+<div class="callout"><strong>Целевой принцип:</strong> CanenceFlow не является каталогом аккордов. Это навигационная система по музыкальному пространству: <b>current context → reachable options → relation → sound → explanation</b>.</div>
+</section>
+
+<section id="concept-builder" class="searchable" data-kind="proposal">
+<div class="section-head"><div><h2>15. Интерактивный CanenceFlow Concept Builder</h2><p>Мини-демо того, как несколько независимых grammars могут собираться в одну сгенерированную карту. Это архитектурная иллюстрация, не спецификация готового продукта.</p></div></div>
+<div class="grammar-builder">
+  <div class="controls">
+    <label>Harmony base</label>
+    <select id="cfBase">
+      <option value="major">Major</option><option value="minor">Minor / Dark</option><option value="jazz">Jazz</option><option value="modal">Modal</option>
+    </select>
+    <label>Style layer</label>
+    <select id="cfStyle">
+      <option value="none">None</option><option value="cinematic">Cinematic</option><option value="neosoul">Neo-Soul</option><option value="synthwave">Synthwave</option><option value="gospel">Gospel</option><option value="ambient">Ambient</option><option value="metal">Metal / Heavy</option>
+    </select>
+    <label>Transformation / objective</label>
+    <select id="cfTransform">
+      <option value="functional">Functional navigation</option><option value="smooth">Smooth voice leading</option><option value="reharm">Reharmonization</option><option value="modulate">Modulation</option><option value="unexpected">Most unexpected</option>
+    </select>
+    <label>Instrument projection</label>
+    <select id="cfInstrument"><option>Piano</option><option>Guitar</option><option>Melodica</option></select>
+    <div class="details" id="cfSummary"></div>
+  </div>
+  <div class="builder-output">
+    <h3 style="margin-top:0">Generated layers</h3>
+    <div class="tag-row" id="cfTags"></div>
+    <div class="layer-stack" id="cfLayers"></div>
+    <h3>Heuristic profile</h3>
+    <div id="cfMetrics"></div>
+    <div class="callout" id="cfDeveloperNote" style="margin-bottom:0"></div>
+  </div>
+</div>
+</section>
+
+<section id="roadmap" class="searchable" data-kind="proposal">
+<div class="section-head"><div><h2>16. Roadmap для разработки CanenceFlow</h2><p>Порядок, который сохраняет сильную сторону ChordFiles — простоту — но постепенно переводит продукт к composable Harmony Graph Engine.</p></div></div>
+<div class="table-wrap"><table><thead><tr><th>Этап</th><th>Что реализовать</th><th>Цель</th></tr></thead><tbody>
+<tr><td><b>MVP core</b></td><td>12 keys; major/minor; diatonic triads/sevenths; secondary dominants; modal interchange; Roman ↔ chord; audio audition; progression tray</td><td>Воспроизвести фундаментальную ценность Progressions</td></tr>
+<tr><td><b>Instrument views</b></td><td>Piano + Guitar standard; root/chord/scale tones; shared selected object</td><td>Цифровой аналог front/back</td></tr>
+<tr><td><b>Advanced harmony</b></td><td>Secondary diminished; Neapolitan; harmonic/melodic minor; blues families</td><td>Dark/Scales/Blues как presets одного engine</td></tr>
+<tr><td><b>Grammar layer</b></td><td>HarmonyPack schema; typed transitions; style overlays; rule provenance; pack composition</td><td>Сделать Jazz/Cinematic/Neo-Soul/Gospel не отдельными экранами, а data-driven grammars</td></tr>
+<tr><td><b>Transformations</b></td><td>Voice-leading optimizer; reharmonization ranking; modulation pathfinding; common-tone search</td><td>Перейти от статической карты к операциям над музыкальным пространством</td></tr>
+<tr><td><b>Composition layer</b></td><td>Target notes; voice leading; voicing suggestions; progression editing</td><td>Перейти от chord explorer к composition assistant</td></tr>
+<tr><td><b>Professional bridge</b></td><td>MIDI, MusicXML, DAW-friendly export, alternate tunings</td><td>Встроить результат в реальный workflow музыканта</td></tr>
+<tr><td><b>Personalization</b></td><td>Style-aware reranking поверх rule graph, а не генерация теории «с нуля»</td><td>Объяснимые рекомендации без black-box поведения</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="risks" class="searchable" data-kind="fact infer proposal">
+<div class="section-head"><div><h2>17. Ограничения и failure modes</h2><p>Что физическая система делает хорошо и где software должен действовать иначе.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3><span class="badge fact">факт</span>Физические ограничения</h3><ul><li>Конечное место на карточке.</li><li>Заранее отпечатанный набор states.</li><li>Guitar editions ориентированы на standard tuning.</li><li>Нет встроенного audio/playback/export.</li><li>Нельзя динамически сортировать варианты по контексту пользователя.</li></ul></div>
+<div class="card"><h3><span class="badge proposal">для приложения</span>Цифровые риски</h3><ul><li>Переусложнить интерфейс и потерять главную ценность — cognitive simplicity.</li><li>Спрятать music theory за black-box AI.</li><li>Путать enharmonic pitch identity и notation spelling.</li><li>Жёстко кодировать жанры отдельными экранами вместо data-driven presets.</li><li>Показывать слишком много связей одновременно и превратить graph в «паутину».</li></ul></div>
+</div>
+<div class="callout"><strong>Оптимальная стратегия CanenceFlow:</strong> не «сделать больше, чем ChordFiles», а сделать <em>меньше в каждый момент времени</em>, но дать глубину по запросу: progressive disclosure, audition, explanation, instrument view, export.</div>
+</section>
+
+<section id="ip" class="searchable" data-kind="fact infer proposal">
+<div class="section-head"><div><h2>18. IP и юридические границы</h2><p>Что безопасно переносить как общую идею, а что лучше не копировать буквально.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3><span class="badge fact">факт</span>Что относится к общим музыкальным принципам</h3><p>Secondary dominants, modal mixture, Neapolitan, Roman numerals, scale formulas и функциональная гармония не являются изобретением ChordFiles.</p></div>
+<div class="card"><h3><span class="badge proposal">для приложения</span>Чего не делать</h3><p>Не переносить их artwork, точную сетку, текст инструкций, фирменные обозначения и не использовать их опубликованные таблицы как seed database. Реализовать свою domain model, собственный layout и проверить IP-status перед коммерческим релизом.</p></div>
+</div>
+<p class="note">Публичный поиск в рамках исследования не обнаружил очевидного патента по названию/автору, но это не является полноценным freedom-to-operate search. Для коммерческого продукта нужен отдельный поиск SIPO/EUIPO/WIPO/EPO при необходимости.</p>
+</section>
+
+<section id="sources" class="searchable" data-kind="fact">
+<div class="section-head"><div><h2>19. Источники и provenance</h2><p>Первичные материалы отделены от независимых теоретических/технических источников.</p></div></div>
+<div class="grid g2">
+<div class="card"><h3>Пользовательские PDF (первичные инструкции)</h3><ul class="source-list">
+<li><b>Guitar_PRO_EN.pdf</b> — Progressions, 2 страницы: front/back, Main Chords, Secondary Dominants, Modal Interchange, diagram legend, melody/scale-tone example.</li>
+<li><b>Piano_PRO_EN.pdf</b> — тот же workflow для клавиатуры, включая root/chord/scale tone encoding.</li>
+<li><b>Guitar_DARK_EN.pdf</b> — Dark Harmony: secondary diminished, Neapolitan 6th, target resolutions, guitar diagrams.</li>
+<li><b>Piano_DARK_EN.pdf</b> — Dark Harmony для piano, те же functional relations и keyboard projection.</li>
+</ul></div>
+<div class="card"><h3>Официальные web-источники ChordFiles</h3><ul class="source-list">
+<li><a href="https://www.chordfiles.com/" target="_blank" rel="noreferrer">ChordFiles home</a></li>
+<li><a href="https://www.chordfiles.com/instructions/" target="_blank" rel="noreferrer">Instructions</a></li>
+<li><a href="https://www.chordfiles.com/product/chord_files-progressions/" target="_blank" rel="noreferrer">Progressions II — Guitar</a></li>
+<li><a href="https://www.chordfiles.com/product/chord_files-dark-harmony/" target="_blank" rel="noreferrer">Dark Harmony II — Guitar</a></li>
+<li><a href="https://www.chordfiles.com/product/scales-guitar/" target="_blank" rel="noreferrer">Scales — Guitar</a></li>
+<li><a href="https://www.chordfiles.com/product/blues-guitar/" target="_blank" rel="noreferrer">Blues — Guitar</a></li>
+<li><a href="https://www.chordfiles.com/examples/" target="_blank" rel="noreferrer">Progressions examples</a></li>
+<li><a href="https://www.chordfiles.com/example-dark-harmony/" target="_blank" rel="noreferrer">Dark Harmony examples</a></li>
+<li><a href="https://www.chordfiles.com/story/" target="_blank" rel="noreferrer">Story</a></li>
+<li><a href="https://www.chordfiles.com/terms-of-service/" target="_blank" rel="noreferrer">Terms of Service</a></li>
+</ul></div>
+</div>
+<details><summary>Независимые технические и теоретические источники</summary><ul class="source-list">
+<li><a href="https://tonaljs.github.io/tonal/docs/harmony/keys" target="_blank" rel="noreferrer">Tonal.js — keys/harmony</a></li>
+<li><a href="https://music21.org/music21docs/moduleReference/moduleRoman.html" target="_blank" rel="noreferrer">music21 — RomanNumeral</a></li>
+<li><a href="https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/kind/" target="_blank" rel="noreferrer">W3C MusicXML — harmony kind</a></li>
+<li><a href="https://viva.pressbooks.pub/openmusictheory/chapter/modal-mixture/" target="_blank" rel="noreferrer">Open Music Theory — Modal Mixture</a></li>
+<li><a href="https://openmusictheory.github.io/alteredSubdominants.html" target="_blank" rel="noreferrer">Open Music Theory — Neapolitan / altered subdominants</a></li>
+<li><a href="https://openmusictheory.github.io/harmonicFunctions.html" target="_blank" rel="noreferrer">Open Music Theory — harmonic functions</a></li>
+<li><a href="https://www.hooktheory.com/" target="_blank" rel="noreferrer">Hooktheory / Hookpad</a></li>
+<li><a href="https://chordbot.com/" target="_blank" rel="noreferrer">Chordbot</a></li>
+<li><a href="https://www.sequencer.de/synthesizer/threads/nutzt-hier-jemand-chordfiles.167288/" target="_blank" rel="noreferrer">Sequencer.de discussion</a></li>
+</ul></details>
+<details><summary>Юридические справочные источники</summary><ul class="source-list">
+<li><a href="https://eur-lex.europa.eu/eli/dir/2009/24/oj" target="_blank" rel="noreferrer">EU Software Directive 2009/24/EC</a></li>
+<li><a href="https://intellectual-property-helpdesk.ec.europa.eu/ip-management-and-resources/copyright_en" target="_blank" rel="noreferrer">European IP Helpdesk — copyright</a></li>
+<li><a href="https://guidelines.euipo.europa.eu/2231430/2234081/designs-guidelines/4-1-3-icons-graphic-user-interfaces-and-the-like" target="_blank" rel="noreferrer">EUIPO — GUI/design guidance</a></li>
+</ul></details>
+<div class="callout"><strong>Маркировка в документе:</strong> <span class="badge fact">факт</span> подтверждено первичным/публичным источником; <span class="badge infer">реконструкция</span> вывод по фотографиям/описаниям; <span class="badge proposal">для приложения</span> проектное предложение, а не функция ChordFiles.</div>
+</section>
+
+<div class="footer">Назначение файла: developer handoff / knowledge source для <b>CanenceFlow</b>. Он описывает принципы и архитектурные гипотезы, а не воспроизводит фирменный визуальный дизайн ChordFiles. Версия: 2026-09-10.</div>
+</main>
+</div>
+<script>
+const keys = [
+ {name:'C', tonic:0, scale:['C','D','E','F','G','A','B']},
+ {name:'Db', tonic:1, scale:['Db','Eb','F','Gb','Ab','Bb','C']},
+ {name:'D', tonic:2, scale:['D','E','F#','G','A','B','C#']},
+ {name:'Eb', tonic:3, scale:['Eb','F','G','Ab','Bb','C','D']},
+ {name:'E', tonic:4, scale:['E','F#','G#','A','B','C#','D#']},
+ {name:'F', tonic:5, scale:['F','G','A','Bb','C','D','E']},
+ {name:'Gb', tonic:6, scale:['Gb','Ab','Bb','Cb','Db','Eb','F']},
+ {name:'G', tonic:7, scale:['G','A','B','C','D','E','F#']},
+ {name:'Ab', tonic:8, scale:['Ab','Bb','C','Db','Eb','F','G']},
+ {name:'A', tonic:9, scale:['A','B','C#','D','E','F#','G#']},
+ {name:'Bb', tonic:10, scale:['Bb','C','D','Eb','F','G','A']},
+ {name:'B', tonic:11, scale:['B','C#','D#','E','F#','G#','A#']}
+];
+const pcsSharp=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const pcsFlat=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const flatKeys=new Set(['Db','Eb','F','Gb','Ab','Bb']);
+const romanDegrees={I:0,ii:1,iii:2,IV:3,V:4,vi:5,'vii°':6};
+function noteName(pc,keyName){return (flatKeys.has(keyName)?pcsFlat:pcsSharp)[(pc+12)%12]}
+function majorChordSet(k){
+  const q=['','m','m','','','m','dim']; const r=['I','ii','iii','IV','V','vi','vii°'];
+  return r.map((roman,i)=>({roman,name:k.scale[i]+q[i],role:i===0?'tonic':i===3?'subdominant':i===4?'dominant':'diatonic'}));
+}
+function secDom(k,targetRoman){
+  const idx=romanDegrees[targetRoman]; const targetPc=(k.tonic+[0,2,4,5,7,9,11][idx])%12; const root=(targetPc+7)%12;
+  return {roman:'V/'+targetRoman.replace('°',''),name:noteName(root,k.name)+'7',target:targetRoman};
+}
+function borrowed(k){
+  const t=k.tonic;
+  return [
+    {roman:'iv',name:noteName((t+5)%12,k.name)+'m',desc:'borrowed minor subdominant'},
+    {roman:'♭III',name:noteName((t+3)%12,k.name),desc:'borrowed color'},
+    {roman:'♭VI',name:noteName((t+8)%12,k.name),desc:'borrowed color'},
+    {roman:'♭VII',name:noteName((t+10)%12,k.name),desc:'borrowed color'}
+  ];
+}
+function darkSet(k){
+  const t=k.tonic;
+  const names=[
+    {roman:'i',name:noteName(t,k.name)+'m',role:'tonic minor'},
+    {roman:'ii°',name:noteName((t+2)%12,k.name)+'dim',role:'diminished'},
+    {roman:'♭III',name:noteName((t+3)%12,k.name),role:'relative-major color'},
+    {roman:'iv',name:noteName((t+5)%12,k.name)+'m',role:'minor subdominant'},
+    {roman:'V',name:noteName((t+7)%12,k.name),role:'dominant'},
+    {roman:'♭VI',name:noteName((t+8)%12,k.name),role:'minor color'},
+    {roman:'♭VII',name:noteName((t+10)%12,k.name),role:'minor color'}
+  ];
+  return names;
+}
+function renderDemo(){
+ const k=keys[document.getElementById('keySelect').selectedIndex];
+ const preset=document.getElementById('presetSelect').value;
+ const lanes=document.getElementById('lanes'); lanes.innerHTML='';
+ if(preset==='progressions'){
+   const targets=['ii','iii','IV','V','vi'];
+   const tension=targets.map(r=>secDom(k,r));
+   lane(lanes,'Tension / Secondary Dominants',tension,'tensionLane',true);
+   lane(lanes,'Core / Main Chords',majorChordSet(k),'coreLane',false);
+   lane(lanes,'Color / Modal Interchange',borrowed(k),'colorLane',false);
+ } else {
+   const t=k.tonic;
+   const adv=[
+     {roman:'N6',name:noteName((t+1)%12,k.name),target:'V',desc:'Neapolitan predominant'},
+     {roman:'vii°/V',name:noteName((t+6)%12,k.name)+'dim',target:'V',desc:'secondary diminished'},
+     {roman:'vii°/iv',name:noteName((t+4)%12,k.name)+'dim',target:'iv',desc:'secondary diminished'}
+   ];
+   lane(lanes,'Advanced / directed chromatic',adv,'tensionLane',true);
+   lane(lanes,'Core minor (software abstraction)',darkSet(k),'coreLane',false);
+ }
+ renderProgression(k);
+}
+function lane(root,title,items,cls,directed){
+ const el=document.createElement('div'); el.className='lane '+cls; el.innerHTML='<h4>'+title+'</h4><div class="chords"></div>';
+ const c=el.querySelector('.chords');
+ items.forEach(it=>{const b=document.createElement('button');b.className='chord';b.innerHTML='<b>'+it.name+'</b><small>'+it.roman+(it.target?' → '+it.target:'')+'</small>';b.onclick=()=>showDetails(it,directed);c.appendChild(b)});
+ root.appendChild(el);
+}
+function showDetails(it,directed){
+ const d=document.getElementById('demoDetails');
+ d.innerHTML='<b>'+it.name+'</b> · '+it.roman+'<br>'+ (it.target ? 'Directed relation → <b>'+it.target+'</b>.' : (it.desc||it.role||'Relative harmonic function')) + (directed?'<br><span class="small">Edge-first interpretation: отношение важнее самого chord label.</span>':'');
+}
+function renderProgression(k){
+ const p=document.getElementById('progSelect').value;
+ const root=document.getElementById('progression');root.innerHTML='';
+ let steps=[];
+ if(p==='p1') steps=[{roman:'I',name:majorChordSet(k)[0].name},secDom(k,'iii'),{roman:'iii',name:majorChordSet(k)[2].name},{roman:'V',name:majorChordSet(k)[4].name}];
+ if(p==='p2') steps=[{roman:'I',name:majorChordSet(k)[0].name},secDom(k,'V'),{roman:'V',name:majorChordSet(k)[4].name},{roman:'I',name:majorChordSet(k)[0].name}];
+ if(p==='p3') steps=[{roman:'I',name:majorChordSet(k)[0].name},{roman:'vi',name:majorChordSet(k)[5].name},{roman:'IV',name:majorChordSet(k)[3].name},{roman:'V',name:majorChordSet(k)[4].name}];
+ steps.forEach(s=>{const e=document.createElement('div');e.className='prog-step';e.innerHTML='<b>'+s.name+'</b><span>'+s.roman+'</span>';root.appendChild(e)});
+}
+const keySel=document.getElementById('keySelect');keys.forEach(k=>{const o=document.createElement('option');o.textContent=k.name+' major';keySel.appendChild(o)});keySel.value='C major';
+['keySelect','presetSelect','progSelect'].forEach(id=>document.getElementById(id).addEventListener('change',renderDemo));renderDemo();
+
+
+// CanenceFlow composable-grammar concept builder (illustrative architecture demo)
+const cfCatalog = {
+  base: {
+    major:{name:'Major', layers:['Diatonic core','Secondary dominants','Modal interchange'], tags:['functional','roman-numeral','key-relative'], m:[35,72,82,35]},
+    minor:{name:'Minor / Dark', layers:['Minor diatonic core','Secondary diminished','Neapolitan / chromatic predominant'], tags:['minor','directed-resolution','chromatic'], m:[55,48,68,52]},
+    jazz:{name:'Jazz', layers:['Diatonic 7th chords','ii–V–I network','Altered & substitute dominants'], tags:['extensions','ii-V-I','tritone-sub'], m:[62,58,62,78]},
+    modal:{name:'Modal', layers:['Pitch collection','Characteristic degrees','Mode-specific chord vocabulary'], tags:['modal','characteristic-tones','non-functional'], m:[42,66,58,55]}
+  },
+  style: {
+    none:{name:'No style overlay', layers:[], tags:[], d:[0,0,0,0]},
+    cinematic:{name:'Cinematic', layers:['Chromatic-mediant options','Borrowed dramatic color','Pedal/common-tone candidates'], tags:['chromatic-mediant','dramatic','color'], d:[18,3,-5,8]},
+    neosoul:{name:'Neo-Soul', layers:['Extended voicings','Passing diminished connectors','Smooth upper-voice candidates'], tags:['maj9','m11','voice-leading'], d:[8,12,2,18]},
+    synthwave:{name:'Synthwave', layers:['Minor/mixture progression families','♭VI / ♭VII color','Retro progression weighting'], tags:['retro','mode-mixture','progression-family'], d:[7,2,4,-5]},
+    gospel:{name:'Gospel', layers:['Chromatic approach chords','Passing diminished','Dominant chains / IV→iv→I'], tags:['gospel','passing-dim','dominant-chain'], d:[16,3,-3,14]},
+    ambient:{name:'Ambient / Dream', layers:['Common-tone harmony','add9/sus/maj9 vocabulary','Pedal-note search'], tags:['common-tone','pedal','planing'], d:[-8,18,8,3]},
+    metal:{name:'Metal / Heavy', layers:['Phrygian/Locrian color','Tritone / ♭II relations','Pedal-riff projection'], tags:['tritone','phrygian','riff'], d:[22,-8,-18,5]}
+  },
+  transform: {
+    functional:{name:'Functional navigation', layers:['Rank by functional tendency'], tags:['target-aware'], d:[0,0,8,0]},
+    smooth:{name:'Smooth voice leading', layers:['Optimize common tones','Minimize voice movement'], tags:['voicing-cost','common-tone'], d:[-10,10,10,12]},
+    reharm:{name:'Reharmonization', layers:['Generate functional/color substitutes','Explain substitution relation'], tags:['substitution','explainable'], d:[12,5,-6,18]},
+    modulate:{name:'Modulation', layers:['Build inter-key graph','Search pivot/dominant paths'], tags:['pathfinding','pivot-chord'], d:[15,-2,-8,22]},
+    unexpected:{name:'Most unexpected', layers:['Down-weight nearest functional edges','Promote controlled chromatic distance'], tags:['surprise','controlled-outside'], d:[28,-10,-22,20]}
+  }
+};
+function clamp(v){return Math.max(0,Math.min(100,v))}
+function renderCfBuilder(){
+  const b=cfCatalog.base[document.getElementById('cfBase').value];
+  const st=cfCatalog.style[document.getElementById('cfStyle').value];
+  const tr=cfCatalog.transform[document.getElementById('cfTransform').value];
+  const inst=document.getElementById('cfInstrument').value;
+  const layers=[...b.layers,...st.layers,...tr.layers,inst+' instrument projection'];
+  const tags=[...new Set([...b.tags,...st.tags,...tr.tags,inst.toLowerCase()])];
+  document.getElementById('cfTags').innerHTML=tags.map(x=>'<span class="chip">'+x+'</span>').join('');
+  document.getElementById('cfLayers').innerHTML=layers.map((x,i)=>'<div class="layer-item"><div><b>'+x+'</b><small>'+(i<b.layers.length?'Base grammar':i<b.layers.length+st.layers.length?'Style overlay':i<layers.length-1?'Transformation':'Renderer')+'</small></div><span class="badge proposal">layer</span></div>').join('');
+  const labels=['Tension','Brightness','Stability','Complexity'];
+  const vals=b.m.map((v,i)=>clamp(v+(st.d[i]||0)+(tr.d[i]||0)));
+  document.getElementById('cfMetrics').innerHTML=labels.map((l,i)=>'<div class="metric"><span>'+l+'</span><div class="bar"><i style="width:'+vals[i]+'%"></i></div><b>'+vals[i]+'</b></div>').join('');
+  document.getElementById('cfSummary').innerHTML='<b>'+b.name+'</b> + <b>'+st.name+'</b> + <b>'+tr.name+'</b><br><span class="small">Projection: '+inst+'. Все слои должны разрешаться в один общий graph state, а не существовать как независимые страницы.</span>';
+  document.getElementById('cfDeveloperNote').innerHTML='<strong>Engine contract:</strong> base grammar создаёт vocabulary и основные edges; style overlay добавляет/перевзвешивает material; transformation меняет objective/ranking; instrument renderer только проецирует итоговые pitches/voicings. Heuristic bars выше — демонстрационные, не music-theory facts.';
+}
+['cfBase','cfStyle','cfTransform','cfInstrument'].forEach(id=>document.getElementById(id).addEventListener('change',renderCfBuilder));
+renderCfBuilder();
+
+const filters=[...document.querySelectorAll('.filter')];
+filters.forEach(btn=>btn.addEventListener('click',()=>{filters.forEach(x=>x.classList.remove('active'));btn.classList.add('active');applyVisibility()}));
+document.getElementById('search').addEventListener('input',applyVisibility);
+function applyVisibility(){
+ const f=document.querySelector('.filter.active').dataset.filter; const q=document.getElementById('search').value.trim().toLowerCase();
+ document.querySelectorAll('.searchable').forEach(el=>{
+   const kind=(el.dataset.kind||'');
+   el.classList.toggle('hidden-by-filter',f!=='all'&&!kind.split(/\s+/).includes(f));
+   el.classList.toggle('search-hidden',!!q&&!el.innerText.toLowerCase().includes(q));
+ });
+}
+const sections=[...document.querySelectorAll('section[id]')];const navLinks=[...document.querySelectorAll('#nav a')];
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));}})},{rootMargin:'-20% 0px -72% 0px',threshold:0});sections.forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

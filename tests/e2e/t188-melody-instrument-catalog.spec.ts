@@ -31,12 +31,12 @@ test.describe("T188 — canonical Melody instrument picker", () => {
 
     await picker.selectOption("gm-081");
     await expect(dialog.locator(".melody-instrument-picker-status")).toContainText(
-      "GM 081 · Lead 2 (sawtooth) · Export only",
+      "GM 081 · Lead 2 (sawtooth) · Realtime",
     );
     await expect(page.getByLabel("Melody Instrument search")).toBeVisible();
   });
 
-  test("previews the Step override and reports export-only without entering playing", async ({
+  test("previews the Step override by loading it from CDN", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -52,15 +52,19 @@ test.describe("T188 — canonical Melody instrument picker", () => {
 
     const play = dialog.getByRole("button", { name: "Play melody preview" });
     await expect(play).toBeEnabled();
-    await play.click();
-
-    await expect(dialog.getByRole("button", { name: "Play melody preview" })).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(dialog.getByRole("button", { name: "Stop melody preview" })).toHaveCount(0);
-    await expect(dialog.locator('[role="alert"]')).toContainText(
-      "GM 027 · Electric Guitar (clean) · Export only / no bundled realtime sample",
+    // gm-027 is now realtime via CDN — it should load and start playing
+    const cdnResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("gleitz.github.io") &&
+        response.url().includes("electric_guitar_clean"),
+      { timeout: 60_000 },
     );
+    await play.click();
+    expect((await cdnResponse).status()).toBe(200);
+    await expect(dialog.getByRole("button", { name: "Stop melody preview" })).toBeVisible({
+      timeout: 60_000,
+    });
+    await dialog.getByRole("button", { name: "Stop melody preview" }).click();
   });
 
   test("loads and plays an available Step override instead of the global instrument", async ({

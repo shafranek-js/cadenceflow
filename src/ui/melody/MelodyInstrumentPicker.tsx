@@ -7,8 +7,7 @@ import {
 import { normalizeMelodyInstrumentSearch } from "./instrumentSearch";
 
 function optionLabel(entry: MelodyInstrumentCatalogEntry): string {
-  const availability = entry.realtimeAvailability === "available" ? "Realtime" : "Export only";
-  return `GM ${String(entry.program).padStart(3, "0")} · ${entry.label} · ${availability}`;
+  return `GM ${String(entry.program).padStart(3, "0")} · ${entry.label} · Realtime`;
 }
 
 export function MelodyInstrumentPicker({
