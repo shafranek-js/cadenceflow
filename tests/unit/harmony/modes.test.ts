@@ -165,15 +165,80 @@ describe("Modes Domain Modeling", () => {
     expect(chords[4]?.chord.baseQuality).toBe("dominant");
   });
 
-  it("derives accurate chords for C Major Pentatonic", () => {
+  it("derives accurate chords and modal badges for C Major Pentatonic", () => {
     // C is pitch class 0
+    const def = getScaleDefinition("major-pentatonic");
+    expect(def.characteristicDegree).toBe(5);
+    expect(def.characteristicInterval).toBe("6");
+    expect(def.characteristicDescriptionRu).toContain("Мажорная секста");
+
+    const pitches = computeScalePitches(0, "major-pentatonic");
+    expect(pitches).toHaveLength(5);
+    expect(pitches[4]?.spelling).toEqual({ step: "A", alter: 0 });
+    expect(pitches[4]?.isCharacteristic).toBe(true); // Degree 5 (A) is characteristic
+
     const chords = computeModalChords(0, "major-pentatonic");
     expect(chords).toHaveLength(5);
     expect(chords[0]?.chordSymbol).toBe("Cmaj7");
     expect(chords[1]?.chordSymbol).toBe("Dm7");
+    expect(chords[1]?.isCharacteristicChord).toBe(true); // ii7 is characteristic
     expect(chords[2]?.chordSymbol).toBe("Em7");
     expect(chords[3]?.chordSymbol).toBe("G7");
     expect(chords[4]?.chordSymbol).toBe("Am7");
+    expect(chords[4]?.isCharacteristicChord).toBe(true); // vi7 is characteristic
+  });
+
+  it("derives accurate chords and modal badges for A Minor Pentatonic", () => {
+    // A is pitch class 9
+    const def = getScaleDefinition("minor-pentatonic");
+    expect(def.characteristicDegree).toBe(5);
+    expect(def.characteristicInterval).toBe("♭7");
+    expect(def.characteristicDescriptionRu).toContain("Малая септима");
+
+    const pitches = computeScalePitches(9, "minor-pentatonic");
+    expect(pitches).toHaveLength(5);
+    expect(pitches[4]?.spelling).toEqual({ step: "G", alter: 0 });
+    expect(pitches[4]?.isCharacteristic).toBe(true); // Degree 5 (G) is characteristic
+
+    const chords = computeModalChords(9, "minor-pentatonic");
+    expect(chords).toHaveLength(5);
+    expect(chords[0]?.chordSymbol).toBe("Am7");
+    expect(chords[0]?.isCharacteristicChord).toBe(true); // i7 is characteristic
+    expect(chords[1]?.chordSymbol).toBe("Cmaj7");
+    expect(chords[2]?.chordSymbol).toBe("Dm7");
+    expect(chords[3]?.chordSymbol).toBe("Em7");
+    expect(chords[4]?.chordSymbol).toBe("G7");
+    expect(chords[4]?.isCharacteristicChord).toBe(true); // ♭VII7 is characteristic
+  });
+
+  it("sets characteristic modal badges for Blues scale chords", () => {
+    const chords = computeModalChords(0, "blues");
+    expect(chords[0]?.isCharacteristicChord).toBe(true); // I7
+    expect(chords[3]?.isCharacteristicChord).toBe(true); // ♭v°7
+    expect(chords[5]?.isCharacteristicChord).toBe(true); // ♭VII7
+  });
+
+  it("sets characteristic leading tone for Ionian and modal badge on dominant V7", () => {
+    const def = getScaleDefinition("ionian");
+    expect(def.characteristicDegree).toBe(7);
+    expect(def.characteristicInterval).toBe("♮7");
+
+    const pitches = computeScalePitches(0, "ionian");
+    expect(pitches[6]?.isCharacteristic).toBe(true); // Degree 7 (B)
+
+    const chords = computeModalChords(0, "ionian");
+    expect(chords[4]?.isCharacteristicChord).toBe(true); // V7
+    expect(chords[6]?.isCharacteristicChord).toBe(true); // vii°7
+  });
+
+  it("ensures every single scale definition has at least 2 canonical modal cadences", () => {
+    for (const scale of SCALE_DEFINITIONS) {
+      const cadences = CANONICAL_MODAL_FORMULAS.filter((f) => f.modeId === scale.id);
+      expect(
+        cadences.length,
+        `Expected scale "${scale.id}" to have at least 2 canonical formulas, found ${cadences.length}`,
+      ).toBeGreaterThanOrEqual(2);
+    }
   });
 });
 
