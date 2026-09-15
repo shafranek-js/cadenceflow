@@ -231,13 +231,14 @@ describe("Modes Domain Modeling", () => {
     expect(chords[6]?.isCharacteristicChord).toBe(true); // vii°7
   });
 
-  it("ensures every single scale definition has at least 2 canonical modal cadences", () => {
+  it("ensures every single scale definition has at least 4 canonical modal cadences and library is comprehensive", () => {
+    expect(CANONICAL_MODAL_FORMULAS.length).toBeGreaterThanOrEqual(50);
     for (const scale of SCALE_DEFINITIONS) {
       const cadences = CANONICAL_MODAL_FORMULAS.filter((f) => f.modeId === scale.id);
       expect(
         cadences.length,
-        `Expected scale "${scale.id}" to have at least 2 canonical formulas, found ${cadences.length}`,
-      ).toBeGreaterThanOrEqual(2);
+        `Expected scale "${scale.id}" to have at least 4 canonical formulas, found ${cadences.length}`,
+      ).toBeGreaterThanOrEqual(4);
     }
   });
 });

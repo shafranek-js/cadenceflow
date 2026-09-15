@@ -617,7 +617,7 @@ function fStep(
 }
 
 export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.freeze([
-  // Ionian (Major)
+  // 1. Ionian (Major)
   {
     id: "ionian-authentic-cadence",
     title: "Ionian Authentic Cadence",
@@ -660,8 +660,40 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(4, "IV", "major"),
     ]),
   },
+  {
+    id: "ionian-pachelbel-descent",
+    title: "Ionian Pachelbel Descent (Canon Line)",
+    modeId: "ionian",
+    genreTag: "Baroque / Classical",
+    description: "The legendary Canon in D sequence: an eight-chord descending bass journey that underpins both Baroque counterpoint and modern pop.",
+    romanProgression: "I → V → vi → iii → IV → I → IV → V",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(5, "V", "major"),
+      fStep(6, "vi", "minor"),
+      fStep(3, "iii", "minor"),
+      fStep(4, "IV", "major"),
+      fStep(1, "I", "major"),
+      fStep(4, "IV", "major"),
+      fStep(5, "V", "major"),
+    ]),
+  },
+  {
+    id: "ionian-jazz-turnaround",
+    title: "Ionian Jazz Rhythm Turnaround",
+    modeId: "ionian",
+    genreTag: "Jazz Standard / Swing",
+    description: "The classic American Songbook circle-of-fifths turnaround anchoring jazz standards, swing themes, and Broadway melodies.",
+    romanProgression: "Imaj⁷ → vi⁷ → ii⁷ → V⁷",
+    steps: Object.freeze([
+      fStep(1, "Imaj7", "major", "major7"),
+      fStep(6, "vi7", "minor", "minor7"),
+      fStep(2, "ii7", "minor", "minor7"),
+      fStep(5, "V7", "dominant"),
+    ]),
+  },
 
-  // Dorian
+  // 2. Dorian
   {
     id: "dorian-funk-vamp",
     title: "Dorian Funk Vamp",
@@ -689,8 +721,49 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(1, "i7", "minor", "minor7"),
     ]),
   },
+  {
+    id: "dorian-modal-jazz-so-what",
+    title: "Dorian Modal Jazz Step (So What)",
+    modeId: "dorian",
+    genreTag: "Modal Jazz / Cool Jazz",
+    description: "Miles Davis' and Bill Evans' revolutionary modal movement: cool parallel minor movement highlighting the Dorian ♮6.",
+    romanProgression: "i⁷ → ii⁷ → i⁷",
+    steps: Object.freeze([
+      fStep(1, "i7", "minor", "minor7"),
+      fStep(2, "ii7", "minor", "minor7"),
+      fStep(1, "i7", "minor", "minor7"),
+    ]),
+  },
+  {
+    id: "dorian-psychedelic-breathe",
+    title: "Dorian Psychedelic Drift (Breathe)",
+    modeId: "dorian",
+    genreTag: "Psychedelic Rock",
+    description: "Hypnotic Pink Floyd cosmic atmosphere: spacious minor tonic floating into the luminous major IV.",
+    romanProgression: "i → IV → i → IV",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(4, "IV", "major"),
+      fStep(1, "i", "minor"),
+      fStep(4, "IV", "major"),
+    ]),
+  },
+  {
+    id: "dorian-folk-scarborough",
+    title: "Dorian Folk Ballad (Scarborough)",
+    modeId: "dorian",
+    genreTag: "Celtic / English Folk",
+    description: "Ancient modal folk progression evoking medieval troubadour tales and timeless acoustic ballads.",
+    romanProgression: "i → ♭VII → i → IV",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(7, "♭VII", "major"),
+      fStep(1, "i", "minor"),
+      fStep(4, "IV", "major"),
+    ]),
+  },
 
-  // Phrygian
+  // 3. Phrygian
   {
     id: "phrygian-flamenco",
     title: "Phrygian Flamenco Cadence",
@@ -718,8 +791,36 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(2, "♭II", "major"),
     ]),
   },
+  {
+    id: "phrygian-metal-chug",
+    title: "Phrygian Metal Chug",
+    modeId: "phrygian",
+    genreTag: "Thrash Metal / Djent",
+    description: "Brutal palm-muted half-step riffing engine used across thrash, death metal, and modern aggressive scoring.",
+    romanProgression: "i → ♭II → i → ♭II",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(2, "♭II", "major"),
+      fStep(1, "i", "minor"),
+      fStep(2, "♭II", "major"),
+    ]),
+  },
+  {
+    id: "phrygian-desert-caravan",
+    title: "Phrygian Desert Caravan",
+    modeId: "phrygian",
+    genreTag: "World / Cinematic Suspense",
+    description: "Exotic Middle Eastern desert journey emphasizing the dark ♭2 and wandering minor ♭vii.",
+    romanProgression: "i → ♭II → ♭vii → i",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(2, "♭II", "major"),
+      fStep(7, "♭vii", "minor"),
+      fStep(1, "i", "minor"),
+    ]),
+  },
 
-  // Lydian
+  // 4. Lydian
   {
     id: "lydian-space-lift",
     title: "Lydian Cinematic Space (E.T. Lift)",
@@ -747,8 +848,49 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(1, "Imaj7", "major", "major7"),
     ]),
   },
+  {
+    id: "lydian-dream-pop-shimmer",
+    title: "Lydian Dream Pop Shimmer",
+    modeId: "lydian",
+    genreTag: "Shoegaze / Dream Pop",
+    description: "Lush, chorus-drenched ethereal movement between tonic and the soft minor vii.",
+    romanProgression: "Imaj⁷ → vii⁷ → Imaj⁷",
+    steps: Object.freeze([
+      fStep(1, "Imaj7", "major", "major7"),
+      fStep(7, "vii7", "minor", "minor7"),
+      fStep(1, "Imaj7", "major", "major7"),
+    ]),
+  },
+  {
+    id: "lydian-heroic-ascent",
+    title: "Lydian Heroic Whimsy",
+    modeId: "lydian",
+    genreTag: "Animation / Film Theme",
+    description: "Danny Elfman and Pixar-style bright, whimsical harmonic lift with vibrant tonal curiosity.",
+    romanProgression: "I → II → IV → I",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(2, "II", "major"),
+      fStep(4, "IV", "major"),
+      fStep(1, "I", "major"),
+    ]),
+  },
+  {
+    id: "lydian-satriani-flight",
+    title: "Lydian Virtuoso Flight (Satriani)",
+    modeId: "lydian",
+    genreTag: "Instrumental Rock",
+    description: "Inspired by Joe Satriani's 'Flying in a Blue Dream', combining the energetic ♯4 with smooth submediant resolution.",
+    romanProgression: "I → II → vi → I",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(2, "II", "major"),
+      fStep(6, "vi", "minor"),
+      fStep(1, "I", "major"),
+    ]),
+  },
 
-  // Mixolydian
+  // 5. Mixolydian
   {
     id: "mixolydian-rock-anthem",
     title: "Mixolydian Rock Anthem",
@@ -776,8 +918,49 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(1, "I7", "dominant"),
     ]),
   },
+  {
+    id: "mixolydian-celtic-reel",
+    title: "Mixolydian Celtic Reel",
+    modeId: "mixolydian",
+    genreTag: "Celtic / Epic Fantasy",
+    description: "Heroic highland melody incorporating the minor dominant v, beloved in Celtic fiddle reels and Lord of the Rings themes.",
+    romanProgression: "I → v → ♭VII → I",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(5, "v", "minor"),
+      fStep(7, "♭VII", "major"),
+      fStep(1, "I", "major"),
+    ]),
+  },
+  {
+    id: "mixolydian-folk-norwegian",
+    title: "Mixolydian 60s Folk (Norwegian Wood)",
+    modeId: "mixolydian",
+    genreTag: "60s Folk-Rock",
+    description: "Acoustic modal storytelling made legendary by The Beatles, balancing bright major tonic with low subtonic warmth.",
+    romanProgression: "I → ♭VII → I",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(7, "♭VII", "major"),
+      fStep(1, "I", "major"),
+    ]),
+  },
+  {
+    id: "mixolydian-southern-rock-turn",
+    title: "Mixolydian Southern Rock Turn",
+    modeId: "mixolydian",
+    genreTag: "Southern Rock",
+    description: "Driving Tom Petty and Creedence Clearwater Revival progression cycling through subdominant and subtonic.",
+    romanProgression: "I → IV → ♭VII → IV",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(4, "IV", "major"),
+      fStep(7, "♭VII", "major"),
+      fStep(4, "IV", "major"),
+    ]),
+  },
 
-  // Aeolian
+  // 6. Aeolian
   {
     id: "aeolian-epic-ballad",
     title: "Aeolian Epic Ballad",
@@ -806,8 +989,50 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(7, "♭VII", "major"),
     ]),
   },
+  {
+    id: "aeolian-passacaglia",
+    title: "Aeolian Passacaglia (Handel)",
+    modeId: "aeolian",
+    genreTag: "Baroque / Neoclassical",
+    description: "Pure stepwise bassline descent down the natural minor tetrachord to the minor dominant v.",
+    romanProgression: "i → ♭VII → ♭VI → v",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(7, "♭VII", "major"),
+      fStep(6, "♭VI", "major"),
+      fStep(5, "v", "minor"),
+    ]),
+  },
+  {
+    id: "aeolian-cinematic-ostinato",
+    title: "Aeolian Cinematic Ostinato (Zimmer)",
+    modeId: "aeolian",
+    genreTag: "Cinematic Drama",
+    description: "Hans Zimmer-style expansive dramatic arch building massive tension across the subdominant and flat submediant.",
+    romanProgression: "i → ♭VI → iv → ♭VII",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(6, "♭VI", "major"),
+      fStep(4, "iv", "minor"),
+      fStep(7, "♭VII", "major"),
+    ]),
+  },
+  {
+    id: "aeolian-synthwave-drive",
+    title: "Aeolian Synthwave Drive",
+    modeId: "aeolian",
+    genreTag: "Synthwave / Cyberpunk",
+    description: "Pulsing arpeggiated 80s neon night drive progression linking dark minor tonic to bright parallel major.",
+    romanProgression: "i → ♭III → ♭VII → iv",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(3, "♭III", "major"),
+      fStep(7, "♭VII", "major"),
+      fStep(4, "iv", "minor"),
+    ]),
+  },
 
-  // Locrian
+  // 7. Locrian
   {
     id: "locrian-tension-cadence",
     title: "Locrian Tension Cadence",
@@ -835,8 +1060,36 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(1, "i°", "diminished"),
     ]),
   },
+  {
+    id: "locrian-creeping-shadow",
+    title: "Locrian Creeping Shadow",
+    modeId: "locrian",
+    genreTag: "Psychological Thriller",
+    description: "Unsettling slow harmonic crawl moving through the minor ♭iii and collapsing back onto the diminished tonic.",
+    romanProgression: "i° → ♭iii → ♭II → i°",
+    steps: Object.freeze([
+      fStep(1, "i°", "diminished"),
+      fStep(3, "♭iii", "minor"),
+      fStep(2, "♭II", "major"),
+      fStep(1, "i°", "diminished"),
+    ]),
+  },
+  {
+    id: "locrian-asymmetrical-groove",
+    title: "Locrian Asymmetrical Groove",
+    modeId: "locrian",
+    genreTag: "Prog Metal / Avant-Garde",
+    description: "Angular, jagged chord shifts favored in complex progressive metal and dark experimental jazz.",
+    romanProgression: "i° → ♭VII → ♭V → ♭II",
+    steps: Object.freeze([
+      fStep(1, "i°", "diminished"),
+      fStep(7, "♭vii", "minor"),
+      fStep(5, "♭V", "major"),
+      fStep(2, "♭II", "major"),
+    ]),
+  },
 
-  // Major Pentatonic
+  // 8. Major Pentatonic
   {
     id: "major-pentatonic-country-road",
     title: "Country Folk Open Road",
@@ -879,8 +1132,36 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(4, "V", "dominant"),
     ]),
   },
+  {
+    id: "major-pentatonic-pastoral-drift",
+    title: "Pure Pastoral Drift",
+    modeId: "major-pentatonic",
+    genreTag: "Acoustic Indie / Folk",
+    description: "Gentle two-chord campfire drift highlighting the pure vocal resonance between major tonic and relative minor.",
+    romanProgression: "I → vi⁷ → I → vi⁷",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(5, "vi7", "minor", "minor7"),
+      fStep(1, "I", "major"),
+      fStep(5, "vi7", "minor", "minor7"),
+    ]),
+  },
+  {
+    id: "major-pentatonic-appalachian-air",
+    title: "Appalachian Mountain Air",
+    modeId: "major-pentatonic",
+    genreTag: "Bluegrass / Americana",
+    description: "Brisk, cheerful acoustic bounce powered by the characteristic ii⁷ chord.",
+    romanProgression: "I → ii⁷ → V → I",
+    steps: Object.freeze([
+      fStep(1, "I", "major"),
+      fStep(2, "ii7", "minor", "minor7"),
+      fStep(4, "V", "dominant"),
+      fStep(1, "I", "major"),
+    ]),
+  },
 
-  // Minor Pentatonic
+  // 9. Minor Pentatonic
   {
     id: "minor-pentatonic-rock-riff",
     title: "Hard Rock Pentatonic Riff",
@@ -923,8 +1204,35 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(3, "iv7", "minor", "minor7"),
     ]),
   },
+  {
+    id: "minor-pentatonic-funk-slap",
+    title: "Funk-Rock Slap Groove",
+    modeId: "minor-pentatonic",
+    genreTag: "Funk-Rock / 90s Alternative",
+    description: "In the vein of Red Hot Chili Peppers: tight rhythmic engine bouncing between tonic minor and subdominant.",
+    romanProgression: "i⁷ → iv⁷ → i⁷ → ♭VII⁷",
+    steps: Object.freeze([
+      fStep(1, "i7", "minor", "minor7"),
+      fStep(3, "iv7", "minor", "minor7"),
+      fStep(1, "i7", "minor", "minor7"),
+      fStep(5, "♭VII7", "dominant"),
+    ]),
+  },
+  {
+    id: "minor-pentatonic-desert-drone",
+    title: "Desert Stoner Rock Drone",
+    modeId: "minor-pentatonic",
+    genreTag: "Stoner Rock / Desert Rock",
+    description: "Heavy, low-tuned power drone cycling endlessly with uncompromising attitude.",
+    romanProgression: "i⁷ → ♭VII⁷ → i⁷",
+    steps: Object.freeze([
+      fStep(1, "i7", "minor", "minor7"),
+      fStep(5, "♭VII7", "dominant"),
+      fStep(1, "i7", "minor", "minor7"),
+    ]),
+  },
 
-  // Blues
+  // 10. Blues
   {
     id: "blues-quick-change",
     title: "12-Bar Blues Quick Change",
@@ -934,10 +1242,10 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
     romanProgression: "I⁷ → IV⁷ → I⁷ → V⁷ → IV⁷ → I⁷",
     steps: Object.freeze([
       fStep(1, "I7", "dominant"),
-      fStep(4, "IV7", "dominant"),
+      fStep(3, "IV7", "dominant"),
       fStep(1, "I7", "dominant"),
       fStep(5, "V7", "dominant"),
-      fStep(4, "IV7", "dominant"),
+      fStep(3, "IV7", "dominant"),
       fStep(1, "I7", "dominant"),
     ]),
   },
@@ -950,15 +1258,57 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
     romanProgression: "I⁷ → IV⁷ → I⁷ → V⁷ → ♭VII⁷ → I⁷",
     steps: Object.freeze([
       fStep(1, "I7", "dominant"),
-      fStep(4, "IV7", "dominant"),
+      fStep(3, "IV7", "dominant"),
       fStep(1, "I7", "dominant"),
       fStep(5, "V7", "dominant"),
       fStep(6, "♭VII7", "dominant"),
       fStep(1, "I7", "dominant"),
     ]),
   },
+  {
+    id: "blues-texas-shuffle",
+    title: "Texas Shuffle Groove (SRV)",
+    modeId: "blues",
+    genreTag: "Texas Blues / Shuffle",
+    description: "Stevie Ray Vaughan-style driving shuffle pacing the three dominant cornerstones with electric fire.",
+    romanProgression: "I⁷ → IV⁷ → I⁷ → V⁷",
+    steps: Object.freeze([
+      fStep(1, "I7", "dominant"),
+      fStep(3, "IV7", "dominant"),
+      fStep(1, "I7", "dominant"),
+      fStep(5, "V7", "dominant"),
+    ]),
+  },
+  {
+    id: "blues-diminished-pass",
+    title: "Blue Note Diminished Pass (B.B. King)",
+    modeId: "blues",
+    genreTag: "Chicago Blues / Jazz Blues",
+    description: "Sophisticated passing diminished chord rooted on the ♭5 blue note resolving cleanly back to tonic.",
+    romanProgression: "I⁷ → IV⁷ → ♭v°⁷ → I⁷",
+    steps: Object.freeze([
+      fStep(1, "I7", "dominant"),
+      fStep(3, "IV7", "dominant"),
+      fStep(4, "♭v°7", "diminished", "diminished7"),
+      fStep(1, "I7", "dominant"),
+    ]),
+  },
+  {
+    id: "blues-delta-boogie",
+    title: "Delta One-Chord Boogie",
+    modeId: "blues",
+    genreTag: "Delta Blues / Boogie",
+    description: "John Lee Hooker-style hypnotic boogie locked into an unstoppable single-chord blues trance.",
+    romanProgression: "I⁷ → I⁷ → IV⁷ → I⁷",
+    steps: Object.freeze([
+      fStep(1, "I7", "dominant"),
+      fStep(1, "I7", "dominant"),
+      fStep(3, "IV7", "dominant"),
+      fStep(1, "I7", "dominant"),
+    ]),
+  },
 
-  // Harmonic Minor
+  // 11. Harmonic Minor
   {
     id: "harmonic-minor-baroque",
     title: "Harmonic Minor Baroque Drama",
@@ -987,8 +1337,50 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
       fStep(5, "V7", "dominant"),
     ]),
   },
+  {
+    id: "harmonic-minor-tango-passion",
+    title: "Tango Nuevo Passion (Piazzolla)",
+    modeId: "harmonic-minor",
+    genreTag: "Tango / Klezmer",
+    description: "Sensual and brooding Argentine tango cadence leading from the diminished supertonic ii° into the dominant V⁷.",
+    romanProgression: "i → ii° → V⁷ → i",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(2, "ii°", "diminished"),
+      fStep(5, "V7", "dominant"),
+      fStep(1, "i", "minor"),
+    ]),
+  },
+  {
+    id: "harmonic-minor-gothic-arch",
+    title: "Gothic Cathedral Arch",
+    modeId: "harmonic-minor",
+    genreTag: "Gothic / Choral Epic",
+    description: "Monumental sacred minor arch used in pipe organ fantasias, requiems, and dark cinematic climaxes.",
+    romanProgression: "i → ♭VI → ii° → V⁷",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(6, "♭VI", "major"),
+      fStep(2, "ii°", "diminished"),
+      fStep(5, "V7", "dominant"),
+    ]),
+  },
+  {
+    id: "harmonic-minor-speed-engine",
+    title: "Neoclassical Speed Engine (Malmsteen)",
+    modeId: "harmonic-minor",
+    genreTag: "Neoclassical Metal",
+    description: "High-voltage oscillating two-chord engine propelling blistering harmonic minor sweeps and pedal arpeggios.",
+    romanProgression: "i → V⁷ → i → V⁷",
+    steps: Object.freeze([
+      fStep(1, "i", "minor"),
+      fStep(5, "V7", "dominant"),
+      fStep(1, "i", "minor"),
+      fStep(5, "V7", "dominant"),
+    ]),
+  },
 
-  // Melodic Minor (Jazz Minor)
+  // 12. Melodic Minor (Jazz Minor)
   {
     id: "melodic-minor-jazz-tonic",
     title: "Jazz Minor Modal Cadence",
@@ -1013,6 +1405,46 @@ export const CANONICAL_MODAL_FORMULAS: readonly ModalCadenceFormula[] = Object.f
     steps: Object.freeze([
       fStep(1, "im(maj7)", "minor", "major7"),
       fStep(2, "ii7", "minor", "minor7"),
+      fStep(4, "IV7", "dominant"),
+      fStep(1, "im(maj7)", "minor", "major7"),
+    ]),
+  },
+  {
+    id: "melodic-minor-bebop-resolution",
+    title: "Bebop Minor Resolution (iiø-V-i)",
+    modeId: "melodic-minor",
+    genreTag: "Bebop / Hard Bop",
+    description: "The quintessential modern jazz minor turnaround resolving cleanly into the bittersweet minor-major tonic.",
+    romanProgression: "ii⁷ → V⁷ → im(maj⁷)",
+    steps: Object.freeze([
+      fStep(2, "ii7", "minor", "minor7"),
+      fStep(5, "V7", "dominant"),
+      fStep(1, "im(maj7)", "minor", "major7"),
+    ]),
+  },
+  {
+    id: "melodic-minor-lydian-dominant",
+    title: "Lydian Dominant Pivot (George Russell)",
+    modeId: "melodic-minor",
+    genreTag: "Contemporary Jazz",
+    description: "Acoustic overtone harmony where the dominant IV⁷ functions as a luminous color chord rather than a tension point.",
+    romanProgression: "im(maj⁷) → IV⁷ → ♭IIImaj⁷ → im(maj⁷)",
+    steps: Object.freeze([
+      fStep(1, "im(maj7)", "minor", "major7"),
+      fStep(4, "IV7", "dominant"),
+      fStep(3, "♭IIImaj7", "major", "major7"),
+      fStep(1, "im(maj7)", "minor", "major7"),
+    ]),
+  },
+  {
+    id: "melodic-minor-noir-mystery",
+    title: "Noir Detective Mystery",
+    modeId: "melodic-minor",
+    genreTag: "Cinematic Noir / Spy",
+    description: "Stealthy, rainy midnight atmosphere with the distinctive major 6th in IV⁷ illuminating the dark minor root.",
+    romanProgression: "im(maj⁷) → IV⁷ → im(maj⁷)",
+    steps: Object.freeze([
+      fStep(1, "im(maj7)", "minor", "major7"),
       fStep(4, "IV7", "dominant"),
       fStep(1, "im(maj7)", "minor", "major7"),
     ]),
@@ -1092,9 +1524,16 @@ export function getModalParentKeyAndFunction(
   }
 
   if (modeId === "blues") {
-    // Blues: 1 -> I, 2 -> I, 3 -> IV, 4 -> IV, 5 -> V, 6 -> V (subtonic dominant)
-    const BLUES_MAP = ["I", "I", "IV", "IV", "V", "V"] as const;
-    const functionId = BLUES_MAP[(degree - 1) % BLUES_MAP.length] ?? "I";
+    // Blues: 1 -> I, 2 -> bIII, 3 -> IV, 4 -> vii° (blue note passing diminished), 5 -> V, 6 -> bVII
+    let functionId: string;
+    if (degree === 1) functionId = "I";
+    else if (degree === 2) functionId = "bIII";
+    else if (degree === 3) functionId = "IV";
+    else if (degree === 4) functionId = "vii°";
+    else if (degree === 5) functionId = "V";
+    else if (degree === 6) functionId = "bVII";
+    else functionId = "I";
+
     return {
       parentTonic: normTonic,
       functionId,
