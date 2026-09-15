@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChordDefinition } from "../../domain/harmony/chord";
+import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
 
 const HARMONY_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.preview-harmony-open";
 
@@ -46,6 +47,8 @@ function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
     }
   };
 
+  const semantics = getFunctionSemantics(fn.functionId);
+
   return (
     <details
       className="harmony-details inspector-disclosure"
@@ -86,6 +89,42 @@ function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
         </dl>
         {concept ? <p>{concept}</p> : null}
         {naturalVariant ? <p className="variant-note">{naturalVariant}</p> : null}
+
+        <div className="harmony-semantics-section">
+          <h4 className="harmony-semantic-title">{semantics.title}</h4>
+          <p className="harmony-semantic-desc">{semantics.description}</p>
+
+          <div className="harmony-semantic-field">
+            <span className="harmony-field-label">Характер / Окрас</span>
+            <span className="harmony-field-val">{semantics.emotionalColor}</span>
+          </div>
+
+          <div
+            className="harmony-semantic-rule"
+            data-tendency-type={semantics.tendencyType}
+          >
+            <span className="harmony-rule-icon" aria-hidden="true">
+              {semantics.tendencyType === "dominant-resolution" ||
+              semantics.tendencyType === "diminished-tension"
+                ? "⊘"
+                : "∞"}
+            </span>
+            <span>{semantics.rule}</span>
+          </div>
+
+          {semantics.styleHints.length > 0 ? (
+            <div className="harmony-style-pills-wrap">
+              <span className="harmony-field-label">Стили и жанры</span>
+              <div className="harmony-style-pills">
+                {semantics.styleHints.map((style) => (
+                  <span key={style} className="harmony-style-pill">
+                    {style}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </details>
   );

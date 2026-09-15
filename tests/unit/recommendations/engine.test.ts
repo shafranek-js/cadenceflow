@@ -30,4 +30,46 @@ describe("Recommendation engine", () => {
     });
     expect(result.bestMatch?.functionId).toBe("V");
   });
+
+  it("penalizes chaining tension chords without resolution (Don't Mix rule)", () => {
+    const result = recommend({
+      currentFunctionId: "V7/vi",
+      recentFunctionIds: ["I", "V7/vi"],
+      visibleFunctionIds: ["vi", "V7/ii", "V7/IV", "I"],
+    });
+    expect(result.bestMatch?.functionId).toBe("vi");
+    expect(result.bestMatch?.score).toBe(112);
+
+    // V7/ii is a chained tension chord without resolution
+    const v7ii = [...result.alternatives, result.bestMatch].find((c) => c?.functionId === "V7/ii");
+    // Since score is 10 (< MIN_STRONG_SCORE 68), it should not be in strong candidates
+    expect(v7ii).toBeUndefined();
+  });
+
+  it("boosts modal interchange entry and return in progressions", () => {
+    const entryResult = recommend({
+      moduleId: "progressions",
+      currentFunctionId: "I",
+      recentFunctionIds: ["I"],
+      visibleFunctionIds: visible,
+    });
+    const bIII = entryResult.alternatives.find((c) => c.functionId === "bIII");
+    expect(bIII?.score).toBe(72);
+    expect(bIII?.factors).toContainEqual(
+      expect.objectContaining({ code: "modal-corridor-entry", contribution: 42 }),
+    );
+
+    const returnResult = recommend({
+      moduleId: "progressions",
+      currentFunctionId: "bIII",
+      recentFunctionIds: ["IV", "bIII"],
+      visibleFunctionIds: visible,
+    });
+    expect(returnResult.bestMatch?.functionId).toBe("bVI"); // existing rule 84
+    const returnToI = returnResult.alternatives.find((c) => c.functionId === "I");
+    expect(returnToI?.score).toBe(78);
+    expect(returnToI?.factors).toContainEqual(
+      expect.objectContaining({ code: "modal-corridor-return" }),
+    );
+  });
 });

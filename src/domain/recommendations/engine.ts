@@ -32,6 +32,19 @@ export interface RecommendationContext {
 
 const MIN_STRONG_SCORE = 68;
 
+const PRIMARY_DIATONIC_PROGRESSIONS = new Set(["I", "IV", "V"]);
+const MODAL_BORROWED_PROGRESSIONS = new Set(["bIII", "bVI", "iv", "bVII"]);
+
+function isTensionChord(functionId: string): boolean {
+  return Boolean(
+    secondaryDominantTarget(functionId) ||
+      secondaryDiminishedTarget(functionId) ||
+      functionId === "N6" ||
+      functionId === "CT°7" ||
+      functionId === "Pass°7",
+  );
+}
+
 function baseScore(moduleId: HarmonicModuleId, from: string, to: string): RecommendationCandidate {
   const factors: RecommendationFactor[] = [];
   const currentTonicizationTarget =
@@ -73,6 +86,34 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
       factors.push({ code: rule.factor, contribution: rule.score - 30, source: "function" });
     }
   }
+
+  // ChordFiles "Don't Mix" penalty: chaining tension chords without resolving them
+  if (isTensionChord(from) && isTensionChord(to)) {
+    score = Math.max(10, score - 25);
+    factors.push({
+      code: "dont-mix-tension-chain",
+      contribution: -25,
+      source: "function",
+    });
+  }
+
+  // ChordFiles Modal Corridor preference for the progressions module
+  if (moduleId === "progressions") {
+    if (PRIMARY_DIATONIC_PROGRESSIONS.has(from) && MODAL_BORROWED_PROGRESSIONS.has(to)) {
+      if (score < 72) {
+        const contribution = 72 - score;
+        score = 72;
+        factors.push({ code: "modal-corridor-entry", contribution, source: "function" });
+      }
+    } else if (MODAL_BORROWED_PROGRESSIONS.has(from) && PRIMARY_DIATONIC_PROGRESSIONS.has(to)) {
+      if (score < 78) {
+        const contribution = 78 - score;
+        score = 78;
+        factors.push({ code: "modal-corridor-return", contribution, source: "function" });
+      }
+    }
+  }
+
   return { functionId: to, score, factors };
 }
 

@@ -786,6 +786,99 @@
 .variant-note {
   font-size: 0.82rem;
 }
+.harmony-semantics-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+.harmony-semantic-title {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-heading, var(--text));
+  line-height: 1.35;
+}
+.harmony-semantic-desc {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.harmony-semantic-field {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+  font-size: 0.8rem;
+}
+.harmony-field-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.harmony-field-val {
+  color: var(--text);
+  font-weight: 500;
+}
+.harmony-semantic-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text);
+  line-height: 1.35;
+}
+.harmony-rule-icon {
+  font-weight: 700;
+  color: var(--primary, #38bdf8);
+  flex-shrink: 0;
+}
+.harmony-semantic-rule[data-tendency-type="dominant-resolution"],
+.harmony-semantic-rule[data-tendency-type="diminished-tension"] {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+.harmony-semantic-rule[data-tendency-type="dominant-resolution"] .harmony-rule-icon,
+.harmony-semantic-rule[data-tendency-type="diminished-tension"] .harmony-rule-icon {
+  color: #f87171;
+}
+.harmony-semantic-rule[data-tendency-type="modal-color"] {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: rgba(168, 85, 247, 0.08);
+}
+.harmony-semantic-rule[data-tendency-type="modal-color"] .harmony-rule-icon {
+  color: #c084fc;
+}
+.harmony-style-pills-wrap {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.harmony-style-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.harmony-style-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
 .dialog-backdrop {
   position: fixed;
   inset: 0;

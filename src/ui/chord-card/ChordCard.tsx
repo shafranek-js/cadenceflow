@@ -6,6 +6,7 @@ import { PianoCardView } from "../piano/PianoCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { CustomizedIndicator } from "./CustomizedIndicator";
 import { Icon } from "../common/Icon";
+import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
 import type { StaffOctaveDirection } from "../staff/staffOctave";
 
 export function ChordCard({
@@ -55,6 +56,9 @@ export function ChordCard({
     model.recommendationStatus !== "none"
       ? `recommendation-${model.chord.harmonicFunction.functionId}`
       : undefined;
+  const semantics = getFunctionSemantics(model.chord.harmonicFunction.functionId);
+  const cardTooltip = `${model.chord.harmonicFunction.functionId} · ${semantics.title}\n${semantics.description}\nХарактер: ${semantics.emotionalColor}\nСтили: ${semantics.styleHints.join(", ")}\nПравило: ${semantics.rule}`;
+
   const select = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (event.altKey) onAltClickReset();
     else if (event.ctrlKey) onCtrlClickAdd();
@@ -65,6 +69,7 @@ export function ChordCard({
     <article
       className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""}`.trim()}
       style={style}
+      title={cardTooltip}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
       data-recommendation={model.recommendationStatus}
       data-customized={customizedCount > 0 ? customizedCount : undefined}
@@ -130,7 +135,7 @@ export function ChordCard({
           aria-describedby={describedBy}
         >
           {view === "harmonic" && (
-            <span className="chord-card-identity">
+            <span className="chord-card-identity" title={cardTooltip}>
               <strong>{model.chord.harmonicFunction.functionId}</strong>
               <span>{model.chord.spelling.symbol}</span>
               <span className="chord-card-notes-label">Notes</span>

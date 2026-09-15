@@ -7,6 +7,11 @@ const BEGINNER: Readonly<Record<string, string>> = {
   "secondary-dominant-resolution": "This dominant strongly points to its target chord.",
   "deceptive-resolution": "Avoids the expected tonic for a softer surprise.",
   "minor-plagal-resolution": "A darker borrowed chord resolves warmly to the tonic.",
+  "dont-mix-tension-chain": "Avoid chaining tension chords without resolving them.",
+  "modal-corridor-entry": "Steps into an expressive borrowed chord from the parallel minor.",
+  "modal-corridor-return": "Smooth return from modal coloration back to the primary key.",
+  "secondary-diminished-resolution": "This diminished chord creates intense pull directly into its target.",
+  "approach-via-secondary-diminished": "Uses a dramatic diminished approach toward a key harmony.",
 };
 
 export interface RecommendationExplanation {
