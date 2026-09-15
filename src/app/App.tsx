@@ -305,6 +305,7 @@ export function App() {
   const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
+  const [guitarAudioState, setGuitarAudioState] = useState<AudioProviderState>("idle");
   const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
   const sharedAudioContextRef = useRef<AudioContext | null>(null);
   const [melodyAudioState, setMelodyAudioState] = useState<AudioProviderState>("idle");
@@ -424,6 +425,9 @@ export function App() {
       const sharedContext = sharedAudioContextRef.current;
       guitarProviderRef.current = new AcousticGuitarProvider({
         ...(sharedContext ? { audioContext: sharedContext } : {}),
+        onStateChange: (state) => {
+          setGuitarAudioState(state);
+        },
       });
       void guitarProviderRef.current.prepare();
     }
@@ -657,7 +661,18 @@ export function App() {
 
   useEffect(() => {
     audioProviderRef.current?.setVolume(project.harmonyTrack.volume);
+    guitarProviderRef.current?.setVolume(project.harmonyTrack.volume);
   }, [project.harmonyTrack.volume]);
+
+  useEffect(() => {
+    if (project.presentation.progressionView === "guitar") {
+      void ensureGuitarProvider()
+        .prepare()
+        .catch(() => {
+          // Reflected in provider state
+        });
+    }
+  }, [ensureGuitarProvider, project.presentation.progressionView]);
 
   useEffect(() => {
     if (!hasMelodyRecipe) {
@@ -1261,6 +1276,13 @@ export function App() {
     store.dispatch(command, editStepPerformance);
   };
   const changeProgressionView = (view: ProgressionView) => {
+    if (view === "guitar") {
+      void ensureGuitarProvider()
+        .prepare()
+        .catch(() => {
+          // Reflected in provider state
+        });
+    }
     if (view === project.presentation.progressionView) return;
     const command: SetProgressionViewCommand = {
       type: "presentation/set-progression-view",
@@ -3113,7 +3135,12 @@ export function App() {
           />
         ) : null
       }
-      statusBar={<PianoAudioStatus state={audioState} />}
+      statusBar={
+        <PianoAudioStatus
+          instrument={project.presentation.progressionView === "guitar" ? "guitar" : "piano"}
+          state={project.presentation.progressionView === "guitar" ? guitarAudioState : audioState}
+        />
+      }
       matrix={
         <HarmonicMatrix
           project={project}
@@ -3259,10 +3286,19 @@ export function App() {
             onSetMeter={changeMeter}
             onSetGroove={changeGroove}
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
-            harmonyAudioState={audioState}
+            harmonyAudioState={
+              project.presentation.progressionView === "guitar"
+                ? guitarAudioState
+                : audioState
+            }
             onRetryHarmonyAudio={() => {
-              const provider = audioProviderRef.current;
-              if (provider) void provider.prepare();
+              if (project.presentation.progressionView === "guitar") {
+                const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
+                void gProvider.prepare();
+              } else {
+                const provider = audioProviderRef.current;
+                if (provider) void provider.prepare();
+              }
             }}
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
             melodyAudioState={melodyAudioState}
@@ -3362,10 +3398,19 @@ export function App() {
             }
             melodyAudioState={melodyAudioState}
             melodyAudioError={melodyAudioError}
-            harmonyAudioState={audioState}
+            harmonyAudioState={
+              project.presentation.progressionView === "guitar"
+                ? guitarAudioState
+                : audioState
+            }
             onRetryHarmonyAudio={() => {
-              const provider = audioProviderRef.current;
-              if (provider) void provider.prepare();
+              if (project.presentation.progressionView === "guitar") {
+                const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
+                void gProvider.prepare();
+              } else {
+                const provider = audioProviderRef.current;
+                if (provider) void provider.prepare();
+              }
             }}
             onRetryMelodyAudio={retryMelodyAudio}
             isMelodyPreviewPlaying={isMelodyPreviewPlaying}
