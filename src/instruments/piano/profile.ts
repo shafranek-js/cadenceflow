@@ -71,6 +71,7 @@ export const PIANO_CARD_VIEWS: readonly CardViewDescriptor[] = Object.freeze([
   Object.freeze({ id: "harmonic", label: "Harmonic" }),
   Object.freeze({ id: "piano", label: "Piano" }),
   Object.freeze({ id: "staff", label: "Staff" }),
+  Object.freeze({ id: "guitar", label: "Guitar" }),
 ]);
 
 export const PIANO_ARTICULATIONS: readonly ArticulationDescriptor[] = Object.freeze([

@@ -696,6 +696,149 @@
 .mini-staff-note-labels span {
   color: inherit;
 }
+
+/* --- Mini Guitar Card Visual & Fretboard SVG (Phase 8) --- */
+.mini-guitar-card-visual {
+  display: grid;
+  width: min(100%, 140px);
+  min-width: 0;
+  gap: 3px;
+  margin-inline: auto;
+  place-items: center;
+}
+
+.mini-guitar-heading {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 0.85rem;
+  padding-inline: 4px;
+}
+
+.mini-guitar-chord-name {
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-guitar-position {
+  color: var(--text-muted);
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.mini-guitar-fretboard-wrap {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.guitar-fretboard-svg {
+  display: block;
+  overflow: visible;
+}
+
+.guitar-fretboard-bg {
+  fill: var(--surface-1, #15181e);
+  stroke: var(--border, #282c35);
+  stroke-width: 1px;
+}
+
+.guitar-nut {
+  fill: #e2e8f0;
+}
+
+.guitar-fret-line {
+  stroke: var(--border-light, #3e4451);
+  stroke-width: 1px;
+}
+
+.guitar-fret-line.is-first {
+  stroke-width: 1.5px;
+}
+
+.guitar-position-label {
+  fill: var(--accent, #38bdf8);
+  font-size: 8px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.guitar-string {
+  stroke: #94a3b8;
+}
+
+.guitar-string-marker {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.guitar-string-marker.is-muted {
+  fill: #ef4444;
+}
+
+.guitar-string-marker.is-open {
+  fill: none;
+  stroke: var(--primary, #38bdf8);
+  stroke-width: 1.5px;
+}
+
+.guitar-barre {
+  fill: color-mix(in srgb, var(--primary, #38bdf8) 75%, transparent);
+  stroke: var(--primary, #38bdf8);
+  stroke-width: 1px;
+}
+
+.guitar-fret-dot {
+  stroke-width: 1px;
+}
+
+.guitar-dot-root {
+  fill: #f43f5e;
+  stroke: #ffffff;
+}
+
+.guitar-dot-chord {
+  fill: var(--primary, #38bdf8);
+  stroke: #0f172a;
+}
+
+.guitar-dot-finger-text {
+  fill: #ffffff;
+  font-size: 7.5px;
+  font-weight: 700;
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.guitar-fret-dot-group.is-root .guitar-dot-finger-text {
+  fill: #ffffff;
+}
+
+.guitar-dot-scale-tone {
+  fill: none;
+  stroke: #eab308;
+  stroke-width: 1.2px;
+  stroke-dasharray: 2 1;
+}
+
+.mini-guitar-frets-tab {
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
 @media (max-width: 1100px) {
   .studio-grid {
     grid-template-columns: 1fr;

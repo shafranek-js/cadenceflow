@@ -679,6 +679,7 @@ export function MatrixContextMenu({
             { id: "harmonic" as const, label: "Harmonic View [H]" },
             { id: "piano" as const, label: "Piano View [P]" },
             { id: "staff" as const, label: "Staff View [S]" },
+            { id: "guitar" as const, label: "Guitar View [G]" },
           ].map((item) => {
             const isActive = item.id === globalView;
             return (

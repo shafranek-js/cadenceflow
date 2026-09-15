@@ -3,6 +3,7 @@ import { formatChordSymbol } from "../../domain/harmony/chord";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import type { ChordCardViewModel } from "./views/types";
 import { PianoCardView } from "../piano/PianoCardView";
+import { GuitarCardView } from "../guitar/GuitarCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { CustomizedIndicator } from "./CustomizedIndicator";
 import { Icon } from "../common/Icon";
@@ -152,6 +153,9 @@ export function ChordCard({
           )}
           {view === "piano" && (
             <PianoCardView chordPitches={model.pianoPitches} chordLabel={chordLabel} />
+          )}
+          {view === "guitar" && (
+            <GuitarCardView chord={model.chord} chordLabel={chordLabel} />
           )}
         </button>
       )}

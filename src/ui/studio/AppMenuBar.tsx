@@ -8,6 +8,7 @@ const CARD_VIEWS: readonly { id: CardViewId; label: string }[] = [
   { id: "harmonic", label: "Harmonic" },
   { id: "piano", label: "Piano" },
   { id: "staff", label: "Staff" },
+  { id: "guitar", label: "Guitar" },
 ];
 
 export interface AppMenuBarProps {

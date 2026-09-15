@@ -4,7 +4,7 @@ import type { ExactPitch, PitchSpelling } from "../harmony/pitch";
 import type { MusicalDuration } from "../timing/duration";
 import type { ChordMelodyRecipe, MelodyInstrument } from "../melody/types";
 
-export type CardViewId = "harmonic" | "piano" | "staff";
+export type CardViewId = "harmonic" | "piano" | "staff" | "guitar";
 export type PianoArticulation = "block" | "arp-up" | "arp-down" | "broken-chord" | "humanized";
 export type RegisterOffset = "auto" | -2 | -1 | 0 | 1 | 2;
 export type DynamicsViewPreference = "musical" | "midi";

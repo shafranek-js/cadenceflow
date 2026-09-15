@@ -53,6 +53,17 @@ export function ViewModeToggle({
       >
         S
       </button>
+      <button
+        type="button"
+        className={`view-mode-btn ${currentView === "guitar" ? "is-active" : ""}`}
+        onClick={() => onChangeView("guitar")}
+        title="Guitar View [G]"
+        aria-label="Guitar View"
+        aria-pressed={currentView === "guitar"}
+        data-testid={`${testIdPrefix}-btn-guitar`}
+      >
+        G
+      </button>
       <select
         className="view-mode-hidden-select"
         aria-label={selectAriaLabel}
@@ -65,6 +76,7 @@ export function ViewModeToggle({
         <option value="harmonic">Harmonic</option>
         <option value="piano">Piano</option>
         <option value="staff">Staff</option>
+        <option value="guitar">Guitar</option>
       </select>
     </div>
   );

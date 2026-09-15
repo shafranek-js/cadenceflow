@@ -8,6 +8,7 @@ import type { KeyboardEvent, MouseEvent } from "react";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { formatMusicalDuration } from "../../domain/timing/duration";
 import { PianoCardView } from "../piano/PianoCardView";
+import { GuitarCardView } from "../guitar/GuitarCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { Icon } from "../common/Icon";
@@ -184,6 +185,9 @@ export function ProgressionStepCard({
             ) : null}
             {view === "piano" ? (
               <PianoCardView chordPitches={pianoPitches} chordLabel={chordLabel} />
+            ) : null}
+            {view === "guitar" ? (
+              <GuitarCardView chord={baseChord} chordLabel={chordLabel} />
             ) : null}
             {view === "staff" ? (
               <span className="compact-staff-label">

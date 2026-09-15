@@ -18,7 +18,7 @@ import {
 
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
-export type ProgressionView = "harmonic" | "piano" | "staff";
+export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar";
 export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4;
 
 export interface PresentationState {
