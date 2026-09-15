@@ -346,13 +346,128 @@ export function computeScalePitches(
 /**
  * Derives the 7 diatonic triads and 7th chords for a 7-note scale.
  */
+interface CustomScaleChordSpec {
+  readonly degree: number;
+  readonly romanNumeral: string;
+  readonly quality: BaseChordQuality;
+  readonly seventh?: HarmonicVariant["seventh"];
+  readonly isCharacteristic?: boolean;
+}
+
+const CUSTOM_SCALE_CHORD_SPECS: Record<
+  "major-pentatonic" | "minor-pentatonic" | "blues",
+  readonly CustomScaleChordSpec[]
+> = {
+  "major-pentatonic": [
+    { degree: 1, romanNumeral: "Imaj⁷", quality: "major", seventh: "major7" },
+    { degree: 2, romanNumeral: "ii⁷", quality: "minor", seventh: "minor7" },
+    { degree: 3, romanNumeral: "iii⁷", quality: "minor", seventh: "minor7" },
+    { degree: 4, romanNumeral: "V⁷", quality: "dominant" },
+    { degree: 5, romanNumeral: "vi⁷", quality: "minor", seventh: "minor7" },
+  ],
+  "minor-pentatonic": [
+    { degree: 1, romanNumeral: "i⁷", quality: "minor", seventh: "minor7" },
+    { degree: 2, romanNumeral: "♭IIImaj⁷", quality: "major", seventh: "major7" },
+    { degree: 3, romanNumeral: "iv⁷", quality: "minor", seventh: "minor7" },
+    { degree: 4, romanNumeral: "v⁷", quality: "minor", seventh: "minor7" },
+    { degree: 5, romanNumeral: "♭VII⁷", quality: "dominant" },
+  ],
+  blues: [
+    { degree: 1, romanNumeral: "I⁷", quality: "dominant" },
+    { degree: 2, romanNumeral: "♭III⁷", quality: "dominant" },
+    { degree: 3, romanNumeral: "IV⁷", quality: "dominant" },
+    { degree: 4, romanNumeral: "♭v°⁷", quality: "diminished", seventh: "diminished7", isCharacteristic: true },
+    { degree: 5, romanNumeral: "V⁷", quality: "dominant" },
+    { degree: 6, romanNumeral: "♭VII⁷", quality: "dominant" },
+  ],
+};
+
+/**
+ * Computes diatonic or characteristic chords for any of the 12 scales.
+ */
 export function computeModalChords(
   tonic: PitchClassIdentity,
   scaleId: ExtendedScaleId,
 ): readonly ModalChordDefinition[] {
+  if (scaleId in CUSTOM_SCALE_CHORD_SPECS) {
+    const specs = CUSTOM_SCALE_CHORD_SPECS[scaleId as keyof typeof CUSTOM_SCALE_CHORD_SPECS];
+    const scalePitches = computeScalePitches(tonic, scaleId);
+
+    return Object.freeze(
+      specs.map((spec) => {
+        const rootPitch = scalePitches[spec.degree - 1]!;
+        const rootPc = rootPitch.pitchClass;
+        const rootSpelling = rootPitch.spelling;
+        const quality = spec.quality;
+        const seventhVariant = spec.seventh;
+
+        const thirdInterval = quality === "minor" || quality === "diminished" ? 3 : 4;
+        const fifthInterval = quality === "diminished" ? 6 : quality === "augmented" ? 8 : 7;
+        const seventhInterval =
+          seventhVariant === "major7"
+            ? 11
+            : seventhVariant === "minor7" || quality === "dominant"
+              ? 10
+              : seventhVariant === "diminished7"
+                ? 9
+                : undefined;
+
+        const rootName = formatPitchSpelling(rootSpelling);
+        let chordSymbol = rootName;
+        if (quality === "minor") chordSymbol += seventhVariant === "minor7" ? "m7" : "m";
+        else if (quality === "diminished") chordSymbol += seventhVariant === "diminished7" ? "°7" : "°";
+        else if (quality === "dominant") chordSymbol += "7";
+        else if (quality === "major") chordSymbol += seventhVariant === "major7" ? "maj7" : "";
+        else if (quality === "augmented") chordSymbol += "aug";
+
+        const variant: HarmonicVariant = Object.freeze({
+          ...(seventhVariant ? { seventh: seventhVariant } : {}),
+          extensions: Object.freeze([]),
+          suspensions: Object.freeze([]),
+          alterations: Object.freeze([]),
+        });
+
+        const functionIdentity: HarmonicFunctionIdentity = Object.freeze({
+          moduleId: "progressions",
+          functionId: `mode-${scaleId}-${spec.degree}`,
+          category: "core",
+        });
+
+        const chord: ChordDefinition = Object.freeze({
+          harmonicFunction: functionIdentity,
+          rootPitchClass: rootPc,
+          baseQuality: quality,
+          variant,
+          spelling: Object.freeze({
+            root: rootSpelling,
+            symbol: chordSymbol,
+          }),
+        });
+
+        const baseMidi = 48 + rootPc;
+        const pitches: ExactPitch[] = [
+          exactPitch(baseMidi, rootSpelling),
+          exactPitch(baseMidi + thirdInterval, spellTonicRoot(normalizePitchClass(rootPc + thirdInterval))),
+          exactPitch(baseMidi + fifthInterval, spellTonicRoot(normalizePitchClass(rootPc + fifthInterval))),
+          ...(seventhInterval !== undefined
+            ? [exactPitch(baseMidi + seventhInterval, spellTonicRoot(normalizePitchClass(rootPc + seventhInterval)))]
+            : []),
+        ];
+
+        return Object.freeze({
+          degree: spec.degree,
+          romanNumeral: spec.romanNumeral,
+          chordSymbol,
+          chord,
+          isCharacteristicChord: Boolean(spec.isCharacteristic),
+          pitches: Object.freeze(pitches),
+        });
+      }),
+    );
+  }
+
   const scale = getScaleDefinition(scaleId);
   if (scale.intervals.length !== 7) {
-    // For non-7 note scales, return chords derived from root tonic
     return Object.freeze([]);
   }
 

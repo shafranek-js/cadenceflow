@@ -347,7 +347,11 @@ export function ModesExplorerModal({
               <section className="modes-chords-section" aria-label="Modal Diatonic Chords">
                 <div className="modes-chords-header">
                   <div className="chords-title-group">
-                    <h4>Диатонические аккорды лада</h4>
+                    <h4>
+                      {activeFamily === "pentatonic-blues"
+                        ? "Характерные аккорды строя"
+                        : "Диатонические аккорды лада"}
+                    </h4>
                     <span className="chords-subtitle">
                       Кликните на карточку для аудио-прослушивания
                     </span>

@@ -133,5 +133,47 @@ describe("Modes Domain Modeling", () => {
     expect(deg7.parentTonic).toBe(0);
     expect(deg7.functionId).toBe("I"); // C is I in C
   });
+
+  it("derives accurate chords for F Blues scale including blue note passing diminished chord", () => {
+    // F is pitch class 5
+    const chords = computeModalChords(5, "blues");
+    expect(chords).toHaveLength(6);
+
+    // Degree 1: I7 (F7)
+    expect(chords[0]?.degree).toBe(1);
+    expect(chords[0]?.romanNumeral).toBe("I⁷");
+    expect(chords[0]?.chordSymbol).toBe("F7");
+    expect(chords[0]?.chord.baseQuality).toBe("dominant");
+
+    // Degree 3: IV7 (Bb7)
+    expect(chords[2]?.degree).toBe(3);
+    expect(chords[2]?.romanNumeral).toBe("IV⁷");
+    expect(chords[2]?.chordSymbol).toBe("Bb7");
+    expect(chords[2]?.chord.baseQuality).toBe("dominant");
+
+    // Degree 4: ♭v°7 (B°7) - Blue note passing diminished!
+    expect(chords[3]?.degree).toBe(4);
+    expect(chords[3]?.romanNumeral).toBe("♭v°⁷");
+    expect(chords[3]?.chordSymbol).toBe("B°7");
+    expect(chords[3]?.chord.baseQuality).toBe("diminished");
+    expect(chords[3]?.isCharacteristicChord).toBe(true);
+
+    // Degree 5: V7 (C7)
+    expect(chords[4]?.degree).toBe(5);
+    expect(chords[4]?.romanNumeral).toBe("V⁷");
+    expect(chords[4]?.chordSymbol).toBe("C7");
+    expect(chords[4]?.chord.baseQuality).toBe("dominant");
+  });
+
+  it("derives accurate chords for C Major Pentatonic", () => {
+    // C is pitch class 0
+    const chords = computeModalChords(0, "major-pentatonic");
+    expect(chords).toHaveLength(5);
+    expect(chords[0]?.chordSymbol).toBe("Cmaj7");
+    expect(chords[1]?.chordSymbol).toBe("Dm7");
+    expect(chords[2]?.chordSymbol).toBe("Em7");
+    expect(chords[3]?.chordSymbol).toBe("G7");
+    expect(chords[4]?.chordSymbol).toBe("Am7");
+  });
 });
 
