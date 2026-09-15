@@ -6042,8 +6042,8 @@ summary:focus-visible,
 }
 
 .modes-explorer-modal {
-  width: min(1280px, 96vw);
-  max-height: 92vh;
+  width: min(1380px, 96vw);
+  max-height: 94vh;
   display: flex;
   flex-direction: column;
   background: #0f172a;
@@ -6097,8 +6097,9 @@ summary:focus-visible,
 }
 
 .modes-tonic-section {
-  padding: 10px 20px 6px;
+  padding: 10px 18px 8px;
   background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .modes-section-label {
@@ -6142,7 +6143,7 @@ summary:focus-visible,
 }
 
 .modes-family-section {
-  padding: 8px 20px 10px;
+  padding: 8px 18px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -6391,8 +6392,8 @@ summary:focus-visible,
 }
 
 .modes-chords-section {
-  padding: 10px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 18px 16px;
+  border-bottom: none;
 }
 
 .modes-chords-header {
@@ -6508,7 +6509,7 @@ summary:focus-visible,
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(420px, 1fr);
   overflow: hidden;
 }
 
@@ -6528,7 +6529,7 @@ summary:focus-visible,
 
 .modes-content-right {
   border-left: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.5);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -6542,9 +6543,9 @@ summary:focus-visible,
   }
 }
 
-/* Formulas Section in Right Column */
+/* Formulas Section in Right Column (Full Vertical Height) */
 .modes-formulas-section {
-  padding: 12px 16px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -6556,18 +6557,20 @@ summary:focus-visible,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   flex-shrink: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .formulas-title {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: #f8fafc;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .formulas-icon {

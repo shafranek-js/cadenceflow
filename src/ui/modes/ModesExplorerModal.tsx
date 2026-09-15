@@ -183,100 +183,100 @@ export function ModesExplorerModal({
           </button>
         </div>
 
-        {/* 2D State Machine: Axis 1 (Tonic) */}
-        <section className="modes-tonic-section" aria-label="Tonic Root Selection">
-          <div className="modes-section-label">
-            <span>1. TONIC ROOT (Горизонтальный слайдер тоники)</span>
-          </div>
-          <div className="modes-tonic-pills" role="radiogroup" aria-label="Tonic pitch class">
-            {TONIC_PITCH_CLASSES.map((item) => {
-              const isSelected = item.pc === selectedTonic;
-              return (
-                <button
-                  key={item.pc}
-                  type="button"
-                  className={`modes-tonic-pill ${isSelected ? "is-active" : ""}`}
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => setSelectedTonic(item.pc)}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 2D State Machine: Axis 2 (Family & Mode Selector) */}
-        <section className="modes-family-section" aria-label="Mode Family Selection">
-          <div className="modes-section-label">
-            <span>2. SCALE FAMILY & MODE (Вертикальный слайдер лада)</span>
-          </div>
-          <div className="modes-family-tabs" role="tablist">
-            <button
-              type="button"
-              className={`modes-tab-btn ${activeFamily === "diatonic" ? "is-active" : ""}`}
-              role="tab"
-              aria-selected={activeFamily === "diatonic"}
-              onClick={() => {
-                setActiveFamily("diatonic");
-                setSelectedScaleId("dorian");
-              }}
-            >
-              7 Diatonic Church Modes
-            </button>
-            <button
-              type="button"
-              className={`modes-tab-btn ${activeFamily === "minor-variants" ? "is-active" : ""}`}
-              role="tab"
-              aria-selected={activeFamily === "minor-variants"}
-              onClick={() => {
-                setActiveFamily("minor-variants");
-                setSelectedScaleId("harmonic-minor");
-              }}
-            >
-              Minor Variants (Harmonic & Melodic)
-            </button>
-            <button
-              type="button"
-              className={`modes-tab-btn ${activeFamily === "pentatonic-blues" ? "is-active" : ""}`}
-              role="tab"
-              aria-selected={activeFamily === "pentatonic-blues"}
-              onClick={() => {
-                setActiveFamily("pentatonic-blues");
-                setSelectedScaleId("blues");
-              }}
-            >
-              Pentatonic & Blues
-            </button>
-          </div>
-
-          <div className="modes-pills" role="radiogroup" aria-label="Select scale">
-            {filteredScales.map((scale) => {
-              const isSelected = scale.id === selectedScaleId;
-              return (
-                <button
-                  key={scale.id}
-                  type="button"
-                  className={`modes-scale-pill ${isSelected ? "is-active" : ""}`}
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => setSelectedScaleId(scale.id)}
-                >
-                  <span className="pill-name">{scale.name}</span>
-                  {scale.characteristicInterval && (
-                    <span className="pill-characteristic">{scale.characteristicInterval}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         {/* Modal 2-Column Split Body */}
         <div className="modes-content-body">
-          {/* Left Column: Scale details & Diatonic chords */}
+          {/* Left Column: Scale controls, details & Diatonic chords */}
           <div className="modes-content-left">
+            {/* 2D State Machine: Axis 1 (Tonic) */}
+            <section className="modes-tonic-section" aria-label="Tonic Root Selection">
+              <div className="modes-section-label">
+                <span>1. TONIC ROOT (Горизонтальный слайдер тоники)</span>
+              </div>
+              <div className="modes-tonic-pills" role="radiogroup" aria-label="Tonic pitch class">
+                {TONIC_PITCH_CLASSES.map((item) => {
+                  const isSelected = item.pc === selectedTonic;
+                  return (
+                    <button
+                      key={item.pc}
+                      type="button"
+                      className={`modes-tonic-pill ${isSelected ? "is-active" : ""}`}
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setSelectedTonic(item.pc)}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* 2D State Machine: Axis 2 (Family & Mode Selector) */}
+            <section className="modes-family-section" aria-label="Mode Family Selection">
+              <div className="modes-section-label">
+                <span>2. SCALE FAMILY & MODE (Вертикальный слайдер лада)</span>
+              </div>
+              <div className="modes-family-tabs" role="tablist">
+                <button
+                  type="button"
+                  className={`modes-tab-btn ${activeFamily === "diatonic" ? "is-active" : ""}`}
+                  role="tab"
+                  aria-selected={activeFamily === "diatonic"}
+                  onClick={() => {
+                    setActiveFamily("diatonic");
+                    setSelectedScaleId("dorian");
+                  }}
+                >
+                  7 Diatonic Church Modes
+                </button>
+                <button
+                  type="button"
+                  className={`modes-tab-btn ${activeFamily === "minor-variants" ? "is-active" : ""}`}
+                  role="tab"
+                  aria-selected={activeFamily === "minor-variants"}
+                  onClick={() => {
+                    setActiveFamily("minor-variants");
+                    setSelectedScaleId("harmonic-minor");
+                  }}
+                >
+                  Minor Variants (Harmonic & Melodic)
+                </button>
+                <button
+                  type="button"
+                  className={`modes-tab-btn ${activeFamily === "pentatonic-blues" ? "is-active" : ""}`}
+                  role="tab"
+                  aria-selected={activeFamily === "pentatonic-blues"}
+                  onClick={() => {
+                    setActiveFamily("pentatonic-blues");
+                    setSelectedScaleId("blues");
+                  }}
+                >
+                  Pentatonic & Blues
+                </button>
+              </div>
+
+              <div className="modes-pills" role="radiogroup" aria-label="Select scale">
+                {filteredScales.map((scale) => {
+                  const isSelected = scale.id === selectedScaleId;
+                  return (
+                    <button
+                      key={scale.id}
+                      type="button"
+                      className={`modes-scale-pill ${isSelected ? "is-active" : ""}`}
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setSelectedScaleId(scale.id)}
+                    >
+                      <span className="pill-name">{scale.name}</span>
+                      {scale.characteristicInterval && (
+                        <span className="pill-characteristic">{scale.characteristicInterval}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Scale Details & Characteristic Banner */}
             <section className="modes-details-banner" aria-label="Scale Characteristics">
               <div className="modes-banner-main">
