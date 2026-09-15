@@ -5,6 +5,7 @@ import type {
   Project,
   ThemeMode,
 } from "../../domain/project/project";
+import type { GenreFocusId } from "../../domain/harmony/functionSemantics";
 import type { AppliedCommand, ProjectCommand } from ".";
 
 export interface SetThemePayload {
@@ -213,4 +214,35 @@ export function setResolutionArrows(
     },
   };
 }
+
+export interface SetGenreFocusPayload {
+  readonly genre: GenreFocusId;
+  readonly nowIso: string;
+}
+
+export type SetGenreFocusCommand = ProjectCommand<SetGenreFocusPayload> & {
+  readonly type: "presentation/set-genre-focus";
+};
+
+export function setGenreFocus(
+  project: Project,
+  command: SetGenreFocusCommand,
+): AppliedCommand {
+  const previous = project.presentation.genreFocus ?? "all";
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        genreFocus: command.payload.genre,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-genre-focus",
+      payload: { genre: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
 

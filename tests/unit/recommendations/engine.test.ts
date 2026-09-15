@@ -72,4 +72,29 @@ describe("Recommendation engine", () => {
       expect.objectContaining({ code: "modal-corridor-return" }),
     );
   });
+
+  it("boosts recommendations matching active genreFocus with genre-affinity", () => {
+    const defaultResult = recommend({
+      moduleId: "progressions",
+      currentFunctionId: "I",
+      recentFunctionIds: ["I"],
+      visibleFunctionIds: visible,
+      genreFocus: "all",
+    });
+    const defaultBIII = defaultResult.alternatives.find((c) => c.functionId === "bIII");
+    expect(defaultBIII?.score).toBe(72);
+
+    const cinematicResult = recommend({
+      moduleId: "progressions",
+      currentFunctionId: "I",
+      recentFunctionIds: ["I"],
+      visibleFunctionIds: visible,
+      genreFocus: "cinematic",
+    });
+    const cinematicBIII = cinematicResult.alternatives.find((c) => c.functionId === "bIII");
+    expect(cinematicBIII?.score).toBe(84);
+    expect(cinematicBIII?.factors).toContainEqual(
+      expect.objectContaining({ code: "genre-affinity", contribution: 12 }),
+    );
+  });
 });

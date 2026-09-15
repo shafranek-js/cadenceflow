@@ -18,6 +18,8 @@ export function ChordCard({
   suzukiColors = false,
   resolutionTargetSymbol,
   isResolutionTarget,
+  isGenreFocused = false,
+  isGenreDimmed = false,
   style,
   onMouseEnter,
   onMouseLeave,
@@ -35,6 +37,8 @@ export function ChordCard({
   readonly suzukiColors?: boolean;
   readonly resolutionTargetSymbol?: string | undefined;
   readonly isResolutionTarget?: boolean | undefined;
+  readonly isGenreFocused?: boolean | undefined;
+  readonly isGenreDimmed?: boolean | undefined;
   readonly style?: React.CSSProperties | undefined;
   readonly onMouseEnter?: (() => void) | undefined;
   readonly onMouseLeave?: (() => void) | undefined;
@@ -67,13 +71,15 @@ export function ChordCard({
 
   return (
     <article
-      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""}`.trim()}
+      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""} ${isGenreFocused ? "is-genre-focus" : ""} ${isGenreDimmed ? "is-genre-dimmed" : ""}`.trim()}
       style={style}
       title={cardTooltip}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
       data-recommendation={model.recommendationStatus}
       data-customized={customizedCount > 0 ? customizedCount : undefined}
       data-resolution-target={isResolutionTarget ? "true" : undefined}
+      data-genre-focus={isGenreFocused ? "true" : undefined}
+      data-genre-dimmed={isGenreDimmed ? "true" : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >

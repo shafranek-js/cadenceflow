@@ -9,6 +9,7 @@ import type { GlobalTiming } from "../timing/meter";
 import type { GrooveSettings } from "../timing/swing";
 import type { MelodyTrackSettings } from "../melody/types";
 import type { HarmonyTrackSettings } from "../harmony/track";
+import type { GenreFocusId } from "../harmony/functionSemantics";
 import {
   countStepCreationOverrides,
   type ProjectDefaults,
@@ -34,6 +35,8 @@ export interface PresentationState {
   readonly suzukiColors?: boolean;
   /** Whether the Harmonic Matrix displays resolution tendency arrows and targets. */
   readonly resolutionArrows?: boolean;
+  /** Active musical genre focus filtering and highlighting the matrix. */
+  readonly genreFocus?: GenreFocusId;
 }
 
 export interface MatrixCardTemplateState {

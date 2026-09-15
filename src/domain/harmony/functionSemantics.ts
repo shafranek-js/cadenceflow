@@ -156,7 +156,7 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
     title: "Низкая секста (заимствование из параллельного минора)",
     description: "Драматический аккорд параллельного минора, создающий мощный хроматический контраст перед V или I.",
     emotionalColor: "Драматическая глубина, тайна (Dramatic grandeur)",
-    styleHints: Object.freeze(["Film Score", "Neo-Soul", "Dark Pop", "Synthwave"]),
+    styleHints: Object.freeze(["Cinematic", "Film Score", "Neo-Soul", "Dark Pop", "Synthwave"]),
     rule: "Modal Color (≈): Вход из I, IV, V; выход обратно в I, IV, V",
     tendencyType: "modal-color",
   }),
@@ -165,7 +165,7 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
     title: "Минорная субдоминанта (ностальгический окрас)",
     description: "Золотой стандарт романтической меланхолии и разрешения в тонику (цепочка IV – iv – I).",
     emotionalColor: "Ностальгия, щемящая грусть (Bitter-sweet nostalgia)",
-    styleHints: Object.freeze(["Beatles-style", "Lo-Fi Hip-Hop", "Indie Pop", "Ballad"]),
+    styleHints: Object.freeze(["Beatles-style", "Lo-Fi Hip-Hop", "Indie Pop", "Ballad", "Gospel"]),
     rule: "Modal Color (≈): Вход из I, IV, V; выход обратно в I, IV, V",
     tendencyType: "modal-color",
   }),
@@ -235,4 +235,83 @@ function createFallbackSemantics(functionId: string): HarmonicFunctionSemantics 
 export function getFunctionSemantics(functionId: string): HarmonicFunctionSemantics {
   const normalized = functionId === "V7/I" ? "V7" : functionId;
   return FUNCTION_SEMANTICS[normalized] ?? createFallbackSemantics(functionId);
+}
+
+export type GenreFocusId =
+  | "all"
+  | "neo-soul"
+  | "jazz"
+  | "gospel"
+  | "pop-ballad"
+  | "cinematic"
+  | "rock";
+
+export interface GenreFocusOption {
+  readonly id: GenreFocusId;
+  readonly label: string;
+  readonly tags: readonly string[];
+  readonly description: string;
+}
+
+export const GENRE_FOCUS_OPTIONS: readonly GenreFocusOption[] = Object.freeze([
+  {
+    id: "all",
+    label: "All Styles",
+    tags: Object.freeze([]),
+    description: "Full harmonic matrix without genre filtering",
+  },
+  {
+    id: "neo-soul",
+    label: "Neo-Soul",
+    tags: Object.freeze(["Neo-Soul", "R&B", "Soul", "Lo-Fi", "Bossa Nova"]),
+    description: "Rich extensions, secondary dominants (V7/ii, V7/vi), and warm minor substitutions",
+  },
+  {
+    id: "jazz",
+    label: "Jazz",
+    tags: Object.freeze(["Jazz", "Jazz Standard", "Bossa Nova", "Lo-Fi"]),
+    description: "Dominant turnarounds (ii-V-I), secondary dominants, and chromatic tension",
+  },
+  {
+    id: "gospel",
+    label: "Gospel",
+    tags: Object.freeze(["Gospel", "Soul", "Blues"]),
+    description: "Bright subdominant lifts (V7/IV -> IV), minor plagal (iv -> I), and blues drive",
+  },
+  {
+    id: "pop-ballad",
+    label: "Pop / Ballad",
+    tags: Object.freeze(["Pop", "Pop Ballad", "Pop Standard", "Country", "Folk"]),
+    description: "Emotional diatonic cores (I-V-vi-IV), warm deceptive resolutions, and acoustic balance",
+  },
+  {
+    id: "cinematic",
+    label: "Cinematic",
+    tags: Object.freeze(["Cinematic", "Film Noir", "Romantic Classical", "Epic Pop", "Classical"]),
+    description: "Epic modal interchange (bIII, bVI), Neapolitan color (N6), and diminished drama",
+  },
+  {
+    id: "rock",
+    label: "Rock",
+    tags: Object.freeze(["Rock", "Classic Rock", "Alternative Rock", "Metal", "Post-Rock", "Synthwave"]),
+    description: "Powerful borrowed modal chords (bVII, bVI, bIII), double dominant (V7/V), and minor roots",
+  },
+]);
+
+/**
+ * Checks whether a given harmonic function aligns with a selected musical style focus.
+ */
+export function isFunctionRelevantToGenre(functionId: string, genre: GenreFocusId): boolean {
+  if (genre === "all") return true;
+  const option = GENRE_FOCUS_OPTIONS.find((opt) => opt.id === genre);
+  if (!option || option.tags.length === 0) return true;
+
+  const semantics = getFunctionSemantics(functionId);
+  return semantics.styleHints.some((hint) => {
+    const lowerHint = hint.toLowerCase();
+    return option.tags.some((tag) => {
+      const lowerTag = tag.toLowerCase();
+      return lowerHint.includes(lowerTag) || lowerTag.includes(lowerHint);
+    });
+  });
 }

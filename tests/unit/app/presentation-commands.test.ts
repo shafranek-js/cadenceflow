@@ -6,11 +6,13 @@ import {
   setStaffBassVisibility,
   setSuzukiColors,
   setResolutionArrows,
+  setGenreFocus,
   setTheme,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetSuzukiColorsCommand,
   type SetResolutionArrowsCommand,
+  type SetGenreFocusCommand,
   type SetThemeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
@@ -131,6 +133,28 @@ describe("US10 presentation commands", () => {
     const inverseResult = setResolutionArrows(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
     expect(undone.presentation.resolutionArrows).toBe(true);
+  });
+
+  it("changes genreFocus presentation and supports undo/redo and inverse", () => {
+    const initial = createDefaultProject("presentation-genre", "Presentation Genre");
+    const store = new AppStore(initial);
+    const command: SetGenreFocusCommand = {
+      type: "presentation/set-genre-focus",
+      payload: { genre: "neo-soul", nowIso },
+    };
+
+    store.dispatch(command, setGenreFocus);
+    expect(store.project.presentation.genreFocus).toBe("neo-soul");
+    expect(store.history.undoDepth).toBe(1);
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.genreFocus).toBe("all");
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.genreFocus).toBe("neo-soul");
+
+    const inverseResult = setGenreFocus(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.genreFocus).toBe("all");
   });
 
   it("provides three distinct explanation representations without changing recommendation data", () => {

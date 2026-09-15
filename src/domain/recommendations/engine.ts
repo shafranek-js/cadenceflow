@@ -2,6 +2,10 @@ import type { HarmonicModuleId } from "../harmony/functions";
 import { rulesForModule, secondaryDiminishedTarget, secondaryDominantTarget } from "./scoring";
 import type { CompositionIntent } from "../progression/branch";
 import { intentAdjustment } from "./intents";
+import {
+  type GenreFocusId,
+  isFunctionRelevantToGenre,
+} from "../harmony/functionSemantics";
 
 export interface RecommendationFactor {
   readonly code: string;
@@ -28,6 +32,7 @@ export interface RecommendationContext {
   readonly visibleFunctionIds: readonly string[];
   readonly variantEvidence?: Readonly<Record<string, number>>;
   readonly compositionIntent?: CompositionIntent;
+  readonly genreFocus?: GenreFocusId;
 }
 
 const MIN_STRONG_SCORE = 68;
@@ -145,6 +150,12 @@ export function recommend(context: RecommendationContext): RecommendationResult 
         score += intent.amount;
         factors.push({ code: intent.code, contribution: intent.amount, source: "intent" });
       }
+      if (context.genreFocus && context.genreFocus !== "all") {
+        if (isFunctionRelevantToGenre(id, context.genreFocus)) {
+          score += 12;
+          factors.push({ code: "genre-affinity", contribution: 12, source: "intent" });
+        }
+      }
       return {
         functionId: id,
         score,
@@ -163,6 +174,7 @@ export function recommend(context: RecommendationContext): RecommendationResult 
       context.recentFunctionIds,
       context.variantEvidence ?? {},
       context.compositionIntent ?? "neutral",
+      context.genreFocus ?? "all",
     ]),
     bestMatch,
     alternatives: Object.freeze(alternatives),

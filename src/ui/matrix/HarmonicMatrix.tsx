@@ -18,6 +18,8 @@ import { MatrixResolutionArrows } from "./MatrixResolutionArrows";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
 import { ViewModeToggle } from "../common/ViewModeToggle";
+import { GenreFocusSelector } from "./GenreFocusSelector";
+import { isFunctionRelevantToGenre, type GenreFocusId } from "../../domain/harmony/functionSemantics";
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 
@@ -41,6 +43,7 @@ export function HarmonicMatrix({
   onStaffOctaveChange,
   onClearSelection,
   onOpenMatrixMenu,
+  onGenreFocusChange,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -58,6 +61,7 @@ export function HarmonicMatrix({
   readonly onStaffOctaveChange: (functionId: string, direction: StaffOctaveDirection) => void;
   readonly onClearSelection?: () => void;
   readonly onOpenMatrixMenu?: (anchor: HTMLElement, position: { x: number; y: number }) => void;
+  readonly onGenreFocusChange?: (genre: GenreFocusId) => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -113,6 +117,11 @@ export function HarmonicMatrix({
         })()
       : undefined;
 
+    const activeGenre = project.presentation.genreFocus ?? "all";
+    const isGenreFocused =
+      activeGenre !== "all" && isFunctionRelevantToGenre(identity.functionId, activeGenre);
+    const isGenreDimmed = activeGenre !== "all" && !isGenreFocused;
+
     return (
       <ChordCard
         key={cardKey(identity)}
@@ -146,6 +155,8 @@ export function HarmonicMatrix({
         customizedCount={matrixCardOverrideCount(template)}
         resolutionTargetSymbol={cardResolutionTargetSymbol}
         isResolutionTarget={Boolean(targetFunctionId && identity.functionId === targetFunctionId)}
+        isGenreFocused={isGenreFocused}
+        isGenreDimmed={isGenreDimmed}
         onMouseEnter={() => setHoveredFunctionId(identity.functionId)}
         onMouseLeave={() => setHoveredFunctionId((curr) => (curr === identity.functionId ? null : curr))}
         onClickResolutionTarget={
@@ -217,6 +228,10 @@ export function HarmonicMatrix({
           tonic={project.tonic}
           mode={modeForModule(project.activeModule)}
           onChange={onTonicChange}
+        />
+        <GenreFocusSelector
+          value={project.presentation.genreFocus ?? "all"}
+          onChange={onGenreFocusChange ?? (() => {})}
         />
         <div className="matrix-toolbar-actions">
           <ViewModeToggle

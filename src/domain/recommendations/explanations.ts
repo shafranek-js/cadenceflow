@@ -12,6 +12,7 @@ const BEGINNER: Readonly<Record<string, string>> = {
   "modal-corridor-return": "Smooth return from modal coloration back to the primary key.",
   "secondary-diminished-resolution": "This diminished chord creates intense pull directly into its target.",
   "approach-via-secondary-diminished": "Uses a dramatic diminished approach toward a key harmony.",
+  "genre-affinity": "Aligns naturally with the selected musical style.",
 };
 
 export interface RecommendationExplanation {

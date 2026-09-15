@@ -51,6 +51,7 @@ export function createDefaultProject(
       showBassInStaff: false,
       suzukiColors: false,
       resolutionArrows: true,
+      genreFocus: "all",
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,

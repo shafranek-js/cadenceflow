@@ -453,3 +453,81 @@
   }
 }
 
+/* --- Genre Focus & Style Quick-Filters (Phase 3) --- */
+
+.genre-focus-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+.genre-focus-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.genre-focus-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.genre-focus-pill {
+  appearance: none;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.04));
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.genre-focus-pill:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.genre-focus-pill.is-active {
+  background: var(--primary, #38bdf8);
+  color: #0f172a;
+  border-color: var(--primary, #38bdf8);
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+}
+
+/* Card state for genre-focused cards */
+.chord-card.is-genre-focus {
+  outline: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+  transition: box-shadow 0.2s ease, outline-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Dimmed non-focused cards when a genre filter is active */
+.chord-card.is-genre-dimmed {
+  opacity: 0.45;
+  filter: grayscale(40%);
+  transition: opacity 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chord-card.is-genre-dimmed:hover,
+.chord-card.is-genre-dimmed.is-selected,
+.chord-card.is-genre-dimmed:focus-within {
+  opacity: 0.95;
+  filter: grayscale(0%);
+}
+
+

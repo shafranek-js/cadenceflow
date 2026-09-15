@@ -216,6 +216,7 @@ import {
   setMeasuresPerSystem,
   setSuzukiColors,
   setResolutionArrows,
+  setGenreFocus,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
@@ -223,7 +224,9 @@ import {
   type SetMeasuresPerSystemCommand,
   type SetSuzukiColorsCommand,
   type SetResolutionArrowsCommand,
+  type SetGenreFocusCommand,
 } from "./commands/presentationCommands";
+import type { GenreFocusId } from "../domain/harmony/functionSemantics";
 import type {
   MeasuresPerSystem,
   PresentationMode,
@@ -692,6 +695,7 @@ export function App() {
         recentFunctionIds: recommendationHistory,
         visibleFunctionIds: vocabulary.map((identity) => identity.functionId),
         compositionIntent: project.temporaryBranch?.compositionIntent ?? "neutral",
+        genreFocus: project.presentation.genreFocus ?? "all",
       })
     : null;
 
@@ -1805,6 +1809,14 @@ export function App() {
     };
     store.dispatch(command, setResolutionArrows);
   };
+  const changeGenreFocus = (genre: GenreFocusId) => {
+    if (genre === (project.presentation.genreFocus ?? "all")) return;
+    const command: SetGenreFocusCommand = {
+      type: "presentation/set-genre-focus",
+      payload: { genre, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setGenreFocus);
+  };
   const applyModuleSwitch = (
     destinationModule: HarmonicModuleId,
     resolutions: Readonly<Record<string, HarmonicFunctionIdentity | "keep-original">>,
@@ -2480,6 +2492,7 @@ export function App() {
           onStaffOctaveChange={changeMatrixStaffOctave}
           onClearSelection={clearMatrixSelection}
           onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
+          onGenreFocusChange={changeGenreFocus}
         />
       }
       inspector={

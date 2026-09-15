@@ -22,6 +22,7 @@ import { snapshotStepPerformance } from "../domain/progression/step";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicVariant } from "../domain/harmony/chord";
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
+import type { GenreFocusId } from "../domain/harmony/functionSemantics";
 import type { CompositionIntent, TemporaryBranch } from "../domain/progression/branch";
 import {
   snapshotChordMelodyRecipe,
@@ -461,6 +462,7 @@ export function encodePortableProject(project: Project): string {
       showBassInStaff: project.presentation.showBassInStaff,
       suzukiColors: project.presentation.suzukiColors === true,
       resolutionArrows: project.presentation.resolutionArrows !== false,
+      genreFocus: project.presentation.genreFocus ?? "all",
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
@@ -703,6 +705,10 @@ export function decodePortableProject(jsonString: string): Project {
         showBassInStaff: presentation["showBassInStaff"] === true,
         suzukiColors: presentation["suzukiColors"] === true,
         resolutionArrows: presentation["resolutionArrows"] !== false,
+        genreFocus:
+          typeof presentation["genreFocus"] === "string"
+            ? (presentation["genreFocus"] as GenreFocusId)
+            : "all",
       });
     })(),
     harmonyTrack,

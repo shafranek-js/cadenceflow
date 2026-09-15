@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getFunctionSemantics } from "../../../src/domain/harmony/functionSemantics";
+import {
+  getFunctionSemantics,
+  isFunctionRelevantToGenre,
+} from "../../../src/domain/harmony/functionSemantics";
 
 describe("Harmonic function semantics and style hints", () => {
   it("provides comprehensive semantics for secondary dominants", () => {
@@ -51,5 +54,23 @@ describe("Harmonic function semantics and style hints", () => {
     expect(dimV.title).toContain("к V");
     expect(dimV.rule).toContain("Don't Mix");
     expect(dimV.tendencyType).toBe("diminished-tension");
+  });
+
+  it("identifies harmonic functions relevant to active genre focus", () => {
+    // All styles returns true for everything
+    expect(isFunctionRelevantToGenre("V7", "all")).toBe(true);
+    expect(isFunctionRelevantToGenre("bIII", "all")).toBe(true);
+
+    // Neo-Soul
+    expect(isFunctionRelevantToGenre("V7/ii", "neo-soul")).toBe(true);
+    expect(isFunctionRelevantToGenre("V7/vi", "neo-soul")).toBe(true);
+
+    // Cinematic
+    expect(isFunctionRelevantToGenre("bIII", "cinematic")).toBe(true);
+    expect(isFunctionRelevantToGenre("bVI", "cinematic")).toBe(true);
+
+    // Gospel
+    expect(isFunctionRelevantToGenre("V7/IV", "gospel")).toBe(true);
+    expect(isFunctionRelevantToGenre("iv", "gospel")).toBe(true);
   });
 });
