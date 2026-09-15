@@ -63,6 +63,10 @@ import { BranchControls } from "../ui/progression/BranchControls";
 import { VoiceLeadingMenu } from "../ui/progression/VoiceLeadingMenu";
 import { ModulationModal } from "../ui/modulation/ModulationModal";
 import type { ModulationPath } from "../domain/harmony/modulation";
+import { ModesExplorerModal } from "../ui/modes/ModesExplorerModal";
+import type { ModalCadenceFormula } from "../domain/harmony/modes";
+import { getModalParentKeyAndFunction } from "../domain/harmony/modes";
+import type { PitchClassIdentity } from "../domain/harmony/pitch";
 import {
   optimizeProgressionVoiceLeading,
   type VoiceLeadingStrategy,
@@ -1369,6 +1373,159 @@ export function App() {
           store.dispatch(switchModuleCommand, switchModule);
         }
       }
+    },
+    [store],
+  );
+
+  const [isModesExplorerOpen, setIsModesExplorerOpen] = useState(false);
+  const modesAuditionStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopAuditioningModes = useCallback(() => {
+    if (modesAuditionStopTimerRef.current !== null) {
+      clearTimeout(modesAuditionStopTimerRef.current);
+      modesAuditionStopTimerRef.current = null;
+    }
+    getPreviewAuditionController()?.stop();
+  }, [getPreviewAuditionController]);
+
+  const handleAuditionScaleNotes = useCallback(
+    (pitches: readonly { midiNumber: number }[]) => {
+      stopAuditioningModes();
+      const noteDuration = 0.22;
+      const events: import("../audio/contracts").AudioNoteEvent[] = pitches.map((p, idx) => ({
+        pitch: p.midiNumber,
+        channelRole: "upper",
+        velocity: 78,
+        startSeconds: idx * noteDuration,
+        durationSeconds: noteDuration * 0.95,
+      }));
+      getPreviewAuditionController()?.audition(events);
+      modesAuditionStopTimerRef.current = setTimeout(() => {
+        modesAuditionStopTimerRef.current = null;
+      }, Math.ceil((pitches.length * noteDuration + 0.5) * 1000));
+    },
+    [getPreviewAuditionController, stopAuditioningModes],
+  );
+
+  const handleAuditionModalChord = useCallback(
+    (pitches: readonly { midiNumber: number }[]) => {
+      stopAuditioningModes();
+      const events: import("../audio/contracts").AudioNoteEvent[] = pitches.map((p) => ({
+        pitch: p.midiNumber,
+        channelRole: "upper",
+        velocity: 80,
+        startSeconds: 0,
+        durationSeconds: 1.2,
+      }));
+      getPreviewAuditionController()?.audition(events);
+    },
+    [getPreviewAuditionController, stopAuditioningModes],
+  );
+
+  const handleAuditionModalFormula = useCallback(
+    (formula: ModalCadenceFormula, modalTonic: PitchClassIdentity) => {
+      stopAuditioningModes();
+      const currentProject = store.project;
+      const allEvents: import("../audio/contracts").AudioNoteEvent[] = [];
+      const tempoBpm = currentProject.globalTiming.tempoBpm;
+      const stepDurationSeconds = 1.0;
+
+      for (let i = 0; i < formula.steps.length; i++) {
+        const formulaStep = formula.steps[i]!;
+        const { parentTonic, functionId, moduleId } = getModalParentKeyAndFunction(
+          modalTonic,
+          formula.modeId,
+          formulaStep.degree,
+        );
+        const stepId = `mode-audition-step-${i}`;
+        const baseStep = createMatrixChordStep(currentProject, functionId, stepId, moduleId);
+        const mode = getHarmonicModule(moduleId).mode;
+        const context: HarmonicContext = {
+          tonic: parentTonic,
+          mode,
+          moduleId,
+          spellingContext: { tonic: parentTonic, mode },
+        };
+        const realization = realizeStepAudioEvents({
+          step: baseStep,
+          tonic: parentTonic,
+          context,
+          tempoBpm,
+          stepStartSeconds: i * stepDurationSeconds,
+        });
+        allEvents.push(...realization.events);
+      }
+
+      const scheduled = getPreviewAuditionController()?.audition(allEvents);
+      if (scheduled) {
+        const totalDuration = allEvents.reduce(
+          (latest, ev) => Math.max(latest, ev.startSeconds + ev.durationSeconds),
+          0,
+        );
+        modesAuditionStopTimerRef.current = setTimeout(() => {
+          modesAuditionStopTimerRef.current = null;
+        }, Math.max(1, Math.ceil(totalDuration * 1000)));
+      }
+    },
+    [getPreviewAuditionController, stopAuditioningModes, store],
+  );
+
+  const handleApplyModalFormulaToProgression = useCallback(
+    (formula: ModalCadenceFormula, modalTonic: PitchClassIdentity, switchKey: boolean) => {
+      const currentProject = store.project;
+      const nowIso = new Date().toISOString();
+      const { parentTonic } = getModalParentKeyAndFunction(modalTonic, formula.modeId, 1);
+
+      const targetTonic = switchKey ? parentTonic : currentProject.tonic;
+
+      const newSteps: ChordStep[] = formula.steps.map((formulaStep, idx) => {
+        const { functionId, moduleId } = getModalParentKeyAndFunction(
+          modalTonic,
+          formula.modeId,
+          formulaStep.degree,
+        );
+        const stepId = `step-mode-${Date.now().toString(36)}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
+        const step = createMatrixChordStep(currentProject, functionId, stepId, moduleId);
+        if (formulaStep.seventh) {
+          return Object.freeze({
+            ...step,
+            harmonicVariant: Object.freeze({
+              ...step.harmonicVariant,
+              seventh: formulaStep.seventh,
+            }),
+          });
+        }
+        return step;
+      });
+
+      const command: AppendStepsCommand = {
+        type: "progression/append-steps",
+        payload: {
+          steps: newSteps,
+          nowIso,
+        },
+      };
+      store.dispatch(command, appendSteps);
+
+      if (switchKey && currentProject.tonic !== targetTonic) {
+        const tonicCommand: SetTonicCommand = {
+          type: "harmony/set-tonic",
+          payload: { tonic: targetTonic, nowIso },
+        };
+        store.dispatch(tonicCommand, setTonic);
+      }
+    },
+    [store],
+  );
+
+  const handleApplyModalKeyToProject = useCallback(
+    (tonic: PitchClassIdentity) => {
+      if (store.project.tonic === tonic) return;
+      const tonicCommand: SetTonicCommand = {
+        type: "harmony/set-tonic",
+        payload: { tonic, nowIso: new Date().toISOString() },
+      };
+      store.dispatch(tonicCommand, setTonic);
     },
     [store],
   );
@@ -2792,6 +2949,7 @@ export function App() {
                 onSuzukiColorsChange={changeSuzukiColors}
                 resolutionArrows={project.presentation.resolutionArrows !== false}
                 onResolutionArrowsChange={changeResolutionArrows}
+                onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
               />
               {globalSettingsVisibility.showThemeControl ? (
                 <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
@@ -2846,6 +3004,7 @@ export function App() {
           onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
           onGenreFocusChange={changeGenreFocus}
           onOpenPresets={() => setPresetsPanelOpen(true)}
+          onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
         />
       }
       inspector={
@@ -3231,6 +3390,20 @@ export function App() {
             onApplyBridge={handleApplyModulationBridge}
             selectedStepId={project.progression.selectedStepId}
           />
+          <ModesExplorerModal
+            isOpen={isModesExplorerOpen}
+            project={project}
+            onClose={() => {
+              stopAuditioningModes();
+              setIsModesExplorerOpen(false);
+            }}
+            onAuditionScaleNotes={handleAuditionScaleNotes}
+            onAuditionChord={handleAuditionModalChord}
+            onAuditionFormula={handleAuditionModalFormula}
+            onStopAudition={stopAuditioningModes}
+            onApplyFormulaToProgression={handleApplyModalFormulaToProgression}
+            onApplyKeyToProject={handleApplyModalKeyToProject}
+          />
           {progressionMenu ? (
             <ProgressionContextMenu
               position={progressionMenu.position}
@@ -3318,6 +3491,7 @@ export function App() {
                 }))
               }
               onClearSelection={clearMatrixSelection}
+              onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
               onClose={() => setMatrixMenu(null)}
             />
           ) : null}

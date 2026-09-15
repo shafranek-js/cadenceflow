@@ -48,6 +48,7 @@ export interface MatrixContextMenuProps {
   readonly onToggleResolutionArrows?: (() => void) | undefined;
   readonly onSetArticulation?: ((articulation: PianoArticulation) => void) | undefined;
   readonly onSetRegister?: ((register: RegisterOffset) => void) | undefined;
+  readonly onOpenModesExplorer?: (() => void) | undefined;
   readonly onToggleRecommendations?: (() => void) | undefined;
   readonly onClearSelection?: (() => void) | undefined;
   readonly onClose: () => void;
@@ -102,6 +103,7 @@ export function MatrixContextMenu({
   onToggleResolutionArrows,
   onSetArticulation,
   onSetRegister,
+  onOpenModesExplorer,
   onToggleRecommendations,
   onClearSelection,
   onClose,
@@ -526,6 +528,26 @@ export function MatrixContextMenu({
               <span className="score-system-menu-shortcut">Esc</span>
             </span>
           </button>
+        ) : null}
+        {onOpenModesExplorer ? (
+          <>
+            <div className="score-system-menu-separator" />
+            <button
+              ref={registerRef(btnIndex++)}
+              type="button"
+              role="menuitem"
+              className="score-system-menu-item"
+              data-testid="matrix-menu-modes-explorer"
+              onClick={() => {
+                onOpenModesExplorer();
+                onClose();
+              }}
+            >
+              <span className="score-system-menu-item-row">
+                <span>🎼 Scales & Modes Explorer...</span>
+              </span>
+            </button>
+          </>
         ) : null}
       </div>
 

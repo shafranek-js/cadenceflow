@@ -44,6 +44,7 @@ export function HarmonicMatrix({
   onOpenMatrixMenu,
   onGenreFocusChange,
   onOpenPresets,
+  onOpenModesExplorer,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -63,6 +64,7 @@ export function HarmonicMatrix({
   readonly onOpenMatrixMenu?: (anchor: HTMLElement, position: { x: number; y: number }) => void;
   readonly onGenreFocusChange?: (genre: GenreFocusId) => void;
   readonly onOpenPresets?: () => void;
+  readonly onOpenModesExplorer?: () => void;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -242,6 +244,19 @@ export function HarmonicMatrix({
             >
               <span className="btn-bolt" aria-hidden="true">⚡</span>
               <span className="btn-label">Formulas</span>
+            </button>
+          )}
+          {onOpenModesExplorer && (
+            <button
+              type="button"
+              className="matrix-formulas-btn matrix-modes-btn"
+              onClick={onOpenModesExplorer}
+              data-testid="matrix-modes-trigger"
+              title="Open ChordFiles Scales & Modes Explorer"
+              aria-label="Open ChordFiles Scales and Modes Explorer"
+            >
+              <span className="btn-icon" aria-hidden="true">🎼</span>
+              <span className="btn-label">Modes</span>
             </button>
           )}
           <ViewModeToggle

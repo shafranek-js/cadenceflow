@@ -28,6 +28,7 @@ export interface AppMenuBarProps {
   readonly onSuzukiColorsChange?: (enabled: boolean) => void;
   readonly resolutionArrows?: boolean;
   readonly onResolutionArrowsChange?: (enabled: boolean) => void;
+  readonly onOpenModesExplorer?: () => void;
 }
 
 export function AppMenuBar({
@@ -47,6 +48,7 @@ export function AppMenuBar({
   onSuzukiColorsChange,
   resolutionArrows = true,
   onResolutionArrowsChange,
+  onOpenModesExplorer,
 }: AppMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
@@ -305,6 +307,22 @@ export function AppMenuBar({
               <span>Resolution arrows</span>
               {resolutionArrows ? <span aria-hidden="true">✓</span> : null}
             </button>
+            {onOpenModesExplorer ? (
+              <>
+                <div className="app-menu-section-label">Theory tools</div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="menu-open-modes-explorer"
+                  onClick={() => {
+                    onOpenModesExplorer();
+                    closeMenu("view");
+                  }}
+                >
+                  <span>🎼 Scales & Modes Explorer...</span>
+                </button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
