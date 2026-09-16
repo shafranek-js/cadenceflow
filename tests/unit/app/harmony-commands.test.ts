@@ -50,13 +50,31 @@ describe("Harmony Track commands", () => {
     });
   });
 
+  it("updates instrument to any GM instrument and restores through undo", () => {
+    const initial = createDefaultProject("harmony-command", "Harmony Commands", T0);
+    const command: SetHarmonyTrackSettingsCommand = {
+      type: "harmony/set-track-settings",
+      payload: { patch: { instrument: "gm-024" }, nowIso: T1 },
+    };
+
+    const applied = setHarmonyTrackSettings(initial, command);
+
+    expect(applied.project.harmonyTrack).toEqual({
+      instrument: "gm-024",
+      muted: false,
+      solo: false,
+      volume: 100,
+    });
+    expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
+  });
+
   it("rejects unsupported instruments and contradictory settings", () => {
     const initial = createDefaultProject("harmony-command", "Harmony Commands", T0);
 
     expect(() =>
       setHarmonyTrackSettings(initial, {
         type: "harmony/set-track-settings",
-        payload: { patch: { instrument: "violin" as never }, nowIso: T1 },
+        payload: { patch: { instrument: "unsupported-instrument" as never }, nowIso: T1 },
       }),
     ).toThrow(HarmonyTrackValidationError);
 

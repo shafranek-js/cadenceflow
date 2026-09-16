@@ -19,7 +19,7 @@ export function MelodyInstrumentPicker({
   ariaLabel = "Melody Instrument",
   disabled = false,
 }: {
-  readonly value: MelodyInstrumentId | undefined;
+  readonly value: MelodyInstrumentId | "piano" | undefined;
   readonly onChange: (instrument: MelodyInstrumentId | undefined) => void;
   readonly allowInherit?: boolean;
   readonly trackInstrument?: MelodyInstrumentId;
@@ -27,6 +27,7 @@ export function MelodyInstrumentPicker({
   readonly ariaLabel?: string;
   readonly disabled?: boolean;
 }) {
+  const effectiveValue = value === "piano" ? "gm-000" : value;
   const [query, setQuery] = useState("");
   const normalizedQuery = normalizeMelodyInstrumentSearch(query);
   const entries = useMemo(() => {
@@ -44,12 +45,12 @@ export function MelodyInstrumentPicker({
       );
       return normalizedQuery.split(" ").every((token) => searchableText.includes(token));
     });
-    if (value && !filtered.some((entry) => entry.id === value)) {
-      const current = MELODY_INSTRUMENT_CATALOG.find((entry) => entry.id === value);
+    if (effectiveValue && !filtered.some((entry) => entry.id === effectiveValue)) {
+      const current = MELODY_INSTRUMENT_CATALOG.find((entry) => entry.id === effectiveValue);
       if (current) return [current, ...filtered];
     }
     return filtered;
-  }, [normalizedQuery, value]);
+  }, [effectiveValue, normalizedQuery]);
 
   const groupedEntries = useMemo(() => {
     const groups = new Map<string, MelodyInstrumentCatalogEntry[]>();
@@ -81,7 +82,7 @@ export function MelodyInstrumentPicker({
       />
       <select
         aria-label={ariaLabel}
-        value={value ?? ""}
+        value={effectiveValue ?? ""}
         disabled={disabled}
         onChange={(event) =>
           onChange(event.target.value ? (event.target.value as MelodyInstrumentId) : undefined)
@@ -101,9 +102,9 @@ export function MelodyInstrumentPicker({
       <span className="melody-instrument-picker-status" role="status">
         {inherited && allowInherit
           ? inheritedLabel
-          : value
+          : effectiveValue
             ? (() => {
-                const entry = MELODY_INSTRUMENT_CATALOG.find((candidate) => candidate.id === value);
+                const entry = MELODY_INSTRUMENT_CATALOG.find((candidate) => candidate.id === effectiveValue);
                 return entry ? optionLabel(entry) : "Unknown instrument";
               })()
             : inheritedLabel}

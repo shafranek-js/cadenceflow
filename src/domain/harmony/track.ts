@@ -1,4 +1,9 @@
-export type HarmonyInstrument = "piano";
+import {
+  validateMelodyInstrumentId,
+  type MelodyInstrumentId,
+} from "../melody/instrumentCatalog";
+
+export type HarmonyInstrument = "piano" | MelodyInstrumentId;
 
 export interface HarmonyTrackSettings {
   readonly instrument: HarmonyInstrument;
@@ -41,10 +46,23 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
   const solo = isRecord(value) ? value.solo : undefined;
   const volume = isRecord(value) ? value.volume : undefined;
 
+  let validatedInstrument: HarmonyInstrument;
+  if (instrument === "piano") {
+    validatedInstrument = "piano";
+  } else {
+    try {
+      validatedInstrument = validateMelodyInstrumentId(instrument);
+    } catch {
+      throw new HarmonyTrackValidationError(
+        "Harmony Track settings require a supported instrument, boolean mute/solo flags, and integer volume 0..127",
+        "invalid-settings",
+      );
+    }
+  }
+
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, ["instrument", "muted", "solo", "volume"]) ||
-    instrument !== "piano" ||
     typeof muted !== "boolean" ||
     typeof solo !== "boolean" ||
     (muted === true && solo === true) ||
@@ -53,13 +71,13 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     (volume as number) > 127
   ) {
     throw new HarmonyTrackValidationError(
-      "Harmony Track settings require Piano, boolean mute/solo flags, and integer volume 0..127",
+      "Harmony Track settings require a supported instrument, boolean mute/solo flags, and integer volume 0..127",
       "invalid-settings",
     );
   }
 
   return Object.freeze({
-    instrument: "piano",
+    instrument: validatedInstrument,
     muted: muted as boolean,
     solo: solo as boolean,
     volume: volume as number,

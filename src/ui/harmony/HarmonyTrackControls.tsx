@@ -1,6 +1,7 @@
 import type { AudioProviderState } from "../../audio/contracts";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
 import { TrackControls } from "../track/TrackControls";
+import { MelodyInstrumentPicker } from "../melody/MelodyInstrumentPicker";
 
 export function HarmonyTrackControls({
   settings,
@@ -20,8 +21,15 @@ export function HarmonyTrackControls({
       trackName="Harmony"
       settings={settings}
       onChange={(patch) => onChange(patch as Partial<HarmonyTrackSettings>)}
-      instrumentOptions={[{ value: "piano", label: "Piano" }]}
-      instrumentDisabled
+      instrumentControl={
+        <MelodyInstrumentPicker
+          value={settings.instrument}
+          onChange={(instrument) => {
+            if (instrument) onChange({ instrument });
+          }}
+          ariaLabel="Harmony Track Instrument"
+        />
+      }
       providerState={providerState}
       providerError={providerError}
       {...(onRetry ? { onRetry } : {})}

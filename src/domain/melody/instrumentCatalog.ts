@@ -8,7 +8,13 @@
  */
 
 export type MelodyInstrumentId =
-  "flute" | "violin" | "clarinet" | "oboe" | "cello" | "synth-lead" | `gm-${string}`;
+  | "flute"
+  | "violin"
+  | "clarinet"
+  | "oboe"
+  | "cello"
+  | "synth-lead"
+  | `gm-${string}`;
 
 export type MelodyInstrumentFamily =
   | "Piano"
@@ -427,8 +433,9 @@ export function validateMelodyInstrumentCatalog(
 
 validateMelodyInstrumentCatalog();
 
-export function getMelodyInstrument(id: MelodyInstrumentId): MelodyInstrumentCatalogEntry {
-  const entry = MELODY_INSTRUMENT_BY_ID.get(id);
+export function getMelodyInstrument(id: MelodyInstrumentId | "piano"): MelodyInstrumentCatalogEntry {
+  const effectiveId = id === "piano" ? "gm-000" : id;
+  const entry = MELODY_INSTRUMENT_BY_ID.get(effectiveId as MelodyInstrumentId);
   if (!entry) throw new MelodyInstrumentCatalogError(`Unknown Melody instrument: ${id}`);
   return entry;
 }

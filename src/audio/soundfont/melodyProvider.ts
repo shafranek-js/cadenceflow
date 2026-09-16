@@ -227,6 +227,12 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     }
   }
 
+  setVolume(volume: number): void {
+    const nextVolume = clampMidi(volume);
+    this.liveVolume = nextVolume;
+    this.previewVolume = nextVolume;
+  }
+
   setPreviewSettings(instrument: MelodyInstrument, volume: number): void {
     if (instrument !== this.previewInstrument) this.cancelPlaybacks(this.previewPlaybacks);
     this.previewInstrument = instrument;
@@ -398,7 +404,7 @@ function assertMelodyEvents(events: readonly AudioNoteEvent[]): void {
   if (
     events.some(
       (event) =>
-        event.channelRole !== "melody" ||
+        !["melody", "upper", "bass"].includes(event.channelRole ?? "") ||
         !Number.isInteger(event.pitch) ||
         event.pitch < 0 ||
         event.pitch > 127 ||

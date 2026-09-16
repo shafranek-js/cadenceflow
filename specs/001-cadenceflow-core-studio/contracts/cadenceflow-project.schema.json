@@ -126,7 +126,12 @@
       "additionalProperties": false,
       "required": ["instrument", "muted", "solo", "volume"],
       "properties": {
-        "instrument": { "const": "piano" },
+        "instrument": {
+          "anyOf": [
+            { "const": "piano" },
+            { "$ref": "#/$defs/melodyInstrument" }
+          ]
+        },
         "muted": { "type": "boolean" },
         "solo": { "type": "boolean" },
         "volume": { "type": "integer", "minimum": 0, "maximum": 127 }

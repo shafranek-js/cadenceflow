@@ -22,7 +22,7 @@ function mount(element: React.ReactElement) {
 }
 
 describe("Harmony Track controls", () => {
-  it("renders a disabled Piano selector and exposes mute, solo, and volume controls", () => {
+  it("renders the Harmony Track instrument picker and exposes mute, solo, and volume controls", () => {
     const onChange = vi.fn();
     const mounted = mount(
       el(HarmonyTrackControls, {
@@ -31,14 +31,19 @@ describe("Harmony Track controls", () => {
       }),
     );
 
-    expect(
-      mounted.container.querySelector('[aria-label="Harmony Track Instrument"]'),
-    ).toHaveProperty("disabled", true);
+    const instrumentSelect = mounted.container.querySelector(
+      '[aria-label="Harmony Track Instrument"]',
+    ) as HTMLSelectElement;
+    expect(instrumentSelect).not.toBeNull();
+    expect(instrumentSelect.disabled).toBe(false);
+    expect(mounted.container.querySelector('[aria-label="Harmony Track Instrument search"]')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Harmony Track Volume"]')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Mute Harmony Track"]')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Solo Harmony Track"]')).not.toBeNull();
 
     act(() => {
+      instrumentSelect.value = "gm-024";
+      instrumentSelect.dispatchEvent(new Event("change", { bubbles: true }));
       (
         mounted.container.querySelector('[aria-label="Mute Harmony Track"]') as HTMLButtonElement
       ).click();
@@ -46,8 +51,9 @@ describe("Harmony Track controls", () => {
         mounted.container.querySelector('[aria-label="Solo Harmony Track"]') as HTMLButtonElement
       ).click();
     });
-    expect(onChange).toHaveBeenNthCalledWith(1, { muted: true });
-    expect(onChange).toHaveBeenNthCalledWith(2, { solo: true });
+    expect(onChange).toHaveBeenNthCalledWith(1, { instrument: "gm-024" });
+    expect(onChange).toHaveBeenNthCalledWith(2, { muted: true });
+    expect(onChange).toHaveBeenNthCalledWith(3, { solo: true });
     mounted.unmount();
   });
 
