@@ -42,4 +42,18 @@ describe("PianoAudioStatus component", () => {
     );
     expect(htmlFallback).toContain("Guitar Audio: Guitar Fallback");
   });
+
+  it("renders soundfont audio status labels when engine='soundfont'", () => {
+    const htmlPiano = renderToString(
+      el(PianoAudioStatus, { state: "ready", instrument: "piano", engine: "soundfont" }),
+    );
+    expect(htmlPiano).toContain("Piano Audio: SoundFont Piano Ready");
+    expect(htmlPiano).toContain("data-engine=\"soundfont\"");
+
+    const htmlGuitar = renderToString(
+      el(PianoAudioStatus, { state: "ready", instrument: "guitar", engine: "soundfont" }),
+    );
+    expect(htmlGuitar).toContain("Guitar Audio: SoundFont Guitar Ready");
+    expect(htmlGuitar).toContain("data-engine=\"soundfont\"");
+  });
 });

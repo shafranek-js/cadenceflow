@@ -68,6 +68,34 @@ describe("Harmony Track commands", () => {
     expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
   });
 
+  it("updates audio engine settings and restores through undo", () => {
+    const initial = createDefaultProject("harmony-command", "Harmony Commands", T0);
+    const command: SetHarmonyTrackSettingsCommand = {
+      type: "harmony/set-track-settings",
+      payload: {
+        patch: {
+          pianoEngine: "soundfont",
+          guitarEngine: "soundfont",
+          guitarSoundfontInstrument: "gm-026",
+        },
+        nowIso: T1,
+      },
+    };
+
+    const applied = setHarmonyTrackSettings(initial, command);
+
+    expect(applied.project.harmonyTrack).toEqual({
+      instrument: "piano",
+      muted: false,
+      solo: false,
+      volume: 100,
+      pianoEngine: "soundfont",
+      guitarEngine: "soundfont",
+      guitarSoundfontInstrument: "gm-026",
+    });
+    expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
+  });
+
   it("rejects unsupported instruments and contradictory settings", () => {
     const initial = createDefaultProject("harmony-command", "Harmony Commands", T0);
 
@@ -75,6 +103,20 @@ describe("Harmony Track commands", () => {
       setHarmonyTrackSettings(initial, {
         type: "harmony/set-track-settings",
         payload: { patch: { instrument: "unsupported-instrument" as never }, nowIso: T1 },
+      }),
+    ).toThrow(HarmonyTrackValidationError);
+
+    expect(() =>
+      setHarmonyTrackSettings(initial, {
+        type: "harmony/set-track-settings",
+        payload: { patch: { pianoEngine: "invalid-engine" as never }, nowIso: T1 },
+      }),
+    ).toThrow(HarmonyTrackValidationError);
+
+    expect(() =>
+      setHarmonyTrackSettings(initial, {
+        type: "harmony/set-track-settings",
+        payload: { patch: { guitarSoundfontInstrument: "not-gm" as never }, nowIso: T1 },
       }),
     ).toThrow(HarmonyTrackValidationError);
 

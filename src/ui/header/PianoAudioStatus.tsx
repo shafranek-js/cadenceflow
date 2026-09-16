@@ -1,20 +1,28 @@
 import type { AudioProviderState } from "../../audio/contracts";
+import type { AudioEngineType } from "../../domain/harmony/track";
 
 export interface PianoAudioStatusProps {
   readonly state: AudioProviderState;
   readonly instrument?: "piano" | "guitar";
+  readonly engine?: AudioEngineType;
 }
 
-export function PianoAudioStatus({ state, instrument = "piano" }: PianoAudioStatusProps) {
+export function PianoAudioStatus({
+  state,
+  instrument = "piano",
+  engine = "hq-samples",
+}: PianoAudioStatusProps) {
   const isGuitar = instrument === "guitar";
+  const isSoundFont = engine === "soundfont";
 
   const getLabel = (s: AudioProviderState): string => {
     if (isGuitar) {
+      const typeStr = isSoundFont ? "SoundFont Guitar" : "HQ Guitar";
       switch (s) {
         case "loading":
-          return "Loading HQ Guitar...";
+          return `Loading ${typeStr}...`;
         case "ready":
-          return "HQ Guitar Ready";
+          return `${typeStr} Ready`;
         case "fallback":
           return "Guitar Fallback";
         case "error":
@@ -25,11 +33,12 @@ export function PianoAudioStatus({ state, instrument = "piano" }: PianoAudioStat
       }
     }
 
+    const typeStr = isSoundFont ? "SoundFont Piano" : "HQ Piano";
     switch (s) {
       case "loading":
-        return "Loading HQ Piano...";
+        return `Loading ${typeStr}...`;
       case "ready":
-        return "HQ Piano Ready";
+        return `${typeStr} Ready`;
       case "fallback":
         return "Audio Fallback";
       case "error":
@@ -48,6 +57,7 @@ export function PianoAudioStatus({ state, instrument = "piano" }: PianoAudioStat
       data-testid="piano-audio-status"
       data-status={state}
       data-instrument={instrument}
+      data-engine={engine}
       role="status"
       aria-live="polite"
       aria-atomic="true"

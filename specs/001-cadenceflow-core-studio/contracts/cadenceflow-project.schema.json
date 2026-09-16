@@ -134,7 +134,10 @@
         },
         "muted": { "type": "boolean" },
         "solo": { "type": "boolean" },
-        "volume": { "type": "integer", "minimum": 0, "maximum": 127 }
+        "volume": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "pianoEngine": { "enum": ["hq-samples", "soundfont"] },
+        "guitarEngine": { "enum": ["hq-samples", "soundfont"] },
+        "guitarSoundfontInstrument": { "$ref": "#/$defs/melodyInstrument" }
       },
       "not": {
         "required": ["muted", "solo"],

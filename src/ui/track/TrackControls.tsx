@@ -23,6 +23,7 @@ export function TrackControls({
   providerState = "idle",
   providerError = null,
   onRetry,
+  children,
 }: {
   readonly trackName: string;
   readonly settings: TrackControlSettings;
@@ -33,6 +34,7 @@ export function TrackControls({
   readonly providerState?: AudioProviderState;
   readonly providerError?: string | null;
   readonly onRetry?: () => void;
+  readonly children?: ReactNode;
 }) {
   const legacyClassPrefix = trackName.toLowerCase();
   const providerIssueIsFatal = providerState === "error";
@@ -165,6 +167,7 @@ export function TrackControls({
         />
         <output>{volumeDraft}</output>
       </label>
+      {children}
     </section>
   );
 }

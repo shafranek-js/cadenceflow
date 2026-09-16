@@ -86,4 +86,49 @@ describe("Harmony Track controls", () => {
     expect(onChange).toHaveBeenLastCalledWith({ volume: 64 });
     mounted.unmount();
   });
+
+  it("toggles Piano and Guitar audio engines and selects guitar soundfont tone", () => {
+    const onChange = vi.fn();
+    const mounted = mount(
+      el(HarmonyTrackControls, {
+        settings: {
+          instrument: "piano",
+          muted: false,
+          solo: false,
+          volume: 100,
+          pianoEngine: "hq-samples",
+          guitarEngine: "soundfont",
+          guitarSoundfontInstrument: "gm-025",
+        },
+        onChange,
+      }),
+    );
+
+    const pianoSoundfontBtn = mounted.container.querySelector(
+      '[data-testid="piano-engine-soundfont-btn"]',
+    ) as HTMLButtonElement;
+    const guitarHqBtn = mounted.container.querySelector(
+      '[data-testid="guitar-engine-hq-btn"]',
+    ) as HTMLButtonElement;
+    const guitarToneSelect = mounted.container.querySelector(
+      '[data-testid="guitar-soundfont-instrument-select"]',
+    ) as HTMLSelectElement;
+
+    expect(pianoSoundfontBtn).not.toBeNull();
+    expect(guitarHqBtn).not.toBeNull();
+    expect(guitarToneSelect).not.toBeNull();
+    expect(guitarToneSelect.value).toBe("gm-025");
+
+    act(() => {
+      pianoSoundfontBtn.click();
+      guitarHqBtn.click();
+      guitarToneSelect.value = "gm-024";
+      guitarToneSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenNthCalledWith(1, { pianoEngine: "soundfont" });
+    expect(onChange).toHaveBeenNthCalledWith(2, { guitarEngine: "hq-samples" });
+    expect(onChange).toHaveBeenNthCalledWith(3, { guitarSoundfontInstrument: "gm-024" });
+    mounted.unmount();
+  });
 });

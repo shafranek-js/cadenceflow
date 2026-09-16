@@ -306,11 +306,13 @@ export function App() {
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
   const [guitarAudioState, setGuitarAudioState] = useState<AudioProviderState>("idle");
+  const [guitarSoundFontState, setGuitarSoundFontState] = useState<AudioProviderState>("idle");
   const [harmonySoundFontState, setHarmonySoundFontState] = useState<AudioProviderState>("idle");
   const [harmonySoundFontError, setHarmonySoundFontError] = useState<string | null>(null);
   const audioProviderRef = useRef<HqSamplePianoProvider | null>(null);
   const sharedAudioContextRef = useRef<AudioContext | null>(null);
   const harmonySoundFontProviderRef = useRef<MelodySoundFontProvider | null>(null);
+  const guitarSoundFontProviderRef = useRef<MelodySoundFontProvider | null>(null);
   const [melodyAudioState, setMelodyAudioState] = useState<AudioProviderState>("idle");
   const [melodyAudioError, setMelodyAudioError] = useState<string | null>(null);
   const melodyProviderRef = useRef<MelodySoundFontProvider | null>(null);
@@ -425,6 +427,36 @@ export function App() {
     return guitarProviderRef.current;
   }, []);
 
+  const ensureGuitarSoundFontProvider = useCallback(() => {
+    const instrument: MelodyInstrument = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
+    if (!guitarSoundFontProviderRef.current) {
+      const provider = new MelodySoundFontProvider({
+        ...(sharedAudioContextRef.current ? { audioContext: sharedAudioContextRef.current } : {}),
+        instrument,
+        volume: project.harmonyTrack.volume,
+        onStateChange: (state) => {
+          setGuitarSoundFontState(state);
+        },
+      });
+      guitarSoundFontProviderRef.current = provider;
+      setGuitarSoundFontState(provider.state);
+    }
+    guitarSoundFontProviderRef.current.setTrackSettings({
+      instrument,
+      volume: project.harmonyTrack.volume,
+      muted: project.harmonyTrack.muted,
+      solo: project.harmonyTrack.solo,
+    });
+    return guitarSoundFontProviderRef.current;
+  }, [project.harmonyTrack]);
+
+  const getActiveGuitarProvider = useCallback(() => {
+    if (project.harmonyTrack.guitarEngine === "soundfont") {
+      return guitarSoundFontProviderRef.current ?? ensureGuitarSoundFontProvider();
+    }
+    return guitarProviderRef.current ?? ensureGuitarProvider();
+  }, [ensureGuitarProvider, ensureGuitarSoundFontProvider, project.harmonyTrack.guitarEngine]);
+
   const ensureHarmonySoundFontProvider = useCallback(() => {
     const soundFontInstrument: MelodyInstrument =
       project.harmonyTrack.instrument === "piano" ? "gm-000" : project.harmonyTrack.instrument;
@@ -452,16 +484,21 @@ export function App() {
 
   const getActiveHarmonyProvider = useCallback(() => {
     if (project.presentation.progressionView === "guitar") {
-      return guitarProviderRef.current ?? ensureGuitarProvider();
+      return getActiveGuitarProvider();
     }
+    const isSoundFontPiano = project.harmonyTrack.pianoEngine === "soundfont";
     if (project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000") {
+      if (isSoundFontPiano) {
+        return harmonySoundFontProviderRef.current ?? ensureHarmonySoundFontProvider();
+      }
       return audioProviderRef.current;
     }
     return harmonySoundFontProviderRef.current ?? ensureHarmonySoundFontProvider();
   }, [
-    ensureGuitarProvider,
+    getActiveGuitarProvider,
     ensureHarmonySoundFontProvider,
     project.harmonyTrack.instrument,
+    project.harmonyTrack.pianoEngine,
     project.presentation.progressionView,
   ]);
 
@@ -475,15 +512,13 @@ export function App() {
   }, [getActiveHarmonyProvider]);
 
   const getGuitarPreviewAuditionController = useCallback(() => {
-    const provider = ensureGuitarProvider();
-    if (!guitarPreviewAuditionControllerRef.current) {
-      guitarPreviewAuditionControllerRef.current = new PreviewAuditionController({
-        provider,
-        clock: provider.clock,
-      });
-    }
-    return guitarPreviewAuditionControllerRef.current;
-  }, [ensureGuitarProvider]);
+    const provider = getActiveGuitarProvider();
+    if (!provider) return null;
+    return new PreviewAuditionController({
+      provider,
+      clock: provider.clock,
+    });
+  }, [getActiveGuitarProvider]);
 
   const applyMelodyPreparationResult = useCallback((result: MelodyPreparationResult) => {
     setMelodyAudioError(formatMelodyPreparationNotice(result));
@@ -699,6 +734,8 @@ export function App() {
       void provider.dispose();
       guitarProviderRef.current?.stop();
       void guitarProviderRef.current?.dispose();
+      guitarSoundFontProviderRef.current?.stop();
+      void guitarSoundFontProviderRef.current?.dispose();
       harmonySoundFontProviderRef.current?.stop();
       void harmonySoundFontProviderRef.current?.dispose();
       if (sharedAudioContextRef.current === sharedAudioContext) {
@@ -710,27 +747,49 @@ export function App() {
   useEffect(() => {
     audioProviderRef.current?.setVolume(project.harmonyTrack.volume);
     guitarProviderRef.current?.setVolume(project.harmonyTrack.volume);
+    guitarSoundFontProviderRef.current?.setVolume(project.harmonyTrack.volume);
     harmonySoundFontProviderRef.current?.setVolume(project.harmonyTrack.volume);
   }, [project.harmonyTrack.volume]);
 
   useEffect(() => {
     if (project.presentation.progressionView === "guitar") {
-      void ensureGuitarProvider()
-        .prepare()
-        .catch(() => {
-          // Reflected in provider state
-        });
+      if (project.harmonyTrack.guitarEngine === "soundfont") {
+        const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
+        const provider = ensureGuitarSoundFontProvider();
+        void provider
+          .prepareForInstruments([inst])
+          .then(applyHarmonyPreparationResult)
+          .catch((error) => {
+            setHarmonySoundFontError(error instanceof Error ? error.message : String(error));
+          });
+      } else {
+        void ensureGuitarProvider()
+          .prepare()
+          .catch(() => {
+            // Reflected in provider state
+          });
+      }
     }
-  }, [ensureGuitarProvider, project.presentation.progressionView]);
+  }, [
+    applyHarmonyPreparationResult,
+    ensureGuitarProvider,
+    ensureGuitarSoundFontProvider,
+    project.harmonyTrack.guitarEngine,
+    project.harmonyTrack.guitarSoundfontInstrument,
+    project.presentation.progressionView,
+  ]);
 
   useEffect(() => {
-    if (project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000") {
+    const isPiano =
+      project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000";
+    if (isPiano && project.harmonyTrack.pianoEngine !== "soundfont") {
       setHarmonySoundFontError(null);
       return;
     }
+    const inst = isPiano ? "gm-000" : project.harmonyTrack.instrument;
     const provider = ensureHarmonySoundFontProvider();
     void provider
-      .prepareForInstruments([project.harmonyTrack.instrument])
+      .prepareForInstruments([inst])
       .then(applyHarmonyPreparationResult)
       .catch((error) => {
         setHarmonySoundFontError(error instanceof Error ? error.message : String(error));
@@ -739,6 +798,7 @@ export function App() {
     applyHarmonyPreparationResult,
     ensureHarmonySoundFontProvider,
     project.harmonyTrack.instrument,
+    project.harmonyTrack.pianoEngine,
   ]);
 
   useEffect(() => {
@@ -768,7 +828,14 @@ export function App() {
   useEffect(() => {
     playbackControllerRef.current?.stop();
     playbackControllerRef.current = null;
-  }, [hasMelodyRecipe, project.harmonyTrack.instrument, project.presentation.progressionView]);
+  }, [
+    hasMelodyRecipe,
+    project.harmonyTrack.instrument,
+    project.harmonyTrack.pianoEngine,
+    project.harmonyTrack.guitarEngine,
+    project.harmonyTrack.guitarSoundfontInstrument,
+    project.presentation.progressionView,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3206,11 +3273,20 @@ export function App() {
       statusBar={
         <PianoAudioStatus
           instrument={project.presentation.progressionView === "guitar" ? "guitar" : "piano"}
+          engine={
+            project.presentation.progressionView === "guitar"
+              ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
+              : (project.harmonyTrack.pianoEngine ?? "hq-samples")
+          }
           state={
             project.presentation.progressionView === "guitar"
-              ? guitarAudioState
+              ? project.harmonyTrack.guitarEngine === "soundfont"
+                ? guitarSoundFontState
+                : guitarAudioState
               : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
-                ? audioState
+                ? project.harmonyTrack.pianoEngine === "soundfont"
+                  ? harmonySoundFontState
+                  : audioState
                 : harmonySoundFontState
           }
         />
@@ -3362,25 +3438,57 @@ export function App() {
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             harmonyAudioState={
               project.presentation.progressionView === "guitar"
-                ? guitarAudioState
-                : project.harmonyTrack.instrument === "piano"
-                  ? audioState
+                ? project.harmonyTrack.guitarEngine === "soundfont"
+                  ? guitarSoundFontState
+                  : guitarAudioState
+                : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+                  ? project.harmonyTrack.pianoEngine === "soundfont"
+                    ? harmonySoundFontState
+                    : audioState
                   : harmonySoundFontState
             }
             harmonyAudioError={
               project.presentation.progressionView === "guitar"
-                ? null
-                : project.harmonyTrack.instrument === "piano"
-                  ? null
+                ? project.harmonyTrack.guitarEngine === "soundfont"
+                  ? harmonySoundFontError
+                  : null
+                : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+                  ? project.harmonyTrack.pianoEngine === "soundfont"
+                    ? harmonySoundFontError
+                    : null
                   : harmonySoundFontError
             }
             onRetryHarmonyAudio={() => {
               if (project.presentation.progressionView === "guitar") {
-                const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
-                void gProvider.prepare();
-              } else if (project.harmonyTrack.instrument === "piano") {
-                const provider = audioProviderRef.current;
-                if (provider) void provider.prepare();
+                if (project.harmonyTrack.guitarEngine === "soundfont") {
+                  const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
+                  const provider = ensureGuitarSoundFontProvider();
+                  void provider
+                    .prepareForInstruments([inst])
+                    .then(applyHarmonyPreparationResult)
+                    .catch((err) => {
+                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                    });
+                } else {
+                  const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
+                  void gProvider.prepare();
+                }
+              } else if (
+                project.harmonyTrack.instrument === "piano" ||
+                project.harmonyTrack.instrument === "gm-000"
+              ) {
+                if (project.harmonyTrack.pianoEngine === "soundfont") {
+                  const provider = ensureHarmonySoundFontProvider();
+                  void provider
+                    .prepareForInstruments(["gm-000"])
+                    .then(applyHarmonyPreparationResult)
+                    .catch((err) => {
+                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                    });
+                } else {
+                  const provider = audioProviderRef.current;
+                  if (provider) void provider.prepare();
+                }
               } else {
                 const provider = ensureHarmonySoundFontProvider();
                 void provider
