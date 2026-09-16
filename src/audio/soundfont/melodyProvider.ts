@@ -96,6 +96,7 @@ export interface MelodySoundFontProviderOptions {
   readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
   readonly loadInstrument?: InstrumentLoader | undefined;
   readonly assetBaseUrl?: string | undefined;
+  readonly guitarAssetBaseUrl?: string | undefined;
 }
 
 /**
@@ -110,6 +111,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
   private readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
   private readonly loadInstrument: InstrumentLoader;
   private readonly assetBaseUrl: string;
+  private readonly guitarAssetBaseUrl: string;
   private readonly players = new Map<MelodyInstrument, MelodySamplePlayer>();
   private readonly loads = new Map<MelodyInstrument, Promise<MelodySamplePlayer>>();
   private readonly livePlaybacks = new Set<ActivePlayback>();
@@ -128,8 +130,14 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     this.destinationNode = options.destination;
     this.onStateChange = options.onStateChange;
     this.loadInstrument = options.loadInstrument ?? defaultInstrumentLoader;
+    const baseUrl =
+      typeof import.meta !== "undefined" && import.meta.env?.BASE_URL
+        ? import.meta.env.BASE_URL
+        : "/";
     this.assetBaseUrl =
-      options.assetBaseUrl ?? `${import.meta.env.BASE_URL}audio/melody/FluidR3_GM/`;
+      options.assetBaseUrl ?? `${baseUrl.replace(/\/$/, "")}/audio/melody/FluidR3_GM/`;
+    this.guitarAssetBaseUrl =
+      options.guitarAssetBaseUrl ?? `${baseUrl.replace(/\/$/, "")}/audio/guitar/`;
     this.liveInstrument = options.instrument ?? "flute";
     this.liveVolume = clampMidi(options.volume ?? 100);
     this.previewInstrument = this.liveInstrument;
@@ -284,10 +292,16 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     const entry = getMelodyInstrument(instrument);
 
     // Locally bundled instruments (the original 6) use the local asset bundle.
+    // In addition, GM 24 (Acoustic Guitar Nylon) and GM 25 (Acoustic Guitar Steel)
+    // are bundled locally under /audio/guitar/ for offline capability and fast load.
     // All other GM programs are loaded on-demand from the FluidR3_GM CDN.
     let url: string;
     if (entry.sampleAsset) {
       url = `${this.assetBaseUrl}${entry.sampleAsset}`;
+    } else if (entry.program === 24) {
+      url = `${this.guitarAssetBaseUrl}acoustic_guitar_nylon-mp3.js`;
+    } else if (entry.program === 25) {
+      url = `${this.guitarAssetBaseUrl}acoustic_guitar_steel-mp3.js`;
     } else {
       const fluidName = FLUID_R3_NAMES[entry.program];
       if (!fluidName) {

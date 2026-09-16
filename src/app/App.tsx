@@ -384,6 +384,14 @@ export function App() {
     return Object.freeze([...new Set(instruments)]);
   }, [project.melodyTrack.instrument, project.progression.steps]);
 
+  const applyMelodyPreparationResult = useCallback((result: MelodyPreparationResult) => {
+    setMelodyAudioError(formatMelodyPreparationNotice(result));
+  }, []);
+
+  const applyHarmonyPreparationResult = useCallback((result: MelodyPreparationResult) => {
+    setHarmonySoundFontError(formatMelodyPreparationNotice(result));
+  }, []);
+
   const ensureMelodyProvider = useCallback(() => {
     if (!melodyProviderRef.current) {
       const provider = new MelodySoundFontProvider({
@@ -447,8 +455,14 @@ export function App() {
       muted: project.harmonyTrack.muted,
       solo: project.harmonyTrack.solo,
     });
+    void guitarSoundFontProviderRef.current
+      .prepareForInstruments([instrument])
+      .then(applyHarmonyPreparationResult)
+      .catch((error) => {
+        setHarmonySoundFontError(error instanceof Error ? error.message : String(error));
+      });
     return guitarSoundFontProviderRef.current;
-  }, [project.harmonyTrack]);
+  }, [applyHarmonyPreparationResult, project.harmonyTrack]);
 
   const getActiveGuitarProvider = useCallback(() => {
     if (project.harmonyTrack.guitarEngine === "soundfont") {
@@ -505,28 +519,32 @@ export function App() {
   const getPreviewAuditionController = useCallback(() => {
     const provider = getActiveHarmonyProvider();
     if (!provider) return null;
-    return new PreviewAuditionController({
-      provider,
-      clock: provider.clock,
-    });
+    if (
+      !previewAuditionControllerRef.current ||
+      previewAuditionControllerRef.current.getProvider() !== provider
+    ) {
+      previewAuditionControllerRef.current = new PreviewAuditionController({
+        provider,
+        clock: provider.clock,
+      });
+    }
+    return previewAuditionControllerRef.current;
   }, [getActiveHarmonyProvider]);
 
   const getGuitarPreviewAuditionController = useCallback(() => {
     const provider = getActiveGuitarProvider();
     if (!provider) return null;
-    return new PreviewAuditionController({
-      provider,
-      clock: provider.clock,
-    });
+    if (
+      !guitarPreviewAuditionControllerRef.current ||
+      guitarPreviewAuditionControllerRef.current.getProvider() !== provider
+    ) {
+      guitarPreviewAuditionControllerRef.current = new PreviewAuditionController({
+        provider,
+        clock: provider.clock,
+      });
+    }
+    return guitarPreviewAuditionControllerRef.current;
   }, [getActiveGuitarProvider]);
-
-  const applyMelodyPreparationResult = useCallback((result: MelodyPreparationResult) => {
-    setMelodyAudioError(formatMelodyPreparationNotice(result));
-  }, []);
-
-  const applyHarmonyPreparationResult = useCallback((result: MelodyPreparationResult) => {
-    setHarmonySoundFontError(formatMelodyPreparationNotice(result));
-  }, []);
 
   const retryMelodyAudio = useCallback(() => {
     const provider = ensureMelodyProvider();
@@ -752,7 +770,12 @@ export function App() {
   }, [project.harmonyTrack.volume]);
 
   useEffect(() => {
-    if (project.presentation.progressionView === "guitar") {
+    const isGuitarActive =
+      project.presentation.progressionView === "guitar" ||
+      project.presentation.globalMatrixCardView === "guitar" ||
+      project.harmonyTrack.guitarEngine === "soundfont";
+
+    if (isGuitarActive) {
       if (project.harmonyTrack.guitarEngine === "soundfont") {
         const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
         const provider = ensureGuitarSoundFontProvider();
@@ -776,6 +799,7 @@ export function App() {
     ensureGuitarSoundFontProvider,
     project.harmonyTrack.guitarEngine,
     project.harmonyTrack.guitarSoundfontInstrument,
+    project.presentation.globalMatrixCardView,
     project.presentation.progressionView,
   ]);
 
@@ -959,6 +983,9 @@ export function App() {
     store.dispatch(command, addBranchPreview);
   };
   const auditionMatrixCard = (functionId: string) => {
+    if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === "suspended") {
+      void sharedAudioContextRef.current.resume();
+    }
     const currentProject = store.project;
     const isGuitar = currentProject.presentation.globalMatrixCardView === "guitar";
     const previousContext = resolvePreviousHarmonicContext(currentProject);
@@ -3272,14 +3299,21 @@ export function App() {
       }
       statusBar={
         <PianoAudioStatus
-          instrument={project.presentation.progressionView === "guitar" ? "guitar" : "piano"}
+          instrument={
+            project.presentation.progressionView === "guitar" ||
+            project.presentation.globalMatrixCardView === "guitar"
+              ? "guitar"
+              : "piano"
+          }
           engine={
-            project.presentation.progressionView === "guitar"
+            project.presentation.progressionView === "guitar" ||
+            project.presentation.globalMatrixCardView === "guitar"
               ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
               : (project.harmonyTrack.pianoEngine ?? "hq-samples")
           }
           state={
-            project.presentation.progressionView === "guitar"
+            project.presentation.progressionView === "guitar" ||
+            project.presentation.globalMatrixCardView === "guitar"
               ? project.harmonyTrack.guitarEngine === "soundfont"
                 ? guitarSoundFontState
                 : guitarAudioState
@@ -3437,7 +3471,8 @@ export function App() {
             onSetGroove={changeGroove}
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             harmonyAudioState={
-              project.presentation.progressionView === "guitar"
+              project.presentation.progressionView === "guitar" ||
+              project.presentation.globalMatrixCardView === "guitar"
                 ? project.harmonyTrack.guitarEngine === "soundfont"
                   ? guitarSoundFontState
                   : guitarAudioState
@@ -3448,7 +3483,8 @@ export function App() {
                   : harmonySoundFontState
             }
             harmonyAudioError={
-              project.presentation.progressionView === "guitar"
+              project.presentation.progressionView === "guitar" ||
+              project.presentation.globalMatrixCardView === "guitar"
                 ? project.harmonyTrack.guitarEngine === "soundfont"
                   ? harmonySoundFontError
                   : null
@@ -3459,7 +3495,10 @@ export function App() {
                   : harmonySoundFontError
             }
             onRetryHarmonyAudio={() => {
-              if (project.presentation.progressionView === "guitar") {
+              if (
+                project.presentation.progressionView === "guitar" ||
+                project.presentation.globalMatrixCardView === "guitar"
+              ) {
                 if (project.harmonyTrack.guitarEngine === "soundfont") {
                   const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
                   const provider = ensureGuitarSoundFontProvider();

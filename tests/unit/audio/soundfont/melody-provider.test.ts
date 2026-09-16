@@ -195,4 +195,26 @@ describe("T172 — local sampled Melody provider", () => {
     expect(violin.play).toHaveBeenCalledTimes(1);
     playback.cancel();
   });
+
+  it("loads guitar soundfonts gm-024 (nylon) and gm-025 (steel) from local assets", async () => {
+    const guitarPlayer = createPlayer();
+    const loader = vi.fn(async () => guitarPlayer);
+    const provider = new MelodySoundFontProvider({
+      audioContext: createContext(),
+      loadInstrument: loader,
+      assetBaseUrl: "/audio/melody/FluidR3_GM/",
+      guitarAssetBaseUrl: "/audio/guitar/",
+    });
+
+    await provider.prepareForInstruments(["gm-024", "gm-025"]);
+
+    expect(provider.state).toBe("ready");
+    expect(loader).toHaveBeenCalledTimes(2);
+    expect(loader.mock.calls.find((c) => c[1] === "gm-024")?.[2]).toBe(
+      "/audio/guitar/acoustic_guitar_nylon-mp3.js",
+    );
+    expect(loader.mock.calls.find((c) => c[1] === "gm-025")?.[2]).toBe(
+      "/audio/guitar/acoustic_guitar_steel-mp3.js",
+    );
+  });
 });

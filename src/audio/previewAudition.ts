@@ -28,6 +28,12 @@ export class PreviewAuditionController {
   private readonly provider: InstrumentAudioProvider;
   private readonly clock: AudioClock;
   private activePlayback: ScheduledPlayback | null = null;
+  private pendingAudition: {
+    readonly events: readonly AudioNoteEvent[];
+    readonly token: number;
+    readonly requestedAt: number;
+  } | null = null;
+  private pendingToken = 0;
 
   constructor(options: PreviewAuditionControllerOptions) {
     this.provider = options.provider;
@@ -36,31 +42,56 @@ export class PreviewAuditionController {
     };
   }
 
+  getProvider(): InstrumentAudioProvider {
+    return this.provider;
+  }
+
   get currentPlayback(): ScheduledPlayback | null {
     return this.activePlayback;
   }
 
   audition(events: readonly AudioNoteEvent[]): ScheduledPlayback | null {
     // 1. Cancel / stop prior Matrix preview playback scope immediately
-    if (this.activePlayback) {
-      try {
-        this.activePlayback.cancel();
-      } catch {
-        // Ignore cancellation errors
-      }
-      this.activePlayback = null;
-    }
+    this.stop();
 
     if (!events || events.length === 0) {
       return null;
     }
 
-    // 2. Check provider state: if provider is not in playable state, do not schedule
+    // 2. Check provider state: if provider is not yet ready, prepare and queue audition
     if (this.provider.state !== "ready" && this.provider.state !== "fallback") {
+      if (this.provider.state === "idle" || this.provider.state === "loading") {
+        const token = ++this.pendingToken;
+        const requestedAt = Date.now();
+        this.pendingAudition = { events, token, requestedAt };
+
+        void this.provider
+          .prepare()
+          .then(() => {
+            if (
+              this.pendingAudition &&
+              this.pendingAudition.token === token &&
+              Date.now() - requestedAt < 3000
+            ) {
+              const pendingEvents = this.pendingAudition.events;
+              this.pendingAudition = null;
+              this.playEvents(pendingEvents);
+            }
+          })
+          .catch(() => {
+            if (this.pendingAudition?.token === token) {
+              this.pendingAudition = null;
+            }
+          });
+      }
       return null;
     }
 
-    // 3. Resume AudioContext if suspended (browser autoplay policy on user gesture)
+    return this.playEvents(events);
+  }
+
+  private playEvents(events: readonly AudioNoteEvent[]): ScheduledPlayback | null {
+    // Resume AudioContext if suspended (browser autoplay policy on user gesture)
     const providerWithCtx = this.provider as unknown as { audioCtx?: AudioContext | null };
     if (providerWithCtx.audioCtx && providerWithCtx.audioCtx.state === "suspended") {
       providerWithCtx.audioCtx.resume().catch(() => {});
@@ -80,6 +111,7 @@ export class PreviewAuditionController {
   }
 
   stop(): void {
+    this.pendingAudition = null;
     if (this.activePlayback) {
       try {
         this.activePlayback.cancel();

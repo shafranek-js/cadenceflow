@@ -464,4 +464,52 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     );
     expect(sortedPiano).toEqual(sortedAudio);
   });
+
+  it("triggers provider prepare and schedules queued preview once idle provider becomes ready", async () => {
+    let providerState: "idle" | "ready" = "idle";
+    let resolvePrepare: (() => void) | null = null;
+    const preparePromise = new Promise<void>((resolve) => {
+      resolvePrepare = resolve;
+    });
+
+    const scheduledEvents: AudioNoteEvent[][] = [];
+    const provider: InstrumentAudioProvider = {
+      id: "mock-idle-provider",
+      get state() {
+        return providerState;
+      },
+      prepare: vi.fn(async () => {
+        await preparePromise;
+        providerState = "ready";
+      }),
+      schedule: vi.fn((events) => {
+        scheduledEvents.push([...events]);
+        return { id: "p-1", cancel: vi.fn() };
+      }),
+      stop: vi.fn(),
+      dispose: vi.fn(async () => {}),
+    };
+
+    const controller = new PreviewAuditionController({ provider });
+    const events: AudioNoteEvent[] = [
+      { pitch: 60, startSeconds: 0, durationSeconds: 1, velocity: 80, channelRole: "upper" },
+    ];
+
+    // Audition while idle: should trigger prepare and return null immediately
+    const result = controller.audition(events);
+    expect(result).toBeNull();
+    expect(provider.prepare).toHaveBeenCalledTimes(1);
+    expect(scheduledEvents.length).toBe(0);
+
+    // Once preparation finishes, queued audition should play
+    resolvePrepare!();
+    await preparePromise;
+    // Allow microtasks to run
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(scheduledEvents.length).toBe(1);
+    expect(scheduledEvents[0]?.[0]?.pitch).toBe(60);
+
+    controller.dispose();
+  });
 });
