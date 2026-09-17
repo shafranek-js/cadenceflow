@@ -229,6 +229,8 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     if (instrumentChanged) this.cancelPlaybacks(this.livePlaybacks);
     this.liveInstrument = settings.instrument;
     this.liveVolume = clampMidi(settings.volume);
+    this.previewInstrument = settings.instrument;
+    this.previewVolume = clampMidi(settings.volume);
     if (!this.players.has(this.liveInstrument)) {
       this.preparationError = null;
       this.setProviderState("idle");

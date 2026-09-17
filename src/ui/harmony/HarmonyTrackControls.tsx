@@ -4,7 +4,7 @@ import type { MelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
 import { TrackControls } from "../track/TrackControls";
 import { MelodyInstrumentPicker } from "../melody/MelodyInstrumentPicker";
 
-const GUITAR_SOUNDFONT_OPTIONS: readonly { readonly id: MelodyInstrumentId; readonly label: string }[] = [
+export const GUITAR_SOUNDFONT_OPTIONS: readonly { readonly id: MelodyInstrumentId; readonly label: string }[] = [
   { id: "gm-024", label: "GM 024 · Acoustic Guitar (nylon)" },
   { id: "gm-025", label: "GM 025 · Acoustic Guitar (steel)" },
   { id: "gm-026", label: "GM 026 · Electric Guitar (jazz)" },
