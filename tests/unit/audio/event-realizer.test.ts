@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  realizeGuitarStepAudioEvents,
   realizeProgressionAudioEvents,
   realizeStepAudioEvents,
 } from "../../../src/audio/eventRealizer";
+import { realizeChord } from "../../../src/domain/harmony/realization";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import type { HarmonicContext } from "../../../src/domain/harmony/modules/types";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
@@ -150,5 +152,131 @@ describe("T089 — Canonical performance-event realization", () => {
     expect(step2BassEvent).toBeDefined();
     // Step 2 Auto bass chooses E (4) because previous bass was F (5)
     expect(step2BassEvent!.pitch % 12).toBe(4); // E
+  });
+});
+
+describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont realization", () => {
+  const cMajorChord = realizeChord({ moduleId: "progressions", functionId: "I" }, 0);
+
+  it("realizes block articulation with natural guitar downstrum stagger", () => {
+    const step = createStep("g-1", "I", { articulation: "block", masterVelocity: 85 });
+    const result = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+      instrument: "gm-025",
+    });
+
+    expect(result.pitches.length).toBeGreaterThanOrEqual(4);
+    expect(result.events.length).toBe(result.pitches.length);
+    expect(result.totalDurationSeconds).toBe(2.0);
+
+    // First note at t = 0
+    expect(result.events[0]!.startSeconds).toBe(0);
+    expect(result.events[0]!.instrument).toBe("gm-025");
+    expect(result.events[0]!.channelRole).toBe("bass");
+
+    // Subsequent notes staggered by downstrum offset (0.016s per string)
+    for (let i = 1; i < result.events.length; i++) {
+      expect(result.events[i]!.startSeconds).toBeGreaterThan(result.events[i - 1]!.startSeconds);
+      expect(result.events[i]!.channelRole).toBe("upper");
+      expect(result.events[i]!.instrument).toBe("gm-025");
+    }
+  });
+
+  it("realizes arp-up articulation with ascending pitch start times", () => {
+    const step = createStep("g-2", "I", { articulation: "arp-up" });
+    const result = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+
+    expect(result.events.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < result.events.length; i++) {
+      // Arp-up: strictly increasing start times and ascending pitches
+      expect(result.events[i]!.startSeconds).toBeGreaterThan(result.events[i - 1]!.startSeconds);
+      expect(result.events[i]!.pitch).toBeGreaterThanOrEqual(result.events[i - 1]!.pitch);
+    }
+  });
+
+  it("realizes arp-down articulation with descending pitch start times", () => {
+    const step = createStep("g-3", "I", { articulation: "arp-down" });
+    const result = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+
+    expect(result.events.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < result.events.length; i++) {
+      // Arp-down: strictly increasing start times and descending pitches
+      expect(result.events[i]!.startSeconds).toBeGreaterThan(result.events[i - 1]!.startSeconds);
+      expect(result.events[i]!.pitch).toBeLessThanOrEqual(result.events[i - 1]!.pitch);
+    }
+  });
+
+  it("realizes broken-chord articulation with bass group and delayed treble group", () => {
+    const step = createStep("g-4", "I", { articulation: "broken-chord" });
+    const result = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+
+    expect(result.events.length).toBeGreaterThanOrEqual(4);
+    const firstNote = result.events[0]!;
+    const lastNote = result.events[result.events.length - 1]!;
+
+    expect(firstNote.startSeconds).toBe(0);
+    // Upper group delayed by ~110ms
+    expect(lastNote.startSeconds).toBeGreaterThanOrEqual(0.10);
+  });
+
+  it("realizes humanized articulation with deterministic jitter and dynamics", () => {
+    const step = createStep("g-5", "I", { articulation: "humanized", masterVelocity: 80 });
+    const result1 = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+    const result2 = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+
+    expect(result1.events).toEqual(result2.events);
+    // Bass note anchors at t = 0
+    expect(result1.events[0]!.startSeconds).toBe(0);
+    expect(result1.events[0]!.channelRole).toBe("bass");
+
+    for (const evt of result1.events) {
+      expect(evt.velocity).toBeGreaterThanOrEqual(1);
+      expect(evt.velocity).toBeLessThanOrEqual(127);
+      expect(evt.startSeconds).toBeLessThan(0.1);
+    }
+  });
+
+  it("respects per-note velocity overrides and master velocity", () => {
+    const cVoicing = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      tempoBpm: 120,
+    });
+    const firstPitch = cVoicing.pitches[0]!.midiNumber;
+
+    const step = createStep("g-6", "I", {
+      masterVelocity: 75,
+      perNoteVelocityOverrides: { [String(firstPitch)]: 115 },
+    });
+    const result = realizeGuitarStepAudioEvents({
+      chord: cMajorChord,
+      step,
+      tempoBpm: 120,
+    });
+
+    const targetNote = result.events.find((e) => e.pitch === firstPitch);
+    expect(targetNote).toBeDefined();
+    expect(targetNote!.velocity).toBe(115);
   });
 });

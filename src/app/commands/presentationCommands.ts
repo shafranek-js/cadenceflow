@@ -245,4 +245,34 @@ export function setGenreFocus(
   };
 }
 
+export interface SetGuitarChordOrientationPayload {
+  readonly orientation: "vertical" | "horizontal";
+  readonly nowIso: string;
+}
+
+export type SetGuitarChordOrientationCommand = ProjectCommand<SetGuitarChordOrientationPayload> & {
+  readonly type: "presentation/set-guitar-chord-orientation";
+};
+
+export function setGuitarChordOrientation(
+  project: Project,
+  command: SetGuitarChordOrientationCommand,
+): AppliedCommand {
+  const previous = project.presentation.guitarChordOrientation ?? "vertical";
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        guitarChordOrientation: command.payload.orientation,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-guitar-chord-orientation",
+      payload: { orientation: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
 

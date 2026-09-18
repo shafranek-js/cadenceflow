@@ -8,12 +8,14 @@ import {
   setResolutionArrows,
   setGenreFocus,
   setTheme,
+  setGuitarChordOrientation,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetSuzukiColorsCommand,
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetThemeCommand,
+  type SetGuitarChordOrientationCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { explainRecommendation } from "../../../src/domain/recommendations/explanations";
@@ -178,5 +180,27 @@ describe("US10 presentation commands", () => {
     expect(`${expert.headline} ${expert.details.join(" ")}`).toContain("score");
     expect(candidate.functionId).toBe("V");
     expect(candidate.score).toBe(92);
+  });
+
+  it("toggles guitar chord orientation between vertical and horizontal with undo/redo", () => {
+    const initial = createDefaultProject("presentation-guitar-orientation", "Guitar Orientation");
+    const store = new AppStore(initial);
+    const command: SetGuitarChordOrientationCommand = {
+      type: "presentation/set-guitar-chord-orientation",
+      payload: { orientation: "horizontal", nowIso },
+    };
+
+    expect(initial.presentation.guitarChordOrientation).toBe("vertical");
+    store.dispatch(command, setGuitarChordOrientation);
+    expect(store.project.presentation.guitarChordOrientation).toBe("horizontal");
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.guitarChordOrientation).toBe("vertical");
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.guitarChordOrientation).toBe("horizontal");
+
+    const inverseResult = setGuitarChordOrientation(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.guitarChordOrientation).toBe("vertical");
   });
 });

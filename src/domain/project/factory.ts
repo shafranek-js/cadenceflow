@@ -52,6 +52,7 @@ export function createDefaultProject(
       suzukiColors: false,
       resolutionArrows: true,
       genreFocus: "all",
+      guitarChordOrientation: "vertical",
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,

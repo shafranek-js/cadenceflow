@@ -4,7 +4,7 @@ import type { MelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
 import type { CardViewId } from "../../domain/progression/step";
 import type { ProgressionView } from "../../domain/project/project";
 import { Icon } from "../common/Icon";
-import { GUITAR_SOUNDFONT_OPTIONS } from "../harmony/HarmonyTrackControls";
+import { GUITAR_SOUNDFONT_OPTIONS, PIANO_SOUNDFONT_OPTIONS } from "../harmony/HarmonyTrackControls";
 
 export const AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.audio-engines-disclosure-open";
@@ -54,21 +54,28 @@ export function AudioEnginesInspector({
   };
 
   const pianoEngine = settings.pianoEngine ?? "hq-samples";
+  const pianoSoundfontInstrument = settings.pianoSoundfontInstrument ?? "gm-000";
   const guitarEngine = settings.guitarEngine ?? "hq-samples";
   const guitarSoundfontInstrument = settings.guitarSoundfontInstrument ?? "gm-025";
   const isGuitarActive =
-    globalMatrixCardView === "guitar" || progressionView === "guitar";
+    globalMatrixCardView === "guitar" ||
+    progressionView === "guitar" ||
+    progressionView === "tablature";
 
   const selectedGuitarOption =
     GUITAR_SOUNDFONT_OPTIONS.find((opt) => opt.id === guitarSoundfontInstrument) ??
     GUITAR_SOUNDFONT_OPTIONS[1]!;
+
+  const selectedPianoOption =
+    PIANO_SOUNDFONT_OPTIONS.find((opt) => opt.id === pianoSoundfontInstrument) ??
+    PIANO_SOUNDFONT_OPTIONS[0]!;
 
   const activeBadgeLabel = isGuitarActive
     ? guitarEngine === "soundfont"
       ? `Guitar: SoundFont (${selectedGuitarOption.label.replace(/^GM \d+ · /, "")})`
       : "Guitar: HQ Acoustic"
     : pianoEngine === "soundfont"
-      ? "Piano: SoundFont"
+      ? `Piano: SoundFont (${selectedPianoOption.label.replace(/^GM \d+ · /, "")})`
       : "Piano: HQ Grand";
 
   const compactActiveBadgeLabel = isGuitarActive
@@ -148,6 +155,36 @@ export function AudioEnginesInspector({
               </button>
             </div>
           </div>
+
+          {/* Piano Tone select if piano is SoundFont */}
+          {pianoEngine === "soundfont" ? (
+            <div className="audio-engine-tone-row" data-testid="piano-soundfont-tone-row">
+              <label
+                className="audio-engine-tone-label"
+                htmlFor="inspector-piano-soundfont-select"
+              >
+                Tone
+              </label>
+              <select
+                id="inspector-piano-soundfont-select"
+                aria-label="Piano Tone"
+                data-testid="inspector-piano-soundfont-select"
+                value={pianoSoundfontInstrument}
+                onChange={(e) =>
+                  onChange({
+                    pianoSoundfontInstrument: e.target.value as MelodyInstrumentId,
+                  })
+                }
+                className="audio-engine-select"
+              >
+                {PIANO_SOUNDFONT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label.replace(/^GM \d+ · /, "")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           {/* Guitar Row */}
           <div

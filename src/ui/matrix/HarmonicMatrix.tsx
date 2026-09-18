@@ -154,6 +154,7 @@ export function HarmonicMatrix({
         view={view}
         showBassInStaff={project.presentation.showBassInStaff}
         suzukiColors={project.presentation.suzukiColors ?? false}
+        guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
         selected={previewFunctionId === identity.functionId}
         customizedCount={matrixCardOverrideCount(template)}
         resolutionTargetSymbol={cardResolutionTargetSymbol}
@@ -264,6 +265,7 @@ export function HarmonicMatrix({
             onChangeView={onGlobalView}
             selectAriaLabel="Global Card View"
             testIdPrefix="matrix-view"
+            availableViews={["harmonic", "piano", "staff", "guitar"]}
           />
         </div>
       </header>

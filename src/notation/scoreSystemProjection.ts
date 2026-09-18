@@ -31,7 +31,7 @@ export interface ScoreSystem {
 export interface ScoreSystemProjection {
   readonly availableWidthPx: number;
   readonly measuresPerSystem: MeasuresPerSystem;
-  readonly maximumMeasuresPerSystem: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly maximumMeasuresPerSystem: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   readonly measures: readonly ScoreSystemMeasure[];
   readonly systems: readonly ScoreSystem[];
 }
@@ -60,7 +60,7 @@ export function autoMaximumMeasuresPerSystem(
 function maximumFor(
   measuresPerSystem: MeasuresPerSystem,
   measureDurationQuarterBeats: number,
-): 1 | 2 | 3 | 4 | 5 | 6 {
+): 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 {
   return measuresPerSystem === "auto"
     ? autoMaximumMeasuresPerSystem(measureDurationQuarterBeats)
     : measuresPerSystem;

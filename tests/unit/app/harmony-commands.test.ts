@@ -75,6 +75,7 @@ describe("Harmony Track commands", () => {
       payload: {
         patch: {
           pianoEngine: "soundfont",
+          pianoSoundfontInstrument: "gm-004",
           guitarEngine: "soundfont",
           guitarSoundfontInstrument: "gm-026",
         },
@@ -90,6 +91,7 @@ describe("Harmony Track commands", () => {
       solo: false,
       volume: 100,
       pianoEngine: "soundfont",
+      pianoSoundfontInstrument: "gm-004",
       guitarEngine: "soundfont",
       guitarSoundfontInstrument: "gm-026",
     });
@@ -117,6 +119,13 @@ describe("Harmony Track commands", () => {
       setHarmonyTrackSettings(initial, {
         type: "harmony/set-track-settings",
         payload: { patch: { guitarSoundfontInstrument: "not-gm" as never }, nowIso: T1 },
+      }),
+    ).toThrow(HarmonyTrackValidationError);
+
+    expect(() =>
+      setHarmonyTrackSettings(initial, {
+        type: "harmony/set-track-settings",
+        payload: { patch: { pianoSoundfontInstrument: "not-gm" as never }, nowIso: T1 },
       }),
     ).toThrow(HarmonyTrackValidationError);
 

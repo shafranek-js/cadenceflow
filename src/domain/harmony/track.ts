@@ -15,6 +15,7 @@ export interface HarmonyTrackSettings {
   readonly pianoEngine?: AudioEngineType;
   readonly guitarEngine?: AudioEngineType;
   readonly guitarSoundfontInstrument?: MelodyInstrumentId;
+  readonly pianoSoundfontInstrument?: MelodyInstrumentId;
 }
 
 export const DEFAULT_HARMONY_TRACK_SETTINGS: HarmonyTrackSettings = Object.freeze({
@@ -53,6 +54,7 @@ const ALLOWED_HARMONY_TRACK_KEYS = Object.freeze([
   "pianoEngine",
   "guitarEngine",
   "guitarSoundfontInstrument",
+  "pianoSoundfontInstrument",
 ]);
 
 export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettings {
@@ -63,6 +65,7 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
   const pianoEngine = isRecord(value) ? value.pianoEngine : undefined;
   const guitarEngine = isRecord(value) ? value.guitarEngine : undefined;
   const guitarSoundfontInstrument = isRecord(value) ? value.guitarSoundfontInstrument : undefined;
+  const pianoSoundfontInstrument = isRecord(value) ? value.pianoSoundfontInstrument : undefined;
 
   let validatedInstrument: HarmonyInstrument;
   if (instrument === "piano") {
@@ -128,6 +131,18 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     }
   }
 
+  let validatedPianoSoundfontInstrument: MelodyInstrumentId | undefined;
+  if (pianoSoundfontInstrument !== undefined) {
+    try {
+      validatedPianoSoundfontInstrument = validateMelodyInstrumentId(pianoSoundfontInstrument);
+    } catch {
+      throw new HarmonyTrackValidationError(
+        "Harmony Track pianoSoundfontInstrument must be a valid GM instrument id",
+        "invalid-settings",
+      );
+    }
+  }
+
   return Object.freeze({
     instrument: validatedInstrument,
     muted: muted as boolean,
@@ -137,6 +152,9 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     ...(validatedGuitarEngine ? { guitarEngine: validatedGuitarEngine } : {}),
     ...(validatedGuitarSoundfontInstrument
       ? { guitarSoundfontInstrument: validatedGuitarSoundfontInstrument }
+      : {}),
+    ...(validatedPianoSoundfontInstrument
+      ? { pianoSoundfontInstrument: validatedPianoSoundfontInstrument }
       : {}),
   });
 }

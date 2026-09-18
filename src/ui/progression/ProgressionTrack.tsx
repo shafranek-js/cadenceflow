@@ -81,6 +81,7 @@ export function ProgressionTrack({
   onSetMelodyRecipe,
   onRemoveMelodyRecipe,
   activeMelodyEventKey,
+  activeEventStartedAt,
   melodyAudioState,
   melodyAudioError,
   onRetryMelodyAudio,
@@ -146,6 +147,7 @@ export function ProgressionTrack({
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
   readonly onHarmonyTrackSettingsChange?: (patch: Partial<HarmonyTrackSettings>) => void;
   readonly activeMelodyEventKey?: string | null;
+  readonly activeEventStartedAt?: number | null | undefined;
   readonly melodyAudioState?: AudioProviderState;
   readonly melodyAudioError?: string | null;
   readonly onRetryMelodyAudio?: () => void;
@@ -301,7 +303,10 @@ export function ProgressionTrack({
         stepId: item.step.id,
         label,
         pitches: realization.pitches,
-        ...(project.presentation.showBassInStaff && realization.bassPitch
+        ...((project.presentation.showBassInStaff ||
+          project.presentation.progressionView === "tablature" ||
+          isInvertedBass) &&
+        realization.bassPitch
           ? { bassPitch: realization.bassPitch }
           : {}),
         chordPitches: realization.pitches,
@@ -516,6 +521,7 @@ export function ProgressionTrack({
           inLoop={isInLoop}
           showBassInStaff={project.presentation.showBassInStaff}
           suzukiColors={project.presentation.suzukiColors ?? false}
+          guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
           onRemove={() => onRemove(step.id)}
@@ -585,21 +591,24 @@ export function ProgressionTrack({
     );
   };
 
-  const usesStaffSystems = project.presentation.progressionView === "staff";
-  const renderMeasureCard = (measure: (typeof layout.measures)[number]) => {
+  const renderMeasureContent = (measure: (typeof layout.measures)[number]) => {
     const isSelectedMeasure = measure.items.some(
       (item) => item.kind !== "gap" && item.stepId === selectedStepId,
     );
     return (
       <section
         key={measure.measureIndex}
-        className={`progression-measure-card ${usesStaffSystems ? "has-shared-staff" : ""} ${isSelectedMeasure ? "has-selected-step" : ""}`}
+        className={`score-system-measure progression-measure-card ${isSelectedMeasure ? "has-selected-step" : ""}`}
         data-testid="progression-measure"
         data-measure-index={measure.measureIndex}
         data-has-selected-step={isSelectedMeasure ? "true" : undefined}
         aria-label={`Measure ${measure.number}, ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator}`}
+        style={{
+          flex: `${rationalToNumber(measure.capacityBeats)} 1 0%`,
+          minWidth: 0,
+        }}
       >
-        <header className="progression-measure-header">
+        <header className="score-system-measure-header progression-measure-header">
           <strong>Measure {measure.number}</strong>
           <span>
             {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
@@ -608,7 +617,7 @@ export function ProgressionTrack({
             {project.globalTiming.meter.grouping.join("+")}
           </span>
         </header>
-        <div className="progression-measure-grid" data-testid="progression-measure-grid">
+        <div className="score-system-measure-grid progression-measure-grid" data-testid="progression-measure-grid">
           {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
             <div
               key={
@@ -618,7 +627,7 @@ export function ProgressionTrack({
             >
               {item.kind === "gap"
                 ? renderGap(measure.number, item.durationBeats)
-                : renderFragment(item, measure.number, usesStaffSystems)}
+                : renderFragment(item, measure.number, false)}
             </div>
           ))}
         </div>
@@ -700,55 +709,53 @@ export function ProgressionTrack({
             )}
           </div>
         ) : null}
-        {usesStaffSystems ? (
-          <>
-            <ScoreSystemView
-              project={project}
-              layout={layout}
-              melodyTimeline={melodyTimeline}
-              measuresPerSystem={project.presentation.measuresPerSystem}
-              selectedStepId={selectedStepId}
-              playingStepId={currentPlayingStepId}
-              activeMelodyEventKey={activeMelodyEventKey}
-              measureItemsForMeasure={staffItemsForMeasure}
-              onSelectStep={onSelectStep}
-              onEditPerformance={onEditPerformance}
-              onReorder={onReorder}
-              {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
-              {...(onFocusMatrix ? { onFocusMatrix: focusMatrixForGap } : {})}
-              {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
-              {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
-              {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
-              {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
-              {...(onDeleteSystem ? { onDeleteSystem } : {})}
-              {...(isSystemLooping ? { isSystemLooping } : {})}
-              {...(isSystemMuted ? { isSystemMuted } : {})}
-              {...(isSystemSolo ? { isSystemSolo } : {})}
-              {...(canPasteSystem !== undefined ? { canPasteSystem } : {})}
-              {...(onPlayFromSystem ? { onPlayFromSystem } : {})}
-              {...(onToggleLoopSystem ? { onToggleLoopSystem } : {})}
-              {...(onToggleMuteSystem ? { onToggleMuteSystem } : {})}
-              {...(onToggleSoloSystem ? { onToggleSoloSystem } : {})}
-              {...(onMoveSystemUp ? { onMoveSystemUp } : {})}
-              {...(onMoveSystemDown ? { onMoveSystemDown } : {})}
-              {...(onCopySystem ? { onCopySystem } : {})}
-              {...(onPasteSystemAfter ? { onPasteSystemAfter } : {})}
-              {...(onInsertEmptySystemAfter ? { onInsertEmptySystemAfter } : {})}
-              {...(onInsertRestAfterSystem ? { onInsertRestAfterSystem } : {})}
-              {...(onExploreAlternativeFromSystem ? { onExploreAlternativeFromSystem } : {})}
-              {...(onOctaveUpSystem ? { onOctaveUpSystem } : {})}
-              {...(onOctaveDownSystem ? { onOctaveDownSystem } : {})}
-              {...(onResetPerformanceSystem ? { onResetPerformanceSystem } : {})}
-              {...(onSetArticulationSystem ? { onSetArticulationSystem } : {})}
-              {...(onApplyMelodyContourSystem ? { onApplyMelodyContourSystem } : {})}
-              {...(onSetMelodyGridSystem ? { onSetMelodyGridSystem } : {})}
-              {...(onClearMelodySystem ? { onClearMelodySystem } : {})}
-              {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
-            />
-          </>
-        ) : (
-          layout.measures.map(renderMeasureCard)
-        )}
+        {project.progression.steps.length > 0 ? (
+          <ScoreSystemView
+            project={project}
+            layout={layout}
+            melodyTimeline={melodyTimeline}
+            measuresPerSystem={project.presentation.measuresPerSystem}
+            selectedStepId={selectedStepId}
+            playingStepId={currentPlayingStepId}
+            activeMelodyEventKey={activeMelodyEventKey}
+            activeEventStartedAt={activeEventStartedAt}
+            measureItemsForMeasure={staffItemsForMeasure}
+            onSelectStep={onSelectStep}
+            onEditPerformance={onEditPerformance}
+            onReorder={onReorder}
+            renderMeasureContent={renderMeasureContent}
+            {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
+            {...(onFocusMatrix ? { onFocusMatrix: focusMatrixForGap } : {})}
+            {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
+            {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
+            {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
+            {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
+            {...(onDeleteSystem ? { onDeleteSystem } : {})}
+            {...(isSystemLooping ? { isSystemLooping } : {})}
+            {...(isSystemMuted ? { isSystemMuted } : {})}
+            {...(isSystemSolo ? { isSystemSolo } : {})}
+            {...(canPasteSystem !== undefined ? { canPasteSystem } : {})}
+            {...(onPlayFromSystem ? { onPlayFromSystem } : {})}
+            {...(onToggleLoopSystem ? { onToggleLoopSystem } : {})}
+            {...(onToggleMuteSystem ? { onToggleMuteSystem } : {})}
+            {...(onToggleSoloSystem ? { onToggleSoloSystem } : {})}
+            {...(onMoveSystemUp ? { onMoveSystemUp } : {})}
+            {...(onMoveSystemDown ? { onMoveSystemDown } : {})}
+            {...(onCopySystem ? { onCopySystem } : {})}
+            {...(onPasteSystemAfter ? { onPasteSystemAfter } : {})}
+            {...(onInsertEmptySystemAfter ? { onInsertEmptySystemAfter } : {})}
+            {...(onInsertRestAfterSystem ? { onInsertRestAfterSystem } : {})}
+            {...(onExploreAlternativeFromSystem ? { onExploreAlternativeFromSystem } : {})}
+            {...(onOctaveUpSystem ? { onOctaveUpSystem } : {})}
+            {...(onOctaveDownSystem ? { onOctaveDownSystem } : {})}
+            {...(onResetPerformanceSystem ? { onResetPerformanceSystem } : {})}
+            {...(onSetArticulationSystem ? { onSetArticulationSystem } : {})}
+            {...(onApplyMelodyContourSystem ? { onApplyMelodyContourSystem } : {})}
+            {...(onSetMelodyGridSystem ? { onSetMelodyGridSystem } : {})}
+            {...(onClearMelodySystem ? { onClearMelodySystem } : {})}
+            {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
+          />
+        ) : null}
       </div>
       {melodyMenu
         ? (() => {

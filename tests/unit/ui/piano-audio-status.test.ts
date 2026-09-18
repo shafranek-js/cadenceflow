@@ -197,5 +197,41 @@ describe("PianoAudioStatus component", () => {
 
       mounted.unmount();
     });
+
+    it("renders piano tone select when instrument='piano' and engine='soundfont'", () => {
+      const onSettingsChange = vi.fn();
+      const mounted = mount(
+        el(PianoAudioStatus, {
+          state: "ready",
+          instrument: "piano",
+          engine: "soundfont",
+          pianoSoundfontInstrument: "gm-004",
+          onSettingsChange,
+        }),
+      );
+
+      const statusPill = mounted.container.querySelector<HTMLDivElement>(
+        '[data-testid="piano-audio-status"]',
+      );
+      act(() => {
+        statusPill?.click();
+      });
+
+      const toneSelect = mounted.container.querySelector<HTMLSelectElement>(
+        '[data-testid="popover-piano-tone-select"]',
+      );
+      expect(toneSelect).not.toBeNull();
+      expect(toneSelect?.value).toBe("gm-004");
+
+      act(() => {
+        if (toneSelect) {
+          toneSelect.value = "gm-006";
+          toneSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+
+      expect(onSettingsChange).toHaveBeenCalledWith({ pianoSoundfontInstrument: "gm-006" });
+      mounted.unmount();
+    });
   });
 });

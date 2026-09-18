@@ -17,6 +17,11 @@
   --score-playback: #e6bb8a;
   --score-playback-border: #8a5732;
   --score-playback-ink: #35200f;
+  --score-playback-glow: rgba(245, 158, 11, 0.95);
+  --score-playback-glow-spread: rgba(245, 158, 11, 0.6);
+  --score-playback-tab-bg: #fef3c7;
+  --score-playback-tab-border: #f59e0b;
+  --score-playback-tab-text: #78350f;
   --score-focus: #005fcc;
   --score-hover: #f2f5f8;
   --score-gap: #f4f6f7;
@@ -34,6 +39,11 @@
   --score-playback: #e9bd8c;
   --score-playback-border: #81512e;
   --score-playback-ink: #35200f;
+  --score-playback-glow: rgba(245, 158, 11, 0.95);
+  --score-playback-glow-spread: rgba(245, 158, 11, 0.6);
+  --score-playback-tab-bg: #fef3c7;
+  --score-playback-tab-border: #f59e0b;
+  --score-playback-tab-text: #78350f;
   --score-focus: #005fcc;
   --score-hover: #f1f5f8;
   --score-gap: #f5f7f8;
@@ -299,10 +309,538 @@
   height: 12px;
 }
 
+.score-system-canvas {
+  position: relative;
+  z-index: 2;
+  background: transparent !important;
+}
+
 .score-system-canvas > svg {
   display: block;
-  background-color: var(--score-paper) !important;
+  background-color: transparent !important;
 }
+
+/* -------------------------------------------------------------------------
+   Score System Measures Row (Harmonic, Piano, Guitar Views)
+   ------------------------------------------------------------------------- */
+.score-system-measures-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  background: var(--score-paper);
+}
+
+.score-system-measure.progression-measure-card {
+  width: auto;
+  min-width: 0;
+  padding: 8px 10px 12px;
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid var(--score-rule);
+  background: transparent;
+  color: var(--score-ink);
+  box-shadow: none;
+  transition: background-color 0.15s ease;
+}
+
+.score-system-measure.progression-measure-card:last-child {
+  border-right: none;
+}
+
+.score-system-measure.progression-measure-card.has-selected-step {
+  background: color-mix(in srgb, var(--score-selected) 28%, transparent);
+}
+
+.score-system-measure .score-system-measure-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--score-rule) 60%, transparent);
+  color: var(--score-muted-ink);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.score-system-measure .score-system-measure-header strong {
+  color: var(--score-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.score-system-measure .score-system-measure-header span:not(:first-of-type) {
+  padding: 1px 5px;
+  border: 1px solid var(--score-rule);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--score-paper) 80%, var(--score-rule));
+  color: var(--score-muted-ink);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-system-measure .score-system-measure-grid {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--score-rule);
+  border-radius: 6px;
+  background: var(--score-paper);
+  overflow: hidden;
+}
+
+.score-system .progression-measure-grid > .measure-item-wrapper > .measure-step-segment {
+  min-width: 0;
+}
+
+.score-system .progression-step-card,
+.score-system .progression-rest-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  padding: 6px;
+  border: 0;
+  border-right: 1px solid var(--score-rule);
+  border-radius: 0;
+  background: var(--score-paper);
+  color: var(--score-ink);
+  grid-template-rows: unset;
+  gap: 0;
+}
+
+.score-system .progression-step-select-button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  color: inherit;
+  cursor: pointer;
+}
+
+.score-system .measure-item-wrapper:last-child .progression-step-card,
+.score-system .measure-item-wrapper:last-child .progression-rest-card {
+  border-right: none;
+}
+
+.score-system .progression-step-card.is-selected,
+.score-system .progression-rest-card.is-selected {
+  background: var(--score-selected, #f0e4cc) !important;
+  color: var(--score-ink, #281a0e) !important;
+  outline: none !important;
+  box-shadow: inset 0 0 0 1.5px var(--score-selected-border, #a87435) !important;
+}
+
+.score-system .progression-step-card.is-selected .progression-step-select-button,
+.score-system .progression-step-card.is-selected .step-view strong {
+  color: var(--score-ink, #281a0e) !important;
+}
+
+.score-system .progression-step-card.is-selected .step-view span {
+  color: var(--score-muted-ink, #6b4c2b) !important;
+}
+
+.score-system .progression-step-card.is-selected .step-inversion-badge {
+  color: var(--score-ink, #281a0e) !important;
+  background: color-mix(in srgb, var(--score-selected-border, #a87435) 18%, transparent) !important;
+}
+
+.score-system .progression-step-card.is-selected .progression-step-number {
+  border-color: var(--score-selected-border, #a87435);
+  background: color-mix(in srgb, var(--score-selected, #f0e4cc) 65%, #ffffff);
+  color: var(--score-ink, #281a0e);
+  font-weight: 700;
+}
+
+.score-system .progression-step-card.is-selected .mini-piano-chord-name,
+.score-system .progression-step-card.is-selected .mini-guitar-chord-name {
+  color: var(--score-ink, #281a0e) !important;
+}
+
+.score-system .progression-step-card.is-selected .mini-piano-octave,
+.score-system .progression-step-card.is-selected .mini-guitar-position {
+  color: var(--score-muted-ink, #6b4c2b) !important;
+}
+
+.score-system .progression-step-card.is-playing,
+.score-system .progression-rest-card.is-playing {
+  background: var(--score-playback-tab-bg, #fef3c7) !important;
+  color: var(--score-playback-ink, #35200f) !important;
+  outline: none !important;
+  border-color: var(--score-playback-border, #8a5732) !important;
+  box-shadow: inset 0 0 0 1.5px var(--score-playback-border, #8a5732), 0 2px 10px var(--score-playback-glow-spread, rgba(245, 158, 11, 0.45)) !important;
+}
+
+.score-system .progression-step-card.is-playing.is-selected,
+.score-system .progression-rest-card.is-playing.is-selected {
+  background: var(--score-playback-tab-bg, #fef3c7) !important;
+  color: var(--score-playback-ink, #35200f) !important;
+  outline: none !important;
+  border-color: var(--score-playback-border, #8a5732) !important;
+  box-shadow: inset 0 0 0 2px var(--score-selected-border, #a87435), 0 2px 12px var(--score-playback-glow-spread, rgba(245, 158, 11, 0.55)) !important;
+}
+
+.score-system .progression-step-card.is-playing .progression-step-select-button {
+  color: var(--score-playback-ink, #35200f) !important;
+}
+
+.score-system .progression-step-card.is-playing .step-view strong {
+  color: var(--score-playback-ink, #35200f) !important;
+}
+
+.score-system .progression-step-card.is-playing .step-view span {
+  color: var(--score-playback-tab-text, #78350f) !important;
+}
+
+.score-system .progression-step-card.is-playing .step-inversion-badge {
+  color: var(--score-playback-ink, #35200f) !important;
+  background: color-mix(in srgb, var(--score-playback-border, #8a5732) 15%, transparent) !important;
+}
+
+.score-system .progression-step-card.is-playing .progression-step-number {
+  border-color: var(--score-playback-border, #8a5732);
+  background: color-mix(in srgb, var(--score-playback, #e6bb8a) 80%, #ffffff);
+  color: var(--score-playback-ink, #35200f);
+  font-weight: 700;
+}
+
+.score-system .progression-step-card.is-playing .progression-step-remove-button {
+  color: var(--score-playback-tab-text, #78350f);
+}
+
+.score-system .progression-step-card.is-playing .progression-step-remove-button:hover {
+  background: color-mix(in srgb, var(--danger, #ff4d4f) 16%, transparent);
+  color: var(--danger, #ff4d4f);
+}
+
+.score-system .progression-step-card.is-playing .mini-piano-chord-name,
+.score-system .progression-step-card.is-playing .mini-guitar-chord-name {
+  color: var(--score-playback-ink, #35200f) !important;
+}
+
+.score-system .progression-step-card.is-playing .mini-piano-octave,
+.score-system .progression-step-card.is-playing .mini-guitar-position {
+  color: var(--score-playback-tab-text, #78350f) !important;
+}
+
+.score-system .progression-step-card.is-in-loop,
+.score-system .progression-rest-card.is-in-loop {
+  outline: 1px dashed var(--score-selected-border);
+  outline-offset: -2px;
+}
+
+.score-system .progression-step-number {
+  border-color: var(--score-rule);
+  background: color-mix(in srgb, var(--score-paper) 80%, var(--score-rule));
+  color: var(--score-muted-ink);
+}
+
+.score-system .progression-step-remove-button {
+  color: var(--score-muted-ink);
+}
+
+.score-system .progression-step-remove-button:hover {
+  background: color-mix(in srgb, var(--danger, #ff4d4f) 12%, transparent);
+  color: var(--danger, #ff4d4f);
+}
+
+.score-system .progression-step-select-button,
+.score-system .progression-step-select-button[aria-pressed],
+.score-system .progression-step-select-button:hover,
+.score-system .progression-step-select-button:focus,
+.score-system .progression-step-select-button:focus-visible,
+.score-system .progression-step-select-button:active,
+.score-system .staff-card-preview-button,
+.score-system .staff-card-preview-button[aria-pressed],
+.score-system .staff-card-preview-button:hover,
+.score-system .staff-card-preview-button:focus,
+.score-system .staff-card-preview-button:focus-visible,
+.score-system .staff-card-preview-button:active {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.score-system .progression-step-select-button {
+  color: var(--score-ink);
+}
+
+.score-system .step-view {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  width: 100%;
+}
+
+.score-system .step-view strong[data-testid="step-function"],
+.score-system .step-view strong {
+  font-size: clamp(1.4rem, 2.5vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--score-ink);
+}
+
+.score-system .step-view .step-inversion-badge {
+  font-size: clamp(0.95rem, 1.5vw, 1.3rem);
+  padding: 2px 7px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.score-system .step-view > span {
+  font-size: clamp(0.76rem, 1.1vw, 0.95rem);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--score-muted-ink);
+  opacity: 0.9;
+}
+
+.score-system .progression-step-continuation {
+  border-right: 1px dashed var(--score-rule);
+  background: color-mix(in srgb, var(--score-paper) 95%, var(--score-rule));
+  color: var(--score-muted-ink);
+}
+
+.score-system .progression-measure-gap {
+  border: 1px dashed var(--score-rule);
+  background: color-mix(in srgb, var(--score-paper) 92%, var(--score-rule));
+  color: var(--score-muted-ink);
+}
+
+.score-system .progression-measure-gap strong {
+  color: var(--score-ink);
+}
+
+.score-system .progression-measure-gap span {
+  color: var(--score-muted-ink);
+}
+
+.score-system .progression-gap-actions button {
+  border-color: var(--score-rule);
+  background: var(--score-paper);
+  color: var(--score-ink);
+}
+
+.score-system .progression-gap-actions button:hover,
+.score-system .progression-gap-actions button:focus-visible {
+  border-color: var(--score-focus);
+  color: var(--score-focus);
+}
+
+/* Guitar card view on score paper surface */
+.score-system .mini-guitar-chord-name {
+  color: var(--score-ink);
+}
+
+.score-system .mini-guitar-position {
+  color: var(--score-muted-ink);
+}
+
+.score-system .guitar-fretboard-bg {
+  fill: color-mix(in srgb, var(--score-paper) 93%, var(--score-rule));
+  stroke: var(--score-rule);
+}
+
+.score-system .guitar-nut {
+  fill: var(--score-ink);
+}
+
+.score-system .guitar-fret-line {
+  stroke: var(--score-rule);
+}
+
+.score-system .guitar-position-label {
+  fill: var(--score-muted-ink);
+}
+
+.score-system .guitar-string {
+  stroke: color-mix(in srgb, var(--score-ink) 55%, var(--score-rule));
+}
+
+.score-system .mini-guitar-frets-tab span {
+  color: var(--score-muted-ink);
+}
+
+/* Piano card view on score paper surface: expanded, highly readable keyboard */
+.score-system .mini-piano-card-visual {
+  width: min(100%, clamp(200px, 94%, 520px));
+  gap: 6px;
+  margin-inline: auto;
+  padding-block: 4px;
+}
+
+.score-system .mini-piano-heading {
+  min-height: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.score-system .mini-piano-chord-name {
+  color: var(--score-ink);
+  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.score-system .mini-piano-octave {
+  color: var(--score-muted-ink);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.score-system .mini-piano {
+  border-radius: 4px;
+  border-color: color-mix(in srgb, var(--score-rule) 70%, #000);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.score-system .mini-piano-key-labels {
+  height: 28px;
+}
+
+.score-system .mini-piano-white-key-label {
+  color: var(--score-muted-ink);
+  font-size: clamp(0.74rem, 1.2vw, 0.9rem);
+  font-weight: 750;
+}
+
+.score-system .mini-piano-accidental-key-label {
+  font-size: clamp(0.68rem, 1.1vw, 0.82rem);
+  font-weight: 800;
+  width: 36px;
+}
+
+/* Guitar card view on score paper surface: scaled diagram & crisp fretboard */
+.score-system .mini-guitar-card-visual {
+  width: max-content;
+  max-width: 100%;
+  gap: 4px;
+  margin-inline: auto;
+  padding-block: 2px 4px;
+  place-items: center;
+}
+
+.score-system .mini-guitar-card-visual.is-horizontal {
+  width: max-content;
+  max-width: 100%;
+  gap: 4px;
+}
+
+.score-system .mini-guitar-heading {
+  min-height: 1.15rem;
+  width: 100%;
+  padding-inline: 2px;
+}
+
+.score-system .mini-guitar-chord-name {
+  font-size: clamp(0.82rem, 1vw, 0.95rem);
+  font-weight: 700;
+  color: var(--score-ink);
+  letter-spacing: -0.01em;
+}
+
+.score-system .mini-guitar-position {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--score-muted-ink);
+}
+
+.score-system .mini-guitar-fretboard-wrap svg {
+  width: clamp(124px, 15vw, 152px);
+  height: auto;
+}
+
+.score-system .mini-guitar-card-visual.is-horizontal .mini-guitar-fretboard-wrap svg {
+  width: clamp(176px, 21vw, 236px);
+  height: auto;
+}
+
+.score-system .guitar-fret-number {
+  fill: var(--score-muted-ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+/* -------------------------------------------------------------------------
+   Tablature Left-Hand Fingering Indicators (Badges, Dots, Numbers)
+   ------------------------------------------------------------------------- */
+.score-system-canvas svg .vf-tab-finger-badge,
+.score-system-canvas svg .vf-tab-finger-dot,
+.score-system-canvas svg .vf-tab-fret-badge {
+  user-select: none;
+}
+
+/* Fret background circle (badge directly under fret number) */
+.score-system-canvas svg .vf-tab-fret-badge {
+  stroke: #ffffff;
+  stroke-width: 0.8px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+  cursor: pointer;
+}
+
+.score-system-canvas svg text.vf-tab-fret-text-with-badge {
+  fill: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Dot beside fret number */
+.score-system-canvas svg .vf-tab-finger-dot circle {
+  stroke: #ffffff;
+  stroke-width: 0.8px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+/* Numbered pill beside fret number */
+.score-system-canvas svg .vf-tab-finger-badge circle {
+  stroke: #ffffff;
+  stroke-width: 0.8px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+.score-system-canvas svg .vf-tab-finger {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 7pt;
+  font-weight: 900;
+  fill: #ffffff !important;
+  pointer-events: none;
+  user-select: none;
+}
+
+.score-system-canvas svg .vf-tab-fret-badge[data-tab-finger="1"] { fill: #f7aa06; }
+.score-system-canvas svg .vf-tab-fret-badge[data-tab-finger="2"] { fill: #c920ff; }
+.score-system-canvas svg .vf-tab-fret-badge[data-tab-finger="3"] { fill: #00affe; }
+.score-system-canvas svg .vf-tab-fret-badge[data-tab-finger="4"] { fill: #f56e50; }
+
+.score-system-canvas svg [data-tab-finger="1"] .vf-tab-finger-circle { fill: #f7aa06; }
+.score-system-canvas svg [data-tab-finger="2"] .vf-tab-finger-circle { fill: #c920ff; }
+.score-system-canvas svg [data-tab-finger="3"] .vf-tab-finger-circle { fill: #00affe; }
+.score-system-canvas svg [data-tab-finger="4"] .vf-tab-finger-circle { fill: #f56e50; }
 
 .progression-measure-score > .melody-staff-view,
 .progression-measure-score > .measure-staff-view {
@@ -481,11 +1019,55 @@
   color: var(--score-ink);
 }
 
+.score-system .measure-staff-event.is-playing {
+  /* Removed rectangle background and shadow - measure highlight and playhead indicate progress */
+}
+
 .score-system .measure-staff-event.is-playing .measure-staff-event-select {
   border-color: var(--score-playback-border);
   background: var(--score-playback);
   color: var(--score-playback-ink);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--score-playback-border) 28%, transparent);
+}
+
+/* Active Measure Highlight (Guitar Pro / AlphaTab style - placed behind staff) */
+.score-system-active-measure {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  background: color-mix(in srgb, #38bdf8 10%, transparent);
+  border-left: 2px solid color-mix(in srgb, #0284c7 40%, transparent);
+  border-right: 2px solid color-mix(in srgb, #0284c7 40%, transparent);
+  border-radius: 4px;
+}
+
+/* Vertical Playhead Cursor across all staves - placed behind notation elements */
+.score-system-playhead {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  width: 2px;
+}
+
+.score-system-playhead-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #38bdf8;
+  opacity: 0.9;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+}
+
+.score-system-playhead-cap {
+  position: absolute;
+  top: -6px;
+  left: -4px;
+  width: 10px;
+  height: 6px;
+  background: #0284c7;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
 .measure-staff-event-select:hover,
@@ -1043,6 +1625,270 @@
   background: color-mix(in srgb, #51cf66 18%, transparent);
   color: #51cf66;
   border: 1px solid color-mix(in srgb, #51cf66 35%, transparent);
+}
+
+button.score-system-status-tag.fingering {
+  cursor: pointer;
+  background: color-mix(in srgb, var(--text, #334155) 8%, transparent);
+  color: var(--text-muted, #64748b);
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 70%, transparent);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+button.score-system-status-tag.fingering:hover {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 18%, transparent);
+  color: var(--accent, #2563eb);
+}
+
+button.score-system-status-tag.hand-legend-trigger {
+  cursor: pointer;
+  background: color-mix(in srgb, var(--text, #334155) 8%, transparent);
+  color: var(--text, #334155);
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 70%, transparent);
+  transition: all 0.15s ease;
+  font-family: inherit;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+button.score-system-status-tag.hand-legend-trigger:hover {
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+  color: #f59e0b;
+  border-color: color-mix(in srgb, #f59e0b 45%, transparent);
+}
+
+.score-system-fingering-dots-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--text, #334155) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 50%, transparent);
+  transition: all 0.15s ease;
+  vertical-align: middle;
+}
+
+.score-system-fingering-dots-legend:hover {
+  background: color-mix(in srgb, var(--text, #334155) 14%, transparent);
+  border-color: color-mix(in srgb, var(--border, #cbd5e1) 90%, transparent);
+}
+
+.score-system-fingering-dots-legend .dot-mini {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.score-system-fingering-dots-legend .dot-1 { background: #f59e0b; }
+.score-system-fingering-dots-legend .dot-2 { background: #a855f7; }
+.score-system-fingering-dots-legend .dot-3 { background: #0ea5e9; }
+.score-system-fingering-dots-legend .dot-4 { background: #ef4444; }
+
+/* -------------------------------------------------------------------------
+   Guitar Left Hand Legend Modal
+   ------------------------------------------------------------------------- */
+.guitar-hand-legend-backdrop {
+  z-index: 1050;
+}
+
+.guitar-hand-legend-dialog {
+  width: min(560px, 94vw);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+.hand-legend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+}
+
+.hand-legend-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hand-legend-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hand-legend-content {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+@media (max-width: 580px) {
+  .hand-legend-content {
+    flex-direction: column;
+  }
+}
+
+.hand-legend-graphic {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: color-mix(in srgb, var(--surface-subtle, #f8fafc) 60%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.guitar-hand-image {
+  display: block;
+  width: 190px;
+  height: auto;
+  max-height: 255px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.28));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.hand-legend-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.hand-legend-intro {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hand-legend-finger-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hand-legend-finger-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.hand-legend-pill {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+  background: var(--finger-color, #64748b);
+}
+
+.hand-legend-finger-names {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+}
+
+.hand-legend-finger-names strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.hand-legend-finger-names span {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.hand-legend-open-string {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+.hand-legend-style-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.style-picker-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.style-picker-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.style-option-btn {
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle, transparent);
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.style-option-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.style-option-btn.active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .melody-editor-dialog {
@@ -1655,10 +2501,10 @@
 .progression-step-card,
 .progression-rest-card {
   display: grid;
-  grid-template-rows: auto minmax(52px, 1fr) auto;
-  gap: 6px;
-  min-height: 100px;
-  padding: 10px 8px 8px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  min-height: 80px;
+  padding: 8px 6px;
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease,
@@ -2517,5 +3363,20 @@
   color: #38bdf8;
   font-weight: 700;
   margin-left: 2px;
+}
+
+/* Outer dark-yellow outline on yellow noteheads (E) for enhanced contrast on light score paper */
+.vf-notehead[fill="#fbf405"] text,
+.vf-notehead[stroke="#b45309"] text {
+  stroke: #b45309 !important;
+  stroke-width: 1.5px !important;
+  paint-order: stroke fill !important;
+}
+
+/* Crisp 1px horizontal lines for musical notation and guitar tablature staves, including ledger lines */
+.vf-stave path,
+.vf-stavenote > path {
+  stroke-width: 1px !important;
+  shape-rendering: crispEdges !important;
 }
 

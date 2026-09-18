@@ -17,6 +17,7 @@ export function ChordCard({
   customizedCount,
   showBassInStaff = false,
   suzukiColors = false,
+  guitarChordOrientation = "vertical",
   resolutionTargetSymbol,
   isResolutionTarget,
   isGenreFocused = false,
@@ -36,6 +37,7 @@ export function ChordCard({
   readonly customizedCount: number;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
+  readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly resolutionTargetSymbol?: string | undefined;
   readonly isResolutionTarget?: boolean | undefined;
   readonly isGenreFocused?: boolean | undefined;
@@ -155,7 +157,11 @@ export function ChordCard({
             <PianoCardView chordPitches={model.pianoPitches} chordLabel={chordLabel} />
           )}
           {view === "guitar" && (
-            <GuitarCardView chord={model.chord} chordLabel={chordLabel} />
+            <GuitarCardView
+              chord={model.chord}
+              chordLabel={chordLabel}
+              orientation={guitarChordOrientation}
+            />
           )}
         </button>
       )}

@@ -5,12 +5,20 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
-import type { ExactPitch } from "../../domain/harmony/pitch";
+import { normalizePitchClass, type ExactPitch } from "../../domain/harmony/pitch";
 import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
+import {
+  pitchToGuitarTabPosition,
+  resolveGuitarTabEntry,
+  optimizeGuitarMelodyTab,
+  type GuitarMelodyInputNote,
+  type GuitarTabPosition,
+} from "../../domain/instruments/guitar/tablature";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import type { Project } from "../../domain/project/project";
 import { formatMusicalDuration, musicalDuration } from "../../domain/timing/duration";
@@ -18,7 +26,7 @@ import type {
   ProgressionMeasure,
   ProgressionMeasureLayout,
 } from "../../domain/timing/measureLayout";
-import { rationalToNumber } from "../../domain/timing/rational";
+import { addRational, rationalToNumber } from "../../domain/timing/rational";
 import {
   projectScoreSystems,
   type ScoreSystem,
@@ -43,6 +51,10 @@ import { melodyInstrumentLabel } from "../melody/labels";
 import type { MeasureStaffItem } from "./MeasureStaffView";
 import { performanceOctaveShiftPatch } from "./staffOctave";
 import { ScoreSystemContextMenu, type ScoreSystemMenuPosition } from "./ScoreSystemContextMenu";
+import {
+  GuitarHandLegendModal,
+  type TabFingeringStyle,
+} from "../guitar/GuitarHandLegendModal";
 
 const DEFAULT_SCORE_WIDTH_PX = 960;
 const SCORE_STAFF_HEIGHT_PX = 160;
@@ -87,6 +99,8 @@ function sourceChordLabel(project: Project, stepId: string): string {
 function harmonySequenceEntry(
   item: MeasureStaffItem,
   playingStepId: string | undefined,
+  isTablature = false,
+  project?: Project,
 ): StaffSequenceEntry {
   if (item.kind === "gap") {
     return {
@@ -104,11 +118,37 @@ function harmonySequenceEntry(
       startOffsetBeats: item.startOffsetBeats,
     };
   }
+  let tabPositions:
+    | readonly { readonly str: number; readonly fret: number; readonly finger?: number }[]
+    | undefined;
+  if (isTablature && project) {
+    const step = project.progression.steps.find(
+      (candidate) => candidate.id === item.stepId && candidate.kind === "chord",
+    );
+    if (step && step.kind === "chord") {
+      const chord = {
+        ...realizeChord(step.harmonicFunction, project.tonic),
+        variant: step.harmonicVariant,
+      };
+      const bassPc = item.bassPitch
+        ? item.bassPitch.pitchClassIdentity
+        : undefined;
+      const tabEntry = resolveGuitarTabEntry(chord, item.label, bassPc);
+      tabPositions = tabEntry.strings
+        .filter((s) => s.fret >= 0)
+        .map((s) => ({
+          str: s.stringNumber,
+          fret: s.fret,
+          ...(typeof s.finger === "number" ? { finger: s.finger } : {}),
+        }));
+    }
+  }
   return {
     key: item.key,
     kind: "chord",
     projection: projectPitchesToStaff(item.pitches),
     ...(item.bassPitch ? { bassProjection: projectPitchesToStaff([item.bassPitch]) } : {}),
+    ...(tabPositions ? { tabPositions } : {}),
     duration: item.duration,
     startOffsetBeats: item.startOffsetBeats,
     continuesFromPrevious: item.continuesFromPrevious,
@@ -120,6 +160,8 @@ function harmonySequenceEntry(
 function melodySequenceEntry(
   entry: MelodyStaffEntry,
   activeMelodyEventKey: string | null | undefined,
+  isTablature = false,
+  customTabPosition?: GuitarTabPosition,
 ): StaffSequenceEntry {
   if (entry.kind === "rest") {
     return {
@@ -129,10 +171,14 @@ function melodySequenceEntry(
       startOffsetBeats: entry.startOffsetBeats,
     };
   }
+  const tabPositions = isTablature
+    ? [customTabPosition ?? pitchToGuitarTabPosition(entry.pitch, "melody")]
+    : undefined;
   return {
     key: entry.key,
     kind: "note",
     projection: projectPitchesToStaff([entry.pitch]),
+    ...(tabPositions ? { tabPositions } : {}),
     duration: musicalDuration(entry.durationBeats),
     startOffsetBeats: entry.startOffsetBeats,
     continuesFromPrevious: entry.continuesFromPrevious,
@@ -165,14 +211,13 @@ function systemMeasureRatio(
     .slice(0, measurePosition)
     .reduce((sum, measure) => sum + measure.requiredWidthPx, 0);
   const measure = system.measures[measurePosition]!;
-  return (
-    (connectorInset +
-      measureStart * scale +
-      Math.min(Math.max(rationalToNumber(startOffsetBeats) / barLengthBeats, 0), 1) *
-        measure.requiredWidthPx *
-        scale) /
-    systemWidth
-  );
+  const measureStartPx = connectorInset + measureStart * scale;
+  const measureWidthPx = measure.requiredWidthPx * scale;
+  const leftPadding = measurePosition === 0 ? (system.index === 0 ? 84 : 54) : 24;
+  const rightPadding = 24;
+  const usableWidth = Math.max(measureWidthPx - leftPadding - rightPadding, 1);
+  const onsetRatio = Math.min(Math.max(rationalToNumber(startOffsetBeats) / barLengthBeats, 0), 1);
+  return (measureStartPx + leftPadding + onsetRatio * usableWidth) / systemWidth;
 }
 
 function systemMeasureSpan(
@@ -261,6 +306,7 @@ interface ScoreSystemCanvasProps {
   readonly selectedStepId: string | undefined;
   readonly playingStepId: string | undefined;
   readonly activeMelodyEventKey: string | null | undefined;
+  readonly activeEventStartedAt?: number | null | undefined;
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
@@ -301,6 +347,95 @@ interface ScoreSystemCanvasProps {
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
+  readonly showFingering?: boolean | undefined;
+  readonly onToggleFingering?: (() => void) | undefined;
+  readonly fingeringStyle?: TabFingeringStyle | undefined;
+  readonly onOpenHandLegend?: (() => void) | undefined;
+  readonly renderMeasureContent?: ((measure: ProgressionMeasure) => ReactNode) | undefined;
+}
+
+function ScoreSystemPlayhead({
+  startX,
+  endX,
+  durationMs,
+  eventKey,
+  topPx,
+  heightPx,
+  systemIndex,
+  startedAt,
+}: {
+  startX: number;
+  endX: number;
+  durationMs: number;
+  eventKey: string;
+  topPx: number;
+  heightPx: number;
+  systemIndex: number;
+  startedAt?: number | null | undefined;
+}) {
+  const lineRef = useRef<HTMLDivElement | null>(null);
+  const currentXRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const el = lineRef.current;
+    if (!el) return;
+
+    let frameId: number;
+    const now = performance.now();
+    // Anchor playback animation to the audio clock onset timestamp when available.
+    // If startedAt was recorded when the event triggered in WebAudio, effectiveStartTime accounts
+    // for any polling or React rendering latency so the playhead arrives on each notehead exactly
+    // as the audio sounds without accumulating drift.
+    const effectiveStartTime =
+      typeof startedAt === "number" && startedAt > 0 && startedAt <= now
+        ? startedAt
+        : now;
+
+    const span = endX - startX;
+    // Allow extrapolation forward for up to 300ms while waiting for the next step update
+    const maxElapsed = durationMs + 300;
+
+    const tick = (frameNow: number) => {
+      const elapsed = frameNow - effectiveStartTime;
+      if (elapsed > maxElapsed) {
+        // Playback likely paused or stopped; clamp at endX
+        currentXRef.current = endX;
+        el.style.transform = `translateX(${endX}px)`;
+        return;
+      }
+
+      const progress = durationMs > 0 ? Math.min(Math.max(elapsed / durationMs, 0), 1.3) : 1;
+      const currentX = startX + span * progress;
+      currentXRef.current = currentX;
+      el.style.transform = `translateX(${currentX}px)`;
+
+      frameId = requestAnimationFrame(tick);
+    };
+
+    tick(now);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [startX, endX, durationMs, eventKey, startedAt]);
+
+  return (
+    <div
+      ref={lineRef}
+      className="score-system-playhead"
+      data-testid={`score-system-playhead-${systemIndex}`}
+      style={{
+        position: "absolute",
+        left: 0,
+        top: `${topPx}px`,
+        height: `${heightPx}px`,
+        willChange: "transform",
+      }}
+    >
+      <div className="score-system-playhead-cap" />
+      <div className="score-system-playhead-line" />
+    </div>
+  );
 }
 
 function ScoreSystemCanvas({
@@ -313,6 +448,7 @@ function ScoreSystemCanvas({
   selectedStepId,
   playingStepId,
   activeMelodyEventKey,
+  activeEventStartedAt,
   onSelectStep,
   onEditPerformance,
   onReorder,
@@ -347,8 +483,16 @@ function ScoreSystemCanvas({
   onSetMelodyGridSystem,
   onClearMelodySystem,
   onToggleSuzukiColors,
+  showFingering,
+  onToggleFingering,
+  fingeringStyle,
+  onOpenHandLegend,
+  renderMeasureContent,
 }: ScoreSystemCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [localShowFingering, setLocalShowFingering] = useState(true);
+  const effectiveShowFingering = showFingering ?? localShowFingering;
+  const handleToggleFingering = onToggleFingering ?? (() => setLocalShowFingering((v) => !v));
   const [renderedPositions, setRenderedPositions] = useState<Readonly<Record<string, number>>>({});
   const [systemMenu, setSystemMenu] = useState<{
     readonly anchor: HTMLElement;
@@ -412,19 +556,88 @@ function ScoreSystemCanvas({
       ) ?? [],
     [melodyTimeline, system.measures],
   );
-  const showBass = project.presentation.showBassInStaff;
+  const isTablature = project.presentation.progressionView === "tablature";
+  const isNotationView =
+    project.presentation.progressionView === "staff" || isTablature;
+  const showBass = isTablature ? false : project.presentation.showBassInStaff;
   const suzukiColors = project.presentation.suzukiColors ?? false;
+
+  const optimizedMelodyTabPositions = useMemo(() => {
+    if (!isTablature || !isNotationView) return new Map<string, GuitarTabPosition>();
+
+    const chordBaseFretByMeasure = new Map<number, number>();
+    for (const projectedMeasure of system.measures) {
+      const items = measureItems[projectedMeasure.measureIndex] ?? [];
+      for (const item of items) {
+        if (item.kind === "chord") {
+          const step = project.progression.steps.find(
+            (c) => c.id === item.stepId && c.kind === "chord",
+          );
+          if (step && step.kind === "chord") {
+            const chord = {
+              ...realizeChord(step.harmonicFunction, project.tonic),
+              variant: step.harmonicVariant,
+            };
+            const bassPc = item.bassPitch?.pitchClassIdentity;
+            const tabEntry = resolveGuitarTabEntry(chord, item.label, bassPc);
+            chordBaseFretByMeasure.set(projectedMeasure.measureIndex, tabEntry.baseFret);
+            break;
+          }
+        }
+      }
+    }
+
+    const melodyNotes: GuitarMelodyInputNote[] = [];
+    for (const lane of systemMelodyLanes) {
+      for (const projectedMeasure of system.measures) {
+        const laneMeasure = lane.measures[projectedMeasure.measureIndex];
+        if (!laneMeasure) continue;
+        for (const entry of laneMeasure.entries) {
+          if (entry.kind === "note") {
+            melodyNotes.push({
+              key: entry.key,
+              pitch: entry.pitch,
+              startOffsetBeats: rationalToNumber(entry.startBeats),
+              durationBeats: rationalToNumber(entry.durationBeats),
+              measureIndex: projectedMeasure.measureIndex,
+            });
+          }
+        }
+      }
+    }
+
+    if (melodyNotes.length === 0) return new Map<string, GuitarTabPosition>();
+
+    melodyNotes.sort((a, b) => (a.startOffsetBeats ?? 0) - (b.startOffsetBeats ?? 0));
+    const optimizedPositions = optimizeGuitarMelodyTab(melodyNotes, chordBaseFretByMeasure);
+    const result = new Map<string, GuitarTabPosition>();
+    for (let i = 0; i < melodyNotes.length; i++) {
+      const note = melodyNotes[i]!;
+      const pos = optimizedPositions[i];
+      if (pos) {
+        result.set(note.key, pos);
+      }
+    }
+    return result;
+  }, [isTablature, system.measures, measureItems, project, systemMelodyLanes]);
+
   const inputs = useMemo<readonly StaffSystemMeasureInput[]>(
-    () =>
-      system.measures.map((measure) => {
+    () => {
+      if (!isNotationView) return [];
+      return system.measures.map((measure) => {
         const harmonyEntries = (measureItems[measure.measureIndex] ?? []).map((item) =>
-          harmonySequenceEntry(item, playingStepId),
+          harmonySequenceEntry(item, playingStepId, isTablature, project),
         );
         const melodyLanes = systemMelodyLanes.map((lane) => ({
           id: lane.instrumentId,
           clef: lane.clef,
           entries: (lane.measures[measure.measureIndex]?.entries ?? []).map((entry) =>
-            melodySequenceEntry(entry, activeMelodyEventKey),
+            melodySequenceEntry(
+              entry,
+              activeMelodyEventKey,
+              isTablature,
+              entry.kind === "note" ? optimizedMelodyTabPositions.get(entry.key) : undefined,
+            ),
           ),
         }));
         return {
@@ -432,12 +645,25 @@ function ScoreSystemCanvas({
           widthPx: measure.requiredWidthPx,
           harmonyEntries,
           ...(melodyLanes.length > 0 ? { melodyLanes } : {}),
+          ...(melodyLanes[0]?.entries ? { melodyEntries: melodyLanes[0].entries } : {}),
         };
-      }),
-    [activeMelodyEventKey, measureItems, playingStepId, system.measures, systemMelodyLanes],
+      });
+    },
+    [
+      activeMelodyEventKey,
+      isNotationView,
+      isTablature,
+      measureItems,
+      optimizedMelodyTabPositions,
+      playingStepId,
+      project,
+      system.measures,
+      systemMelodyLanes,
+    ],
   );
 
   useEffect(() => {
+    if (!isNotationView) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cleanup: () => void = () => undefined;
@@ -456,12 +682,25 @@ function ScoreSystemCanvas({
         showBass,
         showTimeSignature: system.index === 0,
         suzukiColors,
+        isTablature,
+        showFingering: effectiveShowFingering,
+        fingeringStyle,
       },
     );
     return () => {
       cleanup();
     };
-  }, [inputs, project.globalTiming.meter, showBass, suzukiColors, system.index, displayWidthPx]);
+  }, [
+    displayWidthPx,
+    effectiveShowFingering,
+    fingeringStyle,
+    inputs,
+    isTablature,
+    project.globalTiming.meter,
+    showBass,
+    suzukiColors,
+    system.index,
+  ]);
 
   const barLengthBeats = rationalToNumber(layout.barLengthBeats);
   const systemHeight = scoreSystemHeight(systemMelodyLanes.length, showBass);
@@ -485,8 +724,221 @@ function ScoreSystemCanvas({
   );
   const canRepeatOrExtend = project.progression.steps.at(-1)?.kind === "chord";
 
+  const activeMeasureAndPlayhead = useMemo(() => {
+    if (!isNotationView) return null;
+    const isPlaying = Boolean(playingStepId || activeMelodyEventKey);
+    if (!isPlaying) return null;
+
+    const tempoBpm = project.globalTiming.tempoBpm || 120;
+    const msPerBeat = 60000 / tempoBpm;
+
+    const connectorInset = showBass ? 14 : 0;
+    const systemWidth = Math.max(displayWidthPx, 1);
+    const scale = Math.max(systemWidth - connectorInset, 1) / Math.max(system.requiredWidthPx, 1);
+
+    const getMeasureEndPx = (measureIdx: number): number => {
+      const measurePos = system.measures.findIndex((m) => m.measureIndex === measureIdx);
+      if (measurePos < 0) return displayWidthPx;
+      const startPx =
+        connectorInset +
+        system.measures.slice(0, measurePos).reduce((sum, m) => sum + m.requiredWidthPx, 0) * scale;
+      return startPx + system.measures[measurePos]!.requiredWidthPx * scale;
+    };
+
+    let activeMeasureIndex: number | null = null;
+    let startX = 0;
+    let endX = 0;
+    let durationMs = 0;
+    let activeEventKey = "";
+
+    // 1. Check if an active melody note is playing in this system
+    if (activeMelodyEventKey) {
+      for (const lane of systemMelodyLanes) {
+        const laneEntries: {
+          readonly entry: MelodyStaffEntry;
+          readonly measureIndex: number;
+          readonly startX: number;
+        }[] = [];
+
+        for (const projectedMeasure of system.measures) {
+          const laneMeasure = lane.measures[projectedMeasure.measureIndex];
+          if (!laneMeasure) continue;
+          for (const entry of laneMeasure.entries) {
+            const startRatio =
+              renderedPositions[positionKey(`melody:${lane.instrumentId}`, entry.key)] ??
+              melodyEventRatio(
+                system,
+                displayWidthPx,
+                projectedMeasure,
+                entry,
+                lane.instrumentId,
+                renderedPositions,
+                barLengthBeats,
+                showBass,
+              );
+            laneEntries.push({
+              entry,
+              measureIndex: projectedMeasure.measureIndex,
+              startX: startRatio * displayWidthPx,
+            });
+          }
+        }
+
+        const matchIndex = laneEntries.findIndex(
+          (item) => item.entry.kind === "note" && item.entry.eventKey === activeMelodyEventKey,
+        );
+
+        if (matchIndex >= 0) {
+          const currentItem = laneEntries[matchIndex]!;
+          activeMeasureIndex = currentItem.measureIndex;
+          startX = currentItem.startX;
+          durationMs = Math.max(rationalToNumber(currentItem.entry.durationBeats) * msPerBeat, 50);
+          activeEventKey = `melody-${lane.instrumentId}-${currentItem.entry.key}`;
+
+          if (matchIndex + 1 < laneEntries.length) {
+            endX = laneEntries[matchIndex + 1]!.startX;
+          } else {
+            endX = getMeasureEndPx(currentItem.measureIndex);
+          }
+          endX = Math.max(endX, startX + 4);
+          break;
+        }
+      }
+    }
+
+    // 2. If not found in melody, check harmony (chord or rest)
+    if (activeMeasureIndex === null && playingStepId) {
+      const allHarmonyItems: {
+        readonly item: MeasureStaffItem;
+        readonly measureIndex: number;
+        readonly startX: number;
+      }[] = [];
+
+      for (const projectedMeasure of system.measures) {
+        const items = measureItems[projectedMeasure.measureIndex] ?? [];
+        for (const item of items) {
+          const startRatio =
+            renderedPositions[positionKey("harmony", item.key)] ??
+            systemMeasureRatio(
+              system,
+              displayWidthPx,
+              projectedMeasure.measureIndex,
+              item.startOffsetBeats,
+              barLengthBeats,
+              showBass,
+            );
+          allHarmonyItems.push({
+            item,
+            measureIndex: projectedMeasure.measureIndex,
+            startX: startRatio * displayWidthPx,
+          });
+        }
+      }
+
+      const matchingIndices: number[] = [];
+      allHarmonyItems.forEach((candidate, idx) => {
+        if (candidate.item.kind !== "gap" && candidate.item.stepId === playingStepId) {
+          matchingIndices.push(idx);
+        }
+      });
+
+      if (matchingIndices.length > 0) {
+        const firstIndex = matchingIndices[0]!;
+        const lastIndex = matchingIndices[matchingIndices.length - 1]!;
+        const firstItem = allHarmonyItems[firstIndex]!;
+        const lastItem = allHarmonyItems[lastIndex]!;
+
+        activeMeasureIndex = firstItem.measureIndex;
+        startX = firstItem.startX;
+
+        if (lastIndex + 1 < allHarmonyItems.length) {
+          endX = allHarmonyItems[lastIndex + 1]!.startX;
+        } else {
+          endX = getMeasureEndPx(lastItem.measureIndex);
+        }
+        endX = Math.max(endX, startX + 4);
+
+        const totalBeats = matchingIndices.reduce(
+          (sum, idx) => sum + rationalToNumber(allHarmonyItems[idx]!.item.duration.beats),
+          0,
+        );
+        durationMs = Math.max(totalBeats * msPerBeat, 50);
+        activeEventKey = `harmony-${firstItem.item.key}`;
+      }
+    }
+
+    if (activeMeasureIndex === null) return null;
+
+    const measurePos = system.measures.findIndex((m) => m.measureIndex === activeMeasureIndex);
+    if (measurePos < 0) return null;
+
+    const measureStartPx =
+      connectorInset +
+      system.measures.slice(0, measurePos).reduce((sum, m) => sum + m.requiredWidthPx, 0) * scale;
+    const measureWidthPx = system.measures[measurePos]!.requiredWidthPx * scale;
+
+    return {
+      measureIndex: activeMeasureIndex,
+      measureLeftPx: measureStartPx,
+      measureWidthPx,
+      startX,
+      endX,
+      durationMs,
+      eventKey: activeEventKey,
+      startedAt: activeEventStartedAt ?? null,
+    };
+  }, [
+    activeEventStartedAt,
+    activeMelodyEventKey,
+    barLengthBeats,
+    displayWidthPx,
+    measureItems,
+    playingStepId,
+    project.globalTiming.tempoBpm,
+    renderedPositions,
+    showBass,
+    system,
+    systemMelodyLanes,
+  ]);
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const wasActiveRef = useRef(false);
+
+  // Auto-scroll vertically to keep the currently playing system centered in focus
+  useEffect(() => {
+    const isSystemActive = Boolean(activeMeasureAndPlayhead);
+    if (isSystemActive && !wasActiveRef.current && cardRef.current) {
+      cardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }
+    wasActiveRef.current = isSystemActive;
+  }, [Boolean(activeMeasureAndPlayhead)]);
+
+  // Auto-scroll horizontally if this system is horizontally scrollable
+  useEffect(() => {
+    if (!activeMeasureAndPlayhead || !system.horizontallyScrollable || !scrollContainerRef.current) {
+      return;
+    }
+    const container = scrollContainerRef.current;
+    const playheadX = activeMeasureAndPlayhead.startX;
+    const scrollLeft = container.scrollLeft;
+    const clientWidth = container.clientWidth;
+
+    if (playheadX > scrollLeft + clientWidth - 100 || playheadX < scrollLeft + 40) {
+      container.scrollTo({
+        left: Math.max(0, playheadX - clientWidth / 3),
+        behavior: "smooth",
+      });
+    }
+  }, [activeMeasureAndPlayhead?.measureIndex, system.horizontallyScrollable]);
+
   return (
     <div
+      ref={cardRef}
       className="progression-measure-score score-system-card"
       data-testid="progression-measure-score"
     >
@@ -540,6 +992,58 @@ function ScoreSystemCanvas({
               Loop
             </span>
           ) : null}
+          {isTablature ? (
+            <>
+              <button
+                type="button"
+                className={`score-system-status-tag fingering ${effectiveShowFingering ? "active" : ""}`}
+                data-testid={`score-system-fingering-toggle-${system.index}`}
+                title={
+                  effectiveShowFingering
+                    ? "Аппликатура: включена (нажмите, чтобы скрыть)"
+                    : "Аппликатура: скрыта (нажмите, чтобы показать)"
+                }
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleFingering();
+                }}
+              >
+                Fingering {effectiveShowFingering ? "ON" : "OFF"}
+              </button>
+              {effectiveShowFingering ? (
+                <button
+                  type="button"
+                  className="score-system-status-tag hand-legend-trigger"
+                  data-testid={`score-system-hand-legend-btn-${system.index}`}
+                  title="Открыть схему аппликатуры левой руки и палитру пальцев"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenHandLegend?.();
+                  }}
+                >
+                  🖐 Легенда
+                </button>
+              ) : null}
+              {effectiveShowFingering ? (
+                <span
+                  className="score-system-fingering-dots-legend"
+                  title="Цвета пальцев: 1=Указательный (янтарный), 2=Средний (фиолетовый), 3=Безымянный (синий), 4=Мизинец (красный). Нажмите для открытия схемы"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenHandLegend?.();
+                  }}
+                >
+                  <span className="dot-mini dot-1">1</span>
+                  <span className="dot-mini dot-2">2</span>
+                  <span className="dot-mini dot-3">3</span>
+                  <span className="dot-mini dot-4">4</span>
+                </span>
+              ) : null}
+            </>
+          ) : null}
           {system.horizontallyScrollable ? <span>Dense measure scrolls locally</span> : null}
           {onDeleteSystem ? (
             <button
@@ -559,6 +1063,7 @@ function ScoreSystemCanvas({
           ) : null}
         </header>
         <div
+          ref={scrollContainerRef}
           className="score-system-scroll"
           style={{
             maxWidth: "100%",
@@ -566,65 +1071,95 @@ function ScoreSystemCanvas({
             overflowY: "hidden",
           }}
         >
-          <div
-            className="score-system-paper"
-            style={{
-              position: "relative",
-              width: `${displayWidthPx}px`,
-              minWidth: `${displayWidthPx}px`,
-              height: `${systemHeight + SCORE_LABEL_BAND_PX}px`,
-            }}
-          >
+          {isNotationView ? (
             <div
-              ref={canvasRef}
-              className="measure-staff score-system-canvas"
-              role="img"
-              aria-label={`Score notation for measures ${system.measures[0]?.measure.number} through ${system.measures.at(-1)?.measure.number}`}
+              className="score-system-paper"
               style={{
-                position: "absolute",
-                top: `${SCORE_LABEL_BAND_PX}px`,
-                left: 0,
+                position: "relative",
                 width: `${displayWidthPx}px`,
                 minWidth: `${displayWidthPx}px`,
-                height: `${systemHeight}px`,
+                height: `${systemHeight + SCORE_LABEL_BAND_PX}px`,
               }}
-            />
-            <div
-              className="score-system-annotations"
-              style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
             >
-              {systemMelodyLanes.map((lane, laneIndex) => {
-                const laneLabel = melodyInstrumentLabel(lane.instrumentId);
-                return (
-                  <span
-                    key={`lane-label-${lane.instrumentId}`}
-                    className="score-system-melody-lane-label"
-                    data-testid={`score-system-melody-lane-label-${lane.instrumentId}`}
-                    data-melody-instrument={lane.instrumentId}
-                    role="img"
-                    aria-label={`Melody lane ${laneLabel}`}
-                    style={
-                      {
-                        top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 2}px`,
-                      } as CSSProperties
-                    }
-                  >
-                    {laneLabel}
-                  </span>
-                );
-              })}
-              {harmonyAnnotations.map(({ projectedMeasure, item }) => {
-                const xRatio =
-                  renderedPositions[positionKey("harmony", item.key)] ??
-                  systemMeasureRatio(
-                    system,
-                    displayWidthPx,
-                    projectedMeasure.measureIndex,
-                    item.startOffsetBeats,
-                    barLengthBeats,
-                    showBass,
+              {activeMeasureAndPlayhead ? (
+                <div
+                  className="score-system-active-measure"
+                  data-testid={`score-system-active-measure-${system.index}`}
+                  data-measure-index={activeMeasureAndPlayhead.measureIndex}
+                  style={{
+                    position: "absolute",
+                    left: `${activeMeasureAndPlayhead.measureLeftPx}px`,
+                    width: `${activeMeasureAndPlayhead.measureWidthPx}px`,
+                    top: `${SCORE_LABEL_BAND_PX}px`,
+                    height: `${systemHeight}px`,
+                    zIndex: 0,
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : null}
+              {activeMeasureAndPlayhead ? (
+                <ScoreSystemPlayhead
+                  startX={activeMeasureAndPlayhead.startX}
+                  endX={activeMeasureAndPlayhead.endX}
+                  durationMs={activeMeasureAndPlayhead.durationMs}
+                  eventKey={activeMeasureAndPlayhead.eventKey}
+                  topPx={SCORE_LABEL_BAND_PX}
+                  heightPx={systemHeight}
+                  systemIndex={system.index}
+                  startedAt={activeMeasureAndPlayhead.startedAt}
+                />
+              ) : null}
+              <div
+                ref={canvasRef}
+                className="measure-staff score-system-canvas"
+                role="img"
+                aria-label={`Score notation for measures ${system.measures[0]?.measure.number} through ${system.measures.at(-1)?.measure.number}`}
+                style={{
+                  position: "absolute",
+                  top: `${SCORE_LABEL_BAND_PX}px`,
+                  left: 0,
+                  width: `${displayWidthPx}px`,
+                  minWidth: `${displayWidthPx}px`,
+                  height: `${systemHeight}px`,
+                  zIndex: 2,
+                }}
+              />
+              <div
+                className="score-system-annotations"
+                style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+              >
+                {systemMelodyLanes.map((lane, laneIndex) => {
+                  const laneLabel = melodyInstrumentLabel(lane.instrumentId);
+                  return (
+                    <span
+                      key={`lane-label-${lane.instrumentId}`}
+                      className="score-system-melody-lane-label"
+                      data-testid={`score-system-melody-lane-label-${lane.instrumentId}`}
+                      data-melody-instrument={lane.instrumentId}
+                      role="img"
+                      aria-label={`Melody lane ${laneLabel}`}
+                      style={
+                        {
+                          top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 2}px`,
+                        } as CSSProperties
+                      }
+                    >
+                      {laneLabel}
+                    </span>
                   );
-                const durationRatio = rationalToNumber(item.duration.beats) / barLengthBeats;
+                })}
+                {harmonyAnnotations.map(({ projectedMeasure, item }) => {
+                  const xRatio =
+                    renderedPositions[positionKey("harmony", item.key)] ??
+                    systemMeasureRatio(
+                      system,
+                      displayWidthPx,
+                      projectedMeasure.measureIndex,
+                      item.startOffsetBeats,
+                      barLengthBeats,
+                      showBass,
+                    );
+                  const durationRatio = rationalToNumber(item.duration.beats) / barLengthBeats;
                 const selected = selectedStepId === item.stepId;
                 const playing = playingStepId === item.stepId;
                 const chord = item.kind === "chord" ? item : null;
@@ -834,52 +1369,67 @@ function ScoreSystemCanvas({
                   </div>
                 );
               })}
-              {systemMelodyLanes.flatMap((lane, laneIndex) =>
-                system.measures.flatMap((projectedMeasure) => {
-                  const measure: MelodyStaffMeasure | undefined =
-                    lane.measures[projectedMeasure.measureIndex];
-                  if (!measure) return [];
-                  return measure.entries.flatMap((entry) => {
-                    if (entry.kind !== "note") return [];
-                    const annotationKey = `${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`;
-                    const xRatio = melodyEventRatio(
-                      system,
-                      displayWidthPx,
-                      projectedMeasure,
-                      entry,
-                      lane.instrumentId,
-                      renderedPositions,
-                      barLengthBeats,
-                      showBass,
-                    );
-                    const selected = selectedStepId === entry.sourceStepId;
-                    const active = activeMelodyEventKey === entry.eventKey;
-                    const label = `Melody ${melodyInstrumentLabel(lane.instrumentId)}, ${formatPitch(entry.pitch)}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${sourceChordLabel(project, entry.sourceStepId)}`;
-                    const style = {
-                      "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
-                      top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 4 + (melodyRows[annotationKey] ?? 0) * MELODY_NOTE_ANNOTATION_ROW_GAP_PX}px`,
-                    } as CSSProperties;
-                    return (
-                      <button
-                        key={`${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`}
-                        type="button"
-                        className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"}`.trim()}
-                        style={style}
-                        data-melody-event-key={entry.eventKey}
-                        data-step-id={entry.sourceStepId}
-                        data-melody-instrument={lane.instrumentId}
-                        aria-label={label}
-                        aria-pressed={selected}
-                        aria-current={active ? "step" : undefined}
-                        title={label}
-                        onClick={() => onSelectStep(entry.sourceStepId)}
-                      />
-                    );
-                  });
-                }),
+                {systemMelodyLanes.flatMap((lane, laneIndex) =>
+                  system.measures.flatMap((projectedMeasure) => {
+                    const measure: MelodyStaffMeasure | undefined =
+                      lane.measures[projectedMeasure.measureIndex];
+                    if (!measure) return [];
+                    return measure.entries.flatMap((entry) => {
+                      if (entry.kind !== "note") return [];
+                      const annotationKey = `${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`;
+                      const xRatio = melodyEventRatio(
+                        system,
+                        displayWidthPx,
+                        projectedMeasure,
+                        entry,
+                        lane.instrumentId,
+                        renderedPositions,
+                        barLengthBeats,
+                        showBass,
+                      );
+                      const selected = selectedStepId === entry.sourceStepId;
+                      const active = activeMelodyEventKey === entry.eventKey;
+                      const label = `Melody ${melodyInstrumentLabel(lane.instrumentId)}, ${formatPitch(entry.pitch)}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${sourceChordLabel(project, entry.sourceStepId)}`;
+                      const style = {
+                        "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
+                        top: `${SCORE_LABEL_BAND_PX + laneIndex * (SCORE_STAFF_HEIGHT_PX + SCORE_STAFF_GAP_PX) + 4 + (melodyRows[annotationKey] ?? 0) * MELODY_NOTE_ANNOTATION_ROW_GAP_PX}px`,
+                      } as CSSProperties;
+                      return (
+                        <button
+                          key={`${lane.instrumentId}-${projectedMeasure.measureIndex}-${entry.key}`}
+                          type="button"
+                          className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"}`.trim()}
+                          style={style}
+                          data-melody-event-key={entry.eventKey}
+                          data-step-id={entry.sourceStepId}
+                          data-melody-instrument={lane.instrumentId}
+                          aria-label={label}
+                          aria-pressed={selected}
+                          aria-current={active ? "step" : undefined}
+                          title={label}
+                          onClick={() => onSelectStep(entry.sourceStepId)}
+                        />
+                      );
+                    });
+                  }),
+                )}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="score-system-measures-row"
+              data-testid="score-system-measures-row"
+              data-system-index={system.index}
+              style={{
+                width: system.horizontallyScrollable ? `${displayWidthPx}px` : "100%",
+                minWidth: system.horizontallyScrollable ? `${displayWidthPx}px` : "100%",
+              }}
+            >
+              {system.measures.map((sm) =>
+                renderMeasureContent ? renderMeasureContent(sm.measure) : null,
               )}
             </div>
-          </div>
+          )}
         </div>
         {systemMenu ? (
           <ScoreSystemContextMenu
@@ -953,6 +1503,7 @@ export interface ScoreSystemViewProps {
   readonly selectedStepId: string | undefined;
   readonly playingStepId: string | undefined;
   readonly activeMelodyEventKey: string | null | undefined;
+  readonly activeEventStartedAt?: number | null | undefined;
   readonly measureItemsForMeasure: (measure: ProgressionMeasure) => readonly MeasureStaffItem[];
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
@@ -993,6 +1544,7 @@ export interface ScoreSystemViewProps {
   readonly onSetMelodyGridSystem?: ((system: ScoreSystem, grid: MelodyGrid) => void) | undefined;
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
+  readonly renderMeasureContent?: ((measure: ProgressionMeasure) => ReactNode) | undefined;
 }
 
 /** Responsive multi-measure Staff projection used by My Progression. */
@@ -1004,6 +1556,7 @@ export function ScoreSystemView({
   selectedStepId,
   playingStepId,
   activeMelodyEventKey,
+  activeEventStartedAt,
   measureItemsForMeasure,
   onSelectStep,
   onEditPerformance,
@@ -1038,9 +1591,29 @@ export function ScoreSystemView({
   onSetMelodyGridSystem,
   onClearMelodySystem,
   onToggleSuzukiColors,
+  renderMeasureContent,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [availableWidthPx, setAvailableWidthPx] = useState(0);
+  const [showFingering, setShowFingering] = useState(true);
+  const [fingeringStyle, setFingeringStyle] = useState<TabFingeringStyle>(() => {
+    try {
+      const stored = window.localStorage.getItem("cadenceflow.tabFingeringStyle");
+      if (stored === "badge" || stored === "dots" || stored === "numbers") {
+        return stored;
+      }
+    } catch {}
+    return "badge";
+  });
+  const [showHandLegend, setShowHandLegend] = useState(false);
+
+  const handleSetFingeringStyle = (style: TabFingeringStyle) => {
+    setFingeringStyle(style);
+    try {
+      window.localStorage.setItem("cadenceflow.tabFingeringStyle", style);
+    } catch {}
+  };
+
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -1097,6 +1670,7 @@ export function ScoreSystemView({
       ref={rootRef}
       className="score-system-view"
       data-testid="progression-score-systems"
+      data-progression-view={project.presentation.progressionView}
       data-system-count={projection.systems.length}
       data-measures-per-system={String(measuresPerSystem)}
       data-auto-maximum={
@@ -1121,6 +1695,7 @@ export function ScoreSystemView({
             selectedStepId={selectedStepId}
             playingStepId={playingStepId}
             activeMelodyEventKey={activeMelodyEventKey}
+            activeEventStartedAt={activeEventStartedAt}
             onSelectStep={onSelectStep}
             onEditPerformance={onEditPerformance}
             onReorder={onReorder}
@@ -1155,9 +1730,21 @@ export function ScoreSystemView({
             onSetMelodyGridSystem={onSetMelodyGridSystem}
             onClearMelodySystem={onClearMelodySystem}
             {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
+            showFingering={showFingering}
+            onToggleFingering={() => setShowFingering((prev) => !prev)}
+            fingeringStyle={fingeringStyle}
+            onOpenHandLegend={() => setShowHandLegend(true)}
+            renderMeasureContent={renderMeasureContent}
           />
         );
       })}
+      {showHandLegend ? (
+        <GuitarHandLegendModal
+          onClose={() => setShowHandLegend(false)}
+          fingeringStyle={fingeringStyle}
+          onSetFingeringStyle={handleSetFingeringStyle}
+        />
+      ) : null}
     </div>
   );
 }

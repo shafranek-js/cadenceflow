@@ -18,8 +18,8 @@ import {
 
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
-export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar";
-export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4;
+export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar" | "tablature";
+export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface PresentationState {
   readonly expertiseMode: PresentationMode;
@@ -37,6 +37,8 @@ export interface PresentationState {
   readonly resolutionArrows?: boolean;
   /** Active musical genre focus filtering and highlighting the matrix. */
   readonly genreFocus?: GenreFocusId;
+  /** Orientation of guitar chord diagrams: vertical (standard) or horizontal (90 deg CCW). */
+  readonly guitarChordOrientation?: "vertical" | "horizontal";
 }
 
 export interface MatrixCardTemplateState {

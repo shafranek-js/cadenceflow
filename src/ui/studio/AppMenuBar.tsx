@@ -2,13 +2,21 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import type { CardViewId } from "../../domain/progression/step";
 import type { ProgressionView } from "../../domain/project/project";
 
-type AppMenuId = "export" | "edit" | "view";
+type AppMenuId = "export" | "edit" | "view" | "help";
 
-const CARD_VIEWS: readonly { id: CardViewId; label: string }[] = [
+const MATRIX_CARD_VIEWS: readonly { id: CardViewId; label: string }[] = [
   { id: "harmonic", label: "Harmonic" },
   { id: "piano", label: "Piano" },
   { id: "staff", label: "Staff" },
   { id: "guitar", label: "Guitar" },
+];
+
+const PROGRESSION_VIEWS: readonly { id: ProgressionView; label: string }[] = [
+  { id: "harmonic", label: "Harmonic" },
+  { id: "piano", label: "Piano" },
+  { id: "staff", label: "Staff" },
+  { id: "guitar", label: "Guitar" },
+  { id: "tablature", label: "Tablature" },
 ];
 
 export interface AppMenuBarProps {
@@ -28,7 +36,12 @@ export interface AppMenuBarProps {
   readonly onSuzukiColorsChange?: (enabled: boolean) => void;
   readonly resolutionArrows?: boolean;
   readonly onResolutionArrowsChange?: (enabled: boolean) => void;
+  readonly guitarChordOrientation?: "vertical" | "horizontal";
+  readonly onGuitarChordOrientationChange?: (orientation: "vertical" | "horizontal") => void;
   readonly onOpenModesExplorer?: () => void;
+  readonly onOpenHelp?: () => void;
+  readonly onOpenFingeringLegend?: () => void;
+  readonly onOpenShortcutsHelp?: () => void;
 }
 
 export function AppMenuBar({
@@ -48,7 +61,12 @@ export function AppMenuBar({
   onSuzukiColorsChange,
   resolutionArrows = true,
   onResolutionArrowsChange,
+  guitarChordOrientation = "vertical",
+  onGuitarChordOrientationChange,
   onOpenModesExplorer,
+  onOpenHelp,
+  onOpenFingeringLegend,
+  onOpenShortcutsHelp,
 }: AppMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<AppMenuId | null>(null);
   const menuBarRef = useRef<HTMLElement>(null);
@@ -233,9 +251,9 @@ export function AppMenuBar({
             onKeyDown={handleMenuKeyDown}
           >
             <div className="app-menu-section-label">Matrix card view</div>
-            {CARD_VIEWS.map((view) => (
+            {MATRIX_CARD_VIEWS.map((view) => (
               <button
-                key={view.id}
+                key={`matrix-${view.id}`}
                 type="button"
                 role="menuitemradio"
                 aria-checked={cardView === view.id}
@@ -250,7 +268,7 @@ export function AppMenuBar({
               </button>
             ))}
             <div className="app-menu-section-label">My Progression view</div>
-            {CARD_VIEWS.map((view) => (
+            {PROGRESSION_VIEWS.map((view) => (
               <button
                 key={`progression-${view.id}`}
                 type="button"
@@ -293,6 +311,22 @@ export function AppMenuBar({
               <span>Suzuki note colors</span>
               {suzukiColors ? <span aria-hidden="true">✓</span> : null}
             </button>
+            <div className="app-menu-section-label">Guitar view</div>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={guitarChordOrientation === "horizontal"}
+              data-testid="toggle-guitar-orientation"
+              onClick={() => {
+                onGuitarChordOrientationChange?.(
+                  guitarChordOrientation === "horizontal" ? "vertical" : "horizontal",
+                );
+                closeMenu("view");
+              }}
+            >
+              <span>Rotate guitar chords 90° (horizontal)</span>
+              {guitarChordOrientation === "horizontal" ? <span aria-hidden="true">✓</span> : null}
+            </button>
             <div className="app-menu-section-label">Matrix presentation</div>
             <button
               type="button"
@@ -323,6 +357,83 @@ export function AppMenuBar({
                 </button>
               </>
             ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="app-menu-dropdown">
+        <button
+          ref={(element) => {
+            triggerRefs.current.help = element;
+          }}
+          type="button"
+          className="app-menu-trigger"
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded={openMenu === "help"}
+          aria-controls="help-menu"
+          data-testid="help-menu-toggle"
+          onClick={() => setOpenMenu((current) => (current === "help" ? null : "help"))}
+        >
+          Help
+        </button>
+        {openMenu === "help" ? (
+          <div
+            id="help-menu"
+            className="app-menu-popup"
+            data-menu="help"
+            role="menu"
+            aria-label="Help menu"
+            onKeyDown={handleMenuKeyDown}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="menu-open-help-center"
+              onClick={() => {
+                onOpenHelp?.();
+                closeMenu("help");
+              }}
+            >
+              <span>📖 Справочный центр...</span>
+              <kbd>F1</kbd>
+            </button>
+            {onOpenFingeringLegend ? (
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="menu-open-fingering-legend"
+                onClick={() => {
+                  onOpenFingeringLegend();
+                  closeMenu("help");
+                }}
+              >
+                <span>🖐 Аппликатура левой руки...</span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="menu-open-shortcuts"
+              onClick={() => {
+                onOpenShortcutsHelp?.();
+                closeMenu("help");
+              }}
+            >
+              <span>⌨️ Горячие клавиши...</span>
+            </button>
+            <div className="app-menu-section-label">О приложении</div>
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="menu-open-about"
+              onClick={() => {
+                onOpenHelp?.();
+                closeMenu("help");
+              }}
+            >
+              <span>ℹ️ О CadenceFlow 1.0</span>
+            </button>
           </div>
         ) : null}
       </div>

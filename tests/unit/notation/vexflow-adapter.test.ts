@@ -183,18 +183,18 @@ describe("renderStaffProjection", () => {
     const svgWithColors = containerWithColors.querySelector("svg");
     expect(svgWithColors).not.toBeNull();
     const htmlWithColors = svgWithColors!.outerHTML;
-    expect(htmlWithColors).toContain("#dc2626"); // C = Red
-    expect(htmlWithColors).toContain("#b45309"); // E = Gold
-    expect(htmlWithColors).toContain("#0369a1"); // G = Blue
+    expect(htmlWithColors).toContain("#fc0200"); // C = Red
+    expect(htmlWithColors).toContain("#fbf405"); // E = Yellow
+    expect(htmlWithColors).toContain("#29e1fe"); // G = Cyan
 
     const containerDefault = document.createElement("div");
     renderStaffProjection(containerDefault, projectionFor(pitches), musicalDuration(rational(4)));
     const svgDefault = containerDefault.querySelector("svg");
     expect(svgDefault).not.toBeNull();
     const htmlDefault = svgDefault!.outerHTML;
-    expect(htmlDefault).not.toContain("#dc2626");
-    expect(htmlDefault).not.toContain("#b45309");
-    expect(htmlDefault).not.toContain("#0369a1");
+    expect(htmlDefault).not.toContain("#fc0200");
+    expect(htmlDefault).not.toContain("#fbf405");
+    expect(htmlDefault).not.toContain("#29e1fe");
   });
 });
 
@@ -688,4 +688,499 @@ describe("renderStaffSystem", () => {
     expect(tupletSvg.dataset.staffTupletGroups).toBe("1");
     expect(tupletSvg.querySelectorAll(".vf-tuplet")).toHaveLength(1);
   });
+
+  it("renders multi-measure tablature systems with TabStave and TabNotes", () => {
+    const cMajorTab: StaffSequenceEntry = {
+      key: "m1-c",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(60, { step: "C", alter: 0 }),
+        exactPitch(64, { step: "E", alter: 0 }),
+        exactPitch(67, { step: "G", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 5, fret: 3 },
+        { str: 4, fret: 2 },
+        { str: 3, fret: 0 },
+        { str: 2, fret: 1 },
+        { str: 1, fret: 0 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+    const gTab: StaffSequenceEntry = {
+      key: "m2-g",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(55, { step: "G", alter: 0 }),
+        exactPitch(59, { step: "B", alter: 0 }),
+        exactPitch(62, { step: "D", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 6, fret: 3 },
+        { str: 5, fret: 2 },
+        { str: 4, fret: 0 },
+        { str: 3, fret: 0 },
+        { str: 2, fret: 0 },
+        { str: 1, fret: 3 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+    const container = document.createElement("div");
+    const cleanup = renderStaffSystem(
+      container,
+      [systemMeasure(0, [cMajorTab]), systemMeasure(1, [gTab])],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showTimeSignature: true },
+    );
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    const textContents = Array.from(svg!.querySelectorAll("text")).map((t) => t.textContent);
+    // VexFlow 5 renders TAB clef via SMuFL glyph and frets as text
+    expect(textContents).toContain("3");
+    expect(textContents).toContain("2");
+    expect(textContents).toContain("0");
+    expect(textContents).toContain("1");
+    expect(svg!.querySelectorAll(".vf-tabnote").length).toBe(2);
+    cleanup();
+  });
+
+  it("renders polyphonic tablature with both melody notes and chord accompaniment on TabStave", () => {
+    const cMajorTab: StaffSequenceEntry = {
+      key: "m1-c",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(60, { step: "C", alter: 0 }),
+        exactPitch(64, { step: "E", alter: 0 }),
+        exactPitch(67, { step: "G", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 5, fret: 3 },
+        { str: 4, fret: 2 },
+        { str: 3, fret: 0 },
+        { str: 2, fret: 1 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+
+    const melodyQuarterNotes: StaffSequenceEntry[] = [
+      {
+        key: "mel-0",
+        kind: "note",
+        projection: projectionFor([exactPitch(60, { step: "C", alter: 0 })]),
+        tabPositions: [{ str: 2, fret: 1 }],
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(1)),
+      },
+      {
+        key: "mel-1",
+        kind: "note",
+        projection: projectionFor([exactPitch(64, { step: "E", alter: 0 })]),
+        tabPositions: [{ str: 1, fret: 0 }],
+        startOffsetBeats: rational(1),
+        duration: musicalDuration(rational(1)),
+      },
+      {
+        key: "mel-2",
+        kind: "note",
+        projection: projectionFor([exactPitch(67, { step: "G", alter: 0 })]),
+        tabPositions: [{ str: 1, fret: 3 }],
+        startOffsetBeats: rational(2),
+        duration: musicalDuration(rational(1)),
+      },
+      {
+        key: "mel-3",
+        kind: "note",
+        projection: projectionFor([exactPitch(72, { step: "C", alter: 0 })]),
+        tabPositions: [{ str: 1, fret: 8 }],
+        startOffsetBeats: rational(3),
+        duration: musicalDuration(rational(1)),
+      },
+    ];
+
+    const container = document.createElement("div");
+    let reportedPositions: readonly StaffSystemPosition[] = [];
+    const cleanup = renderStaffSystem(
+      container,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [cMajorTab],
+          melodyEntries: melodyQuarterNotes,
+        },
+      ],
+      meter(4, 4),
+      (positions) => {
+        reportedPositions = positions;
+      },
+      { isTablature: true },
+    );
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    // 4 melody TabNotes + 1 accompaniment chord TabNote = 5 TabNotes on the stave
+    const tabNotes = svg!.querySelectorAll(".vf-tabnote");
+    expect(tabNotes.length).toBe(5);
+
+    const textContents = Array.from(svg!.querySelectorAll("text")).map((t) => t.textContent);
+    // Frets: 8 (melody C5), 3 (melody G4 and bass C3), 0 (melody E4 and harmony G3), 1 (melody C4), 2 (harmony E3)
+    expect(textContents).toContain("8");
+    expect(textContents).toContain("3");
+    expect(textContents).toContain("1");
+    expect(textContents).toContain("2");
+    expect(textContents).toContain("0");
+
+    // Both melody keys and chord keys should be in reported positions
+    const reportedKeys = reportedPositions.map((p) => p.key);
+    expect(reportedKeys).toContain("mel-0");
+    expect(reportedKeys).toContain("mel-1");
+    expect(reportedKeys).toContain("mel-2");
+    expect(reportedKeys).toContain("mel-3");
+    expect(reportedKeys).toContain("m1-c");
+
+    cleanup();
+  });
+
+  it("synchronizes playback highlight attributes and enhances badge pills for active tablature and staff notes", () => {
+    const cMajorTab: StaffSequenceEntry = {
+      key: "m1-c-playing",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(60, { step: "C", alter: 0 }),
+        exactPitch(64, { step: "E", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 5, fret: 3 },
+        { str: 4, fret: 2 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+      highlighted: true,
+    };
+
+    const melodyQuarterNote: StaffSequenceEntry = {
+      key: "mel-playing",
+      kind: "note",
+      projection: projectionFor([exactPitch(60, { step: "C", alter: 0 })]),
+      tabPositions: [{ str: 2, fret: 1 }],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+      highlighted: true,
+    };
+
+    const container = document.createElement("div");
+    const cleanup = renderStaffSystem(
+      container,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [cMajorTab],
+          melodyEntries: [melodyQuarterNote],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true },
+    );
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+
+    // Check playing TabNotes have data-staff-playing and data-staff-entry
+    const playingTabNotes = svg!.querySelectorAll('.vf-tabnote[data-staff-playing="true"]');
+    expect(playingTabNotes.length).toBeGreaterThanOrEqual(1);
+
+    const chordTab = svg!.querySelector('.vf-tabnote[data-staff-entry="m1-c-playing"]');
+    expect(chordTab).not.toBeNull();
+    expect(chordTab!.getAttribute("data-staff-playing")).toBe("true");
+
+    // Check expanded rect attributes
+    const rects = chordTab!.querySelectorAll("rect");
+    expect(rects.length).toBeGreaterThan(0);
+    rects.forEach((rect) => {
+      expect(rect.getAttribute("rx")).toBe("3");
+      expect(rect.getAttribute("ry")).toBe("3");
+      const height = parseFloat(rect.getAttribute("height") || "0");
+      expect(height).toBeGreaterThanOrEqual(8);
+    });
+
+    cleanup();
+  });
+
+  it("renders left-hand finger badges on tablature notes when showFingering is enabled", () => {
+    const melodyEntry: StaffSequenceEntry = {
+      key: "m1-note",
+      kind: "note",
+      projection: projectionFor([exactPitch(60, { step: "C", alter: 0 })]),
+      tabPositions: [{ str: 2, fret: 1, finger: 1 }],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+
+    const containerWithFingering = document.createElement("div");
+    const cleanup1 = renderStaffSystem(
+      containerWithFingering,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [melodyEntry],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: true },
+    );
+
+    const svg1 = containerWithFingering.querySelector("svg");
+    expect(svg1).not.toBeNull();
+    // Default style: badge under fret number
+    const fretBadge = svg1!.querySelector(".vf-tab-fret-badge");
+    expect(fretBadge).not.toBeNull();
+    expect(fretBadge!.getAttribute("data-tab-finger")).toBe("1");
+    const fretText = svg1!.querySelector(".vf-tab-fret-text-with-badge");
+    expect(fretText).not.toBeNull();
+    expect(fretText!.getAttribute("data-tab-finger")).toBe("1");
+    cleanup1();
+
+    // Style: numbers (circle with finger number)
+    const containerNumbers = document.createElement("div");
+    const cleanupNumbers = renderStaffSystem(
+      containerNumbers,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [melodyEntry],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: true, fingeringStyle: "numbers" },
+    );
+    const svgNumbers = containerNumbers.querySelector("svg");
+    expect(svgNumbers).not.toBeNull();
+    const fingerBadges = svgNumbers!.querySelectorAll(".vf-tab-finger");
+    expect(fingerBadges.length).toBe(1);
+    expect(fingerBadges[0]!.getAttribute("data-tab-finger")).toBe("1");
+    expect(fingerBadges[0]!.textContent).toBe("1");
+    cleanupNumbers();
+
+    // Style: dots (pure color dots)
+    const containerDots = document.createElement("div");
+    const cleanupDots = renderStaffSystem(
+      containerDots,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [melodyEntry],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: true, fingeringStyle: "dots" },
+    );
+    const svgDots = containerDots.querySelector("svg");
+    expect(svgDots).not.toBeNull();
+    const dotBadge = svgDots!.querySelector(".vf-tab-finger-dot");
+    expect(dotBadge).not.toBeNull();
+    expect(dotBadge!.getAttribute("data-tab-finger")).toBe("1");
+    cleanupDots();
+
+    const containerWithoutFingering = document.createElement("div");
+    const cleanup2 = renderStaffSystem(
+      containerWithoutFingering,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          harmonyEntries: [melodyEntry],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: false },
+    );
+
+    const svg2 = containerWithoutFingering.querySelector("svg");
+    expect(svg2).not.toBeNull();
+    expect(svg2!.querySelectorAll("[data-tab-finger]").length).toBe(0);
+    cleanup2();
+  });
+
+  it("renders correct finger badges on chord tablature notes", () => {
+    const chordEntry: StaffSequenceEntry = {
+      key: "c-chord",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(48, { step: "C", alter: 0 }),
+        exactPitch(52, { step: "E", alter: 0 }),
+        exactPitch(55, { step: "G", alter: 0 }),
+        exactPitch(60, { step: "C", alter: 0 }),
+        exactPitch(64, { step: "E", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 1, fret: 0 },
+        { str: 2, fret: 1, finger: 1 },
+        { str: 3, fret: 0 },
+        { str: 4, fret: 2, finger: 2 },
+        { str: 5, fret: 3, finger: 3 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+
+    const container = document.createElement("div");
+    renderStaffSystem(
+      container,
+      [{ measureIndex: 0, widthPx: 400, harmonyEntries: [chordEntry] }],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: true, fingeringStyle: "dots" },
+    );
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    const tabNote = svg!.querySelector(".vf-tabnote");
+    expect(tabNote).not.toBeNull();
+    const texts = Array.from(tabNote!.querySelectorAll("text:not(.vf-tab-finger)"));
+    expect(texts).toHaveLength(5);
+    const badges = Array.from(tabNote!.querySelectorAll(".vf-tab-finger-badge"));
+    expect(badges).toHaveLength(3);
+    expect(badges.map((b) => b.getAttribute("data-tab-finger"))).toEqual(["1", "2", "3"]);
+  });
+
+  it("renders correct finger badges in polyphonic tab when melody note occupies a string", () => {
+    const melodyEntry: StaffSequenceEntry = {
+      key: "m1-note",
+      kind: "note",
+      projection: projectionFor([exactPitch(64, { step: "E", alter: 0 })]),
+      tabPositions: [{ str: 1, fret: 0 }],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(1)),
+    };
+    const chordEntry: StaffSequenceEntry = {
+      key: "c-chord",
+      kind: "chord",
+      projection: projectionFor([
+        exactPitch(48, { step: "C", alter: 0 }),
+        exactPitch(52, { step: "E", alter: 0 }),
+        exactPitch(55, { step: "G", alter: 0 }),
+        exactPitch(60, { step: "C", alter: 0 }),
+        exactPitch(64, { step: "E", alter: 0 }),
+      ]),
+      tabPositions: [
+        { str: 1, fret: 0 },
+        { str: 2, fret: 1, finger: 1 },
+        { str: 3, fret: 0 },
+        { str: 4, fret: 2, finger: 2 },
+        { str: 5, fret: 3, finger: 3 },
+      ],
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+    };
+
+    const container = document.createElement("div");
+    renderStaffSystem(
+      container,
+      [
+        {
+          measureIndex: 0,
+          widthPx: 400,
+          melodyLanes: [{ id: "lead", clef: "treble", entries: [melodyEntry] }],
+          harmonyEntries: [chordEntry],
+        },
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showFingering: true, fingeringStyle: "dots" },
+    );
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    const chordTabNote = svg!.querySelector('.vf-tabnote[data-staff-entry="c-chord"]');
+    expect(chordTabNote).not.toBeNull();
+
+    // The chord has 4 frets rendered (str 1 was filtered out for melody):
+    // str 2 (fret 1), str 3 (fret 0), str 4 (fret 2), str 5 (fret 3)
+    const texts = Array.from(chordTabNote!.querySelectorAll("text:not(.vf-tab-finger)"));
+    expect(texts).toHaveLength(4);
+
+    // Badges must be attached to:
+    // str 2: finger 1
+    // str 4: finger 2
+    // str 5: finger 3
+    // str 3 (fret 0) must NOT have any badge
+    const badges = Array.from(chordTabNote!.querySelectorAll(".vf-tab-finger-badge"));
+    expect(badges).toHaveLength(3);
+    expect(badges.map((b) => b.getAttribute("data-tab-finger"))).toEqual(["1", "2", "3"]);
+
+    const textYMap = texts.map((t) => parseFloat(t.getAttribute("y") || "0"));
+    const badgeCyMap = badges.map((b) => parseFloat(b.querySelector("circle")?.getAttribute("cy") || "0"));
+
+    // Verify each badge matches the exact Y of its fret text
+    expect(badgeCyMap[0]).toBeCloseTo(textYMap[0]!, 1); // finger 1 on fret 1 (str 2)
+    expect(badgeCyMap[1]).toBeCloseTo(textYMap[2]!, 1); // finger 2 on fret 2 (str 4)
+    expect(badgeCyMap[2]).toBeCloseTo(textYMap[3]!, 1); // finger 3 on fret 3 (str 5)
+  });
+
+  it("renders ledger lines with 1px stroke-width and crispEdges shape-rendering in staff projection", () => {
+    const container = document.createElement("div");
+    // Middle C (C4) sits on the first ledger line below the treble staff
+    const c4Projection = projectionFor([exactPitch(60, { step: "C", alter: 0 })]);
+    const cleanup = renderStaffProjection(container, c4Projection, musicalDuration(rational(4)));
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+
+    // Ledger lines are direct child path elements of .vf-stavenote
+    const ledgerLines = Array.from(svg!.querySelectorAll(".vf-stavenote > path"));
+    expect(ledgerLines.length).toBeGreaterThan(0);
+    ledgerLines.forEach((line) => {
+      expect(line.getAttribute("stroke-width")).toBe("1");
+      expect(line.getAttribute("shape-rendering")).toBe("crispEdges");
+    });
+
+    cleanup();
+  });
+
+  it("renders ledger lines with 1px stroke-width and crispEdges in score systems", () => {
+    const container = document.createElement("div");
+    const measure: StaffSystemMeasureInput = {
+      measureIndex: 0,
+      harmonyEntries: [
+        {
+          kind: "chord",
+          key: "c4-chord",
+          projection: projectionFor([exactPitch(60, { step: "C", alter: 0 })]),
+          duration: musicalDuration(rational(4)),
+          startOffsetBeats: rational(0),
+          highlighted: false,
+        },
+      ],
+      melodyEntries: [],
+    };
+
+    const cleanup = renderStaffSystem(container, [measure], meter(4, 4));
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+
+    const ledgerLines = Array.from(svg!.querySelectorAll(".vf-stavenote > path"));
+    expect(ledgerLines.length).toBeGreaterThan(0);
+    ledgerLines.forEach((line) => {
+      expect(line.getAttribute("stroke-width")).toBe("1");
+      expect(line.getAttribute("shape-rendering")).toBe("crispEdges");
+    });
+
+    cleanup();
+  });
 });
+

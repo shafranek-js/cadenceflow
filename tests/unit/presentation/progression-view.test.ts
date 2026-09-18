@@ -36,7 +36,22 @@ describe("US13 global progression presentation settings", () => {
     expect(restored.project.presentation.progressionView).toBe("harmonic");
   });
 
-  it.each([1, 2, 3, 4] as const)(
+  it("updates progression view to tablature and guitar", () => {
+    const project = createDefaultProject("test-p", "Test", T0);
+    const tabResult = setProgressionView(project, {
+      type: "presentation/set-progression-view",
+      payload: { view: "tablature", nowIso: T1 },
+    });
+    expect(tabResult.project.presentation.progressionView).toBe("tablature");
+
+    const guitarResult = setProgressionView(tabResult.project, {
+      type: "presentation/set-progression-view",
+      payload: { view: "guitar", nowIso: T1 },
+    });
+    expect(guitarResult.project.presentation.progressionView).toBe("guitar");
+  });
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
     "updates the maximum to %s measures per system and supports inverse",
     (measuresPerSystem) => {
       const project = createDefaultProject("test-p", "Test", T0);

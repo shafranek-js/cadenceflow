@@ -805,6 +805,22 @@ export function ProgressionGlobalInspector({
                   >
                     Staff
                   </button>
+                  <button
+                    type="button"
+                    className={project.presentation.progressionView === "guitar" ? "is-active" : ""}
+                    onClick={() => onSetProgressionView("guitar")}
+                    aria-label="Guitar view"
+                  >
+                    Guitar
+                  </button>
+                  <button
+                    type="button"
+                    className={project.presentation.progressionView === "tablature" ? "is-active" : ""}
+                    onClick={() => onSetProgressionView("tablature")}
+                    aria-label="Tablature view"
+                  >
+                    Tab
+                  </button>
                 </div>
               ) : null}
               {onToggleSuzukiColors ? (
@@ -827,7 +843,7 @@ export function ProgressionGlobalInspector({
         ) : null;
 
       case "measures":
-        return onSetMeasuresPerSystem && project.presentation.progressionView === "staff" ? (
+        return onSetMeasuresPerSystem ? (
           <details
             className="inspector-disclosure measures-per-system-disclosure"
             open={measuresLayoutOpen}
@@ -866,6 +882,38 @@ export function ProgressionGlobalInspector({
                   aria-label="Auto responsive layout"
                 >
                   Auto
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 8 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(8)}
+                  aria-label="8 measures per system"
+                >
+                  8 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 7 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(7)}
+                  aria-label="7 measures per system"
+                >
+                  7 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 6 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(6)}
+                  aria-label="6 measures per system"
+                >
+                  6 Bars
+                </button>
+                <button
+                  type="button"
+                  className={project.presentation.measuresPerSystem === 5 ? "is-active" : ""}
+                  onClick={() => onSetMeasuresPerSystem(5)}
+                  aria-label="5 measures per system"
+                >
+                  5 Bars
                 </button>
                 <button
                   type="button"

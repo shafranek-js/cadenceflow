@@ -9,9 +9,9 @@ import { realizeProgressionStepRealization } from "../../instruments/piano/profi
 import { formatMusicalDuration } from "../../domain/timing/duration";
 import { PianoCardView } from "../piano/PianoCardView";
 import { GuitarCardView } from "../guitar/GuitarCardView";
+import { TabCardView } from "../guitar/TabCardView";
 import { StaffCardView } from "../staff/StaffCardView";
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
-import { Icon } from "../common/Icon";
 import {
   canShiftPerformanceOctave,
   performanceOctaveShiftPatch,
@@ -29,6 +29,7 @@ export function ProgressionStepCard({
   inLoop = false,
   showBassInStaff = false,
   suzukiColors = false,
+  guitarChordOrientation = "vertical",
   onSelect,
   onPerformanceChange,
   onRemove,
@@ -45,6 +46,7 @@ export function ProgressionStepCard({
   readonly inLoop?: boolean;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
+  readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onRemove: () => void;
@@ -160,11 +162,6 @@ export function ProgressionStepCard({
           aria-current={playing ? "step" : undefined}
           aria-haspopup={onOpenMelodyMenu ? "menu" : undefined}
         >
-          {playing ? (
-            <span className="step-state-indicator playing-indicator" aria-hidden="true">
-              <Icon name="play" /> Playing
-            </span>
-          ) : null}
           <span className="step-view">
             {view === "harmonic" ? (
               <>
@@ -187,7 +184,20 @@ export function ProgressionStepCard({
               <PianoCardView chordPitches={pianoPitches} chordLabel={chordLabel} />
             ) : null}
             {view === "guitar" ? (
-              <GuitarCardView chord={baseChord} chordLabel={chordLabel} />
+              <GuitarCardView
+                chord={baseChord}
+                chordLabel={chordLabel}
+                orientation={guitarChordOrientation}
+              />
+            ) : null}
+            {view === "tablature" ? (
+              <TabCardView
+                chord={baseChord}
+                chordLabel={chordLabel}
+                duration={step.duration}
+                articulation={step.performance.articulation}
+                playing={playing}
+              />
             ) : null}
             {view === "staff" ? (
               <span className="compact-staff-label">

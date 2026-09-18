@@ -6,6 +6,7 @@ import "./styles/tokens.css";
 import "./styles/studio.css";
 import "./styles/matrix.css";
 import "./styles/progression.css";
+import "./styles/help.css";
 
 // Initialize test audio hooks strictly when in DEV or explicit test mode
 initAudioTestHooks();

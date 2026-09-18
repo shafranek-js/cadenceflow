@@ -132,6 +132,58 @@ describe("GuitarCardView & GuitarFretboard", () => {
     mounted.unmount();
   });
 
+  it("renders exact string-aligned fret numbers at bottom under each string in vertical mode", () => {
+    const mounted = mount(
+      el(GuitarCardView, {
+        chord: mockCChord,
+        chordLabel: "C",
+        orientation: "vertical",
+      }),
+    );
+
+    const fretNumbers = mounted.container.querySelectorAll(".guitar-fret-number");
+    expect(fretNumbers.length).toBe(6);
+
+    // STRING_X for 6 strings: [20, 36, 52, 68, 84, 100]
+    const expectedX = ["20", "36", "52", "68", "84", "100"];
+    fretNumbers.forEach((el, idx) => {
+      expect(el.getAttribute("x")).toBe(expectedX[idx]);
+    });
+
+    // C Major open shape: x 3 2 0 1 0
+    const texts = Array.from(fretNumbers).map((el) => el.textContent?.trim());
+    expect(texts).toEqual(["x", "3", "2", "0", "1", "0"]);
+
+    mounted.unmount();
+  });
+
+  it("renders horizontal orientation (90 deg CCW) with High E on top and Low E on bottom", () => {
+    const mounted = mount(
+      el(GuitarCardView, {
+        chord: mockCChord,
+        chordLabel: "C",
+        orientation: "horizontal",
+      }),
+    );
+
+    const card = mounted.container.querySelector('[data-testid="mini-guitar-card-visual"]');
+    expect(card?.getAttribute("data-orientation")).toBe("horizontal");
+
+    const svg = mounted.container.querySelector('[data-testid="guitar-fretboard-svg"]');
+    expect(svg?.classList.contains("is-horizontal")).toBe(true);
+    expect(svg?.getAttribute("data-orientation")).toBe("horizontal");
+
+    const fretNumbers = mounted.container.querySelectorAll(".guitar-fret-number");
+    expect(fretNumbers.length).toBe(6);
+
+    // In horizontal mode, HORIZ_STRING_Y = [95, 80, 65, 50, 35, 20]
+    // String 0 (Low E) is at y=95 (bottom), String 5 (High E) is at y=20 (top)
+    const yValues = Array.from(fretNumbers).map((el) => parseFloat(el.getAttribute("y") ?? "0"));
+    expect(yValues[0]).toBeGreaterThan(yValues[5]); // string 0 is below string 5
+
+    mounted.unmount();
+  });
+
   it("integrates seamlessly inside ChordCard when view='guitar'", () => {
     const mounted = mount(
       el(ChordCard, {

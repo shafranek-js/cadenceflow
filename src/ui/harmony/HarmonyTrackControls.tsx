@@ -4,6 +4,17 @@ import type { MelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
 import { TrackControls } from "../track/TrackControls";
 import { MelodyInstrumentPicker } from "../melody/MelodyInstrumentPicker";
 
+export const PIANO_SOUNDFONT_OPTIONS: readonly { readonly id: MelodyInstrumentId; readonly label: string }[] = [
+  { id: "gm-000", label: "GM 000 · Acoustic Grand Piano" },
+  { id: "gm-001", label: "GM 001 · Bright Acoustic Piano" },
+  { id: "gm-002", label: "GM 002 · Electric Grand Piano" },
+  { id: "gm-003", label: "GM 003 · Honky-tonk Piano" },
+  { id: "gm-004", label: "GM 004 · Electric Piano 1" },
+  { id: "gm-005", label: "GM 005 · Electric Piano 2" },
+  { id: "gm-006", label: "GM 006 · Harpsichord" },
+  { id: "gm-007", label: "GM 007 · Clavinet" },
+];
+
 export const GUITAR_SOUNDFONT_OPTIONS: readonly { readonly id: MelodyInstrumentId; readonly label: string }[] = [
   { id: "gm-024", label: "GM 024 · Acoustic Guitar (nylon)" },
   { id: "gm-025", label: "GM 025 · Acoustic Guitar (steel)" },
@@ -29,6 +40,7 @@ export function HarmonyTrackControls({
   readonly onRetry?: () => void;
 }) {
   const pianoEngine = settings.pianoEngine ?? "hq-samples";
+  const pianoSoundfontInstrument = settings.pianoSoundfontInstrument ?? "gm-000";
   const guitarEngine = settings.guitarEngine ?? "hq-samples";
   const guitarSoundfontInstrument = settings.guitarSoundfontInstrument ?? "gm-025";
 
@@ -88,6 +100,41 @@ export function HarmonyTrackControls({
               SoundFont
             </button>
           </div>
+          {pianoEngine === "soundfont" ? (
+            <label
+              style={{
+                display: "grid",
+                gap: "2px",
+                marginTop: "2px",
+              }}
+            >
+              <span style={{ fontSize: "0.7rem", opacity: 0.7 }}>Piano SoundFont Tone</span>
+              <select
+                aria-label="Piano SoundFont Tone"
+                data-testid="piano-soundfont-instrument-select"
+                value={pianoSoundfontInstrument}
+                onChange={(e) =>
+                  onChange({
+                    pianoSoundfontInstrument: e.target.value as MelodyInstrumentId,
+                  })
+                }
+                style={{
+                  fontSize: "0.8rem",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  background: "var(--bg-input, #222)",
+                  color: "var(--text-color, #eee)",
+                  border: "1px solid var(--border-color, #444)",
+                }}
+              >
+                {PIANO_SOUNDFONT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
 
         <div className="harmony-engine-row" style={{ display: "grid", gap: "4px" }}>

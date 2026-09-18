@@ -328,6 +328,8 @@ export class PlaybackController {
       tempoBpm,
       groove,
     });
+    const isSoundFontPiano = params.harmonyTrack?.pianoEngine === "soundfont";
+    const sfPianoInst = params.harmonyTrack?.pianoSoundfontInstrument ?? "gm-000";
     const activePianoEvents = fullPianoEvents
       .filter(
         (event) =>
@@ -339,6 +341,7 @@ export class PlaybackController {
         Object.freeze({
           ...event,
           startSeconds: countInDurationSeconds + event.startSeconds - sliceBaseSeconds,
+          ...(isSoundFontPiano ? { instrument: sfPianoInst } : {}),
         }),
       );
     const melodyProjection = params.melodyTrack
@@ -577,29 +580,37 @@ export class PlaybackController {
       const currentMusicalSeconds = this.scheduler.getElapsedSeconds();
 
       let matchingStepIndex: number | null = null;
+      let stepStartedAt: number | null = null;
       for (const boundary of this.stepBoundaries) {
         if (
           currentMusicalSeconds >= boundary.startSeconds &&
           currentMusicalSeconds < boundary.endSeconds
         ) {
           matchingStepIndex = boundary.stepIndex;
+          const elapsedSec = Math.max(0, currentMusicalSeconds - boundary.startSeconds);
+          stepStartedAt = performance.now() - elapsedSec * 1000;
           break;
         }
       }
 
-      this.transportStore.setCurrentStepIndex(matchingStepIndex, sessionId);
+      this.transportStore.setCurrentStepIndex(matchingStepIndex, sessionId, stepStartedAt);
 
       let activeMelodyEventKey: string | null = null;
+      let melodyStartedAt: number | null = null;
       if (this.melodyAvailableForSession) {
         const melodyEvent = this.melodyTimeBoundaries.find(
           (boundary) =>
             currentMusicalSeconds >= boundary.startSeconds &&
             currentMusicalSeconds < boundary.endSeconds,
         );
-        activeMelodyEventKey = melodyEvent?.eventKey ?? null;
+        if (melodyEvent) {
+          activeMelodyEventKey = melodyEvent.eventKey;
+          const elapsedSec = Math.max(0, currentMusicalSeconds - melodyEvent.startSeconds);
+          melodyStartedAt = performance.now() - elapsedSec * 1000;
+        }
       }
-      this.transportStore.setActiveMelodyEventKey(activeMelodyEventKey, sessionId);
-    }, 30);
+      this.transportStore.setActiveMelodyEventKey(activeMelodyEventKey, sessionId, melodyStartedAt);
+    }, 15);
   }
 
   private clearStepTracking(): void {

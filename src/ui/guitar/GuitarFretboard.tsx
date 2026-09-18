@@ -1,4 +1,3 @@
-import { useId } from "react";
 import type { GuitarChordVoicing, GuitarFretItem } from "../../domain/instruments/guitar/voicings";
 
 export interface GuitarFretboardProps {
@@ -9,12 +8,17 @@ export interface GuitarFretboardProps {
   readonly className?: string;
   readonly width?: number | string;
   readonly height?: number | string;
+  readonly orientation?: "vertical" | "horizontal";
 }
 
-const STRING_X = [20, 36, 52, 68, 84, 100] as const; // stringIndex 0 (low E) to 5 (high E)
+const VERT_STRING_X = [20, 36, 52, 68, 84, 100] as const; // stringIndex 0 (low E) to 5 (high E)
 const STRING_GAUGES = [2.4, 2.0, 1.6, 1.3, 1.0, 0.8] as const;
-const Y_TOP = 26;
-const FRET_HEIGHT = 22;
+const VERT_Y_TOP = 26;
+const VERT_FRET_HEIGHT = 22;
+
+const HORIZ_STRING_Y = [95, 80, 65, 50, 35, 20] as const; // stringIndex 0 (low E at bottom) to 5 (high E at top)
+const HORIZ_X_NUT = 28;
+const HORIZ_FRET_WIDTH = 22;
 
 export function GuitarFretboard({
   voicing,
@@ -22,30 +26,254 @@ export function GuitarFretboard({
   showScaleTones = false,
   showFingerings = true,
   className = "",
-  width = 120,
-  height = 136,
+  width,
+  height,
+  orientation = "vertical",
 }: GuitarFretboardProps) {
   const fretSpan = Math.max(4, voicing.fretSpan);
-  const totalHeight = Y_TOP + fretSpan * FRET_HEIGHT + 10;
   const isNut = voicing.baseFret === 1;
-  const maskId = useId();
+  const isHorizontal = orientation === "horizontal";
+
+  if (isHorizontal) {
+    const fretboardRight = HORIZ_X_NUT + fretSpan * HORIZ_FRET_WIDTH;
+    const fretNumbersX = fretboardRight + 13;
+    const totalWidth = fretNumbersX + 11;
+    const totalHeight = 114;
+    const svgWidth = width ?? 160;
+    const svgHeight = height ?? 116;
+
+    return (
+      <svg
+        className={`guitar-fretboard-svg is-horizontal ${className}`.trim()}
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+        width={svgWidth}
+        height={svgHeight}
+        role="img"
+        aria-label={`${voicing.chordSymbol} horizontal guitar chord diagram starting at fret ${voicing.baseFret}`}
+        data-testid="guitar-fretboard-svg"
+        data-orientation="horizontal"
+      >
+        {/* Background container for neck */}
+        <rect
+          x="6"
+          y="10"
+          width={fretboardRight - 4}
+          height="94"
+          rx="4"
+          className="guitar-fretboard-bg"
+        />
+
+        {/* Nut (vertical bar) if base fret is 1, otherwise regular fret line */}
+        {isNut ? (
+          <rect
+            x={HORIZ_X_NUT - 3.5}
+            y="19"
+            width="4"
+            height="78"
+            rx="1"
+            className="guitar-nut"
+          />
+        ) : (
+          <>
+            <line
+              x1={HORIZ_X_NUT}
+              y1="20"
+              x2={HORIZ_X_NUT}
+              y2="95"
+              className="guitar-fret-line is-first"
+            />
+            {/* Position label above first fret (e.g. "3fr") */}
+            <text
+              x={HORIZ_X_NUT + HORIZ_FRET_WIDTH * 0.5}
+              y="9"
+              className="guitar-position-label"
+              textAnchor="middle"
+            >
+              {`${voicing.baseFret}fr`}
+            </text>
+          </>
+        )}
+
+        {/* Vertical Fret Lines */}
+        {Array.from({ length: fretSpan }).map((_, idx) => {
+          const x = HORIZ_X_NUT + (idx + 1) * HORIZ_FRET_WIDTH;
+          return (
+            <line
+              key={`fret-${idx + 1}`}
+              x1={x}
+              y1="20"
+              x2={x}
+              y2="95"
+              className="guitar-fret-line"
+            />
+          );
+        })}
+
+        {/* Horizontal Strings (High E on top to Low E on bottom) */}
+        {HORIZ_STRING_Y.map((y, idx) => (
+          <line
+            key={`string-${idx}`}
+            x1={HORIZ_X_NUT}
+            y1={y}
+            x2={fretboardRight}
+            y2={y}
+            className="guitar-string"
+            strokeWidth={STRING_GAUGES[idx]}
+          />
+        ))}
+
+        {/* Muted ('X') and Open ('O') String Indicators before the nut on left */}
+        {voicing.frets.map((fret, stringIdx) => {
+          const y = HORIZ_STRING_Y[stringIdx]!;
+          const x = 14;
+          if (fret === -1) {
+            return (
+              <text
+                key={`mute-${stringIdx}`}
+                x={x}
+                y={y + 3.5}
+                className="guitar-string-marker is-muted"
+                textAnchor="middle"
+                aria-label={`String ${6 - stringIdx} muted`}
+              >
+                ×
+              </text>
+            );
+          }
+          if (fret === 0) {
+            return (
+              <circle
+                key={`open-${stringIdx}`}
+                cx={x}
+                cy={y}
+                r="3.5"
+                className="guitar-string-marker is-open"
+                aria-label={`String ${6 - stringIdx} open`}
+              />
+            );
+          }
+          return null;
+        })}
+
+        {/* Barre indicators in horizontal orientation */}
+        {voicing.barres.map((barre, idx) => {
+          const relFret = barre.fret - voicing.baseFret + 1;
+          if (relFret < 1 || relFret > fretSpan) return null;
+          const x = HORIZ_X_NUT + (relFret - 0.5) * HORIZ_FRET_WIDTH;
+          const fromY = HORIZ_STRING_Y[barre.fromStringIndex]!;
+          const toY = HORIZ_STRING_Y[barre.toStringIndex]!;
+          return (
+            <rect
+              key={`barre-${idx}`}
+              x={x - 5.5}
+              y={Math.min(fromY, toY) - 5}
+              width="11"
+              height={Math.abs(toY - fromY) + 10}
+              rx="5.5"
+              className="guitar-barre"
+              aria-label={`Barre fret ${barre.fret}`}
+            />
+          );
+        })}
+
+        {/* In-position Scale Tone Overlay (ghost dots) */}
+        {showScaleTones &&
+          scaleTones.map((item, idx) => {
+            const relFret = item.fret - voicing.baseFret + 1;
+            if (relFret < 1 || relFret > fretSpan) return null;
+            const cx = HORIZ_X_NUT + (relFret - 0.5) * HORIZ_FRET_WIDTH;
+            const cy = HORIZ_STRING_Y[item.stringIndex]!;
+            return (
+              <circle
+                key={`scale-tone-${idx}`}
+                cx={cx}
+                cy={cy}
+                r="3.5"
+                className="guitar-dot-scale-tone"
+              />
+            );
+          })}
+
+        {/* Fretted Chord Notes (finger dots) */}
+        {voicing.items
+          .filter((item) => item.fret > 0)
+          .map((item, idx) => {
+            const relFret = item.fret - voicing.baseFret + 1;
+            if (relFret < 1 || relFret > fretSpan) return null;
+            const cx = HORIZ_X_NUT + (relFret - 0.5) * HORIZ_FRET_WIDTH;
+            const cy = HORIZ_STRING_Y[item.stringIndex]!;
+            const isRoot = item.role === "root";
+
+            return (
+              <g
+                key={`dot-${idx}`}
+                className={`guitar-fret-dot-group ${isRoot ? "is-root" : "is-chord-tone"}`}
+              >
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="5.5"
+                  className={`guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`}
+                />
+                {showFingerings && item.finger ? (
+                  <text
+                    x={cx}
+                    y={cy + 3}
+                    className="guitar-dot-finger-text"
+                    textAnchor="middle"
+                  >
+                    {item.finger}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+
+        {/* Exact string-aligned fret numbers on the right side */}
+        {voicing.frets.map((fret, stringIdx) => {
+          const y = HORIZ_STRING_Y[stringIdx]!;
+          const text = fret === -1 ? "x" : String(fret);
+          return (
+            <text
+              key={`fret-num-${stringIdx}`}
+              x={fretNumbersX}
+              y={y + 3.5}
+              className="guitar-fret-number"
+              textAnchor="middle"
+              aria-label={`String ${6 - stringIdx} fret ${text}`}
+            >
+              {text}
+            </text>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  // --- Vertical Orientation (Default) ---
+  const fretboardBottom = VERT_Y_TOP + fretSpan * VERT_FRET_HEIGHT;
+  const fretNumbersY = fretboardBottom + 16;
+  const totalHeight = fretNumbersY + 5;
+  const svgWidth = width ?? 120;
+  const svgHeight = height ?? 140;
 
   return (
     <svg
-      className={`guitar-fretboard-svg ${className}`.trim()}
+      className={`guitar-fretboard-svg is-vertical ${className}`.trim()}
       viewBox={`0 0 120 ${totalHeight}`}
-      width={width}
-      height={height}
+      width={svgWidth}
+      height={svgHeight}
       role="img"
       aria-label={`${voicing.chordSymbol} guitar chord diagram starting at fret ${voicing.baseFret}`}
       data-testid="guitar-fretboard-svg"
+      data-orientation="vertical"
     >
       {/* Background container */}
       <rect
         x="12"
         y="6"
         width="96"
-        height={totalHeight - 8}
+        height={fretboardBottom - 4}
         rx="4"
         className="guitar-fretboard-bg"
       />
@@ -54,7 +282,7 @@ export function GuitarFretboard({
       {isNut ? (
         <rect
           x="19"
-          y={Y_TOP - 3.5}
+          y={VERT_Y_TOP - 3.5}
           width="82"
           height="4"
           rx="1"
@@ -64,15 +292,15 @@ export function GuitarFretboard({
         <>
           <line
             x1="20"
-            y1={Y_TOP}
+            y1={VERT_Y_TOP}
             x2="100"
-            y2={Y_TOP}
+            y2={VERT_Y_TOP}
             className="guitar-fret-line is-first"
           />
           {/* Position label for higher frets (e.g. "3fr", "5fr") */}
           <text
             x="105"
-            y={Y_TOP + FRET_HEIGHT * 0.65}
+            y={VERT_Y_TOP + VERT_FRET_HEIGHT * 0.65}
             className="guitar-position-label"
             textAnchor="start"
           >
@@ -83,7 +311,7 @@ export function GuitarFretboard({
 
       {/* Horizontal Fret Lines */}
       {Array.from({ length: fretSpan }).map((_, idx) => {
-        const y = Y_TOP + (idx + 1) * FRET_HEIGHT;
+        const y = VERT_Y_TOP + (idx + 1) * VERT_FRET_HEIGHT;
         return (
           <line
             key={`fret-${idx + 1}`}
@@ -97,13 +325,13 @@ export function GuitarFretboard({
       })}
 
       {/* Vertical Strings (from Low E on left to High E on right) */}
-      {STRING_X.map((x, idx) => (
+      {VERT_STRING_X.map((x, idx) => (
         <line
           key={`string-${idx}`}
           x1={x}
-          y1={Y_TOP}
+          y1={VERT_Y_TOP}
           x2={x}
-          y2={Y_TOP + fretSpan * FRET_HEIGHT}
+          y2={fretboardBottom}
           className="guitar-string"
           strokeWidth={STRING_GAUGES[idx]}
         />
@@ -111,7 +339,7 @@ export function GuitarFretboard({
 
       {/* Muted ('X') and Open ('O') String Indicators above the nut */}
       {voicing.frets.map((fret, stringIdx) => {
-        const x = STRING_X[stringIdx]!;
+        const x = VERT_STRING_X[stringIdx]!;
         const y = 14;
         if (fret === -1) {
           // Muted string 'X'
@@ -148,9 +376,9 @@ export function GuitarFretboard({
       {voicing.barres.map((barre, idx) => {
         const relFret = barre.fret - voicing.baseFret + 1;
         if (relFret < 1 || relFret > fretSpan) return null;
-        const fromX = STRING_X[barre.fromStringIndex]!;
-        const toX = STRING_X[barre.toStringIndex]!;
-        const y = Y_TOP + (relFret - 0.5) * FRET_HEIGHT;
+        const fromX = VERT_STRING_X[barre.fromStringIndex]!;
+        const toX = VERT_STRING_X[barre.toStringIndex]!;
+        const y = VERT_Y_TOP + (relFret - 0.5) * VERT_FRET_HEIGHT;
         return (
           <rect
             key={`barre-${idx}`}
@@ -170,8 +398,8 @@ export function GuitarFretboard({
         scaleTones.map((item, idx) => {
           const relFret = item.fret - voicing.baseFret + 1;
           if (relFret < 1 || relFret > fretSpan) return null;
-          const cx = STRING_X[item.stringIndex]!;
-          const cy = Y_TOP + (relFret - 0.5) * FRET_HEIGHT;
+          const cx = VERT_STRING_X[item.stringIndex]!;
+          const cy = VERT_Y_TOP + (relFret - 0.5) * VERT_FRET_HEIGHT;
           return (
             <circle
               key={`scale-tone-${idx}`}
@@ -189,8 +417,8 @@ export function GuitarFretboard({
         .map((item, idx) => {
           const relFret = item.fret - voicing.baseFret + 1;
           if (relFret < 1 || relFret > fretSpan) return null;
-          const cx = STRING_X[item.stringIndex]!;
-          const cy = Y_TOP + (relFret - 0.5) * FRET_HEIGHT;
+          const cx = VERT_STRING_X[item.stringIndex]!;
+          const cy = VERT_Y_TOP + (relFret - 0.5) * VERT_FRET_HEIGHT;
           const isRoot = item.role === "root";
 
           return (
@@ -217,6 +445,24 @@ export function GuitarFretboard({
             </g>
           );
         })}
+
+      {/* Exact string-aligned fret numbers at bottom under each string */}
+      {voicing.frets.map((fret, stringIdx) => {
+        const x = VERT_STRING_X[stringIdx]!;
+        const text = fret === -1 ? "x" : String(fret);
+        return (
+          <text
+            key={`fret-num-${stringIdx}`}
+            x={x}
+            y={fretNumbersY}
+            className="guitar-fret-number"
+            textAnchor="middle"
+            aria-label={`String ${6 - stringIdx} fret ${text}`}
+          >
+            {text}
+          </text>
+        );
+      })}
     </svg>
   );
 }

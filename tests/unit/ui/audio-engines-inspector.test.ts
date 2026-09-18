@@ -159,6 +159,41 @@ describe("AudioEnginesInspector", () => {
     mounted.unmount();
   });
 
+  it("renders piano soundfont tone select and updates badge when piano engine is soundfont", () => {
+    const onChange = vi.fn();
+    const mounted = mount(
+      el(AudioEnginesInspector, {
+        settings: {
+          ...defaultSettings,
+          pianoEngine: "soundfont",
+          pianoSoundfontInstrument: "gm-004",
+        },
+        onChange,
+        globalMatrixCardView: "harmonic",
+      }),
+    );
+
+    const badge = mounted.container.querySelector('[data-testid="audio-engine-active-badge"]');
+    expect(badge?.textContent).toBe("Piano: SoundFont");
+    expect(badge?.getAttribute("title")).toBe("Active timbre: Piano: SoundFont (Electric Piano 1)");
+
+    const toneSelect = mounted.container.querySelector<HTMLSelectElement>(
+      '[data-testid="inspector-piano-soundfont-select"]',
+    );
+    expect(toneSelect).not.toBeNull();
+    expect(toneSelect?.value).toBe("gm-004");
+
+    act(() => {
+      if (toneSelect) {
+        toneSelect.value = "gm-005";
+        toneSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ pianoSoundfontInstrument: "gm-005" });
+    mounted.unmount();
+  });
+
   it("collapses and expands content and persists state to localStorage", () => {
     const onChange = vi.fn();
     const mounted = mount(

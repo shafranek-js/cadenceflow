@@ -231,11 +231,27 @@ function decodeMelodyTrackSettings(raw: unknown): MelodyTrackSettings {
 }
 
 function isProgressionView(value: unknown): value is ProgressionView {
-  return value === "harmonic" || value === "piano" || value === "staff";
+  return (
+    value === "harmonic" ||
+    value === "piano" ||
+    value === "staff" ||
+    value === "guitar" ||
+    value === "tablature"
+  );
 }
 
 function isMeasuresPerSystem(value: unknown): value is MeasuresPerSystem {
-  return value === "auto" || value === 1 || value === 2 || value === 3 || value === 4;
+  return (
+    value === "auto" ||
+    value === 1 ||
+    value === 2 ||
+    value === 3 ||
+    value === 4 ||
+    value === 5 ||
+    value === 6 ||
+    value === 7 ||
+    value === 8
+  );
 }
 
 function inferLegacyProgressionView(rawDoc: Record<string, unknown>): ProgressionView {
@@ -276,10 +292,10 @@ function decodeMeasuresPerSystem(presentation: Record<string, unknown>): Measure
 
   const legacy = presentation["measureLayoutColumns"];
   if (legacy === "auto") return "auto";
-  if (legacy === "1" || legacy === 1) return 1;
-  if (legacy === "2" || legacy === 2) return 2;
-  if (legacy === "3" || legacy === 3) return 3;
-  if (legacy === "4" || legacy === 4) return 4;
+  const num = typeof legacy === "string" ? parseInt(legacy, 10) : legacy;
+  if (typeof num === "number" && num >= 1 && num <= 8) {
+    return num as MeasuresPerSystem;
+  }
   return "auto";
 }
 
@@ -463,6 +479,9 @@ export function encodePortableProject(project: Project): string {
       suzukiColors: project.presentation.suzukiColors === true,
       resolutionArrows: project.presentation.resolutionArrows !== false,
       genreFocus: project.presentation.genreFocus ?? "all",
+      ...(project.presentation.guitarChordOrientation !== undefined
+        ? { guitarChordOrientation: project.presentation.guitarChordOrientation }
+        : {}),
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
@@ -709,6 +728,14 @@ export function decodePortableProject(jsonString: string): Project {
           typeof presentation["genreFocus"] === "string"
             ? (presentation["genreFocus"] as GenreFocusId)
             : "all",
+        ...(presentation["guitarChordOrientation"] === "horizontal" ||
+        presentation["guitarChordOrientation"] === "vertical"
+          ? {
+              guitarChordOrientation: presentation[
+                "guitarChordOrientation"
+              ] as "vertical" | "horizontal",
+            }
+          : {}),
       });
     })(),
     harmonyTrack,

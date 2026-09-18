@@ -57,20 +57,20 @@ describe("ScoreSystemProjection", () => {
     });
   });
 
-  it("keeps manual values as hard maximums from one through four", () => {
+  it("keeps manual values as hard maximums from one through eight", () => {
     const layout = layoutFor(
-      Array.from({ length: 6 }, (_, index) => chordStep(`step-${index}`, 4)),
+      Array.from({ length: 10 }, (_, index) => chordStep(`step-${index}`, 4)),
     );
 
     expect(
-      [1, 2, 3, 4].map(
+      [1, 2, 3, 4, 5, 6, 7, 8].map(
         (measuresPerSystem) =>
           projectScoreSystems(layout, {
             availableWidthPx: 10_000,
-            measuresPerSystem: measuresPerSystem as 1 | 2 | 3 | 4,
+            measuresPerSystem: measuresPerSystem as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
           }).maximumMeasuresPerSystem,
       ),
-    ).toEqual([1, 2, 3, 4]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("uses time-proportional widths and adds space only for dense attacks", () => {

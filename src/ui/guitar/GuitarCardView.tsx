@@ -9,6 +9,7 @@ export interface GuitarCardViewProps {
   readonly chordLabel: string;
   readonly scalePitchClasses?: readonly PitchClassIdentity[];
   readonly showScaleTones?: boolean;
+  readonly orientation?: "vertical" | "horizontal";
 }
 
 export function GuitarCardView({
@@ -16,6 +17,7 @@ export function GuitarCardView({
   chordLabel,
   scalePitchClasses,
   showScaleTones = false,
+  orientation = "vertical",
 }: GuitarCardViewProps) {
   const isSeventh =
     chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
@@ -38,13 +40,16 @@ export function GuitarCardView({
     .map((f) => (f === -1 ? "x" : String(f)))
     .join(" ");
 
+  const isHorizontal = orientation === "horizontal";
+
   return (
     <div
-      className="mini-guitar-card-visual"
+      className={`mini-guitar-card-visual ${isHorizontal ? "is-horizontal" : "is-vertical"}`}
       data-testid="mini-guitar-card-visual"
       data-chord-symbol={chordLabel}
       data-base-fret={voicing.baseFret}
       data-frets={fretStringSummary}
+      data-orientation={orientation}
     >
       <div className="mini-guitar-heading">
         <strong className="mini-guitar-chord-name">{chordLabel}</strong>
@@ -62,13 +67,10 @@ export function GuitarCardView({
           scaleTones={scaleTones}
           showScaleTones={showScaleTones}
           showFingerings={true}
-          width={104}
-          height={118}
+          orientation={orientation}
+          width={isHorizontal ? 172 : 124}
+          height={isHorizontal ? 116 : 142}
         />
-      </div>
-
-      <div className="mini-guitar-frets-tab" aria-hidden="true">
-        <span>{fretStringSummary}</span>
       </div>
     </div>
   );

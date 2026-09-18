@@ -80,6 +80,10 @@ const MEASURES_PER_SYSTEM_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "auto", label: "Auto (Responsive)" },
+  { id: 8, label: "8 Measures / System" },
+  { id: 7, label: "7 Measures / System" },
+  { id: 6, label: "6 Measures / System" },
+  { id: 5, label: "5 Measures / System" },
   { id: 4, label: "4 Measures / System" },
   { id: 3, label: "3 Measures / System" },
   { id: 2, label: "2 Measures / System" },

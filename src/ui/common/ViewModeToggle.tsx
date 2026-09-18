@@ -6,64 +6,97 @@ export interface ViewModeToggleProps {
   readonly onChangeView: (view: CardViewId) => void;
   readonly selectAriaLabel: string;
   readonly testIdPrefix?: string;
+  readonly availableViews?: readonly CardViewId[];
 }
+
+const DEFAULT_VIEWS: readonly CardViewId[] = [
+  "harmonic",
+  "piano",
+  "staff",
+  "guitar",
+  "tablature",
+];
 
 export function ViewModeToggle({
   currentView,
   onChangeView,
   selectAriaLabel,
   testIdPrefix = "view-mode",
+  availableViews = DEFAULT_VIEWS,
 }: ViewModeToggleProps) {
+  const views = availableViews;
+
   return (
     <div
       className="view-mode-toggle"
       role="group"
       data-testid={`${testIdPrefix}-toggle`}
     >
-      <button
-        type="button"
-        className={`view-mode-btn ${currentView === "harmonic" ? "is-active" : ""}`}
-        onClick={() => onChangeView("harmonic")}
-        title="Harmonic View [H]"
-        aria-label="Harmonic View"
-        aria-pressed={currentView === "harmonic"}
-        data-testid={`${testIdPrefix}-btn-harmonic`}
-      >
-        H
-      </button>
-      <button
-        type="button"
-        className={`view-mode-btn ${currentView === "piano" ? "is-active" : ""}`}
-        onClick={() => onChangeView("piano")}
-        title="Piano View [P]"
-        aria-label="Piano View"
-        aria-pressed={currentView === "piano"}
-        data-testid={`${testIdPrefix}-btn-piano`}
-      >
-        P
-      </button>
-      <button
-        type="button"
-        className={`view-mode-btn ${currentView === "staff" ? "is-active" : ""}`}
-        onClick={() => onChangeView("staff")}
-        title="Staff View [S]"
-        aria-label="Staff View"
-        aria-pressed={currentView === "staff"}
-        data-testid={`${testIdPrefix}-btn-staff`}
-      >
-        S
-      </button>
-      <button
-        type="button"
-        className={`view-mode-btn ${currentView === "guitar" ? "is-active" : ""}`}
-        onClick={() => onChangeView("guitar")}
-        title="Guitar View [G]"
-        aria-label="Guitar View"
-        aria-pressed={currentView === "guitar"}
-        data-testid={`${testIdPrefix}-btn-guitar`}
-      >
-        G
-      </button>
+      {views.includes("harmonic") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "harmonic" ? "is-active" : ""}`}
+          onClick={() => onChangeView("harmonic")}
+          title="Harmonic View [H]"
+          aria-label="Harmonic View"
+          aria-pressed={currentView === "harmonic"}
+          data-testid={`${testIdPrefix}-btn-harmonic`}
+        >
+          H
+        </button>
+      )}
+      {views.includes("piano") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "piano" ? "is-active" : ""}`}
+          onClick={() => onChangeView("piano")}
+          title="Piano View [P]"
+          aria-label="Piano View"
+          aria-pressed={currentView === "piano"}
+          data-testid={`${testIdPrefix}-btn-piano`}
+        >
+          P
+        </button>
+      )}
+      {views.includes("staff") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "staff" ? "is-active" : ""}`}
+          onClick={() => onChangeView("staff")}
+          title="Staff View [S]"
+          aria-label="Staff View"
+          aria-pressed={currentView === "staff"}
+          data-testid={`${testIdPrefix}-btn-staff`}
+        >
+          S
+        </button>
+      )}
+      {views.includes("guitar") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "guitar" ? "is-active" : ""}`}
+          onClick={() => onChangeView("guitar")}
+          title="Guitar View [G]"
+          aria-label="Guitar View"
+          aria-pressed={currentView === "guitar"}
+          data-testid={`${testIdPrefix}-btn-guitar`}
+        >
+          G
+        </button>
+      )}
+      {views.includes("tablature") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "tablature" ? "is-active" : ""}`}
+          onClick={() => onChangeView("tablature")}
+          title="Tablature View [T]"
+          aria-label="Tablature View"
+          aria-pressed={currentView === "tablature"}
+          data-testid={`${testIdPrefix}-btn-tablature`}
+        >
+          T
+        </button>
+      )}
       <select
         className="view-mode-hidden-select"
         aria-label={selectAriaLabel}
@@ -73,10 +106,11 @@ export function ViewModeToggle({
         }
         tabIndex={-1}
       >
-        <option value="harmonic">Harmonic</option>
-        <option value="piano">Piano</option>
-        <option value="staff">Staff</option>
-        <option value="guitar">Guitar</option>
+        {views.includes("harmonic") && <option value="harmonic">Harmonic</option>}
+        {views.includes("piano") && <option value="piano">Piano</option>}
+        {views.includes("staff") && <option value="staff">Staff</option>}
+        {views.includes("guitar") && <option value="guitar">Guitar</option>}
+        {views.includes("tablature") && <option value="tablature">Tablature</option>}
       </select>
     </div>
   );

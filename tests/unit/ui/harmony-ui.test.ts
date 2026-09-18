@@ -131,4 +131,36 @@ describe("Harmony Track controls", () => {
     expect(onChange).toHaveBeenNthCalledWith(3, { guitarSoundfontInstrument: "gm-024" });
     mounted.unmount();
   });
+
+  it("renders piano soundfont tone select when pianoEngine is soundfont and triggers onChange", () => {
+    const onChange = vi.fn();
+    const mounted = mount(
+      el(HarmonyTrackControls, {
+        settings: {
+          instrument: "piano",
+          muted: false,
+          solo: false,
+          volume: 100,
+          pianoEngine: "soundfont",
+          pianoSoundfontInstrument: "gm-004",
+        },
+        onChange,
+      }),
+    );
+
+    const pianoToneSelect = mounted.container.querySelector(
+      '[data-testid="piano-soundfont-instrument-select"]',
+    ) as HTMLSelectElement;
+
+    expect(pianoToneSelect).not.toBeNull();
+    expect(pianoToneSelect.value).toBe("gm-004");
+
+    act(() => {
+      pianoToneSelect.value = "gm-006";
+      pianoToneSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ pianoSoundfontInstrument: "gm-006" });
+    mounted.unmount();
+  });
 });

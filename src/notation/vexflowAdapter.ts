@@ -9,6 +9,8 @@ import {
   StaveConnector,
   StaveNote,
   StaveTie,
+  TabNote,
+  TabStave,
   Tuplet,
   Voice,
 } from "vexflow";
@@ -16,11 +18,13 @@ import type { MusicalDuration } from "../domain/timing/duration";
 import type { Meter } from "../domain/timing/meter";
 import { rationalToNumber, type Rational } from "../domain/timing/rational";
 import type { StaffProjectionDto } from "./staffProjection";
-import { getSuzukiNoteColor } from "./suzukiColors";
+import { getSuzukiNoteColor, getSuzukiNoteStroke } from "./suzukiColors";
 
 const STAFF_INK = "#000";
 const STAFF_PLAYING_INK_FALLBACK = "#8a5732";
 const STAFF_LINE_SPACING = 8;
+const SYSTEM_STAFF_LINE_SPACING = 12;
+const TAB_LINE_SPACING = 15;
 const STAFF_SAFETY_MARGIN = 8;
 const MIN_VIEWBOX_WIDTH = 200;
 const MIN_VIEWBOX_HEIGHT = 80;
@@ -110,17 +114,74 @@ function createStaffNote(
   note.setStave(stave);
   note.setCenterAlignment(centerAligned);
   note.setStyle({ fillStyle: ink, strokeStyle: ink });
-  note.setLedgerLineStyle({ fillStyle: ink, strokeStyle: ink });
+  note.setLedgerLineStyle({ fillStyle: ink, strokeStyle: ink, lineWidth: 1 });
 
   if (suzukiColors) {
     projection.notes.forEach((item, index) => {
       const color = getSuzukiNoteColor(item.step);
+      const stroke = getSuzukiNoteStroke(item.step);
       if (color) {
-        note.setKeyStyle(index, { fillStyle: color, strokeStyle: color });
+        note.setKeyStyle(index, {
+          fillStyle: color,
+          strokeStyle: stroke ?? color,
+          ...(item.step === "E" ? { lineWidth: 1.5 } : {}),
+        });
       }
     });
   }
 
+  note.preFormat();
+  return note;
+}
+
+function createTabChordNote(
+  stave: TabStave,
+  entry: StaffSequenceChordEntry,
+  rhythm: StaffRhythm,
+  duration: MusicalDuration,
+  ink = STAFF_INK,
+): TabNote {
+  const positions =
+    entry.tabPositions && entry.tabPositions.length > 0
+      ? entry.tabPositions.map((pos) => ({ str: pos.str, fret: pos.fret }))
+      : [{ str: 6, fret: 0 }];
+
+  const note = new TabNote({
+    positions,
+    duration: rhythm.vexDuration,
+    dots: rhythm.dots,
+    durationOverride: vexDurationOverride(duration, rhythm),
+  });
+  note.setStave(stave);
+  if (ink !== STAFF_INK) {
+    note.setStyle({ fillStyle: ink, strokeStyle: ink });
+  }
+  note.preFormat();
+  return note;
+}
+
+function createTabSingleNote(
+  stave: TabStave,
+  entry: StaffSequenceNoteEntry,
+  rhythm: StaffRhythm,
+  duration: MusicalDuration,
+  ink = STAFF_INK,
+): TabNote {
+  const positions =
+    entry.tabPositions && entry.tabPositions.length > 0
+      ? entry.tabPositions.map((pos) => ({ str: pos.str, fret: pos.fret }))
+      : [{ str: 1, fret: 0 }];
+
+  const note = new TabNote({
+    positions,
+    duration: rhythm.vexDuration,
+    dots: rhythm.dots,
+    durationOverride: vexDurationOverride(duration, rhythm),
+  });
+  note.setStave(stave);
+  if (ink !== STAFF_INK) {
+    note.setStyle({ fillStyle: ink, strokeStyle: ink });
+  }
   note.preFormat();
   return note;
 }
@@ -135,6 +196,11 @@ export interface StaffSequenceChordEntry extends StaffSequenceEntryBase {
   readonly kind: "chord";
   readonly projection: StaffProjectionDto;
   readonly bassProjection?: StaffProjectionDto;
+  readonly tabPositions?: readonly {
+    readonly str: number;
+    readonly fret: number;
+    readonly finger?: number | undefined;
+  }[];
   readonly continuesFromPrevious?: boolean;
   readonly continuesToNext?: boolean;
   readonly highlighted?: boolean;
@@ -143,6 +209,11 @@ export interface StaffSequenceChordEntry extends StaffSequenceEntryBase {
 export interface StaffSequenceNoteEntry extends StaffSequenceEntryBase {
   readonly kind: "note";
   readonly projection: StaffProjectionDto;
+  readonly tabPositions?: readonly {
+    readonly str: number;
+    readonly fret: number;
+    readonly finger?: number | undefined;
+  }[];
   readonly continuesFromPrevious?: boolean;
   readonly continuesToNext?: boolean;
   readonly highlighted?: boolean;
@@ -197,17 +268,30 @@ export interface StaffSystemPosition extends StaffSequencePosition {
   readonly measureIndex: number;
 }
 
+export type TabFingeringStyle = "badge" | "dots" | "numbers";
+
+export const GUITAR_FINGER_COLORS: Record<number, string> = {
+  0: "#9ca3af",
+  1: "#f7aa06",
+  2: "#c920ff",
+  3: "#00affe",
+  4: "#f56e50",
+};
+
 export interface StaffSystemRenderOptions {
   readonly widthPx?: number;
   readonly showTimeSignature?: boolean;
   readonly showBass?: boolean;
   readonly melodyClef?: StaffClef;
   readonly suzukiColors?: boolean;
+  readonly isTablature?: boolean;
+  readonly showFingering?: boolean;
+  readonly fingeringStyle?: TabFingeringStyle | undefined;
 }
 
 interface RenderedSequenceTickable {
   readonly entry: StaffSequenceEntry;
-  readonly note: StaveNote | GhostNote;
+  readonly note: StaveNote | TabNote | GhostNote;
   readonly rhythm: StaffRhythm;
 }
 
@@ -319,7 +403,7 @@ function getSequenceLayout(
   const probeStave = new Stave(staveX, 0, staveWidth, {
     leftBar: true,
     rightBar: true,
-    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+    spacingBetweenLinesPx: SYSTEM_STAFF_LINE_SPACING,
   });
   probeStave.addClef(clef).addTimeSignature(`${meter.numerator}/${meter.denominator}`);
   const staffCenter = probeStave.getYForLine(2);
@@ -417,6 +501,12 @@ function configureSvg(
   svg.dataset.staffPitches = projection.notes.map((item) => String(item.midiNumber)).join(",");
   svg.dataset.staffDuration = `${duration.beats.numerator}/${duration.beats.denominator}`;
   svg.dataset.staffRhythm = rhythm.notation;
+
+  svg.querySelectorAll<SVGPathElement>(".vf-stave path, .vf-stavenote > path").forEach((path) => {
+    path.setAttribute("stroke-width", "1");
+    path.setAttribute("shape-rendering", "crispEdges");
+  });
+
   return svg;
 }
 
@@ -441,7 +531,7 @@ export function renderStaffProjection(
     rightBar: false,
     spacingBetweenLinesPx: STAFF_LINE_SPACING,
   });
-  stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
+  stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK, lineWidth: 1 });
   stave.setContext(context).draw();
 
   const note = createStaffNote(
@@ -500,18 +590,18 @@ export function renderStaffSequence(
   const staveOptions = {
     leftBar: !hasBassStaff,
     rightBar: !hasBassStaff,
-    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+    spacingBetweenLinesPx: SYSTEM_STAFF_LINE_SPACING,
   };
   const stave = new Stave(layout.staveX, layout.staveY, layout.staveWidth, staveOptions);
   stave.addClef(clef).addTimeSignature(`${meter.numerator}/${meter.denominator}`);
-  stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
+  stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK, lineWidth: 1 });
   stave.setContext(context).draw();
   const bassStave = hasBassStaff
     ? new Stave(layout.staveX, layout.bassStaveY!, layout.staveWidth, staveOptions)
     : undefined;
   if (bassStave) {
     bassStave.addClef("bass").addTimeSignature(`${meter.numerator}/${meter.denominator}`);
-    bassStave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
+    bassStave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK, lineWidth: 1 });
     bassStave.setContext(context).draw();
     new StaveConnector(stave, bassStave).setType("brace").setContext(context).draw();
     new StaveConnector(stave, bassStave).setType("singleLeft").setContext(context).draw();
@@ -701,6 +791,40 @@ export function renderStaffSequence(
     .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
     .join(",");
 
+  notes.forEach(({ note, entry }) => {
+    const rawId = note.getAttribute("id") || (note as any).attrs?.id;
+    if (!rawId) return;
+    const domId = rawId.startsWith("vf-") ? rawId : `vf-${rawId}`;
+    const svgEl =
+      container.querySelector<SVGElement>(`#${domId}`) ??
+      container.querySelector<SVGElement>(`#${rawId}`);
+    if (svgEl) {
+      svgEl.setAttribute("data-staff-entry", entry.key);
+      if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
+        svgEl.setAttribute("data-staff-playing", "true");
+      }
+    }
+  });
+  bassNotes.forEach(({ note, entry }) => {
+    const rawId = note.getAttribute("id") || (note as any).attrs?.id;
+    if (!rawId) return;
+    const domId = rawId.startsWith("vf-") ? rawId : `vf-${rawId}`;
+    const svgEl =
+      container.querySelector<SVGElement>(`#${domId}`) ??
+      container.querySelector<SVGElement>(`#${rawId}`);
+    if (svgEl) {
+      svgEl.setAttribute("data-bass-staff-entry", entry.key);
+      if (entry.kind === "chord" && entry.highlighted && entry.bassProjection) {
+        svgEl.setAttribute("data-staff-playing", "true");
+      }
+    }
+  });
+
+  svg.querySelectorAll<SVGPathElement>(".vf-stave path, .vf-stavenote > path").forEach((path) => {
+    path.setAttribute("stroke-width", "1");
+    path.setAttribute("shape-rendering", "crispEdges");
+  });
+
   return () => container.replaceChildren();
 }
 
@@ -781,7 +905,7 @@ function systemStaffHeight(
   const probeStave = new Stave(0, 0, widthPx, {
     leftBar: true,
     rightBar: true,
-    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+    spacingBetweenLinesPx: SYSTEM_STAFF_LINE_SPACING,
   });
   probeStave.addClef(clef);
   if (showTimeSignature) probeStave.addTimeSignature(`${meter.numerator}/${meter.denominator}`);
@@ -814,7 +938,7 @@ function systemStaveOptions(hasBassStaff: boolean) {
   return {
     leftBar: !hasBassStaff,
     rightBar: !hasBassStaff,
-    spacingBetweenLinesPx: STAFF_LINE_SPACING,
+    spacingBetweenLinesPx: SYSTEM_STAFF_LINE_SPACING,
   };
 }
 
@@ -912,20 +1036,31 @@ export function renderStaffSystem(
   let rowTop = 0;
   rows.forEach((row, rowIndex) => {
     const rowHeight = staffHeights[rowIndex]!;
+    const isTablatureRow = Boolean(options.isTablature && row.staff === "harmony");
     const staves = measures.map((measure, measureIndex) => {
-      const stave = new Stave(measureX[measureIndex]!, rowTop, measureWidths[measureIndex]!, {
-        ...systemStaveOptions(row.staff === "harmony" && showBass),
-      });
+      const stave = isTablatureRow
+        ? new TabStave(measureX[measureIndex]!, rowTop, measureWidths[measureIndex]!, {
+            spacingBetweenLinesPx: TAB_LINE_SPACING,
+            leftBar: true,
+            rightBar: true,
+          })
+        : new Stave(measureX[measureIndex]!, rowTop, measureWidths[measureIndex]!, {
+            ...systemStaveOptions(row.staff === "harmony" && showBass),
+          });
       if (measureIndex === 0) {
-        stave.addClef(row.clef);
+        if (isTablatureRow) {
+          stave.addClef("tab");
+        } else {
+          stave.addClef(row.clef);
+        }
         if (showTimeSignature) stave.addTimeSignature(`${meter.numerator}/${meter.denominator}`);
       }
-      const center = stave.getYForLine(2);
+      const center = isTablatureRow ? stave.getYForLine(2.5) : stave.getYForLine(2);
       // getYForLine() is absolute, so preserve this row's top offset while
       // centering the stave. Subtracting the absolute value directly collapses
       // every row onto the first one.
       stave.setY(rowTop + rowHeight / 2 - (center - rowTop));
-      stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
+      stave.setDefaultLedgerLineStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK, lineWidth: 1 });
       stave.setContext(context).draw();
       return stave;
     });
@@ -969,23 +1104,186 @@ export function renderStaffSystem(
       const stave = rowLayout.staves[measureIndex]!;
       const entries = rowLayout.row.entriesForMeasure(measure);
       if (entries.length === 0) return;
+      const isTab = Boolean(options.isTablature && rowLayout.row.staff === "harmony");
+      const measureMelody = measure.melodyLanes?.[0]?.entries ?? measure.melodyEntries ?? [];
+      const hasMeasureMelodyNotes = isTab && measureMelody.some((e) => e.kind === "note");
+
+      if (hasMeasureMelodyNotes) {
+        const renderedMelody: RenderedSystemTickable[] = measureMelody.map((entry) => {
+          const rhythm = staffRhythmForDuration(entry.duration);
+          let note: StaveNote | TabNote | GhostNote;
+          if (entry.kind === "gap" || entry.kind === "rest") {
+            note = createGapNote(stave, entry.duration);
+          } else if (entry.kind === "note") {
+            note = createTabSingleNote(
+              stave as TabStave,
+              entry,
+              rhythm,
+              entry.duration,
+              entry.highlighted ? playingInk : STAFF_INK,
+            );
+          } else {
+            note = createTabChordNote(
+              stave as TabStave,
+              entry,
+              rhythm,
+              entry.duration,
+              entry.highlighted ? playingInk : STAFF_INK,
+            );
+          }
+          note.setAttribute("data-staff-entry", entry.key);
+          if (entry.kind === "note" && entry.highlighted) {
+            note.setAttribute("data-staff-playing", "true");
+          }
+          return { entry, note, rhythm, staff: rowLayout.row.staff, measureIndex, stave };
+        });
+
+        const renderedHarmony: RenderedSystemTickable[] = entries.map((entry) => {
+          const rhythm = staffRhythmForDuration(entry.duration);
+          let note: StaveNote | TabNote | GhostNote;
+          let effectiveEntry = entry;
+          if (entry.kind === "gap" || entry.kind === "rest") {
+            note = createGapNote(stave, entry.duration);
+          } else if (entry.kind === "chord") {
+            const chordOnset = rationalToNumber(entry.startOffsetBeats);
+            const occupiedMelodyStrings = new Set<number>();
+            measureMelody.forEach((m) => {
+              if (m.kind === "note" && rationalToNumber(m.startOffsetBeats) === chordOnset) {
+                m.tabPositions?.forEach((pos) => occupiedMelodyStrings.add(pos.str));
+              }
+            });
+
+            const filteredPositions = (entry.tabPositions ?? []).filter(
+              (pos) => !occupiedMelodyStrings.has(pos.str),
+            );
+
+            effectiveEntry =
+              filteredPositions.length !== (entry.tabPositions?.length ?? 0)
+                ? { ...entry, tabPositions: filteredPositions }
+                : entry;
+
+            if (filteredPositions.length > 0) {
+              note = createTabChordNote(
+                stave as TabStave,
+                { ...entry, tabPositions: filteredPositions },
+                rhythm,
+                entry.duration,
+                entry.highlighted ? playingInk : STAFF_INK,
+              );
+            } else {
+              note = createGapNote(stave, entry.duration);
+            }
+          } else {
+            note = createTabSingleNote(
+              stave as TabStave,
+              entry,
+              rhythm,
+              entry.duration,
+              entry.highlighted ? playingInk : STAFF_INK,
+            );
+          }
+          note.setAttribute("data-staff-entry", entry.key);
+          if (entry.kind === "chord" && entry.highlighted) {
+            note.setAttribute("data-staff-playing", "true");
+          }
+          return { entry: effectiveEntry, note, rhythm, staff: rowLayout.row.staff, measureIndex, stave };
+        });
+
+        const melodyVoice = new Voice({
+          numBeats: meter.numerator,
+          beatValue: meter.denominator,
+        }).setMode(Voice.Mode.SOFT);
+        melodyVoice.addTickables(renderedMelody.map(({ note }) => note));
+
+        const harmonyVoice = new Voice({
+          numBeats: meter.numerator,
+          beatValue: meter.denominator,
+        }).setMode(Voice.Mode.SOFT);
+        harmonyVoice.addTickables(renderedHarmony.map(({ note }) => note));
+
+        new Formatter()
+          .joinVoices([melodyVoice, harmonyVoice])
+          .formatToStave([melodyVoice, harmonyVoice], stave);
+
+        const comparableStaves = rowLayouts.map((candidate) => candidate.staves[measureIndex]!);
+        const timeStartX =
+          Math.max(...comparableStaves.map((candidate) => candidate.getNoteStartX())) +
+          SEQUENCE_NOTE_EDGE_PADDING;
+        const timeEndX =
+          Math.min(...comparableStaves.map((candidate) => candidate.getNoteEndX())) -
+          SEQUENCE_NOTE_EDGE_PADDING;
+        const usableWidth = Math.max(timeEndX - timeStartX, 1);
+
+        const alignItem = (item: RenderedSystemTickable) => {
+          const barLengthBeats = (meter.numerator * 4) / meter.denominator;
+          const onsetRatio = rationalToNumber(item.entry.startOffsetBeats) / barLengthBeats;
+          const targetX = timeStartX + Math.min(Math.max(onsetRatio, 0), 1) * usableWidth;
+          const tickContext = item.note.getTickContext();
+          tickContext.setX(targetX);
+          tickContext.setX(targetX + (targetX - item.note.getAbsoluteX()));
+        };
+
+        renderedMelody.forEach(alignItem);
+        renderedHarmony.forEach(alignItem);
+
+        melodyVoice.draw(context, stave);
+        harmonyVoice.draw(context, stave);
+
+        renderedMelody.forEach((item) => allRendered.push(item));
+        renderedHarmony.forEach((item) => allRendered.push(item));
+
+        [...renderedMelody, ...renderedHarmony].forEach((item) => {
+          if (item.entry.kind === "gap") return;
+          positions.push(
+            Object.freeze({
+              key: item.entry.key,
+              x: item.note.getAbsoluteX(),
+              ratio: item.note.getAbsoluteX() / width,
+              staff: rowLayout.row.staff,
+              measureIndex: measure.measureIndex,
+            }),
+          );
+        });
+        return;
+      }
+
       const rendered = entries.map((entry) => {
         const rhythm = staffRhythmForDuration(entry.duration);
-        const note =
-          entry.kind === "gap"
+        let note: StaveNote | TabNote | GhostNote;
+        if (entry.kind === "gap") {
+          note = createGapNote(stave, entry.duration);
+        } else if (entry.kind === "rest") {
+          note = isTab
             ? createGapNote(stave, entry.duration)
-            : entry.kind === "rest"
-              ? createRestNote(stave, rhythm, entry.duration, rowLayout.row.clef)
-              : createStaffNote(
-                  entry.projection,
-                  stave,
-                  rhythm,
-                  entry.duration,
-                  false,
-                  entry.highlighted ? playingInk : STAFF_INK,
-                  rowLayout.row.clef,
-                  suzukiColors,
-                );
+            : createRestNote(stave, rhythm, entry.duration, rowLayout.row.clef);
+        } else if (isTab && entry.kind === "chord") {
+          note = createTabChordNote(
+            stave as TabStave,
+            entry,
+            rhythm,
+            entry.duration,
+            entry.highlighted ? playingInk : STAFF_INK,
+          );
+        } else if (isTab && entry.kind === "note") {
+          note = createTabSingleNote(
+            stave as TabStave,
+            entry,
+            rhythm,
+            entry.duration,
+            entry.highlighted ? playingInk : STAFF_INK,
+          );
+        } else {
+          note = createStaffNote(
+            entry.projection,
+            stave,
+            rhythm,
+            entry.duration,
+            false,
+            entry.highlighted ? playingInk : STAFF_INK,
+            rowLayout.row.clef,
+            suzukiColors,
+          );
+        }
         note.setAttribute("data-staff-entry", entry.key);
         if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
           note.setAttribute("data-staff-playing", "true");
@@ -1041,6 +1339,7 @@ export function renderStaffSystem(
 
       rendered.forEach((item) => {
         if (item.entry.kind !== "chord" && item.entry.kind !== "note") return;
+        if (!(item.note instanceof StaveNote)) return;
         const indexes = item.entry.projection.notes.map((_, index) => index);
         if (item.entry.continuesFromPrevious) {
           indexes.forEach((index) => {
@@ -1096,6 +1395,182 @@ export function renderStaffSystem(
     .filter((position) => position.staff === "harmony")
     .map((position) => `${position.key}:${position.ratio.toFixed(6)}`)
     .join(",");
+
+  allRendered.forEach(({ note, entry, stave }) => {
+    const rawId = note.getAttribute("id") || (note as any).attrs?.id;
+    if (!rawId) return;
+    const domId = rawId.startsWith("vf-") ? rawId : `vf-${rawId}`;
+    const svgEl =
+      container.querySelector<SVGElement>(`#${domId}`) ??
+      container.querySelector<SVGElement>(`#${rawId}`);
+    if (!svgEl) return;
+    svgEl.setAttribute("data-staff-entry", entry.key);
+    if (options.isTablature && svgEl.classList.contains("vf-tabnote")) {
+      if (
+        options.showFingering &&
+        (entry.kind === "chord" || entry.kind === "note") &&
+        entry.tabPositions &&
+        entry.tabPositions.length > 0
+      ) {
+        const sortedPositions = [...entry.tabPositions].sort((a, b) => a.str - b.str);
+        const textElements = Array.from(
+          svgEl.querySelectorAll<SVGTextElement>("text:not(.vf-tab-finger)"),
+        ).sort(
+          (a, b) =>
+            parseFloat(a.getAttribute("y") || "0") - parseFloat(b.getAttribute("y") || "0"),
+        );
+        const rectElements = Array.from(
+          svgEl.querySelectorAll<SVGRectElement>("rect"),
+        ).sort(
+          (a, b) =>
+            parseFloat(a.getAttribute("y") || "0") - parseFloat(b.getAttribute("y") || "0"),
+        );
+        const style: TabFingeringStyle = options.fingeringStyle ?? "badge";
+        const fingerColors = GUITAR_FINGER_COLORS;
+        const fingerNames: Record<number, string> = {
+          1: "1: Указательный (Index)",
+          2: "2: Средний (Middle)",
+          3: "3: Безымянный (Ring)",
+          4: "4: Мизинец (Pinky)",
+        };
+
+        const tabStave =
+          stave && typeof (stave as any).getYForLine === "function"
+            ? (stave as TabStave)
+            : null;
+
+        sortedPositions.forEach((pos, idx) => {
+          if (pos.finger !== undefined && pos.finger > 0 && pos.fret > 0) {
+            let baseText: SVGTextElement | undefined = undefined;
+            if (tabStave) {
+              const targetY = tabStave.getYForLine(pos.str - 1);
+              baseText = textElements.find(
+                (el) => Math.abs(parseFloat(el.getAttribute("y") || "0") - targetY) < 7,
+              );
+            }
+            if (!baseText) {
+              baseText = textElements[idx];
+            }
+
+            if (baseText) {
+              const textY = parseFloat(baseText.getAttribute("y") || "0");
+              const baseRect =
+                rectElements.find(
+                  (r) => Math.abs(parseFloat(r.getAttribute("y") || "0") - (textY - 3)) < 6,
+                ) ?? rectElements[idx];
+
+              const rectX = parseFloat(
+                baseRect?.getAttribute("x") || baseText.getAttribute("x") || "0",
+              );
+              const rectW = parseFloat(
+                baseRect?.getAttribute("width") || (pos.fret >= 10 ? "16" : "11"),
+              );
+              const rectY = parseFloat(baseRect?.getAttribute("y") || "0");
+              const rectH = parseFloat(baseRect?.getAttribute("height") || "6");
+              const lineY = rectY > 0 ? rectY + rectH / 2 : textY - 3;
+              const centerX = rectX + rectW / 2;
+              const rectRight = rectX + rectW;
+
+              if (style === "badge") {
+                // Circle under the fret number!
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", String(centerX));
+                circle.setAttribute("cy", String(lineY));
+                circle.setAttribute("r", "7.1");
+                circle.setAttribute("class", "vf-tab-fret-badge vf-tab-finger-badge");
+                circle.setAttribute("data-tab-finger", String(pos.finger));
+                circle.setAttribute("fill", fingerColors[pos.finger] || "#475569");
+
+                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                title.textContent = `Лад ${pos.fret} — ${fingerNames[pos.finger] ?? `Палец ${pos.finger}`}`;
+                circle.appendChild(title);
+
+                baseText.classList.add("vf-tab-fret-text-with-badge");
+                baseText.setAttribute("data-tab-finger", String(pos.finger));
+                baseText.setAttribute("fill", "#ffffff");
+
+                // Insert circle right before baseText so baseText renders on top of circle
+                svgEl.insertBefore(circle, baseText);
+              } else if (style === "dots") {
+                // Pure color dot beside fret number
+                const cx = rectRight + 6;
+                const cy = lineY;
+
+                const badgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                badgeGroup.setAttribute("class", "vf-tab-finger-dot vf-tab-finger-badge");
+                badgeGroup.setAttribute("data-tab-finger", String(pos.finger));
+
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", String(cx));
+                circle.setAttribute("cy", String(cy));
+                circle.setAttribute("r", "4.5");
+                circle.setAttribute("class", "vf-tab-finger-circle");
+                circle.setAttribute("fill", fingerColors[pos.finger] || "#475569");
+
+                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                title.textContent = fingerNames[pos.finger] ?? `Палец ${pos.finger}`;
+                circle.appendChild(title);
+
+                badgeGroup.appendChild(circle);
+                svgEl.appendChild(badgeGroup);
+              } else {
+                // Numbered circle beside fret number
+                const cx = rectRight + 8;
+                const cy = lineY;
+
+                const badgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                badgeGroup.setAttribute("class", "vf-tab-finger-badge");
+                badgeGroup.setAttribute("data-tab-finger", String(pos.finger));
+
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", String(cx));
+                circle.setAttribute("cy", String(cy));
+                circle.setAttribute("r", "5.5");
+                circle.setAttribute("class", "vf-tab-finger-circle");
+                circle.setAttribute("fill", fingerColors[pos.finger] || "#475569");
+
+                const fingerSvg = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                fingerSvg.setAttribute("class", "vf-tab-finger vf-tab-finger-text");
+                fingerSvg.setAttribute("data-tab-finger", String(pos.finger));
+                fingerSvg.setAttribute("x", String(cx));
+                fingerSvg.setAttribute("y", String(cy));
+                fingerSvg.setAttribute("text-anchor", "middle");
+                fingerSvg.setAttribute("dominant-baseline", "central");
+                fingerSvg.textContent = String(pos.finger);
+
+                badgeGroup.appendChild(circle);
+                badgeGroup.appendChild(fingerSvg);
+                svgEl.appendChild(badgeGroup);
+              }
+            }
+          }
+        });
+      }
+      if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
+        svgEl.setAttribute("data-staff-playing", "true");
+        svgEl.querySelectorAll<SVGRectElement>("rect").forEach((rect) => {
+          const y = parseFloat(rect.getAttribute("y") || "0");
+          const h = parseFloat(rect.getAttribute("height") || "0");
+          const x = parseFloat(rect.getAttribute("x") || "0");
+          const w = parseFloat(rect.getAttribute("width") || "0");
+          rect.setAttribute("y", String(y - 2));
+          rect.setAttribute("height", String(h + 4));
+          rect.setAttribute("x", String(x - 2));
+          rect.setAttribute("width", String(w + 4));
+          rect.setAttribute("rx", "3");
+          rect.setAttribute("ry", "3");
+        });
+      }
+    } else if ((entry.kind === "chord" || entry.kind === "note") && entry.highlighted) {
+      svgEl.setAttribute("data-staff-playing", "true");
+    }
+  });
+
+  svg.querySelectorAll<SVGPathElement>(".vf-stave path, .vf-stavenote > path").forEach((path) => {
+    path.setAttribute("stroke-width", "1");
+    path.setAttribute("shape-rendering", "crispEdges");
+  });
+
   onLayout?.(Object.freeze(positions));
 
   return () => container.replaceChildren();

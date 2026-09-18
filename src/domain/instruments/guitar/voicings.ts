@@ -436,6 +436,35 @@ export function resolveGuitarChordVoicing(
       // D/F#
       return buildVoicing("D/F#", 2, 6, [2, 0, 0, 2, 3, 2], [1, 0, 0, 2, 4, 3], [], "slash");
     }
+
+    // General slash chord: adapt bass note on 6th string or 5th string
+    const fret6 = (bassPc - 4 + 12) % 12; // low E (PC 4)
+    const fret5 = (bassPc - 9 + 12) % 12; // A (PC 9)
+    const useString6 = fret6 <= 3 || (fret6 <= 5 && fret5 > 3);
+    const bassStringIndex = useString6 ? 0 : 1;
+    const bassFret = useString6 ? fret6 : fret5;
+
+    const baseShape = CANONICAL_OPEN_SHAPES.find(
+      (shape) => shape.rootPc === rootPc && shape.quality === quality,
+    );
+    if (baseShape) {
+      const adaptedFrets: [number, number, number, number, number, number] = [...baseShape.frets];
+      if (bassStringIndex === 0) {
+        adaptedFrets[0] = bassFret;
+      } else {
+        adaptedFrets[0] = -1;
+        adaptedFrets[1] = bassFret;
+      }
+      return buildVoicing(
+        chordSymbol,
+        rootPc,
+        bassPc,
+        adaptedFrets,
+        baseShape.fingers,
+        baseShape.barres ?? [],
+        "slash",
+      );
+    }
   }
 
   // 1. Try matching canonical open shape

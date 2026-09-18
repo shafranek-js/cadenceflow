@@ -7,6 +7,7 @@ export interface TransportState {
   readonly startingStepIndex: number;
   readonly currentStepIndex: number | null;
   readonly activeMelodyEventKey: string | null;
+  readonly activeEventStartedAt: number | null;
   readonly pausedPositionSeconds: number | null;
   readonly loopAwareResetTarget: number;
   readonly playMode: TransportPlayMode;
@@ -41,6 +42,7 @@ export class TransportStore {
       startingStepIndex: 0,
       currentStepIndex: null,
       activeMelodyEventKey: null,
+      activeEventStartedAt: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: 0,
       playMode: "from-start",
@@ -87,6 +89,7 @@ export class TransportStore {
       startingStepIndex: startingIndex,
       currentStepIndex: startingIndex,
       activeMelodyEventKey: null,
+      activeEventStartedAt: performance.now(),
       pausedPositionSeconds: null,
       loopAwareResetTarget: startingIndex,
       playMode: "from-start",
@@ -138,6 +141,7 @@ export class TransportStore {
       startingStepIndex: targetIndex,
       currentStepIndex: targetIndex,
       activeMelodyEventKey: null,
+      activeEventStartedAt: performance.now(),
       pausedPositionSeconds: null,
       loopAwareResetTarget: targetIndex,
       playMode: "from-here",
@@ -159,6 +163,7 @@ export class TransportStore {
       ...this.#state,
       status: "paused",
       activeMelodyEventKey: null,
+      activeEventStartedAt: null,
       pausedPositionSeconds:
         pausedPositionSeconds !== undefined
           ? pausedPositionSeconds
@@ -179,6 +184,7 @@ export class TransportStore {
       ...this.#state,
       status: "playing",
       activeMelodyEventKey: null,
+      activeEventStartedAt: performance.now(),
       error: null,
     });
     this.emit();
@@ -204,6 +210,7 @@ export class TransportStore {
       startingStepIndex: this.#state.loopAwareResetTarget,
       currentStepIndex: null,
       activeMelodyEventKey: null,
+      activeEventStartedAt: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",
@@ -216,7 +223,7 @@ export class TransportStore {
    * Updates the visually active playing step during playback.
    * Stale session callbacks are ignored.
    */
-  setCurrentStepIndex(index: number | null, sessionId?: string): void {
+  setCurrentStepIndex(index: number | null, sessionId?: string, startedAt?: number | null): void {
     if (sessionId && sessionId !== this.#state.sessionId) {
       return;
     }
@@ -230,6 +237,7 @@ export class TransportStore {
     this.#state = Object.freeze({
       ...this.#state,
       currentStepIndex: index,
+      activeEventStartedAt: index !== null ? (startedAt ?? performance.now()) : null,
     });
     this.emit();
   }
@@ -242,13 +250,14 @@ export class TransportStore {
     this.emit();
   }
 
-  setActiveMelodyEventKey(key: string | null, sessionId?: string): void {
+  setActiveMelodyEventKey(key: string | null, sessionId?: string, startedAt?: number | null): void {
     if (sessionId && sessionId !== this.#state.sessionId) return;
     if (this.#state.status !== "playing" && key !== null) return;
     if (this.#state.activeMelodyEventKey === key) return;
     this.#state = Object.freeze({
       ...this.#state,
       activeMelodyEventKey: key,
+      ...(key !== null ? { activeEventStartedAt: startedAt ?? performance.now() } : {}),
     });
     this.emit();
   }
@@ -285,6 +294,7 @@ export class TransportStore {
       startingStepIndex: this.#state.loopAwareResetTarget,
       currentStepIndex: null,
       activeMelodyEventKey: null,
+      activeEventStartedAt: null,
       pausedPositionSeconds: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",

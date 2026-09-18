@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import type { AudioProviderState } from "../../audio/contracts";
 import type { AudioEngineType, HarmonyTrackSettings } from "../../domain/harmony/track";
 import type { MelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
-import { GUITAR_SOUNDFONT_OPTIONS } from "../harmony/HarmonyTrackControls";
+import { GUITAR_SOUNDFONT_OPTIONS, PIANO_SOUNDFONT_OPTIONS } from "../harmony/HarmonyTrackControls";
 import { Icon } from "../common/Icon";
 
 export interface PianoAudioStatusProps {
@@ -10,6 +10,7 @@ export interface PianoAudioStatusProps {
   readonly instrument?: "piano" | "guitar";
   readonly engine?: AudioEngineType;
   readonly guitarSoundfontInstrument?: MelodyInstrumentId;
+  readonly pianoSoundfontInstrument?: MelodyInstrumentId;
   readonly onSettingsChange?: (patch: Partial<HarmonyTrackSettings>) => void;
   readonly onRetry?: () => void;
   readonly hasActiveMelody?: boolean;
@@ -22,6 +23,7 @@ export function PianoAudioStatus({
   instrument = "piano",
   engine = "hq-samples",
   guitarSoundfontInstrument = "gm-025",
+  pianoSoundfontInstrument = "gm-000",
   onSettingsChange,
   onRetry,
 }: PianoAudioStatusProps) {
@@ -201,6 +203,29 @@ export function PianoAudioStatus({
                   SoundFont
                 </button>
               </div>
+
+              {!isGuitar && isSoundFont ? (
+                <label className="audio-status-popover-select-label">
+                  <span className="audio-status-popover-sublabel">Piano Tone</span>
+                  <select
+                    aria-label="Piano Tone"
+                    data-testid="popover-piano-tone-select"
+                    value={pianoSoundfontInstrument}
+                    onChange={(e) =>
+                      onSettingsChange?.({
+                        pianoSoundfontInstrument: e.target.value as MelodyInstrumentId,
+                      })
+                    }
+                    className="audio-status-popover-select"
+                  >
+                    {PIANO_SOUNDFONT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
             </div>
 
             {/* Guitar View Engine */}
@@ -233,7 +258,7 @@ export function PianoAudioStatus({
                 </button>
               </div>
 
-              {(isGuitar && isSoundFont) || (!isGuitar && isSoundFont) ? (
+              {isGuitar && isSoundFont ? (
                 <label className="audio-status-popover-select-label">
                   <span className="audio-status-popover-sublabel">Guitar Tone</span>
                   <select

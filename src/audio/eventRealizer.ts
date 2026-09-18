@@ -1,6 +1,8 @@
 import type { AudioNoteEvent } from "./contracts";
+import type { ChordDefinition } from "../domain/harmony/chord";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
+import { resolveGuitarChordVoicing } from "../domain/instruments/guitar/voicings";
 import type { ChordStep, ProgressionStep } from "../domain/progression/step";
 import {
   addRational,
@@ -376,3 +378,197 @@ export function realizeProgressionAudioEvents(
     ),
   );
 }
+
+export interface RealizeGuitarStepEventsInput {
+  readonly chord: ChordDefinition;
+  readonly step?: ChordStep | undefined;
+  readonly tempoBpm: number;
+  readonly articulation?: string | undefined;
+  readonly masterVelocity?: number | undefined;
+  readonly perNoteVelocityOverrides?: Readonly<Record<string, number>> | undefined;
+  readonly durationBeats?: Rational | undefined;
+  readonly instrument?: string | undefined;
+  readonly stepStartSeconds?: number | undefined;
+  readonly randomSource?: (() => number) | undefined;
+}
+
+export interface RealizedGuitarStepEvents {
+  readonly events: readonly AudioNoteEvent[];
+  readonly totalDurationSeconds: number;
+  readonly pitches: readonly ExactPitch[];
+}
+
+/**
+ * Realizes chord audition and playback events for guitar, faithfully projecting
+ * guitar-specific articulations (downstrum stagger, arp-up, arp-down, broken-chord, fingerstyle jitter)
+ * and note velocities across both HQ sample and SoundFont providers.
+ */
+export function realizeGuitarStepAudioEvents(
+  input: RealizeGuitarStepEventsInput,
+): RealizedGuitarStepEvents {
+  if (!Number.isFinite(input.tempoBpm) || input.tempoBpm <= 0) {
+    throw new RangeError("tempoBpm must be positive");
+  }
+
+  const isSeventh =
+    input.chord.baseQuality === "dominant" || input.chord.variant?.seventh !== undefined;
+  const isMajor7 = input.chord.variant?.seventh === "major7";
+  const guitarVoicing = resolveGuitarChordVoicing({
+    rootPitchClass: input.chord.rootPitchClass,
+    baseQuality: input.chord.baseQuality,
+    spelling: input.chord.spelling,
+    isSeventh,
+    isMajor7,
+  });
+
+  const pitches =
+    input.step?.performance?.voicingMode === "manual" &&
+    input.step.performance.manualVoicing &&
+    input.step.performance.manualVoicing.length > 0
+      ? input.step.performance.manualVoicing
+      : guitarVoicing.pitches;
+
+  const durationBeats = input.durationBeats ?? input.step?.duration?.beats ?? rational(4, 1);
+  const secondsPerBeat = 60 / input.tempoBpm;
+  const totalDurationSeconds = rationalToNumber(durationBeats) * secondsPerBeat;
+  const stepStartSeconds = input.stepStartSeconds ?? 0;
+
+  const articulation = input.articulation ?? input.step?.performance?.articulation ?? "block";
+  const masterVelocity = input.masterVelocity ?? input.step?.performance?.masterVelocity ?? 80;
+  const perNoteOverrides =
+    input.perNoteVelocityOverrides ?? input.step?.performance?.perNoteVelocityOverrides;
+  const instrument = input.instrument;
+
+  const n = pitches.length;
+  if (n === 0) {
+    return Object.freeze({
+      events: Object.freeze([]),
+      totalDurationSeconds,
+      pitches: Object.freeze([]),
+    });
+  }
+
+  const events: AudioNoteEvent[] = [];
+  const addNote = (
+    pitch: ExactPitch,
+    offsetSeconds: number,
+    durationSeconds: number,
+    velocity: number,
+    channelRole: PerformanceEventRole,
+  ) => {
+    events.push(
+      Object.freeze({
+        pitch: pitch.midiNumber,
+        startSeconds: stepStartSeconds + Math.max(0, offsetSeconds),
+        durationSeconds: Math.max(0.1, durationSeconds),
+        velocity: Math.max(1, Math.min(127, Math.round(velocity))),
+        channelRole,
+        ...(instrument ? { instrument } : {}),
+      }),
+    );
+  };
+
+  switch (articulation) {
+    case "arp-up": {
+      const ordered = [...pitches].sort((a, b) => a.midiNumber - b.midiNumber);
+      const maxSpread = totalDurationSeconds * 0.5;
+      const stepDelay = n > 1 ? Math.min(0.065, maxSpread / (n - 1)) : 0;
+      ordered.forEach((pitch, idx) => {
+        const offset = idx * stepDelay;
+        const dur = Math.max(0.2, (totalDurationSeconds - offset) * 0.95);
+        const vel = resolveEffectiveNoteVelocity(
+          masterVelocity,
+          String(pitch.midiNumber),
+          perNoteOverrides,
+        );
+        addNote(pitch, offset, dur, vel, idx === 0 ? "bass" : "upper");
+      });
+      break;
+    }
+
+    case "arp-down": {
+      const ordered = [...pitches].sort((a, b) => b.midiNumber - a.midiNumber);
+      const maxSpread = totalDurationSeconds * 0.5;
+      const stepDelay = n > 1 ? Math.min(0.065, maxSpread / (n - 1)) : 0;
+      ordered.forEach((pitch, idx) => {
+        const offset = idx * stepDelay;
+        const dur = Math.max(0.2, (totalDurationSeconds - offset) * 0.95);
+        const vel = resolveEffectiveNoteVelocity(
+          masterVelocity,
+          String(pitch.midiNumber),
+          perNoteOverrides,
+        );
+        addNote(pitch, offset, dur, vel, idx === ordered.length - 1 ? "bass" : "upper");
+      });
+      break;
+    }
+
+    case "broken-chord": {
+      const ordered = [...pitches].sort((a, b) => a.midiNumber - b.midiNumber);
+      const half = Math.ceil(ordered.length / 2);
+      const halfDelay = Math.min(0.11, totalDurationSeconds * 0.25);
+      ordered.forEach((pitch, idx) => {
+        const isUpper = idx >= half;
+        const baseOffset = isUpper ? halfDelay : 0;
+        const subIdx = isUpper ? idx - half : idx;
+        const offset = baseOffset + subIdx * 0.014;
+        const dur = Math.max(0.2, (totalDurationSeconds - offset) * 0.95);
+        const vel = resolveEffectiveNoteVelocity(
+          masterVelocity,
+          String(pitch.midiNumber),
+          perNoteOverrides,
+        );
+        addNote(pitch, offset, dur, vel, idx === 0 ? "bass" : "upper");
+      });
+      break;
+    }
+
+    case "humanized": {
+      const rng = input.randomSource ?? createDeterministicRandomSource(101);
+      const maxJitter = Math.min(0.025, totalDurationSeconds * 0.1);
+      const ordered = [...pitches].sort((a, b) => a.midiNumber - b.midiNumber);
+      ordered.forEach((pitch, idx) => {
+        const baseVel = resolveEffectiveNoteVelocity(
+          masterVelocity,
+          String(pitch.midiNumber),
+          perNoteOverrides,
+        );
+        if (idx === 0) {
+          addNote(pitch, 0, totalDurationSeconds * 0.95, baseVel, "bass");
+        } else {
+          const jitter = Math.max(0, (rng() - 0.5) * 2 * maxJitter + 0.012 * idx);
+          const durRatio = 0.88 + rng() * 0.08;
+          const velJitter = Math.round((rng() - 0.5) * 12);
+          const vel = Math.max(1, Math.min(127, baseVel + velJitter));
+          const dur = Math.max(0.2, (totalDurationSeconds - jitter) * durRatio);
+          addNote(pitch, jitter, dur, vel, "upper");
+        }
+      });
+      break;
+    }
+
+    case "block":
+    default: {
+      // Natural guitar downstrum stagger (16ms per string)
+      pitches.forEach((pitch, idx) => {
+        const offset = idx * 0.016;
+        const dur = Math.max(0.2, (totalDurationSeconds - offset) * 0.95);
+        const vel = resolveEffectiveNoteVelocity(
+          masterVelocity,
+          String(pitch.midiNumber),
+          perNoteOverrides,
+        );
+        addNote(pitch, offset, dur, vel, idx === 0 ? "bass" : "upper");
+      });
+      break;
+    }
+  }
+
+  events.sort((a, b) => a.startSeconds - b.startSeconds || a.pitch - b.pitch);
+  return Object.freeze({
+    events: Object.freeze(events),
+    totalDurationSeconds,
+    pitches: Object.freeze(pitches),
+  });
+}
+
