@@ -6,10 +6,12 @@ import {
   setStaffBassVisibility,
   setSuzukiColors,
   setTheme,
+  setSidePanelMode,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetSuzukiColorsCommand,
   type SetThemeCommand,
+  type SetSidePanelModeCommand,
 } from "../../src/app/commands/presentationCommands";
 import { ProjectController } from "../../src/app/projectController";
 import { createDefaultProject } from "../../src/domain/project/factory";
@@ -89,6 +91,13 @@ describe("US10 presentation persistence", () => {
       } satisfies SetSuzukiColorsCommand,
       setSuzukiColors,
     );
+    store.dispatch(
+      {
+        type: "presentation/set-side-panel-mode",
+        payload: { mode: "fixed", nowIso: "2026-09-08T12:02:50.000Z" },
+      } satisfies SetSidePanelModeCommand,
+      setSidePanelMode,
+    );
     await controller.flush();
 
     const reloaded = await autosave.loadAutosavedProject();
@@ -97,6 +106,7 @@ describe("US10 presentation persistence", () => {
     expect(reloaded?.presentation.expertiseMode).toBe("expert");
     expect(reloaded?.presentation.showBassInStaff).toBe(true);
     expect(reloaded?.presentation.suzukiColors).toBe(true);
+    expect(reloaded?.presentation.sidePanelMode).toBe("fixed");
     expect(reloaded?.tonic).toBe(initial.tonic);
     expect(reloaded?.activeModule).toBe(initial.activeModule);
     expect(reloaded?.progression.steps).toEqual(initial.progression.steps);

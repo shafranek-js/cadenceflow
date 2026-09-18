@@ -482,6 +482,9 @@ export function encodePortableProject(project: Project): string {
       ...(project.presentation.guitarChordOrientation !== undefined
         ? { guitarChordOrientation: project.presentation.guitarChordOrientation }
         : {}),
+      ...(project.presentation.sidePanelMode !== undefined
+        ? { sidePanelMode: project.presentation.sidePanelMode }
+        : {}),
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
@@ -731,9 +734,14 @@ export function decodePortableProject(jsonString: string): Project {
         ...(presentation["guitarChordOrientation"] === "horizontal" ||
         presentation["guitarChordOrientation"] === "vertical"
           ? {
-              guitarChordOrientation: presentation[
-                "guitarChordOrientation"
-              ] as "vertical" | "horizontal",
+              guitarChordOrientation: presentation["guitarChordOrientation"] as
+                "vertical" | "horizontal",
+            }
+          : {}),
+        ...(presentation["sidePanelMode"] === "fixed" ||
+        presentation["sidePanelMode"] === "autohide"
+          ? {
+              sidePanelMode: presentation["sidePanelMode"] as "fixed" | "autohide",
             }
           : {}),
       });

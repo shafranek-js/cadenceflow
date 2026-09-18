@@ -86,7 +86,6 @@ import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
 import { AcousticGuitarProvider } from "../audio/guitar/AcousticGuitarProvider";
-import { resolveGuitarChordVoicing } from "../domain/instruments/guitar/voicings";
 import {
   formatMelodyPreparationNotice,
   MelodySoundFontProvider,
@@ -122,10 +121,7 @@ import {
   realizeMelodyStepAudition,
   realizeProgressionMelodyPerformance,
 } from "../audio/melodyPerformance";
-import {
-  getAvailableSubstitutions,
-  type ChordSubstitution,
-} from "../domain/harmony/reharmonization";
+import type { ChordSubstitution } from "../domain/harmony/reharmonization";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
@@ -254,6 +250,7 @@ import {
   setResolutionArrows,
   setGenreFocus,
   setGuitarChordOrientation,
+  setSidePanelMode,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
@@ -263,6 +260,7 @@ import {
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetGuitarChordOrientationCommand,
+  type SetSidePanelModeCommand,
 } from "./commands/presentationCommands";
 import type { GenreFocusId } from "../domain/harmony/functionSemantics";
 import type {
@@ -530,7 +528,10 @@ export function App() {
       return getActiveGuitarProvider();
     }
     const isSoundFontPiano = project.harmonyTrack.pianoEngine === "soundfont";
-    if (project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000") {
+    if (
+      project.harmonyTrack.instrument === "piano" ||
+      project.harmonyTrack.instrument === "gm-000"
+    ) {
       if (isSoundFontPiano) {
         return ensureHarmonySoundFontProvider();
       }
@@ -610,7 +611,9 @@ export function App() {
           project.harmonyTrack.instrument === "piano"
             ? (project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000")
             : project.harmonyTrack.instrument;
-        void provider.prepareForInstruments([soundFontInstrument]).then(applyHarmonyPreparationResult);
+        void provider
+          .prepareForInstruments([soundFontInstrument])
+          .then(applyHarmonyPreparationResult);
       } else {
         if (audioProviderRef.current) {
           setAudioState("loading");
@@ -1044,7 +1047,7 @@ export function App() {
   const previewChord = previewIdentity ? realizeChord(previewIdentity, project.tonic) : null;
   const selectedMatrixChordName = previewChord
     ? formatChordSymbol(previewChord)
-    : activePreviewId ?? undefined;
+    : (activePreviewId ?? undefined);
   const inspected = recommendations?.bestMatch ?? null;
 
   const addToProgression = (functionId: string) => {
@@ -1268,8 +1271,8 @@ export function App() {
       currentProject.presentation.globalMatrixCardView === "guitar" ||
       step.cardView === "guitar" ||
       step.cardView === "tablature";
-    let chordPlayback: import("../audio/contracts").ScheduledPlayback | null = null;
-    let chordDurationSeconds = 1.8;
+    let chordPlayback: import("../audio/contracts").ScheduledPlayback | null;
+    let chordDurationSeconds: number;
 
     if (isGuitar) {
       const chord = realizeChord(step.harmonicFunction, currentProject.tonic);
@@ -1282,7 +1285,8 @@ export function App() {
         tempoBpm: currentProject.globalTiming.tempoBpm,
         instrument: currentProject.harmonyTrack.guitarSoundfontInstrument ?? "gm-025",
       });
-      chordPlayback = getGuitarPreviewAuditionController()?.audition(guitarRealization.events) ?? null;
+      chordPlayback =
+        getGuitarPreviewAuditionController()?.audition(guitarRealization.events) ?? null;
       chordDurationSeconds = guitarRealization.totalDurationSeconds;
     } else {
       const isSoundFontPiano = currentProject.harmonyTrack.pianoEngine === "soundfont";
@@ -1415,10 +1419,13 @@ export function App() {
           (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
           0,
         );
-        presetAuditionStopTimerRef.current = setTimeout(() => {
-          presetAuditionStopTimerRef.current = null;
-          setAuditioningPresetId((current) => (current === preset.id ? null : current));
-        }, Math.max(1, Math.ceil(totalDurationSeconds * 1000)));
+        presetAuditionStopTimerRef.current = setTimeout(
+          () => {
+            presetAuditionStopTimerRef.current = null;
+            setAuditioningPresetId((current) => (current === preset.id ? null : current));
+          },
+          Math.max(1, Math.ceil(totalDurationSeconds * 1000)),
+        );
       }
     },
     [getPreviewAuditionController, stopAuditionPreset],
@@ -1488,10 +1495,13 @@ export function App() {
           (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
           0,
         );
-        subAuditionStopTimerRef.current = setTimeout(() => {
-          subAuditionStopTimerRef.current = null;
-          setAuditioningSubId((curr) => (curr === substitution.id ? null : curr));
-        }, Math.max(1, Math.ceil(durationSeconds * 1000)));
+        subAuditionStopTimerRef.current = setTimeout(
+          () => {
+            subAuditionStopTimerRef.current = null;
+            setAuditioningSubId((curr) => (curr === substitution.id ? null : curr));
+          },
+          Math.max(1, Math.ceil(durationSeconds * 1000)),
+        );
       }
     },
     [
@@ -1543,7 +1553,9 @@ export function App() {
           stepId,
           functionId: substitution.targetFunctionId,
           ...(substitution.targetModuleId ? { moduleId: substitution.targetModuleId } : {}),
-          ...(substitution.harmonicVariant ? { harmonicVariant: substitution.harmonicVariant } : {}),
+          ...(substitution.harmonicVariant
+            ? { harmonicVariant: substitution.harmonicVariant }
+            : {}),
           nowIso: new Date().toISOString(),
         },
       };
@@ -1637,10 +1649,13 @@ export function App() {
           (latest, ev) => Math.max(latest, ev.startSeconds + ev.durationSeconds),
           0,
         );
-        modAuditionStopTimerRef.current = setTimeout(() => {
-          modAuditionStopTimerRef.current = null;
-          setAuditioningModPathId((curr) => (curr === path.id ? null : curr));
-        }, Math.max(1, Math.ceil(totalDuration * 1000)));
+        modAuditionStopTimerRef.current = setTimeout(
+          () => {
+            modAuditionStopTimerRef.current = null;
+            setAuditioningModPathId((curr) => (curr === path.id ? null : curr));
+          },
+          Math.max(1, Math.ceil(totalDuration * 1000)),
+        );
       }
     },
     [auditioningModPathId, getPreviewAuditionController, stopAuditioningModulation, store],
@@ -1653,18 +1668,15 @@ export function App() {
       const newSteps: ChordStep[] = path.bridgeSteps.map((bridgeStep, idx) => {
         const fnRef = switchKey ? bridgeStep.targetFunction : bridgeStep.sourceFunction;
         const stepId = `step-mod-${Date.now().toString(36)}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
-        return createMatrixChordStep(
-          currentProject,
-          fnRef.functionId,
-          stepId,
-          fnRef.moduleId,
-        );
+        return createMatrixChordStep(currentProject, fnRef.functionId, stepId, fnRef.moduleId);
       });
 
       if (
         insertMode === "insert" &&
         currentProject.progression.selectedStepId &&
-        currentProject.progression.steps.some((s) => s.id === currentProject.progression.selectedStepId)
+        currentProject.progression.steps.some(
+          (s) => s.id === currentProject.progression.selectedStepId,
+        )
       ) {
         const command: InsertStepsAfterCommand = {
           type: "progression/insert-steps-after",
@@ -1749,9 +1761,12 @@ export function App() {
           ? getGuitarPreviewAuditionController()
           : getPreviewAuditionController();
       controller?.audition(events);
-      modesAuditionStopTimerRef.current = setTimeout(() => {
-        modesAuditionStopTimerRef.current = null;
-      }, Math.ceil((pitches.length * noteDuration + 0.5) * 1000));
+      modesAuditionStopTimerRef.current = setTimeout(
+        () => {
+          modesAuditionStopTimerRef.current = null;
+        },
+        Math.ceil((pitches.length * noteDuration + 0.5) * 1000),
+      );
     },
     [
       getGuitarPreviewAuditionController,
@@ -1779,10 +1794,9 @@ export function App() {
         durationSeconds: isGuitar ? Math.max(0.2, 1.8 - idx * 0.016) : 1.8,
         ...(isGuitar || isSoundFontPiano ? { instrument: sfInst } : {}),
       }));
-      const controller =
-        isGuitar
-          ? getGuitarPreviewAuditionController()
-          : getPreviewAuditionController();
+      const controller = isGuitar
+        ? getGuitarPreviewAuditionController()
+        : getPreviewAuditionController();
       controller?.audition(events);
     },
     [
@@ -1859,17 +1873,15 @@ export function App() {
           (latest, ev) => Math.max(latest, ev.startSeconds + ev.durationSeconds),
           0,
         );
-        modesAuditionStopTimerRef.current = setTimeout(() => {
-          modesAuditionStopTimerRef.current = null;
-        }, Math.max(1, Math.ceil(totalDuration * 1000)));
+        modesAuditionStopTimerRef.current = setTimeout(
+          () => {
+            modesAuditionStopTimerRef.current = null;
+          },
+          Math.max(1, Math.ceil(totalDuration * 1000)),
+        );
       }
     },
-    [
-      getGuitarPreviewAuditionController,
-      getPreviewAuditionController,
-      stopAuditioningModes,
-      store,
-    ],
+    [getGuitarPreviewAuditionController, getPreviewAuditionController, stopAuditioningModes, store],
   );
 
   const handleApplyModalFormulaToProgression = useCallback(
@@ -2759,6 +2771,14 @@ export function App() {
     };
     store.dispatch(command, setGuitarChordOrientation);
   };
+  const changeSidePanelMode = (mode: "fixed" | "autohide") => {
+    if (mode === (project.presentation.sidePanelMode ?? "fixed")) return;
+    const command: SetSidePanelModeCommand = {
+      type: "presentation/set-side-panel-mode",
+      payload: { mode, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setSidePanelMode);
+  };
   const applyModuleSwitch = (
     destinationModule: HarmonicModuleId,
     resolutions: Readonly<Record<string, HarmonicFunctionIdentity | "keep-original">>,
@@ -2840,7 +2860,9 @@ export function App() {
     if (!playbackControllerRef.current) {
       const clock = harmonyProvider.clock;
       const metronomeContext = audioProviderRef.current?.audioCtx ?? sharedAudioContextRef.current;
-      const metronomeProvider = metronomeContext ? new MetronomeClickProvider(metronomeContext) : undefined;
+      const metronomeProvider = metronomeContext
+        ? new MetronomeClickProvider(metronomeContext)
+        : undefined;
       playbackControllerRef.current = new PlaybackController({
         clock,
         pianoProvider: harmonyProvider,
@@ -3328,6 +3350,8 @@ export function App() {
 
   return (
     <StudioWorkspace
+      sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
+      onSidePanelModeChange={changeSidePanelMode}
       header={
         <>
           <div className="app-header-project-area">
@@ -3387,6 +3411,8 @@ export function App() {
                 onResolutionArrowsChange={changeResolutionArrows}
                 guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
                 onGuitarChordOrientationChange={changeGuitarChordOrientation}
+                sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
+                onSidePanelModeChange={changeSidePanelMode}
                 onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
                 onOpenHelp={() => {
                   setIsHelpOpen(true);
@@ -3452,7 +3478,8 @@ export function App() {
               ? project.harmonyTrack.guitarEngine === "soundfont"
                 ? guitarSoundFontState
                 : guitarAudioState
-              : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+              : project.harmonyTrack.instrument === "piano" ||
+                  project.harmonyTrack.instrument === "gm-000"
                 ? project.harmonyTrack.pianoEngine === "soundfont"
                   ? harmonySoundFontState
                   : audioState
@@ -3621,7 +3648,8 @@ export function App() {
                 ? project.harmonyTrack.guitarEngine === "soundfont"
                   ? guitarSoundFontState
                   : guitarAudioState
-                : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+                : project.harmonyTrack.instrument === "piano" ||
+                    project.harmonyTrack.instrument === "gm-000"
                   ? project.harmonyTrack.pianoEngine === "soundfont"
                     ? harmonySoundFontState
                     : audioState
@@ -3633,7 +3661,8 @@ export function App() {
                 ? project.harmonyTrack.guitarEngine === "soundfont"
                   ? harmonySoundFontError
                   : null
-                : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+                : project.harmonyTrack.instrument === "piano" ||
+                    project.harmonyTrack.instrument === "gm-000"
                   ? project.harmonyTrack.pianoEngine === "soundfont"
                     ? harmonySoundFontError
                     : null
@@ -3664,7 +3693,9 @@ export function App() {
                 if (project.harmonyTrack.pianoEngine === "soundfont") {
                   const provider = ensureHarmonySoundFontProvider();
                   void provider
-                    .prepareForInstruments([project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000"])
+                    .prepareForInstruments([
+                      project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
+                    ])
                     .then(applyHarmonyPreparationResult)
                     .catch((err) => {
                       setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
@@ -3744,7 +3775,9 @@ export function App() {
                 title="Modulation Master & Key Transitions"
                 data-testid="progression-modulate-trigger"
               >
-                <span className="btn-modulation-icon" aria-hidden="true">🧭</span>
+                <span className="btn-modulation-icon" aria-hidden="true">
+                  🧭
+                </span>
                 <span>Modulate</span>
               </button>
               <VoiceLeadingMenu
@@ -3787,7 +3820,8 @@ export function App() {
                 ? project.harmonyTrack.guitarEngine === "soundfont"
                   ? guitarSoundFontState
                   : guitarAudioState
-                : project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000"
+                : project.harmonyTrack.instrument === "piano" ||
+                    project.harmonyTrack.instrument === "gm-000"
                   ? project.harmonyTrack.pianoEngine === "soundfont"
                     ? harmonySoundFontState
                     : audioState
@@ -3808,11 +3842,16 @@ export function App() {
                   const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
                   void gProvider.prepare();
                 }
-              } else if (project.harmonyTrack.instrument === "piano" || project.harmonyTrack.instrument === "gm-000") {
+              } else if (
+                project.harmonyTrack.instrument === "piano" ||
+                project.harmonyTrack.instrument === "gm-000"
+              ) {
                 if (project.harmonyTrack.pianoEngine === "soundfont") {
                   const provider = ensureHarmonySoundFontProvider();
                   void provider
-                    .prepareForInstruments([project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000"])
+                    .prepareForInstruments([
+                      project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
+                    ])
                     .then(applyHarmonyPreparationResult)
                     .catch((err) => {
                       setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
@@ -3887,7 +3926,9 @@ export function App() {
             onSetMelodyGridSystem={setMelodyGridSystem}
             onClearMelodySystem={clearMelodySystem}
             onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
-            onToggleSuzukiColors={() => changeSuzukiColors(!(project.presentation.suzukiColors ?? false))}
+            onToggleSuzukiColors={() =>
+              changeSuzukiColors(!(project.presentation.suzukiColors ?? false))
+            }
             onApplyPreset={handleApplyPreset}
             onOpenPresets={() => setPresetsPanelOpen(true)}
             onApplySubstitution={handleApplySubstitution}

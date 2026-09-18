@@ -164,10 +164,7 @@ export type SetSuzukiColorsCommand = ProjectCommand<SetSuzukiColorsPayload> & {
   readonly type: "presentation/set-suzuki-colors";
 };
 
-export function setSuzukiColors(
-  project: Project,
-  command: SetSuzukiColorsCommand,
-): AppliedCommand {
+export function setSuzukiColors(project: Project, command: SetSuzukiColorsCommand): AppliedCommand {
   const previous = project.presentation.suzukiColors ?? false;
   return {
     project: Object.freeze({
@@ -224,10 +221,7 @@ export type SetGenreFocusCommand = ProjectCommand<SetGenreFocusPayload> & {
   readonly type: "presentation/set-genre-focus";
 };
 
-export function setGenreFocus(
-  project: Project,
-  command: SetGenreFocusCommand,
-): AppliedCommand {
+export function setGenreFocus(project: Project, command: SetGenreFocusCommand): AppliedCommand {
   const previous = project.presentation.genreFocus ?? "all";
   return {
     project: Object.freeze({
@@ -275,4 +269,32 @@ export function setGuitarChordOrientation(
   };
 }
 
+export interface SetSidePanelModePayload {
+  readonly mode: "fixed" | "autohide";
+  readonly nowIso: string;
+}
 
+export type SetSidePanelModeCommand = ProjectCommand<SetSidePanelModePayload> & {
+  readonly type: "presentation/set-side-panel-mode";
+};
+
+export function setSidePanelMode(
+  project: Project,
+  command: SetSidePanelModeCommand,
+): AppliedCommand {
+  const previous = project.presentation.sidePanelMode ?? "fixed";
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        sidePanelMode: command.payload.mode,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-side-panel-mode",
+      payload: { mode: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}

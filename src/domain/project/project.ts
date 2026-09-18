@@ -39,6 +39,8 @@ export interface PresentationState {
   readonly genreFocus?: GenreFocusId;
   /** Orientation of guitar chord diagrams: vertical (standard) or horizontal (90 deg CCW). */
   readonly guitarChordOrientation?: "vertical" | "horizontal";
+  /** Right side panels layout: fixed permanent column or auto-hiding smooth sliding drawer. */
+  readonly sidePanelMode?: "fixed" | "autohide";
 }
 
 export interface MatrixCardTemplateState {

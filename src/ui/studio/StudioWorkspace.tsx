@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 interface StaffAnchor {
   readonly stepId: string;
@@ -24,6 +24,8 @@ export interface StudioWorkspaceProps {
   readonly onProgressionBackgroundClick?: () => void;
   readonly onMatrixBackgroundClick?: () => void;
   readonly overlays?: ReactNode;
+  readonly sidePanelMode?: "fixed" | "autohide";
+  readonly onSidePanelModeChange?: (mode: "fixed" | "autohide") => void;
 }
 
 /**
@@ -44,10 +46,90 @@ export function StudioWorkspace({
   onProgressionBackgroundClick,
   onMatrixBackgroundClick,
   overlays,
+  sidePanelMode = "fixed",
+  onSidePanelModeChange,
 }: StudioWorkspaceProps) {
   const progressionStripRef = useRef<HTMLElement>(null);
   const staffAnchorRef = useRef<StaffAnchor | null>(null);
+  const inspectorStackRef = useRef<HTMLElement>(null);
+  const selectedStepStackRef = useRef<HTMLElement>(null);
   const [offsetY, setOffsetY] = useState(0);
+
+  const [isHovered, setIsHovered] = useState(false);
+  const leaveTimerRef = useRef<number | null>(null);
+
+  const cancelLeaveTimer = useCallback(() => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleLeave = useCallback(() => {
+    cancelLeaveTimer();
+    leaveTimerRef.current = window.setTimeout(() => {
+      const activeEl = document.activeElement;
+      const hasFocusInside =
+        (inspectorStackRef.current?.contains(activeEl) ?? false) ||
+        (selectedStepStackRef.current?.contains(activeEl) ?? false);
+      if (!hasFocusInside) {
+        setIsHovered(false);
+      }
+    }, 260);
+  }, [cancelLeaveTimer]);
+
+  const handleMouseEnter = () => {
+    cancelLeaveTimer();
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    scheduleLeave();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (leaveTimerRef.current !== null) {
+        window.clearTimeout(leaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sidePanelMode !== "autohide") return;
+
+    const handlePointerMove = (event: MouseEvent) => {
+      if (window.innerWidth <= 1100) return;
+
+      const edgeThreshold = 24;
+      const sidebarZoneWidth = 340;
+      const distFromRight = window.innerWidth - event.clientX;
+
+      if (distFromRight <= edgeThreshold) {
+        cancelLeaveTimer();
+        setIsHovered(true);
+      } else if (distFromRight > sidebarZoneWidth) {
+        const activeEl = document.activeElement;
+        const hasFocusInside =
+          (inspectorStackRef.current?.contains(activeEl) ?? false) ||
+          (selectedStepStackRef.current?.contains(activeEl) ?? false);
+        if (!hasFocusInside) {
+          scheduleLeave();
+        }
+      } else {
+        cancelLeaveTimer();
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("mousemove", handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("mousemove", handlePointerMove);
+    };
+  }, [sidePanelMode, cancelLeaveTimer, scheduleLeave]);
+
+  const isCollapsed = sidePanelMode === "autohide" && !isHovered;
 
   useLayoutEffect(() => {
     if (!selectedStepInspector) {
@@ -201,7 +283,9 @@ export function StudioWorkspace({
         {transport}
       </section>
       <section
-        className={`studio-grid${selectedStepInspector ? " has-selected-step" : ""}`}
+        className={`studio-grid${selectedStepInspector ? " has-selected-step" : ""}${
+          isCollapsed ? " is-collapsed" : ""
+        }`}
         aria-label="Studio work area"
         onClick={(event) => {
           if (event.target === event.currentTarget) onMatrixBackgroundClick?.();
@@ -215,8 +299,41 @@ export function StudioWorkspace({
         >
           {matrix}
         </div>
-        <aside className="inspector-stack" aria-label="Inspector">
-          {inspector}
+        <aside
+          ref={inspectorStackRef}
+          className="inspector-stack"
+          aria-label="Inspector"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onPointerEnter={handleMouseEnter}
+          onPointerLeave={handleMouseLeave}
+        >
+          <div className="inspector-dock-header">
+            <span className="inspector-dock-title">Inspector</span>
+            <button
+              type="button"
+              className={`inspector-pin-button${sidePanelMode === "fixed" ? " is-pinned" : ""}`}
+              title={
+                sidePanelMode === "fixed"
+                  ? "Unpin sidebar (enable auto-hide)"
+                  : "Pin sidebar (always visible)"
+              }
+              aria-label={sidePanelMode === "fixed" ? "Unpin sidebar" : "Pin sidebar"}
+              data-testid="toggle-pin-side-panel"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onSidePanelModeChange?.(sidePanelMode === "fixed" ? "autohide" : "fixed");
+              }}
+            >
+              <span className="pin-icon" aria-hidden="true">
+                📌
+              </span>
+              <span className="pin-label">
+                {sidePanelMode === "fixed" ? "Pinned" : "Auto-hide"}
+              </span>
+            </button>
+          </div>
+          <div className="inspector-stack-content">{inspector}</div>
         </aside>
         <section
           ref={progressionStripRef}
@@ -231,9 +348,14 @@ export function StudioWorkspace({
         </section>
         {selectedStepInspector ? (
           <aside
+            ref={selectedStepStackRef}
             className="selected-step-stack"
             aria-label="Selected step"
             tabIndex={-1}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onPointerEnter={handleMouseEnter}
+            onPointerLeave={handleMouseLeave}
             onMouseDown={(event) => {
               if (
                 event.target instanceof HTMLElement &&
@@ -244,10 +366,21 @@ export function StudioWorkspace({
             }}
             style={offsetY > 0 ? { marginTop: `${offsetY}px` } : undefined}
           >
-            {selectedStepInspector}
+            <div className="selected-step-stack-content">{selectedStepInspector}</div>
           </aside>
         ) : null}
       </section>
+      {sidePanelMode === "autohide" && isCollapsed ? (
+        <div
+          className="studio-sidebar-hover-sensor"
+          aria-hidden="true"
+          data-testid="sidebar-hover-sensor"
+          onMouseEnter={handleMouseEnter}
+          onMouseOver={handleMouseEnter}
+          onPointerEnter={handleMouseEnter}
+          onClick={handleMouseEnter}
+        />
+      ) : null}
       {overlays}
       <footer className="app-status-bar" role="contentinfo" aria-label="Status bar">
         {statusBar}

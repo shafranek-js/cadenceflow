@@ -38,6 +38,8 @@ export interface AppMenuBarProps {
   readonly onResolutionArrowsChange?: (enabled: boolean) => void;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly onGuitarChordOrientationChange?: (orientation: "vertical" | "horizontal") => void;
+  readonly sidePanelMode?: "fixed" | "autohide";
+  readonly onSidePanelModeChange?: (mode: "fixed" | "autohide") => void;
   readonly onOpenModesExplorer?: () => void;
   readonly onOpenHelp?: () => void;
   readonly onOpenFingeringLegend?: () => void;
@@ -63,6 +65,8 @@ export function AppMenuBar({
   onResolutionArrowsChange,
   guitarChordOrientation = "vertical",
   onGuitarChordOrientationChange,
+  sidePanelMode = "fixed",
+  onSidePanelModeChange,
   onOpenModesExplorer,
   onOpenHelp,
   onOpenFingeringLegend,
@@ -340,6 +344,20 @@ export function AppMenuBar({
             >
               <span>Resolution arrows</span>
               {resolutionArrows ? <span aria-hidden="true">✓</span> : null}
+            </button>
+            <div className="app-menu-section-label">Panels & Layout</div>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={sidePanelMode === "autohide"}
+              data-testid="toggle-side-panel-mode"
+              onClick={() => {
+                onSidePanelModeChange?.(sidePanelMode === "autohide" ? "fixed" : "autohide");
+                closeMenu("view");
+              }}
+            >
+              <span>Auto-hide side panels</span>
+              {sidePanelMode === "autohide" ? <span aria-hidden="true">✓</span> : null}
             </button>
             {onOpenModesExplorer ? (
               <>

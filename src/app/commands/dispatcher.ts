@@ -44,6 +44,7 @@ import {
   setResolutionArrows,
   setGenreFocus,
   setGuitarChordOrientation,
+  setSidePanelMode,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
@@ -53,6 +54,7 @@ import {
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetGuitarChordOrientationCommand,
+  type SetSidePanelModeCommand,
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
@@ -107,7 +109,10 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
     case "presentation/set-genre-focus":
       return setGenreFocus(project, command as SetGenreFocusCommand).project;
     case "presentation/set-guitar-chord-orientation":
-      return setGuitarChordOrientation(project, command as SetGuitarChordOrientationCommand).project;
+      return setGuitarChordOrientation(project, command as SetGuitarChordOrientationCommand)
+        .project;
+    case "presentation/set-side-panel-mode":
+      return setSidePanelMode(project, command as SetSidePanelModeCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
     case "harmony/restore-state":

@@ -9,6 +9,7 @@ import {
   setGenreFocus,
   setTheme,
   setGuitarChordOrientation,
+  setSidePanelMode,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
   type SetSuzukiColorsCommand,
@@ -16,6 +17,7 @@ import {
   type SetGenreFocusCommand,
   type SetThemeCommand,
   type SetGuitarChordOrientationCommand,
+  type SetSidePanelModeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { explainRecommendation } from "../../../src/domain/recommendations/explanations";
@@ -202,5 +204,27 @@ describe("US10 presentation commands", () => {
     const inverseResult = setGuitarChordOrientation(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
     expect(undone.presentation.guitarChordOrientation).toBe("vertical");
+  });
+
+  it("toggles side panel mode between fixed and autohide with undo/redo and inverse", () => {
+    const initial = createDefaultProject("presentation-side-panel-mode", "Side Panel Mode");
+    const store = new AppStore(initial);
+    const command: SetSidePanelModeCommand = {
+      type: "presentation/set-side-panel-mode",
+      payload: { mode: "autohide", nowIso },
+    };
+
+    expect(initial.presentation.sidePanelMode).toBe("fixed");
+    store.dispatch(command, setSidePanelMode);
+    expect(store.project.presentation.sidePanelMode).toBe("autohide");
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.sidePanelMode).toBe("fixed");
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.sidePanelMode).toBe("autohide");
+
+    const inverseResult = setSidePanelMode(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.sidePanelMode).toBe("fixed");
   });
 });
