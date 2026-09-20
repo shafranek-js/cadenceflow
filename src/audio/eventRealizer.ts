@@ -417,6 +417,9 @@ export function realizeGuitarStepAudioEvents(
     rootPitchClass: input.chord.rootPitchClass,
     baseQuality: input.chord.baseQuality,
     spelling: input.chord.spelling,
+    ...(input.chord.bassPitchClass !== undefined
+      ? { bassPitchClass: input.chord.bassPitchClass }
+      : {}),
     isSeventh,
     isMajor7,
   });
@@ -571,4 +574,3 @@ export function realizeGuitarStepAudioEvents(
     pitches: Object.freeze(pitches),
   });
 }
-

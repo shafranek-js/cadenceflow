@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState } from "react";
 import { matrixCardOverrideCount, type Project } from "../../domain/project/project";
 import type { CardViewId } from "../../domain/progression/step";
 import {
@@ -6,9 +6,9 @@ import {
   type HarmonicFunctionIdentity,
   type HarmonicModuleId,
 } from "../../domain/harmony/functions";
-import { getHarmonicModule } from "../../domain/harmony/moduleRegistry";
-import { expandedStripEntries } from "../../domain/harmony/topology";
-import { getZoneForLayer, getResolutionTarget } from "../../domain/harmony/tendencyArrows";
+import { getHarmonicModule, topologyEntryForFunction } from "../../domain/harmony/moduleRegistry";
+import type { MatrixCardTopologyEntry } from "../../domain/harmony/topology";
+import { getZoneForLayer } from "../../domain/harmony/tendencyArrows";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import type { RecommendationResult } from "../../domain/recommendations/engine";
 import { realizeMatrixCardPreview, resolvePreviousHarmonicContext } from "./previewRealization";
@@ -18,7 +18,10 @@ import { MatrixResolutionArrows } from "./MatrixResolutionArrows";
 import { ModuleSelector } from "./ModuleSelector";
 import { TonicSelector } from "./TonicSelector";
 import { ViewModeToggle } from "../common/ViewModeToggle";
-import { isFunctionRelevantToGenre, type GenreFocusId } from "../../domain/harmony/functionSemantics";
+import {
+  isFunctionRelevantToGenre,
+  type GenreFocusId,
+} from "../../domain/harmony/functionSemantics";
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 
@@ -29,6 +32,7 @@ function cardKey(identity: HarmonicFunctionIdentity): string {
 export function HarmonicMatrix({
   project,
   previewFunctionId,
+  playingFunctionId,
   recommendations,
   contextualFunctionIds,
   onPreview,
@@ -42,12 +46,12 @@ export function HarmonicMatrix({
   onStaffOctaveChange,
   onClearSelection,
   onOpenMatrixMenu,
-  onGenreFocusChange,
   onOpenPresets,
   onOpenModesExplorer,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
+  readonly playingFunctionId?: string | undefined;
   readonly recommendations: RecommendationResult | null;
   readonly contextualFunctionIds: readonly HarmonicFunctionIdentity[];
   readonly onPreview: (functionId: string) => void;
@@ -69,26 +73,25 @@ export function HarmonicMatrix({
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
   const alternatives = new Set(recommendations?.alternatives.map((item) => item.functionId) ?? []);
-  const contextualByLayer = new Map<string, readonly HarmonicFunctionIdentity[]>();
-  if (project.activeModule === "dark-harmony" && contextualFunctionIds.length > 0) {
-    contextualByLayer.set("secondary-diminished", contextualFunctionIds);
-  }
-
   const workbenchRef = useRef<HTMLDivElement>(null);
   const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
 
   const previousHarmonicContext = resolvePreviousHarmonicContext(project);
-  const hasRecommendation = Boolean(best || alternatives.size > 0);
 
   const activeSourceFunctionId = hoveredFunctionId ?? previewFunctionId ?? null;
-  const targetFunctionId = activeSourceFunctionId
-    ? getResolutionTarget(activeSourceFunctionId, project.activeModule)
-    : null;
+  const activeSourceEntry = activeSourceFunctionId
+    ? topologyEntryForFunction(project.activeModule, activeSourceFunctionId)
+    : undefined;
+  const targetFunctionId = activeSourceEntry?.targetId ?? null;
 
   const targetSymbol = targetFunctionId
     ? (() => {
         try {
-          const preview = realizeMatrixCardPreview(project, targetFunctionId, previousHarmonicContext);
+          const preview = realizeMatrixCardPreview(
+            project,
+            targetFunctionId,
+            previousHarmonicContext,
+          );
           return formatChordSymbol(preview.chord);
         } catch {
           return undefined;
@@ -99,7 +102,11 @@ export function HarmonicMatrix({
   const renderCard = (
     identity: HarmonicFunctionIdentity,
     position?: { readonly column: number; readonly row: number },
+    topologyEntry?: MatrixCardTopologyEntry,
+    options?: { readonly contextual?: boolean; readonly accessibleDescription?: string },
   ) => {
+    const semanticEntry =
+      topologyEntry ?? topologyEntryForFunction(project.activeModule, identity.functionId);
     const preview = realizeMatrixCardPreview(project, identity.functionId, previousHarmonicContext);
     const template = project.moduleTemplateStates[project.activeModule].cards[identity.functionId];
     const view = project.presentation.globalMatrixCardView;
@@ -108,11 +115,16 @@ export function HarmonicMatrix({
         ? recommendations.bestMatch
         : recommendations?.alternatives.find((item) => item.functionId === identity.functionId);
 
-    const targetIdForCard = getResolutionTarget(identity.functionId, project.activeModule);
+    const targetIdForCard =
+      semanticEntry?.targetId ?? identity.targetId ?? identity.targetFunctionId;
     const cardResolutionTargetSymbol = targetIdForCard
       ? (() => {
           try {
-            const targetPreview = realizeMatrixCardPreview(project, targetIdForCard, previousHarmonicContext);
+            const targetPreview = realizeMatrixCardPreview(
+              project,
+              targetIdForCard,
+              previousHarmonicContext,
+            );
             return formatChordSymbol(targetPreview.chord);
           } catch {
             return undefined;
@@ -124,6 +136,7 @@ export function HarmonicMatrix({
     const isGenreFocused =
       activeGenre !== "all" && isFunctionRelevantToGenre(identity.functionId, activeGenre);
     const isGenreDimmed = activeGenre !== "all" && !isGenreFocused;
+    const accessibleDescription = options?.accessibleDescription;
 
     return (
       <ChordCard
@@ -156,13 +169,19 @@ export function HarmonicMatrix({
         suzukiColors={project.presentation.suzukiColors ?? false}
         guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
         selected={previewFunctionId === identity.functionId}
+        playing={playingFunctionId === identity.functionId}
+        contextual={options?.contextual}
+        {...(accessibleDescription ? { accessibleDescription } : {})}
         customizedCount={matrixCardOverrideCount(template)}
         resolutionTargetSymbol={cardResolutionTargetSymbol}
         isResolutionTarget={Boolean(targetFunctionId && identity.functionId === targetFunctionId)}
         isGenreFocused={isGenreFocused}
         isGenreDimmed={isGenreDimmed}
+        topologyEntry={semanticEntry}
         onMouseEnter={() => setHoveredFunctionId(identity.functionId)}
-        onMouseLeave={() => setHoveredFunctionId((curr) => (curr === identity.functionId ? null : curr))}
+        onMouseLeave={() =>
+          setHoveredFunctionId((curr) => (curr === identity.functionId ? null : curr))
+        }
         onClickResolutionTarget={
           targetIdForCard
             ? () => {
@@ -223,6 +242,7 @@ export function HarmonicMatrix({
       className="matrix-panel"
       aria-label="Harmonic Matrix"
       data-module={project.activeModule}
+      data-topology-columns={String(module.topology.columnCount)}
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
     >
@@ -243,7 +263,9 @@ export function HarmonicMatrix({
               title="Open Presets & Cadence Formulas"
               aria-label="Open Presets and Cadence Formulas"
             >
-              <span className="btn-bolt" aria-hidden="true">⚡</span>
+              <span className="btn-bolt" aria-hidden="true">
+                ⚡
+              </span>
               <span className="btn-label">Formulas</span>
             </button>
           )}
@@ -253,10 +275,12 @@ export function HarmonicMatrix({
               className="matrix-formulas-btn matrix-modes-btn"
               onClick={onOpenModesExplorer}
               data-testid="matrix-modes-trigger"
-              title="Open ChordFiles Scales & Modes Explorer"
-              aria-label="Open ChordFiles Scales and Modes Explorer"
+              title="Open Scales & Modes Explorer"
+              aria-label="Open Scales and Modes Explorer"
             >
-              <span className="btn-icon" aria-hidden="true">🎼</span>
+              <span className="btn-icon" aria-hidden="true">
+                🎼
+              </span>
               <span className="btn-label">Modes</span>
             </button>
           )}
@@ -269,15 +293,6 @@ export function HarmonicMatrix({
           />
         </div>
       </header>
-      {recommendations && !hasRecommendation ? (
-        <p
-          className="matrix-no-recommendation"
-          role="status"
-          data-testid="matrix-no-recommendation"
-        >
-          No strong recommendation for this context. Passive choices remain available.
-        </p>
-      ) : null}
       <div className="matrix-workbench" ref={workbenchRef}>
         <MatrixResolutionArrows
           containerRef={workbenchRef}
@@ -286,25 +301,72 @@ export function HarmonicMatrix({
           targetSymbol={targetSymbol}
           enabled={project.presentation.resolutionArrows !== false}
         />
-        <div className="matrix-grid">
+        <div className="matrix-grid matrix-spatial-board">
           {module.layers.map((layer) => {
             const baselineEntries = module.topology.cards.filter(
               (entry) => entry.layerId === layer.id && entry.baseline,
             );
-            const contextual = contextualByLayer.get(layer.id) ?? [];
-            const expandedEntries = expandedStripEntries(contextual, layer.id, 3, 0);
+            const nonBaselineEntries = module.topology.cards.filter(
+              (entry) => entry.layerId === layer.id && !entry.baseline,
+            );
+            const isProgressionsSecondaryDominants =
+              project.activeModule === "progressions" && layer.id === "secondary-dominants";
+            const isDarkSecondaryDiminished =
+              project.activeModule === "dark-harmony" && layer.id === "secondary-diminished";
+            const contextualEntries = isDarkSecondaryDiminished
+              ? contextualFunctionIds
+                  .map((identity) =>
+                    topologyEntryForFunction(project.activeModule, identity.functionId),
+                  )
+                  .filter((entry): entry is MatrixCardTopologyEntry => entry !== undefined)
+              : [];
+            const occupiedColumns = new Set(baselineEntries.map((entry) => entry.position.column));
+            const inlineContextualEntries = contextualEntries.filter(
+              (entry) => !occupiedColumns.has(entry.position.column),
+            );
+            const contextualSidecarEntries = contextualEntries.filter((entry) =>
+              occupiedColumns.has(entry.position.column),
+            );
+            const sidecarEntries = isProgressionsSecondaryDominants
+              ? nonBaselineEntries
+              : contextualSidecarEntries;
+            const sidecarLabel = isProgressionsSecondaryDominants
+              ? "Tritone substitution"
+              : "Contextual diminished";
             return (
               <FunctionalLayer
                 key={layer.id}
                 label={layer.label}
                 zone={getZoneForLayer(layer.id)}
-                expanded={
-                  expandedEntries.length > 0
-                    ? expandedEntries.map((entry) => renderCard(entry.identity))
-                    : undefined
-                }
+                {...(layer.zoneLabel ? { zoneLabel: layer.zoneLabel } : {})}
+                {...(sidecarEntries.length > 0
+                  ? {
+                      sidecar: {
+                        label: sidecarLabel,
+                        testId: isProgressionsSecondaryDominants
+                          ? "matrix-sidecar-subV7"
+                          : "matrix-sidecar-contextual-diminished",
+                        children: sidecarEntries.map((entry) =>
+                          renderCard(entry.identity, undefined, entry, {
+                            contextual: isDarkSecondaryDiminished,
+                            ...(isProgressionsSecondaryDominants
+                              ? { accessibleDescription: "Tritone substitute resolving to I" }
+                              : {
+                                  accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
+                                }),
+                          }),
+                        ),
+                      },
+                    }
+                  : {})}
               >
-                {baselineEntries.map((entry) => renderCard(entry.identity, entry.position))}
+                {baselineEntries.map((entry) => renderCard(entry.identity, entry.position, entry))}
+                {inlineContextualEntries.map((entry) =>
+                  renderCard(entry.identity, entry.position, entry, {
+                    contextual: true,
+                    accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
+                  }),
+                )}
               </FunctionalLayer>
             );
           })}

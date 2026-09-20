@@ -1,11 +1,4 @@
-import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { PianoArticulation, ProgressionStep } from "../../domain/progression/step";
 import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
@@ -138,6 +131,7 @@ export function ProgressionContextMenu({
     "articulation" | "melody" | "grid" | "layout" | "explore-alternative" | null
   >(null);
   const [submenuTop, setSubmenuTop] = useState(0);
+  const [menuWidth, setMenuWidth] = useState(220);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -145,6 +139,7 @@ export function ProgressionContextMenu({
     const width = menu.getBoundingClientRect().width;
     const height = menu.getBoundingClientRect().height;
     const margin = 8;
+    setMenuWidth(width);
     setAdjustedPosition({
       x: Math.max(margin, Math.min(position.x, window.innerWidth - width - margin)),
       y: Math.max(margin, Math.min(position.y, window.innerHeight - height - margin)),
@@ -189,6 +184,20 @@ export function ProgressionContextMenu({
       firstBtn?.focus();
     }
   }, [activeSubmenu]);
+
+  useLayoutEffect(() => {
+    if (!activeSubmenu || !submenuRef.current || typeof window === "undefined") return;
+    const margin = 8;
+    const adjustSubmenuTop = () => {
+      const height = submenuRef.current?.getBoundingClientRect().height ?? 0;
+      const maxTop = Math.max(margin, window.innerHeight - height - margin);
+      const nextTop = Math.max(margin, Math.min(submenuTop, maxTop));
+      if (Math.abs(nextTop - submenuTop) > 0.5) setSubmenuTop(nextTop);
+    };
+    adjustSubmenuTop();
+    window.addEventListener("resize", adjustSubmenuTop);
+    return () => window.removeEventListener("resize", adjustSubmenuTop);
+  }, [activeSubmenu, submenuTop]);
 
   const handleSubmenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!submenuRef.current) return;
@@ -288,15 +297,14 @@ export function ProgressionContextMenu({
   };
 
   const registerRef = (index: number) => (el: HTMLButtonElement | null) => {
+    // Callback refs run during commit; the collection is only read by keyboard handlers/effects.
+    // eslint-disable-next-line react-hooks/refs
     itemRefs.current[index] = el;
   };
 
   const submenuWidth = 220;
-  const menuWidth = menuRef.current?.getBoundingClientRect().width ?? 220;
   const spaceOnRight =
-    typeof window !== "undefined"
-      ? window.innerWidth - (adjustedPosition.x + menuWidth)
-      : 800;
+    typeof window !== "undefined" ? window.innerWidth - (adjustedPosition.x + menuWidth) : 800;
   const submenuX =
     spaceOnRight >= submenuWidth + 10
       ? adjustedPosition.x + menuWidth - 2
@@ -697,7 +705,7 @@ export function ProgressionContextMenu({
           <>
             <div className="score-system-menu-separator" role="separator" />
             <button
-              ref={registerRef(btnIndex++)}
+              ref={registerRef(btnIndex)}
               type="button"
               role="menuitem"
               disabled={stepCount === 0}
@@ -944,7 +952,8 @@ export function ProgressionContextMenu({
                     onClose();
                   }}
                 >
-                  After {index + 1}: {step.kind === "chord" ? step.harmonicFunction.functionId : "Rest"}
+                  After {index + 1}:{" "}
+                  {step.kind === "chord" ? step.harmonicFunction.functionId : "Rest"}
                 </button>
               ))}
             </>

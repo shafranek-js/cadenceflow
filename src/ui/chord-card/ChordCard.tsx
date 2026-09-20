@@ -9,11 +9,13 @@ import { CustomizedIndicator } from "./CustomizedIndicator";
 import { Icon } from "../common/Icon";
 import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
 import type { StaffOctaveDirection } from "../staff/staffOctave";
+import type { MatrixCardTopologyEntry } from "../../domain/harmony/topology";
 
 export function ChordCard({
   model,
   view,
   selected,
+  playing = false,
   customizedCount,
   showBassInStaff = false,
   suzukiColors = false,
@@ -22,6 +24,9 @@ export function ChordCard({
   isResolutionTarget,
   isGenreFocused = false,
   isGenreDimmed = false,
+  contextual = false,
+  accessibleDescription,
+  topologyEntry,
   style,
   onMouseEnter,
   onMouseLeave,
@@ -34,6 +39,7 @@ export function ChordCard({
   readonly model: ChordCardViewModel;
   readonly view: CardViewId;
   readonly selected: boolean;
+  readonly playing?: boolean | undefined;
   readonly customizedCount: number;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
@@ -42,6 +48,9 @@ export function ChordCard({
   readonly isResolutionTarget?: boolean | undefined;
   readonly isGenreFocused?: boolean | undefined;
   readonly isGenreDimmed?: boolean | undefined;
+  readonly contextual?: boolean | undefined;
+  readonly accessibleDescription?: string | undefined;
+  readonly topologyEntry?: MatrixCardTopologyEntry | undefined;
   readonly style?: React.CSSProperties | undefined;
   readonly onMouseEnter?: (() => void) | undefined;
   readonly onMouseLeave?: (() => void) | undefined;
@@ -56,7 +65,7 @@ export function ChordCard({
   ];
   const noteSummary = noteNames.join(" · ");
   const chordLabel = formatChordSymbol(model.chord);
-  const selectionAriaLabel = `Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click to add to My Progression; Alt-click to reset card settings`;
+  const selectionAriaLabel = `${accessibleDescription ? `${accessibleDescription}; ` : ""}Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click to add to My Progression; Alt-click to reset card settings`;
   const selectionTitle =
     "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings";
   const describedBy =
@@ -64,6 +73,12 @@ export function ChordCard({
       ? `recommendation-${model.chord.harmonicFunction.functionId}`
       : undefined;
   const semantics = getFunctionSemantics(model.chord.harmonicFunction.functionId);
+  const targetId =
+    topologyEntry?.targetId ??
+    model.chord.harmonicFunction.targetId ??
+    model.chord.harmonicFunction.targetFunctionId;
+  const semanticBassPitch =
+    model.chord.bassPitchClass !== undefined ? model.realizedPitches[0] : undefined;
   const cardTooltip = `${model.chord.harmonicFunction.functionId} · ${semantics.title}\n${semantics.description}\nХарактер: ${semantics.emotionalColor}\nСтили: ${semantics.styleHints.join(", ")}\nПравило: ${semantics.rule}`;
 
   const select = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -74,7 +89,7 @@ export function ChordCard({
 
   return (
     <article
-      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${isResolutionTarget ? "is-resolution-target" : ""} ${isGenreFocused ? "is-genre-focus" : ""} ${isGenreDimmed ? "is-genre-dimmed" : ""}`.trim()}
+      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${playing ? "is-playing" : ""} ${isResolutionTarget ? "is-resolution-target" : ""} ${isGenreFocused ? "is-genre-focus" : ""} ${isGenreDimmed ? "is-genre-dimmed" : ""}`.trim()}
       style={style}
       title={cardTooltip}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
@@ -83,6 +98,17 @@ export function ChordCard({
       data-resolution-target={isResolutionTarget ? "true" : undefined}
       data-genre-focus={isGenreFocused ? "true" : undefined}
       data-genre-dimmed={isGenreDimmed ? "true" : undefined}
+      data-matrix-contextual={contextual ? "true" : undefined}
+      data-playing={playing ? "true" : undefined}
+      data-matrix-column={topologyEntry ? String(topologyEntry.position.column) : undefined}
+      data-matrix-row={topologyEntry ? String(topologyEntry.position.row) : undefined}
+      data-mix-policy={topologyEntry?.mixPolicy ?? model.chord.harmonicFunction.mixPolicy}
+      data-target-id={targetId}
+      data-bass-scale-degree={
+        topologyEntry?.bassScaleDegree ?? model.chord.harmonicFunction.bassScaleDegree
+      }
+      data-matrix-auxiliary={topologyEntry?.auxiliary ? "true" : undefined}
+      data-aliases={topologyEntry?.aliases?.join(",")}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -100,7 +126,9 @@ export function ChordCard({
               }
             }}
           >
-            <span className="chord-resolution-arrow" aria-hidden="true">↓</span>
+            <span className="chord-resolution-arrow" aria-hidden="true">
+              ↓
+            </span>
             <span className="chord-resolution-name">{resolutionTargetSymbol}</span>
           </button>
         ) : null}
@@ -115,11 +143,20 @@ export function ChordCard({
             {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
           </span>
         )}
+        {contextual ? (
+          <span className="matrix-contextual-badge" aria-label="Contextual">
+            Contextual
+          </span>
+        ) : null}
       </div>
       {view === "staff" ? (
         <StaffCardView
           className="chord-main"
-          pitches={showBassInStaff ? model.realizedPitches : model.pianoPitches}
+          pitches={
+            showBassInStaff || model.chord.bassPitchClass !== undefined
+              ? model.realizedPitches
+              : model.pianoPitches
+          }
           chordPitches={model.pianoPitches}
           chordLabel={chordLabel}
           duration={model.duration}
@@ -146,7 +183,7 @@ export function ChordCard({
           {view === "harmonic" && (
             <span className="chord-card-identity" title={cardTooltip}>
               <strong>{model.chord.harmonicFunction.functionId}</strong>
-              <span>{model.chord.spelling.symbol}</span>
+              <span>{chordLabel}</span>
               <span className="chord-card-notes-label">Notes</span>
               <span className="chord-card-notes" data-testid="chord-card-notes">
                 {noteSummary || "—"}
@@ -154,7 +191,11 @@ export function ChordCard({
             </span>
           )}
           {view === "piano" && (
-            <PianoCardView chordPitches={model.pianoPitches} chordLabel={chordLabel} />
+            <PianoCardView
+              chordPitches={model.pianoPitches}
+              bassPitch={semanticBassPitch}
+              chordLabel={chordLabel}
+            />
           )}
           {view === "guitar" && (
             <GuitarCardView

@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useCallback, useMemo, useState, type RefObject } from "react";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import type { Project } from "../../domain/project/project";
 import {
@@ -134,7 +128,8 @@ export function ModesExplorerModal({
       if (!onAuditionChord) return;
       if (cardVisualView === "guitar") {
         const isSeventh =
-          chordDef.chord.baseQuality === "dominant" || chordDef.chord.variant?.seventh !== undefined;
+          chordDef.chord.baseQuality === "dominant" ||
+          chordDef.chord.variant?.seventh !== undefined;
         const isMajor7 = chordDef.chord.variant?.seventh === "major7";
         const voicing = resolveGuitarChordVoicing({
           rootPitchClass: chordDef.chord.rootPitchClass,
@@ -192,11 +187,16 @@ export function ModesExplorerModal({
         <div className="modal-header modes-header">
           <div className="modes-title-group">
             <h2 id="modes-modal-title" className="modes-title">
-              <span className="modes-title-icon" aria-hidden="true">🎼</span>
-              ChordFiles Scales & Modes Explorer
+              <span className="modes-title-icon" aria-hidden="true">
+                🎼
+              </span>
+              Scales &amp; Modes Explorer
             </h2>
             <span className="modes-current-key-badge">
-              Active: <strong>{currentTonicLabel} {scaleDef.name}</strong>
+              Active:{" "}
+              <strong>
+                {currentTonicLabel} {scaleDef.name}
+              </strong>
             </span>
           </div>
           <button
@@ -322,7 +322,9 @@ export function ModesExplorerModal({
                     onClick={handlePlayScale}
                     title="Play scale ascending and descending"
                   >
-                    <span className="play-icon" aria-hidden="true">▶</span>
+                    <span className="play-icon" aria-hidden="true">
+                      ▶
+                    </span>
                     <span>Play Scale</span>
                   </button>
                 </div>
@@ -332,7 +334,9 @@ export function ModesExplorerModal({
 
               {scaleDef.characteristicInterval && (
                 <div className="modes-characteristic-callout">
-                  <span className="callout-star" aria-hidden="true">★</span>
+                  <span className="callout-star" aria-hidden="true">
+                    ★
+                  </span>
                   <div className="callout-body">
                     <strong>Характерный признак лада ({scaleDef.characteristicInterval}):</strong>{" "}
                     <span>{scaleDef.characteristicDescriptionRu}</span>
@@ -451,7 +455,9 @@ export function ModesExplorerModal({
             <section className="modes-formulas-section" aria-label="Modal Cadence Formulas">
               <div className="modes-formulas-header">
                 <h4 className="formulas-title">
-                  <span className="formulas-icon" aria-hidden="true">⚡</span>
+                  <span className="formulas-icon" aria-hidden="true">
+                    ⚡
+                  </span>
                   Канонические каденции и ходы
                 </h4>
                 {modalFormulas.length > 0 && (
@@ -477,7 +483,9 @@ export function ModesExplorerModal({
                             <button
                               type="button"
                               className="formula-audition-btn"
-                              onClick={() => onAuditionFormula(formula, selectedTonic, cardVisualView)}
+                              onClick={() =>
+                                onAuditionFormula(formula, selectedTonic, cardVisualView)
+                              }
                               title="Audition progression audio"
                             >
                               <span aria-hidden="true">▶</span> Play
@@ -498,8 +506,13 @@ export function ModesExplorerModal({
                 </div>
               ) : (
                 <div className="modes-formulas-empty">
-                  <span className="empty-icon" aria-hidden="true">🎼</span>
-                  <p>Для этого лада нет предустановленных каденций. Вы можете составить свою последовательность из аккордов слева.</p>
+                  <span className="empty-icon" aria-hidden="true">
+                    🎼
+                  </span>
+                  <p>
+                    Для этого лада нет предустановленных каденций. Вы можете составить свою
+                    последовательность из аккордов слева.
+                  </p>
                 </div>
               )}
             </section>
@@ -518,19 +531,11 @@ export function ModesExplorerModal({
           </label>
           <div className="modes-footer-actions">
             {onApplyKeyToProject && (
-              <button
-                type="button"
-                className="modes-apply-key-btn"
-                onClick={handleApplyKey}
-              >
+              <button type="button" className="modes-apply-key-btn" onClick={handleApplyKey}>
                 Set Project Key ({currentTonicLabel} {scaleDef.name})
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-primary modes-done-btn"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-primary modes-done-btn" onClick={onClose}>
               Done
             </button>
           </div>

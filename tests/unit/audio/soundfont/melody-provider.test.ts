@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AudioNoteEvent } from "../../../../src/audio/contracts";
+import { MELODY_INSTRUMENTS } from "../../../../src/domain/melody/instrumentCatalog";
 import {
   formatMelodyPreparationNotice,
   MELODY_SAMPLE_FILES,
@@ -115,7 +116,7 @@ describe("T172 — local sampled Melody provider", () => {
     });
   });
 
-  it("loads non-bundled instruments from the FluidR3_GM CDN", async () => {
+  it("loads non-stable instruments from the local FluidR3_GM bank", async () => {
     const trumpetPlayer = createPlayer();
     const loader = vi.fn(async () => trumpetPlayer);
     const provider = new MelodySoundFontProvider({
@@ -128,10 +129,8 @@ describe("T172 — local sampled Melody provider", () => {
 
     expect(provider.state).toBe("ready");
     expect(loader).toHaveBeenCalledTimes(1);
-    // gm-056 has no local sampleAsset, so it uses the CDN URL
-    expect(loader.mock.calls[0]?.[2]).toBe(
-      "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3.js",
-    );
+    // gm-056 has no stable ID, so it uses the local soundfont directory.
+    expect(loader.mock.calls[0]?.[2]).toBe("/audio/soundfont/trumpet-mp3.js");
 
     const playback = provider.schedule([event], { now: () => 8 });
     expect(playback.id).toMatch(/^melody-live-/);
@@ -139,7 +138,7 @@ describe("T172 — local sampled Melody provider", () => {
     playback.cancel();
   });
 
-  it("mixes CDN-loaded and locally-bundled instruments in one preparation", async () => {
+  it("mixes stable and catalog-local instruments in one preparation", async () => {
     const violin = createPlayer();
     const trumpet = createPlayer();
     const loader = vi.fn(async (_context, instrument) =>
@@ -156,13 +155,33 @@ describe("T172 — local sampled Melody provider", () => {
     expect(result.unavailable).toEqual([]);
     expect(result.failed).toEqual([]);
     expect(provider.state).toBe("ready");
-    // violin uses local path, gm-056 uses CDN
+    // Both stable and catalog-local programs use committed local paths.
     expect(loader.mock.calls.find((c) => c[1] === "violin")?.[2]).toBe(
       `/audio/melody/FluidR3_GM/${MELODY_SAMPLE_FILES.violin}`,
     );
     expect(loader.mock.calls.find((c) => c[1] === "gm-056")?.[2]).toBe(
-      "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3.js",
+      "/audio/soundfont/trumpet-mp3.js",
     );
+  });
+
+  it("resolves all 128 GM programs to distinct local assets without a network fallback", async () => {
+    const loader = vi.fn(async () => createPlayer());
+    const provider = new MelodySoundFontProvider({
+      audioContext: createContext(),
+      loadInstrument: loader,
+    });
+
+    const result = await provider.prepareForInstruments(MELODY_INSTRUMENTS);
+
+    expect(result.ready).toHaveLength(128);
+    expect(result.failed).toEqual([]);
+    expect(loader).toHaveBeenCalledTimes(128);
+    const urls = loader.mock.calls.map((call) => call[2]);
+    expect(new Set(urls).size).toBe(128);
+    expect(urls.every((url) => !url.includes("gleitz.github.io"))).toBe(true);
+    expect(urls).toContain("/audio/soundfont/church_organ-mp3.js");
+    expect(urls).toContain("/audio/melody/FluidR3_GM/violin-mp3.js");
+    expect(urls).toContain("/audio/guitar/acoustic_guitar_steel-mp3.js");
   });
 
   it("keeps available playback running when another realtime lane fails to load", async () => {
@@ -211,7 +230,7 @@ describe("T172 — local sampled Melody provider", () => {
     expect(provider.state).toBe("ready");
     expect(loader).toHaveBeenCalledTimes(2);
     expect(loader.mock.calls.find((c) => c[1] === "gm-024")?.[2]).toBe(
-      "/audio/guitar/acoustic_guitar_nylon-mp3.js",
+      "/audio/soundfont/acoustic_guitar_nylon-mp3.js",
     );
     expect(loader.mock.calls.find((c) => c[1] === "gm-025")?.[2]).toBe(
       "/audio/guitar/acoustic_guitar_steel-mp3.js",

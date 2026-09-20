@@ -44,7 +44,7 @@ function makeFormula(
 
 /**
  * Curated Canonical Cadence Formulas & Quick Starters (Phase 4).
- * Rooted in ChordFiles and music theory fundamentals.
+ * Rooted in CadenceFlow's harmonic reference and music theory fundamentals.
  * Strictly adheres to FunctionalPreset contract: harmonic functions + durations only,
  * zero performance, voicing, or variant leakage.
  */

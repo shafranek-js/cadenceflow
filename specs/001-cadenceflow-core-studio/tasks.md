@@ -438,6 +438,10 @@ schema, UI, audio, playback, and export tasks without changing existing Project 
 
 ## Phase 17: User Story 13 - Global Progression View and professional score systems (Priority: P2)
 
+> Historical baseline: checked tasks T177–T182 record the initial US13 implementation with three global
+> Progression Views (`Harmonic`, `Piano`, `Staff`) and manual Staff grouping 1–4. The current five-view,
+> 1–8 contract is documented in the current spec and is not narrowed by this historical phase record.
+
 **Goal**: My Progression has one global Harmonic/Piano/Staff mode, and Staff renders responsive
 multi-measure score systems with a shared Melody/Harmony timeline and no `Mixed` state.
 
@@ -462,8 +466,8 @@ accessibility, interaction preservation, and unchanged musical/export data.
 
 ### Score systems
 
-- [x] T180 [P] [US13] Add a pure `ScoreSystemProjection` over the existing measure layout with Staff-only
-  manual maxima 1–4, meter-aware Auto `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`,
+- [x] T180 [P] [US13] [historical baseline] Add a pure `ScoreSystemProjection` over the existing measure
+  layout with Staff-only manual maxima 1–4, meter-aware Auto `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`,
   duration-proportional widths, attack-density expansion, greedy packing, and local-overflow rules in
   `src/notation/scoreSystemProjection.ts`, with focused unit tests.
 - [x] T181 [US13] Render one VexFlow SVG per system with shared measure boundaries and Melody/Harmony
@@ -581,14 +585,16 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
 2. Complete US1 only.
 3. Run `pnpm test`, `pnpm verify:fixtures`, and the US1 Playwright acceptance.
 4. Demo the first vertical slice before expanding to Tonal Minor/Dark Harmony.
-5. Continue milestone-by-milestone; do not start Scales, Blues, Guitar production profile, rendered WAV/MP3, cloud sync, or other future-scope work.
+5. Continue milestone-by-milestone; Scales & Modes exploration, Blues scale vocabulary, and the Guitar
+   production profile are already implemented in the current checkout. Do not start rendered WAV/MP3,
+   cloud sync, or other future-scope work without a separately accepted batch.
 
 ## Notes
 
-- `Progressions` and `Dark Harmony` are v1 harmonic modules; `Scales` and `Blues` remain future modules.
-- Piano is the only full production Instrument Profile in v1. US12's curated Melody Track timbres assign
-  sound, clef, and export metadata to derived monophonic notes but do not add full chord Instrument Profiles;
-  Guitar Card View/profile remains future capability.
+- `Progressions` and `Dark Harmony` remain the two v1 harmonic modules; Scales & Modes Explorer and Blues
+  scale vocabulary are implemented as a non-destructive exploration surface.
+- Piano and Guitar are the current chord Instrument Profiles. The 128-program local Melody catalog assigns
+  sound, clef, and export metadata to derived monophonic notes and remains separate from chord voicing.
 - HQ piano quality is mandatory, but the harmonic/project model must not depend on a specific SoundFont or sample-bank format.
 - No task may serialize Undo/Redo history into project/autosave/`.cadenceflow` data.
 - No task may silently map ambiguous harmonic content during module/mode changes.
@@ -599,22 +605,23 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
 
 - [x] T186 [US12+] Separate Pitch Motion, Rhythm, and Connection. Batch A adds deterministic chord-only
   motions and rhythm/connection presets with legacy recipe compatibility and consistent Staff, playback,
-  MIDI, and MusicXML projection. Contextual voice-leading and the grouped preview gallery remain deferred
-  to separately accepted batches.
+  MIDI, and MusicXML projection. Contextual voice-leading remains deferred to a separately accepted batch;
+  the grouped preview gallery is accepted in T189.
 - [x] T189 [US12+] Add a compact grouped Pitch Motion browser derived from canonical motion ordering,
   synchronized draft-only selection, responsive keyboard-accessible disclosure, and focused unit/Chromium
   acceptance in `src/ui/melody/MelodyEditorDialog.tsx`, new
   `src/ui/melody/MelodyPitchMotionGallery.tsx`, `src/ui/melody/labels.ts`,
   `src/styles/progression.css`, `tests/unit/ui/melody-ui.test.ts`, and
   `tests/e2e/us12-melody-editor-staff.spec.ts` per FR-218–FR-220 and SC-021.
-- [ ] T188 [US12+] Add the canonical 128-program GM Melody Instrument catalog, schema-v5 global/default and
+- [x] T188 [US12+] Add the canonical 128-program GM Melody Instrument catalog, schema-v5 global/default and
   optional Step-local inheritance, shared grouped/searchable picker, explicit realtime availability with
   lazy local loading, and partitioned one-staff/one-MIDI-track/one-MusicXML-part-per-effective-instrument
   projection in
   `src/domain/melody/instrumentCatalog.ts`, `src/domain/melody/types.ts`,
   `src/app/commands/melodyCommands.ts`, `src/persistence/portableProject.ts`,
   `src/domain/project/migrations.ts`, `src/ui/melody/`, `src/audio/`, `src/notation/`, `src/export/`, and
-  focused unit/integration/Chromium tests per FR-221–FR-226 and SC-022; do not add assets or dependencies.
+  focused unit/integration/Chromium tests per FR-221–FR-226 and SC-022, with manifest-provenance and
+  attribution markers for all 128 local programs, lazy loading, and no production CDN dependency.
 
 ## Product Backlog (not scheduled)
 
@@ -622,3 +629,63 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
   that decoratively colors visible noteheads using the confirmed Suzuki pitch-color mapping without
   changing musical data, playback, MIDI, or MusicXML. Colors MUST NOT be the sole accessibility cue;
   light/dark/print contrast and the exact palette plus preview/export scope MUST be fixed before work starts.
+
+## Phase 19: Documentary convergence roadmap (future Batches 3–8)
+
+The following tasks are intentionally open. They record the remaining roadmap gaps found by the Batch 2
+code/reference/spec convergence and must not be treated as implementation acceptance for the current batch.
+
+- [x] T190 [Batch 3] Define and implement the canonical six-column Progressions/Dark Harmony topology per
+  FR-004, FR-040, FR-047–FR-050, and FR-242: preserve legacy `vii°`/`subV7` compatibility, model Dark
+  Harmony poles V and iv/VI, represent diminished aliases as one entity, and carry `mixPolicy`, `targetId`,
+  and `bassScaleDegree` through semantic definitions and projections. Implement first-inversion N6
+  semantics and a physical-board spatial model with three horizontal zones (`Secondary Dominants`, `Main
+  Chords`, `Modal Interchange`), six stable primary columns, vertically aligned source/target relations,
+  semantically aligned lower cards without artificial equalization, permanently visible labeled same-band
+  side slots for legacy collisions, and no full-width `Additional`/`Contextual` strips. Add deterministic
+  desktop topology/layout-pressure acceptance, stable
+  routing positions, all required fixtures, and old-project preservation before changing existing Matrix
+  behavior (missing).
+- [ ] T191 [Batch 4] Replace advisory Don't Mix and Modal Corridor heuristics with the strict rule contract
+  per FR-026–FR-036 and FR-243: after directed tension, `targetId` is the sole best candidate, other
+  tension chords are excluded, and the strict I/IV/V corridor is enforced with a warning plus explicit
+  `Add anyway`. Keep arrow/highlight direction and source/target column relationships visible without
+  Inspector through desktop and layout-pressure states. Cover mouse, keyboard, playback, responsive
+  arrows/highlights, explainable blocked/allowed alternatives, safe legacy-project behavior, and
+  deterministic fixtures in all 12 keys against the harmonic reference (partial).
+- [ ] T192 [Batch 5] Add Piano Root/Chord/Scale Tones, Melody harmonic-role metadata, and non-mutating
+  Target Notes as one coherent semantic projection: classify chord, scale, altered, and target-next roles;
+  keep Target Notes preview-only until explicit application; preserve the full Guitar strum spread at
+  20–40 ms; then perform the single shared `schema-v5 -> schema-v6` cutover with T197, adding
+  `noteColorMode` values `standard | suzuki | harmonic-role` together with Piano/Guitar engine and
+  SoundFont tone persistence. T197 MUST complete first or jointly; there is no separate engine/tone v7
+  migration. Cover non-color accessibility cues, codec/migration/fixture coverage, and no schema-v5 or
+  effective-instrument regression (missing).
+- [ ] T193 [Batch 6] Make Scales & Modes Explorer modal formula application atomic per FR-235–FR-236:
+  keep the Explorer separate without creating a new project harmonic context, apply parent-key plus steps
+  through one undoable command, reject an inappropriate old-key apply, and leave cancel/audition non-mutating.
+  Keep Blues `I7/IV7/V7` semantics scoped to the Explorer surface and add deterministic Chromium acceptance
+  for the transaction, rollback, keyboard/focus, and responsive behavior (partial).
+- [ ] T194 [Batch 7] Add Focus Mode and Card Flip as presentation-only workflows per FR-056–FR-068: retain
+  the minimal Matrix/arrows/audition surface in Focus Mode, expose function+tendency on the card front and
+  fingering on the back, and guarantee no musical or global-view mutation. Cover keyboard/focus lifecycle,
+  reduced-motion behavior, screen readers, responsive containment, persistence boundaries, and Guitar/Melody
+  compatibility (missing).
+- [ ] T195 [Batch 8] Add Printable A4 projection and the release gate per FR-237–FR-239: print measures,
+  chord symbols, arrows, and compact Guitar diagrams through HTML print CSS and the system Save as PDF path;
+  cover long progressions, no clipping, accepted desktop/print sizes, Suzuki-color exclusion/legibility,
+  license/provenance and offline asset verification, schema/codec compatibility, focused and full regression,
+  and final status/publication evidence. This gate depends on T196 and T197 (missing).
+- [ ] T196 [Release prerequisite] Resolve the remaining Guitar asset provenance/IP audit: the reused steel
+  Guitar asset is already evidenced by the T188 manifest with source file, size/hash, pinned FluidR3_GM
+  revision, and CC-BY-3.0 markers; resolve only the nylon Guitar asset and Guitar hand PNG provenance,
+  license, and attribution evidence, or replace/remove assets whose proof cannot be established. Retain the
+  exact inventory and SHA-256/byte-size audit and do not claim legal sufficiency without repository proof
+  (partial).
+- [ ] T197 [Release prerequisite / T192 dependency] Resolve the current Piano/Guitar engine and SoundFont
+  tone persistence gap before or jointly with T192: add codec/schema/migration, IndexedDB autosave,
+  portable export/import, and session Undo/Redo round-trip tests for `pianoEngine`, `guitarEngine`,
+  `pianoSoundfontInstrument`, and `guitarSoundfontInstrument` as part of the single `schema-v5 -> schema-v6`
+  cutover that also adds T192's `noteColorMode`. T197 MUST NOT create a separate schema version or a later
+  engine/tone v7 migration. Update the ownership acceptance for **FR-240–FR-241** and **SC-029–SC-030**
+  without restoring duplicate UI settings surfaces (missing).

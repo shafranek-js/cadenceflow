@@ -77,13 +77,29 @@ test.describe("Progression Global Inspector", () => {
       globalInspector.locator(".template-articulation-disclosure .disclosure-status"),
     ).toContainText("humanized");
 
-    // 8. Measures Layout is Staff-only and hidden in the default Harmonic view.
+    // 8. Measures per system remains in All Steps & Measures; it is a Staff-only setting at runtime.
     const stepCards = page.locator(".progression-step-cards");
     await expect(stepCards).toHaveAttribute("data-layout", "auto");
     await expect(page.getByLabel("Measures Layout")).toHaveCount(0);
     await expect(
       globalInspector.getByRole("button", { name: "Auto responsive layout" }),
-    ).toHaveCount(0);
+    ).toHaveCount(1);
+
+    // Engine and tone ownership is intentionally separate from All Steps & Measures.
+    await expect(globalInspector.getByTestId("inspector-piano-engine-hq-btn")).toHaveCount(0);
+    await expect(globalInspector.getByTestId("inspector-guitar-engine-hq-btn")).toHaveCount(0);
+    const audioEngines = page.getByTestId("audio-engines-inspector");
+    await expect(audioEngines).toBeVisible();
+    await expect(audioEngines.getByTestId("inspector-piano-engine-hq-btn")).toBeVisible();
+    await expect(audioEngines.getByTestId("inspector-guitar-engine-hq-btn")).toBeVisible();
+    await audioEngines.getByTestId("inspector-piano-engine-soundfont-btn").click();
+    await expect(audioEngines.getByTestId("inspector-piano-soundfont-select")).toBeVisible();
+
+    const status = page.getByTestId("piano-audio-status");
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(page.getByTestId("audio-status-popover")).toHaveCount(0);
+    await status.click();
+    await expect(page.getByTestId("audio-status-popover")).toHaveCount(0);
 
     await globalInspector.getByRole("button", { name: "Staff view" }).click();
     await expect(stepCards).toHaveAttribute("data-view", "staff");

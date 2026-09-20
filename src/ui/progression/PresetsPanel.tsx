@@ -1,14 +1,8 @@
 import { useState } from "react";
 import type { FunctionalPreset } from "../../domain/progression/presets";
 import { BUILT_IN_PRESETS } from "../../domain/progression/builtInPresets";
-import {
-  getFormulasForModule,
-  type CadenceFormula,
-} from "../../domain/progression/cadenceFormulas";
-import {
-  GENRE_FOCUS_OPTIONS,
-  type GenreFocusId,
-} from "../../domain/harmony/functionSemantics";
+import { getFormulasForModule } from "../../domain/progression/cadenceFormulas";
+import { GENRE_FOCUS_OPTIONS, type GenreFocusId } from "../../domain/harmony/functionSemantics";
 import type { Project } from "../../domain/project/project";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
@@ -62,9 +56,7 @@ export function PresetsPanel({
   const displayedFormulas =
     formulaGenre === "all"
       ? moduleFormulas
-      : moduleFormulas.filter(
-          (f) => f.genre === formulaGenre || f.tags.includes(formulaGenre),
-        );
+      : moduleFormulas.filter((f) => f.genre === formulaGenre || f.tags.includes(formulaGenre));
 
   const renderAuditionButton = (preset: FunctionalPreset) => {
     if (!onAuditionPreset) return null;
@@ -133,7 +125,8 @@ export function PresetsPanel({
         <div className="presets-panel-body">
           <p className="presets-info-text">
             Presets store harmonic functions and durations only. Performance settings are
-            instantiated from your current Piano defaults when applied. Click <strong>Audition</strong> to preview any progression in the current key.
+            instantiated from your current Piano defaults when applied. Click{" "}
+            <strong>Audition</strong> to preview any progression in the current key.
           </p>
 
           {/* Cadence Formulas & Quick Starters Section */}
@@ -145,9 +138,13 @@ export function PresetsPanel({
             <div className="section-header formulas-section-header">
               <div className="section-title-wrap">
                 <h3 id="cadence-formulas-heading">⚡ Cadence Formulas &amp; Quick Starters</h3>
-                <span className="section-badge formula-badge">ChordFiles Canonical Patterns</span>
+                <span className="section-badge formula-badge">Canonical Cadence Patterns</span>
               </div>
-              <div className="formula-genre-pills" role="tablist" aria-label="Filter formulas by genre">
+              <div
+                className="formula-genre-pills"
+                role="tablist"
+                aria-label="Filter formulas by genre"
+              >
                 {GENRE_FOCUS_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}

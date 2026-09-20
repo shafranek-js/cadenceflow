@@ -12,7 +12,6 @@ import type { MelodyInstrument, MelodyTrackSettings } from "../../domain/melody/
 import {
   getMelodyInstrument,
   FLUID_R3_NAMES,
-  FLUID_R3_CDN_BASE,
   type MelodyInstrumentId,
 } from "../../domain/melody/instrumentCatalog";
 
@@ -97,6 +96,8 @@ export interface MelodySoundFontProviderOptions {
   readonly loadInstrument?: InstrumentLoader | undefined;
   readonly assetBaseUrl?: string | undefined;
   readonly guitarAssetBaseUrl?: string | undefined;
+  /** Base URL for locally vendored GM soundfont files. */
+  readonly soundfontAssetBaseUrl?: string | undefined;
 }
 
 /**
@@ -112,6 +113,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
   private readonly loadInstrument: InstrumentLoader;
   private readonly assetBaseUrl: string;
   private readonly guitarAssetBaseUrl: string;
+  private readonly soundfontAssetBaseUrl: string;
   private readonly players = new Map<MelodyInstrument, MelodySamplePlayer>();
   private readonly loads = new Map<MelodyInstrument, Promise<MelodySamplePlayer>>();
   private readonly livePlaybacks = new Set<ActivePlayback>();
@@ -138,6 +140,8 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
       options.assetBaseUrl ?? `${baseUrl.replace(/\/$/, "")}/audio/melody/FluidR3_GM/`;
     this.guitarAssetBaseUrl =
       options.guitarAssetBaseUrl ?? `${baseUrl.replace(/\/$/, "")}/audio/guitar/`;
+    this.soundfontAssetBaseUrl =
+      options.soundfontAssetBaseUrl ?? `${baseUrl.replace(/\/$/, "")}/audio/soundfont/`;
     this.liveInstrument = options.instrument ?? "flute";
     this.liveVolume = clampMidi(options.volume ?? 100);
     this.previewInstrument = this.liveInstrument;
@@ -231,7 +235,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     this.liveVolume = clampMidi(settings.volume);
     this.previewInstrument = settings.instrument;
     this.previewVolume = clampMidi(settings.volume);
-    if (!this.players.has(this.liveInstrument)) {
+    if (!this.players.has(this.liveInstrument) && !this.loads.has(this.liveInstrument)) {
       this.preparationError = null;
       this.setProviderState("idle");
     }
@@ -293,15 +297,13 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
     const destination = this.destinationNode ?? context.destination;
     const entry = getMelodyInstrument(instrument);
 
-    // Locally bundled instruments (the original 6) use the local asset bundle.
-    // In addition, GM 24 (Acoustic Guitar Nylon) and GM 25 (Acoustic Guitar Steel)
-    // are bundled locally under /audio/guitar/ for offline capability and fast load.
-    // All other GM programs are loaded on-demand from the FluidR3_GM CDN.
+    // Keep the six original stable IDs and steel guitar at their established
+    // local paths. Every other GM program is resolved to the local, manifest-
+    // verified soundfont directory. There is intentionally no network fallback
+    // or silent timbre substitution.
     let url: string;
     if (entry.sampleAsset) {
       url = `${this.assetBaseUrl}${entry.sampleAsset}`;
-    } else if (entry.program === 24) {
-      url = `${this.guitarAssetBaseUrl}acoustic_guitar_nylon-mp3.js`;
     } else if (entry.program === 25) {
       url = `${this.guitarAssetBaseUrl}acoustic_guitar_steel-mp3.js`;
     } else {
@@ -309,7 +311,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
       if (!fluidName) {
         throw new Error(`No FluidR3 name mapping for GM program ${entry.program}`);
       }
-      url = `${FLUID_R3_CDN_BASE}${fluidName}-mp3.js`;
+      url = `${this.soundfontAssetBaseUrl}${fluidName}-mp3.js`;
     }
 
     const loading = this.loadInstrument(context, instrument, url, destination)
@@ -360,6 +362,15 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
         // Silently skip notes for instruments that failed to load so the rest
         // of a mixed Melody can still play. The UI reports the failed state.
         if (!player && this.failedInstruments.includes(instrument)) continue;
+        // Silently skip notes while the instrument is loading or not yet started —
+        // the scheduler's next tick will catch up once the player is ready.
+        if (!player && (this.loads.has(instrument) || this.providerState === "loading" || this.providerState === "idle")) {
+          // Kick off loading if not already in progress
+          if (!this.loads.has(instrument) && !this.players.has(instrument)) {
+            void this.loadPlayer(instrument as MelodyInstrument).catch(() => {});
+          }
+          continue;
+        }
         if (!player) throw new Error(`${instrument} samples are not ready`);
         const node = player.play(event.pitch, baseTime + event.startSeconds, {
           duration: event.durationSeconds,

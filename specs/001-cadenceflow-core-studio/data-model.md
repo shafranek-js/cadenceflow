@@ -32,6 +32,12 @@ Project
 - customPresets: CustomPreset[]
 ```
 
+The current portable contract is schema v5. v4 projects migrate sequentially to v5; schema v5 adds the
+optional Step-local Melody instrument override while preserving global Melody Track inheritance. This
+documentary convergence does not implement schema v6 or alter the runtime codec. The only planned future
+cutover is one atomic v5-to-v6 migration jointly covering `noteColorMode` and Piano/Guitar engine and
+SoundFont tone persistence; the engine/tone work does not create a separate schema version.
+
 ### Invariants
 
 - `activeModule=progressions` implies Major.
@@ -188,14 +194,16 @@ MelodyInstrumentCatalogEntry
 - label: canonical General MIDI program name
 - clef: treble | bass
 - playableRange: { minMidi: 0..127, maxMidi: 0..127 }
-- sampleAsset?: verified local FluidR3_GM file
-- realtimeAvailability: available | export-only
+- sampleAsset: manifest-backed local FluidR3_GM file
+- realtimeAvailability: available (all 128 current catalog entries)
 ```
 
 The immutable catalog contains exactly 128 entries and one entry per program. Existing ids `flute`,
 `violin`, `clarinet`, `oboe`, `cello`, and `synth-lead` remain canonical; programs without those ids use
 `gm-NNN`. Effective resolution is pure: `step.melodyInstrumentOverride ?? melodyTrack.instrument`.
-Availability affects realtime audition only and never changes notes or export eligibility.
+The manifest records source revision, per-file byte size, and SHA-256. Availability affects realtime
+audition only and never changes notes or export eligibility. A failed local load is an explicit provider
+error; the current catalog has no export-only programs.
 
 ## MelodyInstrumentLane (derived, not persisted)
 
@@ -389,8 +397,8 @@ Supported v1 IDs:
 - `harmonic`
 - `piano`
 - `staff`
-
-Future Instrument Profiles may register e.g. `guitar`.
+- `guitar`
+- `tablature`
 
 Matrix has:
 - global selected Card View
@@ -408,8 +416,8 @@ PresentationState
 - expertiseMode: Beginner | Composer | Expert
 - theme: Dark | Light
 - globalMatrixCardView: CardViewId
-- progressionView: harmonic | piano | staff
-- measuresPerSystem: auto | 1 | 2 | 3 | 4
+- progressionView: harmonic | piano | staff | guitar | tablature
+- measuresPerSystem: auto | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 - showBassInStaff: boolean
 - ...other existing presentation-only settings
 ```
@@ -417,16 +425,52 @@ PresentationState
 ### Progression-view invariants
 
 - `progressionView` is one required global value; `mixed` is not valid runtime or persisted state.
-- `measuresPerSystem` is a Staff-only maximum. Manual values `1`–`4` remain hard maximums. `auto`
+- `measuresPerSystem` is a Staff-only maximum. Manual values `1`–`8` remain valid hard maximums. `auto`
   calculates `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`, where one measure is
   `numerator * 4 / denominator` quarter-note beats; available width and density may reduce the actual
-  count. Harmonic/Piano ignore this field and keep independent vertical measure sections.
+  count. Harmonic/Piano/Guitar/Tablature ignore this field and keep independent vertical measure sections.
 - Changing either value is undoable and never mutates Progression Steps or musical/export state.
 - The schema version does not change for this additive normalization. On load, an explicit valid
   `progressionView` wins; otherwise a non-empty uniform set of legacy Chord Step `cardView` values seeds
   it, and mixed/empty/absent legacy values seed `harmonic`.
 - Legacy `ChordStep.cardView` remains loadable for old files but is hidden, is not written by My
   Progression UI, and is ignored by My Progression rendering.
+
+### Audio engine setting boundary
+
+`HarmonyTrackSettings` currently contains the active-session Piano/Guitar engine and SoundFont tone fields,
+but `encodeHarmonyTrackSettings()` writes only `instrument`, `muted`, `solo`, and `volume`. The current
+schema v5 contract also lacks `pianoSoundfontInstrument`, and the portable/autosave/export/Undo round-trip
+does not claim to preserve any engine or tone field. `AudioEnginesInspector` is the sole settings surface;
+All Steps & Measures retains track controls and provider status/retry, while `PianoAudioStatus` is read-only.
+Atomic codec/schema/migration/autosave/export/Undo coverage is an open roadmap task, not a schema-v5 change.
+It is a prerequisite or joint workstream for the single v5-to-v6 cutover owned by T192/T197; it must not
+create a second engine/tone migration after that cutover.
+
+## GuitarChordShape and GuitarTabProjection (derived, not persisted)
+
+```text
+GuitarChordShape
+- standardTuning: E2 A2 D3 G3 B3 E4
+- frets: six positions (-1 muted, 0 open, 1..24 fretted)
+- baseFret: integer >= 1
+- fingers?: six optional left-hand finger numbers
+- scaleTones?: in-position derived non-chord tones
+
+GuitarTabProjection
+- chordSymbol
+- baseFret
+- six ordered string positions with string name, fret, mute/open state, and optional finger
+```
+
+Both projections derive from canonical harmonic/realized pitches. They are used by Guitar and Tablature
+Card/Progression Views and do not create alternate persisted Steps.
+
+## ScaleExplorerProjection (UI projection, not persisted)
+
+The Scales & Modes Explorer derives formula, pitch classes, characteristic metadata, modal chords, and
+canonical cadence formulas from the immutable scale library. Piano and Guitar visualizations are views of
+that projection. Audition is non-mutating; Apply uses existing progression commands.
 
 ## ScoreSystemProjection
 
@@ -487,6 +531,9 @@ DecodedSampleCache
 SoundBankHandle
 PlaybackSession
 ScheduledSourceHandles
+PianoAudioEngine: hq-samples | soundfont
+GuitarAudioEngine: hq-samples | soundfont
+GuitarStrumSchedule: bounded per-string onset offsets
 ```
 
 These are reconstructed after project load.

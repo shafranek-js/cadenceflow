@@ -16,7 +16,9 @@ describe("T188 canonical Melody instrument catalog", () => {
       Array.from({ length: 128 }, (_, program) => program),
     );
     // All 128 programs are now realtime-available
-    expect(MELODY_INSTRUMENT_CATALOG.every((entry) => entry.realtimeAvailability === "available")).toBe(true);
+    expect(
+      MELODY_INSTRUMENT_CATALOG.every((entry) => entry.realtimeAvailability === "available"),
+    ).toBe(true);
     expect(MELODY_INSTRUMENT_CATALOG.every((entry) => Object.isFrozen(entry))).toBe(true);
     expect(validateMelodyInstrumentCatalog()).toBe(MELODY_INSTRUMENT_CATALOG);
   });
@@ -36,8 +38,10 @@ describe("T188 canonical Melody instrument catalog", () => {
   it("has FLUID_R3_NAMES with 128 program-ordered slugs", () => {
     expect(FLUID_R3_NAMES).toHaveLength(128);
     expect(FLUID_R3_NAMES[0]).toBe("acoustic_grand_piano");
+    expect(FLUID_R3_NAMES[54]).toBe("synth_choir");
     expect(FLUID_R3_NAMES[40]).toBe("violin");
     expect(FLUID_R3_NAMES[73]).toBe("flute");
+    expect(FLUID_R3_NAMES[87]).toBe("lead_8_bass__lead");
     expect(FLUID_R3_NAMES[127]).toBe("gunshot");
   });
 });

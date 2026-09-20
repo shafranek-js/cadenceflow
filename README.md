@@ -30,7 +30,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 
 - **Harmonic Modules**:
   - **Tonal Major**: Full diatonic system with secondary dominants ($V^7/V$, $V^7/ii$, etc.), diminished passing chords, and modal borrowings.
-  - **Tonal Minor**: Natural, harmonic, and melodic minor systems with augmented 6th chords and chromatic color chords.
+  - **Tonal Minor**: Natural, harmonic, and melodic minor systems with bounded chromatic color chords; advanced augmented-sixth vocabulary remains deferred.
   - **Dark Harmony**: Minor-dominant modal topologies, Neapolitan chords ($N^6$), and chromatic voice-leading substitutions.
 - **Contextual Recommendation Engine**: Analyzes your progression in real time and proposes **Best Match** and **Alternative** continuations with explainable theoretical rationale.
 - **Safe Mode & Key Switching**: Dynamic re-realization across keys (e.g., $C \to D$) and modes with preservation of harmonic function and pitch spelling.
@@ -39,11 +39,13 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 ### 2. Continuous Score Systems & Flexible Progression Views
 
 - **VexFlow 5 Score Systems**: Renders progressions across continuous multi-measure systems (`ScoreSystemView`) with connected barlines, stave brackets, and metric pulse-aligned beam grouping.
-- **Measures-Per-System Layout**: In Staff view, choose between meter-aware `Auto` reflow or fixed `1`, `2`, `3`, or `4` measures per system, providing an authentic manuscript / sheet-music experience.
+- **Measures-Per-System Layout**: In Staff view, choose between meter-aware `Auto` reflow targeting 2–6 measures or fixed `1`–`8` measures per system, providing an authentic manuscript / sheet-music experience.
 - **Synchronized View Modes**:
   - **Lead Sheet (`harmonic`)**: Displays Roman numerals, functional analysis badges, jazz chord symbols, and musical duration tags.
   - **Piano Keyboard (`piano`)**: Interactive 88-key mini-keyboards showing exact sounding pitches for each chord step.
   - **Grand Staff (`staff`)**: Multi-voice grand staff notation with treble and bass clefs, chord symbols, and noteheads.
+  - **Guitar (`guitar`)**: Deterministic standard-tuning chord shapes, fretboard positions, and fingering.
+  - **Tablature (`tablature`)**: The same canonical Guitar voicing projected as string/fret notation.
 - **Measure Gap Actions**: Visual measure cards highlight metric capacity; fill gaps with meter-aware actions (`Rest`, `Extend`, `Repeat`).
 
 ### 3. HQ Piano Engine & Realistic Audio Backend
@@ -59,7 +61,13 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 
 - **Integrated Melody Layer**: Generate a monophonic melody from the chord progression using selectable patterns, rhythmic grids, and octave offsets with synchronized transport playback.
 - **Derived Staff View**: Display the progression and optional Melody layer as VexFlow grand-staff notation with clefs, chord symbols, noteheads, selection, context actions, and playback highlighting.
-- **Current Sampled Melody Instruments**: Choose from local FluidR3_GM sample maps for Flute, Violin, Clarinet, Oboe, Cello, or Synth Lead. Samples load on demand; the broader General MIDI palette remains planned.
+- **128-Program Melody Catalog**: Choose any General MIDI melodic program from the grouped picker. All 128
+  entries resolve to manifest-backed local FluidR3_GM sample maps and load on demand; the six historical
+  ids remain stable compatibility identifiers.
+- **Guitar & Tablature Views**: Inspect deterministic chord shapes, fingering, in-position Scale Tones,
+  and tablature, with independent HQ Samples/SoundFont Guitar engines and bounded strum timing.
+- **Scales & Modes Explorer**: Explore diatonic, minor-variant, pentatonic, and Blues scales with
+  characteristic chords, Piano/Guitar projections, and auditionable cadence formulas.
 - **Full Track Controls**: Independent volume, mute, and solo controls for both Melody and Harmony tracks.
 
 ### 5. Exact Musical Timing & Transport Runtime
@@ -97,7 +105,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 
 - **Standard MIDI Export**: Generates deterministic Standard MIDI Files (Type 0 and multi-track Type 1 with Conductor, Melody, Chords, and Bass tracks).
 - **MusicXML 4.0 Export**: Produces clean, standards-compliant MusicXML partwise documents validated against official W3C/MusicXML XSD schemas for import into MuseScore, Dorico, Sibelius, or Finale.
-- **Portable Project Files**: Single-file `.cadenceflow` (JSON Schema v3) format for saving, sharing, and archiving complete projects.
+- **Portable Project Files**: Single-file `.cadenceflow` (JSON Schema v5) format for saving, sharing, and archiving complete projects.
 - **Local Autosave & Recovery**: Offline-first IndexedDB storage via Dexie ensures zero data loss across sessions.
 
 ---

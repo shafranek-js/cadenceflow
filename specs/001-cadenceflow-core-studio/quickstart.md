@@ -68,6 +68,9 @@ pnpm exec vitest run \
   tests/unit/audio/hq-sample-piano/sample-cache.test.ts \
   tests/unit/audio/hq-sample-piano/provider.test.ts \
   tests/unit/audio/soundfont/melody-provider.test.ts \
+  tests/unit/melody/instrument-catalog.test.ts \
+  tests/unit/ui/modes-explorer.test.ts \
+  tests/unit/ui/guitar-card-view.test.ts \
   --maxWorkers=1
 ```
 
@@ -86,10 +89,22 @@ pnpm run verify:melody-assets
 pnpm run verify:piano-bank
 ```
 
-`verify:melody-assets` checks the six hashed FluidR3 GM assets, manifest,
-license, and attribution. `verify:piano-bank` regenerates the deterministic
+The Melody manifest and Guitar providers use local repository assets at runtime; no production CDN
+dependency is required. Guitar's two sample-backed variants and the Guitar hand illustration are covered
+by the Batch 2 asset/IP audit in `PROJECT_STATUS.md`; the repository currently lacks provenance/license
+files for those Guitar additions, so no legal sufficiency claim is made for them.
+
+`verify:melody-assets` checks the 128 manifest-backed local FluidR3 GM assets,
+per-file sizes and SHA-256 values, manifest provenance, license, and attribution.
+The six legacy stable ids are compatibility identifiers, not the current asset
+count. `verify:piano-bank` regenerates the deterministic
 480-region manifest and checks every referenced OGG file with `ffmpeg`,
 including decode coverage.
+
+Engine ownership is covered by `tests/e2e/progression-global-inspector.spec.ts`: the global All Steps &
+Measures surface has no engine/tone selectors, `AudioEnginesInspector` contains them, and the lower
+`PianoAudioStatus` is read-only. Engine/tone settings are currently runtime/session-only; the portable and
+autosave codec does not claim to preserve them until the dedicated persistence roadmap task is implemented.
 
 ## Production build for GitHub Pages
 

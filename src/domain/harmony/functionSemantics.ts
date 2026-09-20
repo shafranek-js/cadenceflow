@@ -2,7 +2,7 @@
  * Harmonic Function Semantics and Style Guidance.
  *
  * Implements the theoretical classifications, emotional descriptors, style associations,
- * and movement rules from the ChordFiles master developer reference.
+ * and movement rules from the CadenceFlow harmonic reference.
  */
 
 export interface HarmonicFunctionSemantics {

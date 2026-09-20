@@ -29,8 +29,8 @@ describe("PianoAudioStatus component", () => {
   it("renders piano audio status labels correctly by default", () => {
     const htmlReady = renderToString(el(PianoAudioStatus, { state: "ready" }));
     expect(htmlReady).toContain("Piano Audio: HQ Piano Ready");
-    expect(htmlReady).toContain("data-status=\"ready\"");
-    expect(htmlReady).toContain("data-instrument=\"piano\"");
+    expect(htmlReady).toContain('data-status="ready"');
+    expect(htmlReady).toContain('data-instrument="piano"');
 
     const htmlLoading = renderToString(el(PianoAudioStatus, { state: "loading" }));
     expect(htmlLoading).toContain("Piano Audio: Loading HQ Piano...");
@@ -44,8 +44,8 @@ describe("PianoAudioStatus component", () => {
       el(PianoAudioStatus, { state: "ready", instrument: "guitar" }),
     );
     expect(htmlReady).toContain("Guitar Audio: HQ Guitar Ready");
-    expect(htmlReady).toContain("data-status=\"ready\"");
-    expect(htmlReady).toContain("data-instrument=\"guitar\"");
+    expect(htmlReady).toContain('data-status="ready"');
+    expect(htmlReady).toContain('data-instrument="guitar"');
 
     const htmlLoading = renderToString(
       el(PianoAudioStatus, { state: "loading", instrument: "guitar" }),
@@ -68,169 +68,60 @@ describe("PianoAudioStatus component", () => {
       el(PianoAudioStatus, { state: "ready", instrument: "piano", engine: "soundfont" }),
     );
     expect(htmlPiano).toContain("Piano Audio: SoundFont Piano Ready");
-    expect(htmlPiano).toContain("data-engine=\"soundfont\"");
+    expect(htmlPiano).toContain('data-engine="soundfont"');
 
     const htmlGuitar = renderToString(
       el(PianoAudioStatus, { state: "ready", instrument: "guitar", engine: "soundfont" }),
     );
     expect(htmlGuitar).toContain("Guitar Audio: SoundFont Guitar Ready");
-    expect(htmlGuitar).toContain("data-engine=\"soundfont\"");
+    expect(htmlGuitar).toContain('data-engine="soundfont"');
   });
 
-  describe("Interactive popover behavior", () => {
-    it("opens popover on click and toggles engines", () => {
-      const onSettingsChange = vi.fn();
+  describe("read-only status behavior", () => {
+    it("does not expose an engine settings popover", () => {
       const mounted = mount(
         el(PianoAudioStatus, {
           state: "ready",
           instrument: "piano",
           engine: "hq-samples",
-          onSettingsChange,
         }),
       );
 
       const statusPill = mounted.container.querySelector<HTMLDivElement>(
         '[data-testid="piano-audio-status"]',
       );
-      expect(statusPill?.getAttribute("role")).toBe("button");
+      expect(statusPill?.getAttribute("role")).toBe("status");
+      expect(statusPill?.getAttribute("tabindex")).toBeNull();
+      expect(statusPill?.getAttribute("aria-haspopup")).toBeNull();
+      expect(statusPill?.getAttribute("aria-label")).not.toContain("click to switch");
       expect(mounted.container.querySelector('[data-testid="audio-status-popover"]')).toBeNull();
+      expect(mounted.container.querySelector("button")).toBeNull();
 
-      // Click to open popover
-      act(() => {
-        statusPill?.click();
-      });
-
-      expect(mounted.container.querySelector('[data-testid="audio-status-popover"]')).not.toBeNull();
-
-      // Click SoundFont button for Piano
-      const soundfontPianoBtn = mounted.container.querySelector<HTMLButtonElement>(
-        '[data-testid="popover-piano-soundfont-btn"]',
-      );
-      act(() => {
-        soundfontPianoBtn?.click();
-      });
-      expect(onSettingsChange).toHaveBeenCalledWith({ pianoEngine: "soundfont" });
-
-      // Click HQ Guitar button
-      const hqGuitarBtn = mounted.container.querySelector<HTMLButtonElement>(
-        '[data-testid="popover-guitar-hq-btn"]',
-      );
-      act(() => {
-        hqGuitarBtn?.click();
-      });
-      expect(onSettingsChange).toHaveBeenCalledWith({ guitarEngine: "hq-samples" });
-
-      // Close popover
-      const closeBtn = mounted.container.querySelector<HTMLButtonElement>(
-        '[data-testid="audio-status-popover-close-btn"]',
-      );
-      act(() => {
-        closeBtn?.click();
-      });
+      act(() => statusPill?.click());
       expect(mounted.container.querySelector('[data-testid="audio-status-popover"]')).toBeNull();
-
       mounted.unmount();
     });
 
-    it("handles keyboard Enter and Escape keys", () => {
-      const onSettingsChange = vi.fn();
-      const mounted = mount(
-        el(PianoAudioStatus, {
-          state: "ready",
-          onSettingsChange,
-        }),
-      );
-
-      const statusPill = mounted.container.querySelector<HTMLDivElement>(
-        '[data-testid="piano-audio-status"]',
-      );
-
-      // Press Enter to open
-      act(() => {
-        statusPill?.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-        );
-      });
-
-      expect(mounted.container.querySelector('[data-testid="audio-status-popover"]')).not.toBeNull();
-
-      // Press Escape to close
-      act(() => {
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-        );
-      });
-
-      expect(mounted.container.querySelector('[data-testid="audio-status-popover"]')).toBeNull();
-
-      mounted.unmount();
-    });
-
-    it("triggers retry callback on error state in popover", () => {
+    it("exposes retry inline for error and fallback states", () => {
       const onRetry = vi.fn();
-      const onSettingsChange = vi.fn();
       const mounted = mount(
         el(PianoAudioStatus, {
           state: "error",
-          onSettingsChange,
           onRetry,
         }),
       );
 
-      // Open popover
       const statusPill = mounted.container.querySelector<HTMLDivElement>(
         '[data-testid="piano-audio-status"]',
       );
-      act(() => {
-        statusPill?.click();
-      });
-
       const retryBtn = mounted.container.querySelector<HTMLButtonElement>(
         '[data-testid="audio-status-retry-btn"]',
       );
+      expect(statusPill?.getAttribute("role")).toBe("status");
       expect(retryBtn).not.toBeNull();
 
-      act(() => {
-        retryBtn?.click();
-      });
+      act(() => retryBtn?.click());
       expect(onRetry).toHaveBeenCalledTimes(1);
-
-      mounted.unmount();
-    });
-
-    it("renders piano tone select when instrument='piano' and engine='soundfont'", () => {
-      const onSettingsChange = vi.fn();
-      const mounted = mount(
-        el(PianoAudioStatus, {
-          state: "ready",
-          instrument: "piano",
-          engine: "soundfont",
-          pianoSoundfontInstrument: "gm-004",
-          onSettingsChange,
-        }),
-      );
-
-      const statusPill = mounted.container.querySelector<HTMLDivElement>(
-        '[data-testid="piano-audio-status"]',
-      );
-      act(() => {
-        statusPill?.click();
-      });
-
-      const toneSelect = mounted.container.querySelector<HTMLSelectElement>(
-        '[data-testid="popover-piano-tone-select"]',
-      );
-      expect(toneSelect).not.toBeNull();
-      expect(toneSelect?.value).toBe("gm-004");
-
-      act(() => {
-        if (toneSelect) {
-          toneSelect.value = "gm-006";
-          toneSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-      });
-
-      expect(onSettingsChange).toHaveBeenCalledWith({ pianoSoundfontInstrument: "gm-006" });
       mounted.unmount();
     });
   });

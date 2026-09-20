@@ -9,7 +9,7 @@ export interface ComputeScaleTonesOptions {
 
 /**
  * Computes in-position scale tones within the active chord fretboard box.
- * ChordFiles signature feature: displays the diatonic scale context surrounding
+ * CadenceFlow scale-layer feature: displays the diatonic scale context surrounding
  * the chord shape for melodic fills and improvisation in that position.
  */
 export function getInPositionScaleTones(

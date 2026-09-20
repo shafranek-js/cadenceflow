@@ -92,7 +92,7 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
     }
   }
 
-  // ChordFiles "Don't Mix" penalty: chaining tension chords without resolving them
+  // Don't Mix penalty: chaining tension chords without resolving them
   if (isTensionChord(from) && isTensionChord(to)) {
     score = Math.max(10, score - 25);
     factors.push({
@@ -102,7 +102,7 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
     });
   }
 
-  // ChordFiles Modal Corridor preference for the progressions module
+  // Modal Corridor preference for the progressions module
   if (moduleId === "progressions") {
     if (PRIMARY_DIATONIC_PROGRESSIONS.has(from) && MODAL_BORROWED_PROGRESSIONS.has(to)) {
       if (score < 72) {

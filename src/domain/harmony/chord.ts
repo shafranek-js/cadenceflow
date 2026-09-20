@@ -32,6 +32,10 @@ export interface ChordDefinition {
   readonly baseQuality: BaseChordQuality;
   readonly variant: HarmonicVariant;
   readonly spelling: ChordSpelling;
+  /** Semantic inversion metadata; absent means root-bass defaults remain valid. */
+  readonly bassScaleDegree?: number;
+  readonly bassPitchClass?: PitchClassIdentity;
+  readonly bassSpelling?: PitchSpelling;
 }
 
 export const EMPTY_HARMONIC_VARIANT: HarmonicVariant = Object.freeze({
@@ -63,17 +67,23 @@ export function validateHarmonicVariant(
 
 export function formatChordSymbol(chord: ChordDefinition): string {
   const rootStr = formatPitchSpelling(chord.spelling.root);
+  const suffix =
+    chord.bassPitchClass !== undefined &&
+    chord.bassPitchClass !== chord.rootPitchClass &&
+    chord.bassSpelling
+      ? `/${formatPitchSpelling(chord.bassSpelling)}`
+      : "";
+  let symbol: string;
   if (chord.baseQuality === "minor") {
-    return `${rootStr}m`;
+    symbol = `${rootStr}m`;
+  } else if (chord.baseQuality === "diminished") {
+    symbol = chord.variant?.seventh === "diminished7" ? `${rootStr}°7` : `${rootStr}°`;
+  } else if (chord.baseQuality === "augmented") {
+    symbol = `${rootStr}+`;
+  } else if (chord.baseQuality === "dominant") {
+    symbol = `${rootStr}7`;
+  } else {
+    symbol = rootStr;
   }
-  if (chord.baseQuality === "diminished") {
-    return chord.variant?.seventh === "diminished7" ? `${rootStr}°7` : `${rootStr}°`;
-  }
-  if (chord.baseQuality === "augmented") {
-    return `${rootStr}+`;
-  }
-  if (chord.baseQuality === "dominant") {
-    return `${rootStr}7`;
-  }
-  return rootStr;
+  return `${symbol}${suffix}`;
 }

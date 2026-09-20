@@ -17,6 +17,7 @@ export interface HarmonicContext {
 export interface HarmonicLayerDefinition {
   readonly id: string;
   readonly label: string;
+  readonly zoneLabel?: string;
   readonly kind: "core" | "functional" | "expanded";
   readonly defaultVisible: boolean;
 }

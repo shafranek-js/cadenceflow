@@ -1,7 +1,7 @@
 /**
  * Harmonic Matrix Functional Zoning and Directed Tendency / Resolution Mapping.
  *
- * Implements the theoretical principles of ChordFiles / CadenceFlow:
+ * Implements CadenceFlow's functional-harmony tendency principles:
  * 1. Directed Tension Zone ("Don't Mix" ⊘): Secondary dominants, secondary diminished,
  *    and Neapolitan chords represent directed tension that must resolve to target degrees.
  * 2. Diatonic Core Zone ("Mix Chords" ∞): Foundational diatonic chords that can be freely

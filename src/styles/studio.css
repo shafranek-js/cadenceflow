@@ -3,15 +3,23 @@
   max-width: 100%;
   min-height: 100vh;
   min-width: 0;
-  padding: 12px var(--studio-gutter);
+  padding: 0 var(--studio-gutter) 12px;
 }
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 70;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  max-width: 100%;
+  max-width: none;
   min-width: 0;
+  margin-left: calc(-1 * var(--studio-gutter));
+  margin-right: calc(-1 * var(--studio-gutter));
+  padding: var(--space-3) var(--studio-gutter) var(--space-2) var(--studio-gutter);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
   color: var(--text-muted);
 }
 .app-header > * {
@@ -4442,7 +4450,7 @@ body {
 }
 
 .app-shell {
-  padding: var(--space-3) var(--studio-gutter);
+  padding: 0 var(--studio-gutter) var(--space-3);
   overflow-x: clip;
 }
 
@@ -4732,6 +4740,15 @@ body {
 .app-status-bar .piano-audio-status,
 .app-status-bar .piano-audio-status-container {
   margin-left: auto;
+}
+
+.app-status-message {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .global-settings-control {
@@ -5094,6 +5111,27 @@ button[aria-pressed="true"],
   outline-color: var(--selected);
   border-color: var(--recommendation-alternative);
   box-shadow: inset 0 0 0 1px var(--recommendation-alternative);
+}
+
+.chord-card.is-playing {
+  border-color: var(--playing) !important;
+  outline: 2px solid var(--playing) !important;
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--playing) 16%, var(--surface)) !important;
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--playing) 45%, transparent),
+    inset 0 0 0 1px var(--playing) !important;
+}
+
+.chord-card.is-playing .chord-main {
+  background: color-mix(in srgb, var(--playing) 12%, transparent);
+}
+
+.chord-card.is-playing.is-selected {
+  outline-color: var(--playing) !important;
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--playing) 55%, transparent),
+    inset 0 0 0 2px var(--playing) !important;
 }
 
 .progression-step-card.is-selected,
@@ -7210,114 +7248,12 @@ summary:focus-visible,
 }
 
 /* --------------------------------------------------------------------------
-   Piano Audio Status - Interactive Pill & Popover
+   Piano Audio Status
    -------------------------------------------------------------------------- */
 .piano-audio-status-container {
   position: relative;
   margin-left: auto;
   display: inline-flex;
-}
-
-.piano-audio-status.is-clickable {
-  cursor: pointer;
-  user-select: none;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.piano-audio-status.is-clickable:hover,
-.piano-audio-status.is-clickable:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent, #38bdf8);
-  outline: none;
-}
-
-.audio-status-chevron {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 2px;
-  font-size: 0.65rem;
-  opacity: 0.7;
-}
-
-.audio-status-chevron .ui-icon-disclosure {
-  transition: transform 0.15s ease;
-}
-
-.audio-status-chevron .ui-icon-disclosure.is-rotated {
-  transform: rotate(90deg);
-}
-
-.audio-status-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 50;
-  display: grid;
-  width: min(300px, calc(100vw - 32px));
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border-strong, var(--border));
-  border-radius: var(--radius-panel, 8px);
-  background: var(--surface, #1e232a);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  color: var(--text);
-}
-
-.audio-status-popover-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-}
-
-.audio-status-popover-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.audio-status-popover-close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.audio-status-popover-close-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-
-.audio-status-popover-body {
-  display: grid;
-  gap: 10px;
-}
-
-.audio-status-popover-status-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: var(--surface-2, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border);
-  font-size: 0.72rem;
-}
-
-.audio-status-popover-status-text {
-  flex: 1;
-  color: var(--text-muted);
 }
 
 .audio-status-retry-btn {
@@ -7334,52 +7270,4 @@ summary:focus-visible,
 .audio-status-retry-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-.audio-status-popover-section {
-  display: grid;
-  gap: 5px;
-}
-
-.audio-status-popover-section-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.audio-status-popover-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  border-radius: var(--radius-badge);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  padding: 2px;
-}
-
-.audio-status-popover-toggle button {
-  font-size: 0.72rem;
-  padding: 4px 6px;
-  border-radius: 4px;
-}
-
-.audio-status-popover-select-label {
-  display: grid;
-  gap: 3px;
-  margin-top: 3px;
-}
-
-.audio-status-popover-sublabel {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-.audio-status-popover-select {
-  width: 100%;
-  font-size: 0.72rem;
-  padding: 3px 6px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
 }

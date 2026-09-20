@@ -1,6 +1,9 @@
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
-import { resolveGuitarChordVoicing, type GuitarChordVoicing } from "../../domain/instruments/guitar/voicings";
+import {
+  resolveGuitarChordVoicing,
+  type GuitarChordVoicing,
+} from "../../domain/instruments/guitar/voicings";
 import { getInPositionScaleTones } from "../../domain/instruments/guitar/scaleTones";
 import { GuitarFretboard } from "./GuitarFretboard";
 
@@ -19,14 +22,14 @@ export function GuitarCardView({
   showScaleTones = false,
   orientation = "vertical",
 }: GuitarCardViewProps) {
-  const isSeventh =
-    chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
+  const isSeventh = chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
   const isMajor7 = chord.variant?.seventh === "major7";
 
   const voicing: GuitarChordVoicing = resolveGuitarChordVoicing({
     rootPitchClass: chord.rootPitchClass,
     baseQuality: chord.baseQuality,
     spelling: chord.spelling,
+    ...(chord.bassPitchClass !== undefined ? { bassPitchClass: chord.bassPitchClass } : {}),
     isSeventh,
     isMajor7,
   });
@@ -36,9 +39,7 @@ export function GuitarCardView({
       ? getInPositionScaleTones(voicing, scalePitchClasses)
       : [];
 
-  const fretStringSummary = voicing.frets
-    .map((f) => (f === -1 ? "x" : String(f)))
-    .join(" ");
+  const fretStringSummary = voicing.frets.map((f) => (f === -1 ? "x" : String(f))).join(" ");
 
   const isHorizontal = orientation === "horizontal";
 
@@ -53,10 +54,7 @@ export function GuitarCardView({
     >
       <div className="mini-guitar-heading">
         <strong className="mini-guitar-chord-name">{chordLabel}</strong>
-        <span
-          className="mini-guitar-position"
-          aria-label={`Position fret ${voicing.baseFret}`}
-        >
+        <span className="mini-guitar-position" aria-label={`Position fret ${voicing.baseFret}`}>
           {voicing.baseFret === 1 ? "Open" : `Fret ${voicing.baseFret}`}
         </span>
       </div>

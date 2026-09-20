@@ -36,7 +36,7 @@ test.describe("T188 — canonical Melody instrument picker", () => {
     await expect(page.getByLabel("Melody Instrument search")).toBeVisible();
   });
 
-  test("previews the Step override by loading it from CDN", async ({
+  test("previews a Step override from local assets without external soundfont requests", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -45,6 +45,11 @@ test.describe("T188 — canonical Melody instrument picker", () => {
     const dialog = await openCreateMelodyDialog(page);
     const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
     const search = dialog.getByLabel("Melody Instrument search");
+    const externalSoundfontRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("gleitz.github.io")) externalSoundfontRequests.push(request.url());
+    });
+    await page.route("https://gleitz.github.io/**", (route) => route.abort());
 
     await search.fill("Electric Guitar clean");
     await expect(picker.locator("option[value='gm-027']")).toContainText("Electric Guitar (clean)");
@@ -52,19 +57,104 @@ test.describe("T188 — canonical Melody instrument picker", () => {
 
     const play = dialog.getByRole("button", { name: "Play melody preview" });
     await expect(play).toBeEnabled();
-    // gm-027 is now realtime via CDN — it should load and start playing
-    const cdnResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes("gleitz.github.io") &&
-        response.url().includes("electric_guitar_clean"),
+    const localResponse = page.waitForResponse(
+      (response) => response.url().endsWith("/audio/soundfont/electric_guitar_clean-mp3.js"),
       { timeout: 60_000 },
     );
     await play.click();
-    expect((await cdnResponse).status()).toBe(200);
+    expect((await localResponse).status()).toBe(200);
+    expect(externalSoundfontRequests).toEqual([]);
     await expect(dialog.getByRole("button", { name: "Stop melody preview" })).toBeVisible({
       timeout: 60_000,
     });
     await dialog.getByRole("button", { name: "Stop melody preview" }).click();
+  });
+
+  test("previews Church Organ locally", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+    const dialog = await openCreateMelodyDialog(page);
+    const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
+    await picker.selectOption("gm-019");
+
+    const localResponse = page.waitForResponse(
+      (response) => response.url().endsWith("/audio/soundfont/church_organ-mp3.js"),
+      { timeout: 60_000 },
+    );
+    await dialog.getByRole("button", { name: "Play melody preview" }).click();
+    expect((await localResponse).status()).toBe(200);
+    await expect(dialog.getByRole("button", { name: "Stop melody preview" })).toBeVisible({
+      timeout: 60_000,
+    });
+    await dialog.getByRole("button", { name: "Stop melody preview" }).click();
+  });
+
+  test("keeps the Measures per system menu inside a 1280x720 viewport", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+
+    await page
+      .getByTestId("progression-heading")
+      .getByRole("heading", { name: "My Progression" })
+      .click({ button: "right" });
+    await page.getByTestId("progression-menu-open-layout").hover();
+    const submenu = page.getByTestId("progression-menu-layout-submenu");
+    await expect(submenu).toBeVisible();
+    const box = await submenu.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(1280);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(720);
+    await page.getByTestId("progression-menu-layout-1").click();
+    await expect(page.getByTestId("progression-heading")).toBeVisible();
+  });
+
+  test("keeps the canonical picker reachable across themes, viewports, and 200% pressure", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+    const dialog = await openCreateMelodyDialog(page);
+    const theme = page.getByRole("group", { name: "Theme" });
+    const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
+
+    for (const themeName of ["Dark theme", "Light theme"] as const) {
+      await theme.getByRole("button", { name: themeName, exact: true }).click();
+      for (const viewport of [
+        { width: 1280, height: 720 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await expect(picker).toBeVisible();
+        await expect(dialog.getByLabel("Melody Instrument search")).toBeVisible();
+        const bounds = await dialog.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+        ).toBeLessThanOrEqual(0);
+      }
+    }
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.evaluate(() => {
+      document.documentElement.style.zoom = "2";
+    });
+    await expect(picker).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Apply Melody" })).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+    ).toBeLessThanOrEqual(0);
+    await page.evaluate(() => {
+      document.documentElement.style.zoom = "";
+    });
+    await dialog.getByRole("button", { name: "Cancel" }).click();
   });
 
   test("loads and plays an available Step override instead of the global instrument", async ({

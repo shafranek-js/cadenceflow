@@ -1,0 +1,25 @@
+{
+  "progressions": {
+    "columnLabels": ["I", "vi", "IV", "ii", "V", "iii"],
+    "secondaryDominants": ["V7", "V7/vi", "V7/IV", "V7/ii", "V7/V", "V7/iii"],
+    "main": ["I", "vi", "IV", "ii", "V", "iii", "vii°"],
+    "modal": ["bIII", "bVI", "iv", "bVII"],
+    "contextual": ["subV7"]
+  },
+  "darkHarmony": {
+    "columnLabels": ["i", "ii°", "III", "iv", "V", "VI"],
+    "secondaryDiminished": ["vii°7/V", "vii°7/iv", "vii°7/VI"],
+    "main": ["i", "ii°", "III", "iv", "V", "VI", "vii°"],
+    "colors": ["CT°7", "ChrMed+M3", "Pass°7", "N6", "ChrMed-m3↓"]
+  },
+  "n6": {
+    "targetId": "V",
+    "bassScaleDegree": 4,
+    "rootPitchClassInA": 10,
+    "bassPitchClassInA": 2
+  },
+  "diminishedAliases": {
+    "canonicalId": "vii°7/V",
+    "aliases": ["vii°7/V", "vii°/V", "viio7/V", "viio/V"]
+  }
+}

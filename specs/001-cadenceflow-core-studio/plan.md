@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. Piano remains the only full production Instrument Profile in v1; US12 adds a curated set of Melody Track timbres without treating them as full chord-realization profiles. US13 separates Matrix Card Views from one global My Progression view, renders Staff as responsive multi-measure score systems, and moves Staff interaction onto the score before removing its duplicate Step-card strip.
+Implement CadenceFlow v1 as a local-first, desktop-oriented browser composition studio. The technical core is a pure TypeScript semantic music engine that owns harmonic functions, module-bound Major/Tonal Minor realization, progression instances, exact musical timing, recommendation scoring, voicing semantics, and project serialization. React renders one coherent studio around the Harmonic Matrix, Inspector, My Progression, Card Views, and transport. The current checkout has Piano and Guitar chord-realization profiles, one 128-program local GM Melody catalog, five global Progression Views, Scales & Modes exploration, and separate Piano/Guitar audio engine controls. US13 separates Matrix Card Views from one global My Progression view, renders Staff as responsive multi-measure score systems, and moves Staff interaction onto the score before removing its duplicate Step-card strip.
 
 Audio is sample-based rather than oscillator-based: the launch piano uses a high-quality multisampled acoustic grand through an `InstrumentAudioProvider`, with web-optimized lazy loading/caching; an SF2/SF3 provider can be integrated independently. MIDI and MusicXML are separate projections of the same semantic model.
 
@@ -20,7 +20,7 @@ Audio is sample-based rather than oscillator-based: the launch piano uses a high
 **Project Type**: Single-page desktop-first web application; no backend in v1  
 **Performance Goals**: Matrix interaction response <100 ms for ordinary local actions; preview note scheduling audible without UI-frame-dependent jitter; recommendation refresh <100 ms for v1 vocabulary; 60 fps target for ordinary UI motion; no page-level horizontal scroll in supported desktop range  
 **Constraints**: Harmonic/domain core must be browser/UI/audio-library independent; large piano assets must not block UI; autosave must not persist Undo history; no silent harmonic conversion; no ML requirement  
-**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, one full production instrument profile, six curated Melody Track timbres, three Matrix Card Views, and three mutually exclusive My Progression views
+**Scale/Scope**: One local user, multiple named projects, progression sizes expected in tens to low hundreds of steps, two v1 harmonic modules, Piano and Guitar chord profiles, one 128-program local GM Melody catalog, five mutually exclusive My Progression views, responsive Staff systems with manual grouping 1–8, and a Scales & Modes Explorer
 
 ## Constitution Check
 
@@ -66,7 +66,7 @@ Responsibilities:
 - piano articulation event expansion
 - Piano Card View data
 
-Future Guitar/Ukulele/Melodica profiles implement the same profile contract without changing stored harmonic identity. The US12 Melody Track instrument catalog is deliberately narrower: it assigns clef, General MIDI program, label, and SoundFont timbre to already-derived monophonic notes and does not implement chord voicing, Card Views, or an Instrument Profile.
+Future Ukulele/Melodica profiles implement the same profile contract without changing stored harmonic identity. The Guitar profile now supplies chord voicings, fretboard/Tab projections, in-position Scale Tones, fingering, and Guitar audio routing. The US12 Melody Track catalog assigns clef, General MIDI program, label, and local FluidR3_GM sample map to already-derived monophonic notes and remains separate from chord voicing profiles.
 
 ### 3. Audio Providers
 
@@ -74,7 +74,7 @@ Future Guitar/Ukulele/Melodica profiles implement the same profile contract with
 
 v1 providers:
 - `HqSamplePianoProvider` — default production provider; high-quality multisampled acoustic piano, lazy loaded/cached.
-- `SoundFontProvider` — `spessasynth_lib` SF2/SF3 adapter used by the curated US12 Melody Track catalog; not a user-facing sound-bank manager in v1.
+- `SoundFontProvider` — `spessasynth_lib` SF2/SF3 adapter used by Piano, Guitar, and the local 128-program Melody catalog; not a user-facing sound-bank manager in v1.
 
 Audio providers do **not** decide chord spelling, voicing semantics, harmonic function, or progression timing.
 
@@ -371,7 +371,8 @@ Deliver:
 - pure framework-independent melody types, ten deterministic pitch motions, four exact rhythm cycles,
   two connection modes, five exact Rational grids, octave-offset validation, and immutable
   source-step-linked projection;
-- Project schema v4, sequential v1→v2→v3→v4 migration, portable persistence, and recipe-only storage;
+- Historical Slice 11 schema v4, sequential v1→v2→v3→v4 migration, portable persistence, and recipe-only
+  storage; Slice 14 subsequently advances the current contract to schema v5;
 - undoable create/edit/remove and Repeat/Extend/delete/reorder semantics for linked melody recipes;
 - accessible Chord Step context menu, compact editor, preview, Melody Track controls, Melody Staff, and
   active-note highlighting;
@@ -423,11 +424,11 @@ Exit gate:
 - FR-218–FR-220 and SC-021 pass focused unit and Chromium checks; existing Melody projection, persistence,
   playback, MIDI, MusicXML, and no-Melody behavior remain unchanged.
 
-### Slice 14 — General MIDI Melody catalog and per-Step inheritance
+### Slice 14 — General MIDI Melody catalog and per-Step inheritance (accepted T188)
 
 Deliver:
-- one pure immutable 128-program GM catalog that retains the six existing ids and identifies the six
-  verified local FluidR3_GM assets separately from export-only entries;
+- one pure immutable 128-program GM catalog that retains the six existing ids and maps all 128 programs
+  to manifest-verified local FluidR3_GM assets;
 - schema v5 with an optional sibling `ChordStep.melodyInstrumentOverride`, sequential v4→v5 migration,
   strict validation, portable/autosave recovery, and undoable global/Step-local transitions;
 - one reusable compact grouped/searchable instrument picker used by Melody Track controls and the Melody
@@ -435,16 +436,50 @@ Deliver:
   containment;
 - pure effective-instrument resolution and event partitioning shared by Staff, realtime preview/playback,
   MIDI, and MusicXML;
-- lazy loading only for used available timbres, explicit non-fallback status for export-only timbres,
+- lazy loading only for used local timbres and explicit non-fallback error status if a local asset fails,
   one active-system Staff line, MIDI track, and full-score MusicXML part per unique effective instrument,
   stable first-occurrence ordering, full-score rests, and catalog clefs.
 
-No new sound assets, dependencies, network loading, chord Instrument Profiles, multiple Melody Tracks, or
-arbitrary external SoundFont management enter this slice.
+No arbitrary external SoundFont management, multiple Melody Tracks, or schema-v6 work enter this slice;
+the future schema-v6 cutover is reserved for the jointly coordinated T192/T197 batch.
 
 Exit gate:
 - FR-221–FR-226 and SC-022 pass catalog, migration/persistence, command, Staff/playback/export, and focused
-  Chromium acceptance; the existing six projects and no-Melody outputs remain compatible.
+  Chromium acceptance; the existing six stable ids, v1–v4 projects, and no-Melody outputs remain compatible.
+
+### Current implementation extensions (documented after the 45-commit convergence)
+
+- Global Progression View now includes Harmonic, Piano, Staff, Guitar, and Tablature. `measuresPerSystem`
+  persists `auto` or manual 1–8; Auto currently targets two through six measures and density/width can
+  reflow further.
+- Guitar is a real chord Instrument Profile with standard-tuning voicings, fretboard/chord cards,
+  in-position Scale Tones, exact fingering, tablature projection, and horizontal/vertical orientation.
+  Guitar audio has independent HQ Samples and SoundFont providers with bounded strum scheduling.
+- The Scales & Modes Explorer contains the current diatonic/minor/pentatonic/Blues scale library,
+  characteristic-chord metadata, Piano/Guitar projections, and canonical modal formula audition/apply.
+  Explorer Apply remains a workflow operation; atomic modal apply is a future gap.
+- Voice-leading, reharmonization/substitution, modulation/key-transition, cadence-formula, tendency-arrow,
+  genre-focus, and Suzuki-color surfaces are implemented presentation/command projections over the
+  canonical semantic model.
+- `AudioEnginesInspector` is the sole engine/tone settings surface. The current codec intentionally writes
+  only Harmony instrument, mute, solo, and volume; Piano/Guitar engine and SoundFont tone settings are
+  active-session runtime state until the separate codec/schema/autosave/export/Undo round-trip task closes
+  the persistence gap.
+- The v5 local asset boundary is manifest-driven: 128 FluidR3_GM-derived Melody assets load lazily from
+  the repository; six historical stable ids remain compatibility identifiers, not an asset-count limit.
+
+### Future Matrix topology and routing roadmap (T190–T191)
+
+- T190 must model the Progressions Matrix as a stable physical-board spatial system: three horizontal
+  zones (`Secondary Dominants`, `Main Chords`, `Modal Interchange`), six primary semantic columns,
+  vertically readable source/target alignment above the Main Chords, and meaningful lower-zone alignment
+  without padding Modal Interchange to equal card counts. Diminished and legacy-compatible auxiliaries may
+  remain outside the primary columns when that is clearer.
+- T191 must preserve those spatial relationships while applying strict directed-tension and Modal Corridor
+  rules. Desktop and layout-pressure acceptance must verify visible arrows/highlights, semantic order, and
+  relationship clarity without relying on Inspector. Responsive layout may compress or wrap the structure,
+  but must not replace it with an unrelated independent grid. This is a semantic spatial contract, not a
+  pixel-perfect or branded reference recreation.
 
 ## Performance and Audio Strategy
 
@@ -460,6 +495,9 @@ Exit gate:
 - Migrations are pure functions `vN -> vN+1`, fixture tested.
 - Autosave writes the current schema only.
 - Unsupported future schema versions fail with an explicit compatibility message; never silently discard unknown musical data.
+- The only planned future cutover is one atomic `schema v5 -> v6` migration: T197 must land before or jointly
+  with T192, adding Piano/Guitar engine and SoundFont tone persistence together with T192's `noteColorMode`.
+  T197 MUST NOT introduce a separate schema version or a later engine/tone `v7` migration.
 
 ## Accessibility/Interaction Strategy
 

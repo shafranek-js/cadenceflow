@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:e2e:chromium": "playwright test --project=chromium",
     "verify:fixtures": "tsx scripts/verify-fixtures.ts",
+    "generate:melody-manifest": "tsx scripts/generate-melody-manifest.ts",
     "verify:melody-assets": "tsx scripts/verify-melody-assets.ts",
     "validate:musicxml": "tsx scripts/validate-musicxml.ts",
     "prepare:piano-bank": "tsx scripts/prepare-piano-bank.ts",

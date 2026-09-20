@@ -1,37 +1,1554 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "instrumentId": "fluidr3-gm-midi-js-samples",
   "displayName": "FluidR3 GM sampled melody instruments",
   "format": "MIDI.js MP3 sample maps",
-  "sourceRepository": "https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM",
-  "sourceRevision": "gh-pages",
+  "sourceRepository": "https://github.com/gleitz/midi-js-soundfonts/tree/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM",
+  "sourceRevision": "044fab8e1456bfafc5776e86dfd6bb8697149aef",
+  "sourceDirectory": "FluidR3_GM",
+  "sourceArtifact": "FluidR3_GM.sf2",
   "license": "CC-BY-3.0",
   "licenseFile": "/licenses/FluidR3_GM-CC-BY-3.0.txt",
   "attributionFile": "/licenses/FluidR3_GM-attribution.txt",
+  "programCount": 128,
+  "programs": [
+    {
+      "program": 0,
+      "instrumentId": "gm-000",
+      "sourceName": "acoustic_grand_piano",
+      "asset": "/audio/soundfont/acoustic_grand_piano-mp3.js"
+    },
+    {
+      "program": 1,
+      "instrumentId": "gm-001",
+      "sourceName": "bright_acoustic_piano",
+      "asset": "/audio/soundfont/bright_acoustic_piano-mp3.js"
+    },
+    {
+      "program": 2,
+      "instrumentId": "gm-002",
+      "sourceName": "electric_grand_piano",
+      "asset": "/audio/soundfont/electric_grand_piano-mp3.js"
+    },
+    {
+      "program": 3,
+      "instrumentId": "gm-003",
+      "sourceName": "honkytonk_piano",
+      "asset": "/audio/soundfont/honkytonk_piano-mp3.js"
+    },
+    {
+      "program": 4,
+      "instrumentId": "gm-004",
+      "sourceName": "electric_piano_1",
+      "asset": "/audio/soundfont/electric_piano_1-mp3.js"
+    },
+    {
+      "program": 5,
+      "instrumentId": "gm-005",
+      "sourceName": "electric_piano_2",
+      "asset": "/audio/soundfont/electric_piano_2-mp3.js"
+    },
+    {
+      "program": 6,
+      "instrumentId": "gm-006",
+      "sourceName": "harpsichord",
+      "asset": "/audio/soundfont/harpsichord-mp3.js"
+    },
+    {
+      "program": 7,
+      "instrumentId": "gm-007",
+      "sourceName": "clavinet",
+      "asset": "/audio/soundfont/clavinet-mp3.js"
+    },
+    {
+      "program": 8,
+      "instrumentId": "gm-008",
+      "sourceName": "celesta",
+      "asset": "/audio/soundfont/celesta-mp3.js"
+    },
+    {
+      "program": 9,
+      "instrumentId": "gm-009",
+      "sourceName": "glockenspiel",
+      "asset": "/audio/soundfont/glockenspiel-mp3.js"
+    },
+    {
+      "program": 10,
+      "instrumentId": "gm-010",
+      "sourceName": "music_box",
+      "asset": "/audio/soundfont/music_box-mp3.js"
+    },
+    {
+      "program": 11,
+      "instrumentId": "gm-011",
+      "sourceName": "vibraphone",
+      "asset": "/audio/soundfont/vibraphone-mp3.js"
+    },
+    {
+      "program": 12,
+      "instrumentId": "gm-012",
+      "sourceName": "marimba",
+      "asset": "/audio/soundfont/marimba-mp3.js"
+    },
+    {
+      "program": 13,
+      "instrumentId": "gm-013",
+      "sourceName": "xylophone",
+      "asset": "/audio/soundfont/xylophone-mp3.js"
+    },
+    {
+      "program": 14,
+      "instrumentId": "gm-014",
+      "sourceName": "tubular_bells",
+      "asset": "/audio/soundfont/tubular_bells-mp3.js"
+    },
+    {
+      "program": 15,
+      "instrumentId": "gm-015",
+      "sourceName": "dulcimer",
+      "asset": "/audio/soundfont/dulcimer-mp3.js"
+    },
+    {
+      "program": 16,
+      "instrumentId": "gm-016",
+      "sourceName": "drawbar_organ",
+      "asset": "/audio/soundfont/drawbar_organ-mp3.js"
+    },
+    {
+      "program": 17,
+      "instrumentId": "gm-017",
+      "sourceName": "percussive_organ",
+      "asset": "/audio/soundfont/percussive_organ-mp3.js"
+    },
+    {
+      "program": 18,
+      "instrumentId": "gm-018",
+      "sourceName": "rock_organ",
+      "asset": "/audio/soundfont/rock_organ-mp3.js"
+    },
+    {
+      "program": 19,
+      "instrumentId": "gm-019",
+      "sourceName": "church_organ",
+      "asset": "/audio/soundfont/church_organ-mp3.js"
+    },
+    {
+      "program": 20,
+      "instrumentId": "gm-020",
+      "sourceName": "reed_organ",
+      "asset": "/audio/soundfont/reed_organ-mp3.js"
+    },
+    {
+      "program": 21,
+      "instrumentId": "gm-021",
+      "sourceName": "accordion",
+      "asset": "/audio/soundfont/accordion-mp3.js"
+    },
+    {
+      "program": 22,
+      "instrumentId": "gm-022",
+      "sourceName": "harmonica",
+      "asset": "/audio/soundfont/harmonica-mp3.js"
+    },
+    {
+      "program": 23,
+      "instrumentId": "gm-023",
+      "sourceName": "tango_accordion",
+      "asset": "/audio/soundfont/tango_accordion-mp3.js"
+    },
+    {
+      "program": 24,
+      "instrumentId": "gm-024",
+      "sourceName": "acoustic_guitar_nylon",
+      "asset": "/audio/soundfont/acoustic_guitar_nylon-mp3.js"
+    },
+    {
+      "program": 25,
+      "instrumentId": "gm-025",
+      "sourceName": "acoustic_guitar_steel",
+      "asset": "/audio/guitar/acoustic_guitar_steel-mp3.js"
+    },
+    {
+      "program": 26,
+      "instrumentId": "gm-026",
+      "sourceName": "electric_guitar_jazz",
+      "asset": "/audio/soundfont/electric_guitar_jazz-mp3.js"
+    },
+    {
+      "program": 27,
+      "instrumentId": "gm-027",
+      "sourceName": "electric_guitar_clean",
+      "asset": "/audio/soundfont/electric_guitar_clean-mp3.js"
+    },
+    {
+      "program": 28,
+      "instrumentId": "gm-028",
+      "sourceName": "electric_guitar_muted",
+      "asset": "/audio/soundfont/electric_guitar_muted-mp3.js"
+    },
+    {
+      "program": 29,
+      "instrumentId": "gm-029",
+      "sourceName": "overdriven_guitar",
+      "asset": "/audio/soundfont/overdriven_guitar-mp3.js"
+    },
+    {
+      "program": 30,
+      "instrumentId": "gm-030",
+      "sourceName": "distortion_guitar",
+      "asset": "/audio/soundfont/distortion_guitar-mp3.js"
+    },
+    {
+      "program": 31,
+      "instrumentId": "gm-031",
+      "sourceName": "guitar_harmonics",
+      "asset": "/audio/soundfont/guitar_harmonics-mp3.js"
+    },
+    {
+      "program": 32,
+      "instrumentId": "gm-032",
+      "sourceName": "acoustic_bass",
+      "asset": "/audio/soundfont/acoustic_bass-mp3.js"
+    },
+    {
+      "program": 33,
+      "instrumentId": "gm-033",
+      "sourceName": "electric_bass_finger",
+      "asset": "/audio/soundfont/electric_bass_finger-mp3.js"
+    },
+    {
+      "program": 34,
+      "instrumentId": "gm-034",
+      "sourceName": "electric_bass_pick",
+      "asset": "/audio/soundfont/electric_bass_pick-mp3.js"
+    },
+    {
+      "program": 35,
+      "instrumentId": "gm-035",
+      "sourceName": "fretless_bass",
+      "asset": "/audio/soundfont/fretless_bass-mp3.js"
+    },
+    {
+      "program": 36,
+      "instrumentId": "gm-036",
+      "sourceName": "slap_bass_1",
+      "asset": "/audio/soundfont/slap_bass_1-mp3.js"
+    },
+    {
+      "program": 37,
+      "instrumentId": "gm-037",
+      "sourceName": "slap_bass_2",
+      "asset": "/audio/soundfont/slap_bass_2-mp3.js"
+    },
+    {
+      "program": 38,
+      "instrumentId": "gm-038",
+      "sourceName": "synth_bass_1",
+      "asset": "/audio/soundfont/synth_bass_1-mp3.js"
+    },
+    {
+      "program": 39,
+      "instrumentId": "gm-039",
+      "sourceName": "synth_bass_2",
+      "asset": "/audio/soundfont/synth_bass_2-mp3.js"
+    },
+    {
+      "program": 40,
+      "instrumentId": "violin",
+      "sourceName": "violin",
+      "asset": "/audio/melody/FluidR3_GM/violin-mp3.js"
+    },
+    {
+      "program": 41,
+      "instrumentId": "gm-041",
+      "sourceName": "viola",
+      "asset": "/audio/soundfont/viola-mp3.js"
+    },
+    {
+      "program": 42,
+      "instrumentId": "cello",
+      "sourceName": "cello",
+      "asset": "/audio/melody/FluidR3_GM/cello-mp3.js"
+    },
+    {
+      "program": 43,
+      "instrumentId": "gm-043",
+      "sourceName": "contrabass",
+      "asset": "/audio/soundfont/contrabass-mp3.js"
+    },
+    {
+      "program": 44,
+      "instrumentId": "gm-044",
+      "sourceName": "tremolo_strings",
+      "asset": "/audio/soundfont/tremolo_strings-mp3.js"
+    },
+    {
+      "program": 45,
+      "instrumentId": "gm-045",
+      "sourceName": "pizzicato_strings",
+      "asset": "/audio/soundfont/pizzicato_strings-mp3.js"
+    },
+    {
+      "program": 46,
+      "instrumentId": "gm-046",
+      "sourceName": "orchestral_harp",
+      "asset": "/audio/soundfont/orchestral_harp-mp3.js"
+    },
+    {
+      "program": 47,
+      "instrumentId": "gm-047",
+      "sourceName": "timpani",
+      "asset": "/audio/soundfont/timpani-mp3.js"
+    },
+    {
+      "program": 48,
+      "instrumentId": "gm-048",
+      "sourceName": "string_ensemble_1",
+      "asset": "/audio/soundfont/string_ensemble_1-mp3.js"
+    },
+    {
+      "program": 49,
+      "instrumentId": "gm-049",
+      "sourceName": "string_ensemble_2",
+      "asset": "/audio/soundfont/string_ensemble_2-mp3.js"
+    },
+    {
+      "program": 50,
+      "instrumentId": "gm-050",
+      "sourceName": "synth_strings_1",
+      "asset": "/audio/soundfont/synth_strings_1-mp3.js"
+    },
+    {
+      "program": 51,
+      "instrumentId": "gm-051",
+      "sourceName": "synth_strings_2",
+      "asset": "/audio/soundfont/synth_strings_2-mp3.js"
+    },
+    {
+      "program": 52,
+      "instrumentId": "gm-052",
+      "sourceName": "choir_aahs",
+      "asset": "/audio/soundfont/choir_aahs-mp3.js"
+    },
+    {
+      "program": 53,
+      "instrumentId": "gm-053",
+      "sourceName": "voice_oohs",
+      "asset": "/audio/soundfont/voice_oohs-mp3.js"
+    },
+    {
+      "program": 54,
+      "instrumentId": "gm-054",
+      "sourceName": "synth_choir",
+      "asset": "/audio/soundfont/synth_choir-mp3.js"
+    },
+    {
+      "program": 55,
+      "instrumentId": "gm-055",
+      "sourceName": "orchestra_hit",
+      "asset": "/audio/soundfont/orchestra_hit-mp3.js"
+    },
+    {
+      "program": 56,
+      "instrumentId": "gm-056",
+      "sourceName": "trumpet",
+      "asset": "/audio/soundfont/trumpet-mp3.js"
+    },
+    {
+      "program": 57,
+      "instrumentId": "gm-057",
+      "sourceName": "trombone",
+      "asset": "/audio/soundfont/trombone-mp3.js"
+    },
+    {
+      "program": 58,
+      "instrumentId": "gm-058",
+      "sourceName": "tuba",
+      "asset": "/audio/soundfont/tuba-mp3.js"
+    },
+    {
+      "program": 59,
+      "instrumentId": "gm-059",
+      "sourceName": "muted_trumpet",
+      "asset": "/audio/soundfont/muted_trumpet-mp3.js"
+    },
+    {
+      "program": 60,
+      "instrumentId": "gm-060",
+      "sourceName": "french_horn",
+      "asset": "/audio/soundfont/french_horn-mp3.js"
+    },
+    {
+      "program": 61,
+      "instrumentId": "gm-061",
+      "sourceName": "brass_section",
+      "asset": "/audio/soundfont/brass_section-mp3.js"
+    },
+    {
+      "program": 62,
+      "instrumentId": "gm-062",
+      "sourceName": "synth_brass_1",
+      "asset": "/audio/soundfont/synth_brass_1-mp3.js"
+    },
+    {
+      "program": 63,
+      "instrumentId": "gm-063",
+      "sourceName": "synth_brass_2",
+      "asset": "/audio/soundfont/synth_brass_2-mp3.js"
+    },
+    {
+      "program": 64,
+      "instrumentId": "gm-064",
+      "sourceName": "soprano_sax",
+      "asset": "/audio/soundfont/soprano_sax-mp3.js"
+    },
+    {
+      "program": 65,
+      "instrumentId": "gm-065",
+      "sourceName": "alto_sax",
+      "asset": "/audio/soundfont/alto_sax-mp3.js"
+    },
+    {
+      "program": 66,
+      "instrumentId": "gm-066",
+      "sourceName": "tenor_sax",
+      "asset": "/audio/soundfont/tenor_sax-mp3.js"
+    },
+    {
+      "program": 67,
+      "instrumentId": "gm-067",
+      "sourceName": "baritone_sax",
+      "asset": "/audio/soundfont/baritone_sax-mp3.js"
+    },
+    {
+      "program": 68,
+      "instrumentId": "oboe",
+      "sourceName": "oboe",
+      "asset": "/audio/melody/FluidR3_GM/oboe-mp3.js"
+    },
+    {
+      "program": 69,
+      "instrumentId": "gm-069",
+      "sourceName": "english_horn",
+      "asset": "/audio/soundfont/english_horn-mp3.js"
+    },
+    {
+      "program": 70,
+      "instrumentId": "gm-070",
+      "sourceName": "bassoon",
+      "asset": "/audio/soundfont/bassoon-mp3.js"
+    },
+    {
+      "program": 71,
+      "instrumentId": "clarinet",
+      "sourceName": "clarinet",
+      "asset": "/audio/melody/FluidR3_GM/clarinet-mp3.js"
+    },
+    {
+      "program": 72,
+      "instrumentId": "gm-072",
+      "sourceName": "piccolo",
+      "asset": "/audio/soundfont/piccolo-mp3.js"
+    },
+    {
+      "program": 73,
+      "instrumentId": "flute",
+      "sourceName": "flute",
+      "asset": "/audio/melody/FluidR3_GM/flute-mp3.js"
+    },
+    {
+      "program": 74,
+      "instrumentId": "gm-074",
+      "sourceName": "recorder",
+      "asset": "/audio/soundfont/recorder-mp3.js"
+    },
+    {
+      "program": 75,
+      "instrumentId": "gm-075",
+      "sourceName": "pan_flute",
+      "asset": "/audio/soundfont/pan_flute-mp3.js"
+    },
+    {
+      "program": 76,
+      "instrumentId": "gm-076",
+      "sourceName": "blown_bottle",
+      "asset": "/audio/soundfont/blown_bottle-mp3.js"
+    },
+    {
+      "program": 77,
+      "instrumentId": "gm-077",
+      "sourceName": "shakuhachi",
+      "asset": "/audio/soundfont/shakuhachi-mp3.js"
+    },
+    {
+      "program": 78,
+      "instrumentId": "gm-078",
+      "sourceName": "whistle",
+      "asset": "/audio/soundfont/whistle-mp3.js"
+    },
+    {
+      "program": 79,
+      "instrumentId": "gm-079",
+      "sourceName": "ocarina",
+      "asset": "/audio/soundfont/ocarina-mp3.js"
+    },
+    {
+      "program": 80,
+      "instrumentId": "synth-lead",
+      "sourceName": "lead_1_square",
+      "asset": "/audio/melody/FluidR3_GM/lead_1_square-mp3.js"
+    },
+    {
+      "program": 81,
+      "instrumentId": "gm-081",
+      "sourceName": "lead_2_sawtooth",
+      "asset": "/audio/soundfont/lead_2_sawtooth-mp3.js"
+    },
+    {
+      "program": 82,
+      "instrumentId": "gm-082",
+      "sourceName": "lead_3_calliope",
+      "asset": "/audio/soundfont/lead_3_calliope-mp3.js"
+    },
+    {
+      "program": 83,
+      "instrumentId": "gm-083",
+      "sourceName": "lead_4_chiff",
+      "asset": "/audio/soundfont/lead_4_chiff-mp3.js"
+    },
+    {
+      "program": 84,
+      "instrumentId": "gm-084",
+      "sourceName": "lead_5_charang",
+      "asset": "/audio/soundfont/lead_5_charang-mp3.js"
+    },
+    {
+      "program": 85,
+      "instrumentId": "gm-085",
+      "sourceName": "lead_6_voice",
+      "asset": "/audio/soundfont/lead_6_voice-mp3.js"
+    },
+    {
+      "program": 86,
+      "instrumentId": "gm-086",
+      "sourceName": "lead_7_fifths",
+      "asset": "/audio/soundfont/lead_7_fifths-mp3.js"
+    },
+    {
+      "program": 87,
+      "instrumentId": "gm-087",
+      "sourceName": "lead_8_bass__lead",
+      "asset": "/audio/soundfont/lead_8_bass__lead-mp3.js"
+    },
+    {
+      "program": 88,
+      "instrumentId": "gm-088",
+      "sourceName": "pad_1_new_age",
+      "asset": "/audio/soundfont/pad_1_new_age-mp3.js"
+    },
+    {
+      "program": 89,
+      "instrumentId": "gm-089",
+      "sourceName": "pad_2_warm",
+      "asset": "/audio/soundfont/pad_2_warm-mp3.js"
+    },
+    {
+      "program": 90,
+      "instrumentId": "gm-090",
+      "sourceName": "pad_3_polysynth",
+      "asset": "/audio/soundfont/pad_3_polysynth-mp3.js"
+    },
+    {
+      "program": 91,
+      "instrumentId": "gm-091",
+      "sourceName": "pad_4_choir",
+      "asset": "/audio/soundfont/pad_4_choir-mp3.js"
+    },
+    {
+      "program": 92,
+      "instrumentId": "gm-092",
+      "sourceName": "pad_5_bowed",
+      "asset": "/audio/soundfont/pad_5_bowed-mp3.js"
+    },
+    {
+      "program": 93,
+      "instrumentId": "gm-093",
+      "sourceName": "pad_6_metallic",
+      "asset": "/audio/soundfont/pad_6_metallic-mp3.js"
+    },
+    {
+      "program": 94,
+      "instrumentId": "gm-094",
+      "sourceName": "pad_7_halo",
+      "asset": "/audio/soundfont/pad_7_halo-mp3.js"
+    },
+    {
+      "program": 95,
+      "instrumentId": "gm-095",
+      "sourceName": "pad_8_sweep",
+      "asset": "/audio/soundfont/pad_8_sweep-mp3.js"
+    },
+    {
+      "program": 96,
+      "instrumentId": "gm-096",
+      "sourceName": "fx_1_rain",
+      "asset": "/audio/soundfont/fx_1_rain-mp3.js"
+    },
+    {
+      "program": 97,
+      "instrumentId": "gm-097",
+      "sourceName": "fx_2_soundtrack",
+      "asset": "/audio/soundfont/fx_2_soundtrack-mp3.js"
+    },
+    {
+      "program": 98,
+      "instrumentId": "gm-098",
+      "sourceName": "fx_3_crystal",
+      "asset": "/audio/soundfont/fx_3_crystal-mp3.js"
+    },
+    {
+      "program": 99,
+      "instrumentId": "gm-099",
+      "sourceName": "fx_4_atmosphere",
+      "asset": "/audio/soundfont/fx_4_atmosphere-mp3.js"
+    },
+    {
+      "program": 100,
+      "instrumentId": "gm-100",
+      "sourceName": "fx_5_brightness",
+      "asset": "/audio/soundfont/fx_5_brightness-mp3.js"
+    },
+    {
+      "program": 101,
+      "instrumentId": "gm-101",
+      "sourceName": "fx_6_goblins",
+      "asset": "/audio/soundfont/fx_6_goblins-mp3.js"
+    },
+    {
+      "program": 102,
+      "instrumentId": "gm-102",
+      "sourceName": "fx_7_echoes",
+      "asset": "/audio/soundfont/fx_7_echoes-mp3.js"
+    },
+    {
+      "program": 103,
+      "instrumentId": "gm-103",
+      "sourceName": "fx_8_scifi",
+      "asset": "/audio/soundfont/fx_8_scifi-mp3.js"
+    },
+    {
+      "program": 104,
+      "instrumentId": "gm-104",
+      "sourceName": "sitar",
+      "asset": "/audio/soundfont/sitar-mp3.js"
+    },
+    {
+      "program": 105,
+      "instrumentId": "gm-105",
+      "sourceName": "banjo",
+      "asset": "/audio/soundfont/banjo-mp3.js"
+    },
+    {
+      "program": 106,
+      "instrumentId": "gm-106",
+      "sourceName": "shamisen",
+      "asset": "/audio/soundfont/shamisen-mp3.js"
+    },
+    {
+      "program": 107,
+      "instrumentId": "gm-107",
+      "sourceName": "koto",
+      "asset": "/audio/soundfont/koto-mp3.js"
+    },
+    {
+      "program": 108,
+      "instrumentId": "gm-108",
+      "sourceName": "kalimba",
+      "asset": "/audio/soundfont/kalimba-mp3.js"
+    },
+    {
+      "program": 109,
+      "instrumentId": "gm-109",
+      "sourceName": "bagpipe",
+      "asset": "/audio/soundfont/bagpipe-mp3.js"
+    },
+    {
+      "program": 110,
+      "instrumentId": "gm-110",
+      "sourceName": "fiddle",
+      "asset": "/audio/soundfont/fiddle-mp3.js"
+    },
+    {
+      "program": 111,
+      "instrumentId": "gm-111",
+      "sourceName": "shanai",
+      "asset": "/audio/soundfont/shanai-mp3.js"
+    },
+    {
+      "program": 112,
+      "instrumentId": "gm-112",
+      "sourceName": "tinkle_bell",
+      "asset": "/audio/soundfont/tinkle_bell-mp3.js"
+    },
+    {
+      "program": 113,
+      "instrumentId": "gm-113",
+      "sourceName": "agogo",
+      "asset": "/audio/soundfont/agogo-mp3.js"
+    },
+    {
+      "program": 114,
+      "instrumentId": "gm-114",
+      "sourceName": "steel_drums",
+      "asset": "/audio/soundfont/steel_drums-mp3.js"
+    },
+    {
+      "program": 115,
+      "instrumentId": "gm-115",
+      "sourceName": "woodblock",
+      "asset": "/audio/soundfont/woodblock-mp3.js"
+    },
+    {
+      "program": 116,
+      "instrumentId": "gm-116",
+      "sourceName": "taiko_drum",
+      "asset": "/audio/soundfont/taiko_drum-mp3.js"
+    },
+    {
+      "program": 117,
+      "instrumentId": "gm-117",
+      "sourceName": "melodic_tom",
+      "asset": "/audio/soundfont/melodic_tom-mp3.js"
+    },
+    {
+      "program": 118,
+      "instrumentId": "gm-118",
+      "sourceName": "synth_drum",
+      "asset": "/audio/soundfont/synth_drum-mp3.js"
+    },
+    {
+      "program": 119,
+      "instrumentId": "gm-119",
+      "sourceName": "reverse_cymbal",
+      "asset": "/audio/soundfont/reverse_cymbal-mp3.js"
+    },
+    {
+      "program": 120,
+      "instrumentId": "gm-120",
+      "sourceName": "guitar_fret_noise",
+      "asset": "/audio/soundfont/guitar_fret_noise-mp3.js"
+    },
+    {
+      "program": 121,
+      "instrumentId": "gm-121",
+      "sourceName": "breath_noise",
+      "asset": "/audio/soundfont/breath_noise-mp3.js"
+    },
+    {
+      "program": 122,
+      "instrumentId": "gm-122",
+      "sourceName": "seashore",
+      "asset": "/audio/soundfont/seashore-mp3.js"
+    },
+    {
+      "program": 123,
+      "instrumentId": "gm-123",
+      "sourceName": "bird_tweet",
+      "asset": "/audio/soundfont/bird_tweet-mp3.js"
+    },
+    {
+      "program": 124,
+      "instrumentId": "gm-124",
+      "sourceName": "telephone_ring",
+      "asset": "/audio/soundfont/telephone_ring-mp3.js"
+    },
+    {
+      "program": 125,
+      "instrumentId": "gm-125",
+      "sourceName": "helicopter",
+      "asset": "/audio/soundfont/helicopter-mp3.js"
+    },
+    {
+      "program": 126,
+      "instrumentId": "gm-126",
+      "sourceName": "applause",
+      "asset": "/audio/soundfont/applause-mp3.js"
+    },
+    {
+      "program": 127,
+      "instrumentId": "gm-127",
+      "sourceName": "gunshot",
+      "asset": "/audio/soundfont/gunshot-mp3.js"
+    }
+  ],
   "assets": {
-    "violin-mp3.js": {
+    "/audio/soundfont/acoustic_grand_piano-mp3.js": {
+      "sourceName": "acoustic_grand_piano",
+      "sourceFile": "acoustic_grand_piano-mp3.js",
+      "size": 2631954,
+      "sha256": "00eebe0214c12ff8f32c47c2f7ac92ef352800e868ab0f883b80854486ac4ca6"
+    },
+    "/audio/soundfont/bright_acoustic_piano-mp3.js": {
+      "sourceName": "bright_acoustic_piano",
+      "sourceFile": "bright_acoustic_piano-mp3.js",
+      "size": 2632311,
+      "sha256": "17fe637f5868899a4c1a777c62ad0c3816c1852cb90f6e477b5a6f945a5722d8"
+    },
+    "/audio/soundfont/electric_grand_piano-mp3.js": {
+      "sourceName": "electric_grand_piano",
+      "sourceFile": "electric_grand_piano-mp3.js",
+      "size": 1995850,
+      "sha256": "ef155e91429b0bdf40ac96af79cdcb05e09c03ac0e2c16e71bb1f02b3df4ae75"
+    },
+    "/audio/soundfont/honkytonk_piano-mp3.js": {
+      "sourceName": "honkytonk_piano",
+      "sourceFile": "honkytonk_piano-mp3.js",
+      "size": 2620329,
+      "sha256": "51957f9e7a6edfcea43ffc0f23ef763b144a56879ddfe1c7b1d7ea9ee3a51767"
+    },
+    "/audio/soundfont/electric_piano_1-mp3.js": {
+      "sourceName": "electric_piano_1",
+      "sourceFile": "electric_piano_1-mp3.js",
+      "size": 2232690,
+      "sha256": "19041530232e66f8d9b00f43ede2fa50f59a55b1a27a81daf864c54d371426b2"
+    },
+    "/audio/soundfont/electric_piano_2-mp3.js": {
+      "sourceName": "electric_piano_2",
+      "sourceFile": "electric_piano_2-mp3.js",
+      "size": 2508394,
+      "sha256": "c9d99289fdc382bd287f6c4759637821123dfae846a9a7b093ce0d80a9a4227a"
+    },
+    "/audio/soundfont/harpsichord-mp3.js": {
+      "sourceName": "harpsichord",
+      "sourceFile": "harpsichord-mp3.js",
+      "size": 2332057,
+      "sha256": "d3f214640a2373e362adc236a2e2adc7868fa7b2602cd51baab96321b4382a09"
+    },
+    "/audio/soundfont/clavinet-mp3.js": {
+      "sourceName": "clavinet",
+      "sourceFile": "clavinet-mp3.js",
+      "size": 2423394,
+      "sha256": "0b0e01046b78ed8bfb535da823f31fa5f4bcc64f3e54bdd78688e1e6e547e916"
+    },
+    "/audio/soundfont/celesta-mp3.js": {
+      "sourceName": "celesta",
+      "sourceFile": "celesta-mp3.js",
+      "size": 1751881,
+      "sha256": "95481faad30b05357cc8ec0c71b04e58034ccc8c773ab87d3c4436e45ebbb011"
+    },
+    "/audio/soundfont/glockenspiel-mp3.js": {
+      "sourceName": "glockenspiel",
+      "sourceFile": "glockenspiel-mp3.js",
+      "size": 1946366,
+      "sha256": "871d637db5980e5faa210733872ac50ba6268afb9b71cb9d62a9b9c2c7b95a6e"
+    },
+    "/audio/soundfont/music_box-mp3.js": {
+      "sourceName": "music_box",
+      "sourceFile": "music_box-mp3.js",
+      "size": 1829435,
+      "sha256": "e2c2bd8329642ca6862f950fd99da9920111385a3cc2cf36840e1f86a1197143"
+    },
+    "/audio/soundfont/vibraphone-mp3.js": {
+      "sourceName": "vibraphone",
+      "sourceFile": "vibraphone-mp3.js",
+      "size": 2020776,
+      "sha256": "263bf866f7facd9652d39d4f7f499e8f883bc40adbdee75d8c5caf11403132f5"
+    },
+    "/audio/soundfont/marimba-mp3.js": {
+      "sourceName": "marimba",
+      "sourceFile": "marimba-mp3.js",
+      "size": 1684709,
+      "sha256": "57249b9905d5298469a52a2e0557738e852b5db6387040a8e1cff19e12549cff"
+    },
+    "/audio/soundfont/xylophone-mp3.js": {
+      "sourceName": "xylophone",
+      "sourceFile": "xylophone-mp3.js",
+      "size": 1652787,
+      "sha256": "9dc8927906e3b3fcda1380f2f29aa0b2212f12d3b825a29390ed2fe1398f8921"
+    },
+    "/audio/soundfont/tubular_bells-mp3.js": {
+      "sourceName": "tubular_bells",
+      "sourceFile": "tubular_bells-mp3.js",
+      "size": 2030859,
+      "sha256": "a06612711e5d92aec189d75f90220b024417714eea5599ef1e2dabfdff6365a9"
+    },
+    "/audio/soundfont/dulcimer-mp3.js": {
+      "sourceName": "dulcimer",
+      "sourceFile": "dulcimer-mp3.js",
+      "size": 2364806,
+      "sha256": "00843a0fac1c435aa319e47a3ed704c0ab93743a4d4f21ad70c64dc935404968"
+    },
+    "/audio/soundfont/drawbar_organ-mp3.js": {
+      "sourceName": "drawbar_organ",
+      "sourceFile": "drawbar_organ-mp3.js",
+      "size": 2553611,
+      "sha256": "00aab0b52e7ad3e8f40a5198c4e4dc844d3f5317d362d90534f433f1157cad64"
+    },
+    "/audio/soundfont/percussive_organ-mp3.js": {
+      "sourceName": "percussive_organ",
+      "sourceFile": "percussive_organ-mp3.js",
+      "size": 2686362,
+      "sha256": "1da48c68d4de57d39cc46427fe0ad4637aeeaee0918d05c3108e439674d8d628"
+    },
+    "/audio/soundfont/rock_organ-mp3.js": {
+      "sourceName": "rock_organ",
+      "sourceFile": "rock_organ-mp3.js",
+      "size": 2808964,
+      "sha256": "da73539d8115952a57cb6c4bd6e1e149353a11bf8c4bcddbf252ee369193da94"
+    },
+    "/audio/soundfont/church_organ-mp3.js": {
+      "sourceName": "church_organ",
+      "sourceFile": "church_organ-mp3.js",
+      "size": 2801474,
+      "sha256": "ab13baf72584d80c4ed989a64559d170e8d62a6bddc3964ccc4de3cd2e206490"
+    },
+    "/audio/soundfont/reed_organ-mp3.js": {
+      "sourceName": "reed_organ",
+      "sourceFile": "reed_organ-mp3.js",
+      "size": 2966120,
+      "sha256": "c614da40c1d04687c1b6f2ed132bcd0a17c26f79cade80408e182b07b8602e08"
+    },
+    "/audio/soundfont/accordion-mp3.js": {
+      "sourceName": "accordion",
+      "sourceFile": "accordion-mp3.js",
+      "size": 3002635,
+      "sha256": "a7fe9c0532f7d8a3fec066d3059fed27c82d942bf70c3079c58d25ad91ae69de"
+    },
+    "/audio/soundfont/harmonica-mp3.js": {
+      "sourceName": "harmonica",
+      "sourceFile": "harmonica-mp3.js",
+      "size": 2707455,
+      "sha256": "40a0686cdb730ea607a2942de71dfc38d96ee57b9d48bea185dfb204e1ec9ee0"
+    },
+    "/audio/soundfont/tango_accordion-mp3.js": {
+      "sourceName": "tango_accordion",
+      "sourceFile": "tango_accordion-mp3.js",
+      "size": 3004169,
+      "sha256": "382da2bb21b20f3ab477084aa9f603c5bbdf0204fe13d72b90608b8fa3e1a99d"
+    },
+    "/audio/soundfont/acoustic_guitar_nylon-mp3.js": {
+      "sourceName": "acoustic_guitar_nylon",
+      "sourceFile": "acoustic_guitar_nylon-mp3.js",
+      "size": 1837439,
+      "sha256": "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64"
+    },
+    "/audio/guitar/acoustic_guitar_steel-mp3.js": {
+      "sourceName": "acoustic_guitar_steel",
+      "sourceFile": "acoustic_guitar_steel-mp3.js",
+      "size": 1984415,
+      "sha256": "cb3caa60a5dfe49734c07f8c069df48ab2d0ddca4b38260d8562d8af477db456"
+    },
+    "/audio/soundfont/electric_guitar_jazz-mp3.js": {
+      "sourceName": "electric_guitar_jazz",
+      "sourceFile": "electric_guitar_jazz-mp3.js",
+      "size": 2330622,
+      "sha256": "94807d392bf39488354684713f946c729a65d6e43f6be1263079b4e43791d183"
+    },
+    "/audio/soundfont/electric_guitar_clean-mp3.js": {
+      "sourceName": "electric_guitar_clean",
+      "sourceFile": "electric_guitar_clean-mp3.js",
+      "size": 2109223,
+      "sha256": "dd7d6049c1a6bc17231fb4bcc5120b00ab95dfbcd145b76c8bd201c061508d20"
+    },
+    "/audio/soundfont/electric_guitar_muted-mp3.js": {
+      "sourceName": "electric_guitar_muted",
+      "sourceFile": "electric_guitar_muted-mp3.js",
+      "size": 1657999,
+      "sha256": "981fab86094376b90459892f30671f7d02eb78b4dae7a0a8c3c198d1e8563c68"
+    },
+    "/audio/soundfont/overdriven_guitar-mp3.js": {
+      "sourceName": "overdriven_guitar",
+      "sourceFile": "overdriven_guitar-mp3.js",
+      "size": 2929907,
+      "sha256": "038f84e0ddfa5ae7a3c677379a4a166cb12646abbf922657f9419158accb7557"
+    },
+    "/audio/soundfont/distortion_guitar-mp3.js": {
+      "sourceName": "distortion_guitar",
+      "sourceFile": "distortion_guitar-mp3.js",
+      "size": 2907759,
+      "sha256": "de186d2b6e88714f343c05dba889a8b5fb3ec08f6ae8baea21e72157bd55d065"
+    },
+    "/audio/soundfont/guitar_harmonics-mp3.js": {
+      "sourceName": "guitar_harmonics",
+      "sourceFile": "guitar_harmonics-mp3.js",
+      "size": 2596710,
+      "sha256": "37a10c8a235213529f8bb1a30a4f8c4a2a1741c51377dac13d3aaa23e9d4227c"
+    },
+    "/audio/soundfont/acoustic_bass-mp3.js": {
+      "sourceName": "acoustic_bass",
+      "sourceFile": "acoustic_bass-mp3.js",
+      "size": 1958275,
+      "sha256": "7b6d656613f2b8e2e73526317543a491c630bd5dab4426c54dae55f67dfd1e91"
+    },
+    "/audio/soundfont/electric_bass_finger-mp3.js": {
+      "sourceName": "electric_bass_finger",
+      "sourceFile": "electric_bass_finger-mp3.js",
+      "size": 1991634,
+      "sha256": "4b45ce5222c73a849fb6dcdf96e5cd489866a120d7cbf13498ac53a3a81e57e5"
+    },
+    "/audio/soundfont/electric_bass_pick-mp3.js": {
+      "sourceName": "electric_bass_pick",
+      "sourceFile": "electric_bass_pick-mp3.js",
+      "size": 2087544,
+      "sha256": "86288c80ea96967d3cd843d8676f9df2b3154448bd1d162b9acff8a64635463d"
+    },
+    "/audio/soundfont/fretless_bass-mp3.js": {
+      "sourceName": "fretless_bass",
+      "sourceFile": "fretless_bass-mp3.js",
+      "size": 2083075,
+      "sha256": "35bbb95df84379bc1b67799ecd47ebe6c9d17ae316925b713bb584adf7cf642a"
+    },
+    "/audio/soundfont/slap_bass_1-mp3.js": {
+      "sourceName": "slap_bass_1",
+      "sourceFile": "slap_bass_1-mp3.js",
+      "size": 1899709,
+      "sha256": "28d46dfe5fe2d31f6a36fa8c1bc52b9d0d3247c135d7e894181bcfdd8560f57d"
+    },
+    "/audio/soundfont/slap_bass_2-mp3.js": {
+      "sourceName": "slap_bass_2",
+      "sourceFile": "slap_bass_2-mp3.js",
+      "size": 2133921,
+      "sha256": "63a8aa81e5d8eb09cf00d0a3602c44f8d8a039aeb80435285eb843ce64f0ac05"
+    },
+    "/audio/soundfont/synth_bass_1-mp3.js": {
+      "sourceName": "synth_bass_1",
+      "sourceFile": "synth_bass_1-mp3.js",
+      "size": 2037954,
+      "sha256": "bc26d7c27eb9e62f58875a7f7eff0123b03b40ef0eaf526bb93c38142028b7d5"
+    },
+    "/audio/soundfont/synth_bass_2-mp3.js": {
+      "sourceName": "synth_bass_2",
+      "sourceFile": "synth_bass_2-mp3.js",
+      "size": 2292274,
+      "sha256": "315a79d2c3765e2b518ffe2d1ae6fa4af603db739ccc2b5e1663901bb3cac458"
+    },
+    "/audio/melody/FluidR3_GM/violin-mp3.js": {
+      "sourceName": "violin",
+      "sourceFile": "violin-mp3.js",
       "size": 2870964,
       "sha256": "3c169ac4c7781fe145e545e909993371188aa6bad617bc3a5f0692b7678995f8"
     },
-    "cello-mp3.js": {
+    "/audio/soundfont/viola-mp3.js": {
+      "sourceName": "viola",
+      "sourceFile": "viola-mp3.js",
+      "size": 2803843,
+      "sha256": "0aabb7733ddb5852cb41a5e4881ca2a96781009243ba31d62e3e114c642d9051"
+    },
+    "/audio/melody/FluidR3_GM/cello-mp3.js": {
+      "sourceName": "cello",
+      "sourceFile": "cello-mp3.js",
       "size": 3005203,
       "sha256": "fc72c9351e0dda586802f97a1b890e415640f54dc6cc397bd5dc32b078f6ce4c"
     },
-    "oboe-mp3.js": {
+    "/audio/soundfont/contrabass-mp3.js": {
+      "sourceName": "contrabass",
+      "sourceFile": "contrabass-mp3.js",
+      "size": 2149428,
+      "sha256": "fde56089e8e292e6d95c458c9fc2b8a9e205753647267c900cd0198a66ab5a77"
+    },
+    "/audio/soundfont/tremolo_strings-mp3.js": {
+      "sourceName": "tremolo_strings",
+      "sourceFile": "tremolo_strings-mp3.js",
+      "size": 2803853,
+      "sha256": "571d11230d47f111fc39795eb0d5b2fec1b655aef555ad1a2e4bbc0ef553412f"
+    },
+    "/audio/soundfont/pizzicato_strings-mp3.js": {
+      "sourceName": "pizzicato_strings",
+      "sourceFile": "pizzicato_strings-mp3.js",
+      "size": 1992739,
+      "sha256": "e2e50071902a93fe722d6dbad24c2229b9889c33ae67c1c5d0907978a9dd73bf"
+    },
+    "/audio/soundfont/orchestral_harp-mp3.js": {
+      "sourceName": "orchestral_harp",
+      "sourceFile": "orchestral_harp-mp3.js",
+      "size": 1920729,
+      "sha256": "e6da3bb7c987e2085d923e3a03b2f475c202a2edc9a8fb88ac821e53eca082b3"
+    },
+    "/audio/soundfont/timpani-mp3.js": {
+      "sourceName": "timpani",
+      "sourceFile": "timpani-mp3.js",
+      "size": 2012089,
+      "sha256": "9f6230ae7fd6e4019c2fc9b7a0ac353103b777e45a2cb50880f5f6f6b3a0cba6"
+    },
+    "/audio/soundfont/string_ensemble_1-mp3.js": {
+      "sourceName": "string_ensemble_1",
+      "sourceFile": "string_ensemble_1-mp3.js",
+      "size": 2803855,
+      "sha256": "8571395f4c42a989a63e0aed48ad9d79f0ac1a822ff2afd7cb356191be8fd4a2"
+    },
+    "/audio/soundfont/string_ensemble_2-mp3.js": {
+      "sourceName": "string_ensemble_2",
+      "sourceFile": "string_ensemble_2-mp3.js",
+      "size": 2803855,
+      "sha256": "615a44ee0e735417c3e7f1532c7e9958a211952de2214520210234f8cee0982d"
+    },
+    "/audio/soundfont/synth_strings_1-mp3.js": {
+      "sourceName": "synth_strings_1",
+      "sourceFile": "synth_strings_1-mp3.js",
+      "size": 2897125,
+      "sha256": "48b2ac1aefd3d83d24e7b6ce50fa9284cdbdd5dc7ad8472a6db103f791afcda2"
+    },
+    "/audio/soundfont/synth_strings_2-mp3.js": {
+      "sourceName": "synth_strings_2",
+      "sourceFile": "synth_strings_2-mp3.js",
+      "size": 2978993,
+      "sha256": "d735ec7c0edb185370a1d42068e725d8aab4ef33ebc1b1b41f1b35edd398edeb"
+    },
+    "/audio/soundfont/choir_aahs-mp3.js": {
+      "sourceName": "choir_aahs",
+      "sourceFile": "choir_aahs-mp3.js",
+      "size": 2803848,
+      "sha256": "45586b4abdfc7595af8ae1784dee9bf8b7da73fc4f967cd0333f460297f1eb7a"
+    },
+    "/audio/soundfont/voice_oohs-mp3.js": {
+      "sourceName": "voice_oohs",
+      "sourceFile": "voice_oohs-mp3.js",
+      "size": 2775404,
+      "sha256": "6bc8434ad4e2e082b1db152d706efbed84d340e92ead8047f175eeacb0848fc3"
+    },
+    "/audio/soundfont/synth_choir-mp3.js": {
+      "sourceName": "synth_choir",
+      "sourceFile": "synth_choir-mp3.js",
+      "size": 3004825,
+      "sha256": "2520be81a38891579121968b896b57b679d88d0819083d7dd763b49335a7b56b"
+    },
+    "/audio/soundfont/orchestra_hit-mp3.js": {
+      "sourceName": "orchestra_hit",
+      "sourceFile": "orchestra_hit-mp3.js",
+      "size": 2209675,
+      "sha256": "5dab7f3dcdba76d283da18ff1d776aec2a463748888704e2f604ac4554f4311c"
+    },
+    "/audio/soundfont/trumpet-mp3.js": {
+      "sourceName": "trumpet",
+      "sourceFile": "trumpet-mp3.js",
+      "size": 2937749,
+      "sha256": "7f37e0b8fbbfbf67a1183c746d83c85c11790283e2ea9994bdcdb9055bb0e67c"
+    },
+    "/audio/soundfont/trombone-mp3.js": {
+      "sourceName": "trombone",
+      "sourceFile": "trombone-mp3.js",
+      "size": 2621806,
+      "sha256": "670c03635d7147847d029f09d9bb2d8c8e902852192713dce3750d16d7265abd"
+    },
+    "/audio/soundfont/tuba-mp3.js": {
+      "sourceName": "tuba",
+      "sourceFile": "tuba-mp3.js",
+      "size": 2135054,
+      "sha256": "f3bb7363abfd7b9ab7bafd7b61cdcba46bbc0b6c67b11f446ad21dbf3589febb"
+    },
+    "/audio/soundfont/muted_trumpet-mp3.js": {
+      "sourceName": "muted_trumpet",
+      "sourceFile": "muted_trumpet-mp3.js",
+      "size": 2753123,
+      "sha256": "35de0da65b650aba30e609cadf8bb0c81b65e2faf2725f127175294a14694b8d"
+    },
+    "/audio/soundfont/french_horn-mp3.js": {
+      "sourceName": "french_horn",
+      "sourceFile": "french_horn-mp3.js",
+      "size": 2803849,
+      "sha256": "02ab9a746f2f43c9867d67735e52d100996a0d194f06da5e3c4844528869928e"
+    },
+    "/audio/soundfont/brass_section-mp3.js": {
+      "sourceName": "brass_section",
+      "sourceFile": "brass_section-mp3.js",
+      "size": 2803851,
+      "sha256": "616692d454aafa99de7203940bc6b20bc5c478e5045cc972fc819480e4c64d05"
+    },
+    "/audio/soundfont/synth_brass_1-mp3.js": {
+      "sourceName": "synth_brass_1",
+      "sourceFile": "synth_brass_1-mp3.js",
+      "size": 3005175,
+      "sha256": "7bbfd4c60b7cbd225e013435c8bcae3a20f077b2a2b4d2da8ad24c8c91c6f510"
+    },
+    "/audio/soundfont/synth_brass_2-mp3.js": {
+      "sourceName": "synth_brass_2",
+      "sourceFile": "synth_brass_2-mp3.js",
+      "size": 3005211,
+      "sha256": "8e79ee4839f13a1b71ca3b96cc3cb67d6355559ef2806bb6fa9c1d798a666484"
+    },
+    "/audio/soundfont/soprano_sax-mp3.js": {
+      "sourceName": "soprano_sax",
+      "sourceFile": "soprano_sax-mp3.js",
+      "size": 2803849,
+      "sha256": "7fe1a87b57c7dc16f990adccedaefabe14cf4c2464b3a8352d2a3bb801209ec8"
+    },
+    "/audio/soundfont/alto_sax-mp3.js": {
+      "sourceName": "alto_sax",
+      "sourceFile": "alto_sax-mp3.js",
+      "size": 2602486,
+      "sha256": "18ec57c02f27c7e8dc4620f57fa9b94e32babf4ebae7d1f2205e053d3287abce"
+    },
+    "/audio/soundfont/tenor_sax-mp3.js": {
+      "sourceName": "tenor_sax",
+      "sourceFile": "tenor_sax-mp3.js",
+      "size": 3005207,
+      "sha256": "6e4d21071902042d98b3538138c547d6c71924d2ccb9c33ecbf3d772b82555df"
+    },
+    "/audio/soundfont/baritone_sax-mp3.js": {
+      "sourceName": "baritone_sax",
+      "sourceFile": "baritone_sax-mp3.js",
+      "size": 2401130,
+      "sha256": "3dc7bd2d176591d7270185cebdfc6592c3a6fa79d26bf31d29579100acce55f6"
+    },
+    "/audio/melody/FluidR3_GM/oboe-mp3.js": {
+      "sourceName": "oboe",
+      "sourceFile": "oboe-mp3.js",
       "size": 2782850,
       "sha256": "656bd2e0b6b9f7bb3b864d77bfc75a4efdbf79aff9bdbe860201b4e9c21c3d15"
     },
-    "clarinet-mp3.js": {
+    "/audio/soundfont/english_horn-mp3.js": {
+      "sourceName": "english_horn",
+      "sourceFile": "english_horn-mp3.js",
+      "size": 2619270,
+      "sha256": "4468fb7db39c7831d3a366fdb36026d7a996a51702904d760234b476d9ea4a18"
+    },
+    "/audio/soundfont/bassoon-mp3.js": {
+      "sourceName": "bassoon",
+      "sourceFile": "bassoon-mp3.js",
+      "size": 2602485,
+      "sha256": "763d1dc4111ab8bf8c4b5f481f74f2584f4c8f3f9ccf8e5f4cc53df9af22c22a"
+    },
+    "/audio/melody/FluidR3_GM/clarinet-mp3.js": {
+      "sourceName": "clarinet",
+      "sourceFile": "clarinet-mp3.js",
       "size": 2950454,
       "sha256": "ef38d445ba297b459c1be464080ef37ddf48d9255ee3e517067ce1d11fab6eac"
     },
-    "flute-mp3.js": {
+    "/audio/soundfont/piccolo-mp3.js": {
+      "sourceName": "piccolo",
+      "sourceFile": "piccolo-mp3.js",
+      "size": 2931005,
+      "sha256": "8ac8338440798e4804781f75188078e0e888353309717c9ab8c29369245f741e"
+    },
+    "/audio/melody/FluidR3_GM/flute-mp3.js": {
+      "sourceName": "flute",
+      "sourceFile": "flute-mp3.js",
       "size": 2969583,
       "sha256": "e2e35283876eec60b919beeb8bfa49f46f12dddf5b8c6025e7a45c5d2a24bda5"
     },
-    "lead_1_square-mp3.js": {
+    "/audio/soundfont/recorder-mp3.js": {
+      "sourceName": "recorder",
+      "sourceFile": "recorder-mp3.js",
+      "size": 2403162,
+      "sha256": "d72b5db89a759fb97932db006e6ff2320b7815dbdf221bac9200397e164b6d8c"
+    },
+    "/audio/soundfont/pan_flute-mp3.js": {
+      "sourceName": "pan_flute",
+      "sourceFile": "pan_flute-mp3.js",
+      "size": 2903251,
+      "sha256": "fc8203fb482e011fcbaca22c4d60e94745cdcaa608bc36fe556bd0946a35e865"
+    },
+    "/audio/soundfont/blown_bottle-mp3.js": {
+      "sourceName": "blown_bottle",
+      "sourceFile": "blown_bottle-mp3.js",
+      "size": 2862834,
+      "sha256": "2b19c3b686b2c62901018d66dd28258ad41df5b998ed1b6352dcaa6909f4be52"
+    },
+    "/audio/soundfont/shakuhachi-mp3.js": {
+      "sourceName": "shakuhachi",
+      "sourceFile": "shakuhachi-mp3.js",
+      "size": 2829668,
+      "sha256": "e99cd89497841280e13bf2983791c5123a2c8bb696ddeebf152b35dc7e0e49de"
+    },
+    "/audio/soundfont/whistle-mp3.js": {
+      "sourceName": "whistle",
+      "sourceFile": "whistle-mp3.js",
+      "size": 2369121,
+      "sha256": "0d99db9b3eb08ae861b0c587a2cf61f5449e71aa9ec0e36f5fea6bb376083487"
+    },
+    "/audio/soundfont/ocarina-mp3.js": {
+      "sourceName": "ocarina",
+      "sourceFile": "ocarina-mp3.js",
+      "size": 2730153,
+      "sha256": "6ab7115b4cbee264583647a61f879766d8ac0819be64fd1544a20f718b92bd32"
+    },
+    "/audio/melody/FluidR3_GM/lead_1_square-mp3.js": {
+      "sourceName": "lead_1_square",
+      "sourceFile": "lead_1_square-mp3.js",
       "size": 3005211,
       "sha256": "233a52d98f704399fcee0a41323a26e7e358d50a5a18fa81b59a4150b4fdda62"
+    },
+    "/audio/soundfont/lead_2_sawtooth-mp3.js": {
+      "sourceName": "lead_2_sawtooth",
+      "sourceFile": "lead_2_sawtooth-mp3.js",
+      "size": 2999673,
+      "sha256": "de64fdc423efeac7aba38edaf8f47198b5d80f532993b6ebf184b653ac92b6a2"
+    },
+    "/audio/soundfont/lead_3_calliope-mp3.js": {
+      "sourceName": "lead_3_calliope",
+      "sourceFile": "lead_3_calliope-mp3.js",
+      "size": 2680933,
+      "sha256": "ef2b7c6152ae6b84315ccd88df2b039fdb90821742f63151fb75c40304ea41dc"
+    },
+    "/audio/soundfont/lead_4_chiff-mp3.js": {
+      "sourceName": "lead_4_chiff",
+      "sourceFile": "lead_4_chiff-mp3.js",
+      "size": 2282558,
+      "sha256": "7dd94a3e8ecff3625c2d42da5ce89d1f60694cba5b34855a107b123c28e7eb62"
+    },
+    "/audio/soundfont/lead_5_charang-mp3.js": {
+      "sourceName": "lead_5_charang",
+      "sourceFile": "lead_5_charang-mp3.js",
+      "size": 2983724,
+      "sha256": "ba35ba199d95a242b962e397701c65d362e5556562482001d38cea7c557eda20"
+    },
+    "/audio/soundfont/lead_6_voice-mp3.js": {
+      "sourceName": "lead_6_voice",
+      "sourceFile": "lead_6_voice-mp3.js",
+      "size": 2847270,
+      "sha256": "2495ee285c2c98c312e7e6f414792932ca3bdd43271c7ad2a6160c23d96516cb"
+    },
+    "/audio/soundfont/lead_7_fifths-mp3.js": {
+      "sourceName": "lead_7_fifths",
+      "sourceFile": "lead_7_fifths-mp3.js",
+      "size": 3005211,
+      "sha256": "a17254c35208e7d2bcb84cca40b6375034204d2597fd57eb4db0e9f0335fd5da"
+    },
+    "/audio/soundfont/lead_8_bass__lead-mp3.js": {
+      "sourceName": "lead_8_bass__lead",
+      "sourceFile": "lead_8_bass__lead-mp3.js",
+      "size": 2979795,
+      "sha256": "3384aa40b95dd2eea7323faf8fae7db644903ba93bcb28cfe7337d34cee7b9b9"
+    },
+    "/audio/soundfont/pad_1_new_age-mp3.js": {
+      "sourceName": "pad_1_new_age",
+      "sourceFile": "pad_1_new_age-mp3.js",
+      "size": 2714475,
+      "sha256": "317d73384aa92bd342f3b87383e4a48b22d2a52a1b4d32141b764060bd54ad36"
+    },
+    "/audio/soundfont/pad_2_warm-mp3.js": {
+      "sourceName": "pad_2_warm",
+      "sourceFile": "pad_2_warm-mp3.js",
+      "size": 2906336,
+      "sha256": "c688aeeb3d42d1630086cec28125bd3281aa78ff798ac0fa77083d14628ef221"
+    },
+    "/audio/soundfont/pad_3_polysynth-mp3.js": {
+      "sourceName": "pad_3_polysynth",
+      "sourceFile": "pad_3_polysynth-mp3.js",
+      "size": 3003369,
+      "sha256": "7f543a4315cbcaec852d5d3b3c7fe9e69da8dc57c1aa3df4731ad1202f66ca3f"
+    },
+    "/audio/soundfont/pad_4_choir-mp3.js": {
+      "sourceName": "pad_4_choir",
+      "sourceFile": "pad_4_choir-mp3.js",
+      "size": 2970209,
+      "sha256": "6e687e6da8e5ed84307699c91f391178998e1265aa6a5cadc1a0ea76592399d5"
+    },
+    "/audio/soundfont/pad_5_bowed-mp3.js": {
+      "sourceName": "pad_5_bowed",
+      "sourceFile": "pad_5_bowed-mp3.js",
+      "size": 2645385,
+      "sha256": "08e5cb137827e0671ca7b3f528ebecd69766e280b6a40526745f316a38d16580"
+    },
+    "/audio/soundfont/pad_6_metallic-mp3.js": {
+      "sourceName": "pad_6_metallic",
+      "sourceFile": "pad_6_metallic-mp3.js",
+      "size": 2714176,
+      "sha256": "f58f0549ee2a7ed5d663afd62dd7457a9a9c9bfe0b77869089c29b3b38dd2c6b"
+    },
+    "/audio/soundfont/pad_7_halo-mp3.js": {
+      "sourceName": "pad_7_halo",
+      "sourceFile": "pad_7_halo-mp3.js",
+      "size": 2998196,
+      "sha256": "1a34e0c3db3da744b7a82f22047b5b3e25f8d791529c05f6167422bed8fa9d34"
+    },
+    "/audio/soundfont/pad_8_sweep-mp3.js": {
+      "sourceName": "pad_8_sweep",
+      "sourceFile": "pad_8_sweep-mp3.js",
+      "size": 2470321,
+      "sha256": "159a6d1105042f04ee185dcf4f758ffeb85eb04e4bd7d5c1e2cf223d00789645"
+    },
+    "/audio/soundfont/fx_1_rain-mp3.js": {
+      "sourceName": "fx_1_rain",
+      "sourceFile": "fx_1_rain-mp3.js",
+      "size": 2878255,
+      "sha256": "b257b8b84649a7cff8775e506471bcb8c192c4f72590d695a313860a4dee9a18"
+    },
+    "/audio/soundfont/fx_2_soundtrack-mp3.js": {
+      "sourceName": "fx_2_soundtrack",
+      "sourceFile": "fx_2_soundtrack-mp3.js",
+      "size": 2794913,
+      "sha256": "ac0cda140d6c0fa652559c8ff555d24814ad15eab8d710de037c9452fde18b14"
+    },
+    "/audio/soundfont/fx_3_crystal-mp3.js": {
+      "sourceName": "fx_3_crystal",
+      "sourceFile": "fx_3_crystal-mp3.js",
+      "size": 1983322,
+      "sha256": "0650ebf705023ea69f684bf13fa0722841b35554afc8ce5ed0aef139c2eff684"
+    },
+    "/audio/soundfont/fx_4_atmosphere-mp3.js": {
+      "sourceName": "fx_4_atmosphere",
+      "sourceFile": "fx_4_atmosphere-mp3.js",
+      "size": 2718141,
+      "sha256": "8603ebca6b1b7395505a884be07caec2f6ec990d8f1eeead7d89add771cc2023"
+    },
+    "/audio/soundfont/fx_5_brightness-mp3.js": {
+      "sourceName": "fx_5_brightness",
+      "sourceFile": "fx_5_brightness-mp3.js",
+      "size": 2989529,
+      "sha256": "85b501c6f3e50bee68145770c3921987c7a2ff7e069679942d85ef74cb7f5a77"
+    },
+    "/audio/soundfont/fx_6_goblins-mp3.js": {
+      "sourceName": "fx_6_goblins",
+      "sourceFile": "fx_6_goblins-mp3.js",
+      "size": 2734518,
+      "sha256": "3ed06591f58f3916b990a20746d709296dcce6ff5f60990bf93c91acca9fa848"
+    },
+    "/audio/soundfont/fx_7_echoes-mp3.js": {
+      "sourceName": "fx_7_echoes",
+      "sourceFile": "fx_7_echoes-mp3.js",
+      "size": 2770641,
+      "sha256": "6666c4ae2276526becb17dd400171d58b1e4023f0a38bf42910e9a5d331fb7bc"
+    },
+    "/audio/soundfont/fx_8_scifi-mp3.js": {
+      "sourceName": "fx_8_scifi",
+      "sourceFile": "fx_8_scifi-mp3.js",
+      "size": 2588660,
+      "sha256": "0cccd7d899b0936dd941791e546ef7d113cbae2e517115aaa0ed19133afa5936"
+    },
+    "/audio/soundfont/sitar-mp3.js": {
+      "sourceName": "sitar",
+      "sourceFile": "sitar-mp3.js",
+      "size": 2906871,
+      "sha256": "be220a6fd38a8594cf41d035ab01b8a61895cf4b8f2d7b3b8da78242a9f9d634"
+    },
+    "/audio/soundfont/banjo-mp3.js": {
+      "sourceName": "banjo",
+      "sourceFile": "banjo-mp3.js",
+      "size": 1765131,
+      "sha256": "08f49bde197e518187b17bed57d6b16e4afa1f2102e4e0a368275b57583ec355"
+    },
+    "/audio/soundfont/shamisen-mp3.js": {
+      "sourceName": "shamisen",
+      "sourceFile": "shamisen-mp3.js",
+      "size": 2097342,
+      "sha256": "1f0c039d4d1576d495126d7a4e7e1420cd5e2be499c305409b1802b8c8e42839"
+    },
+    "/audio/soundfont/koto-mp3.js": {
+      "sourceName": "koto",
+      "sourceFile": "koto-mp3.js",
+      "size": 2059794,
+      "sha256": "78dcb2449944130b35ed5f1879d8b1512bc220f39c82ba6806023a62fa6365a4"
+    },
+    "/audio/soundfont/kalimba-mp3.js": {
+      "sourceName": "kalimba",
+      "sourceFile": "kalimba-mp3.js",
+      "size": 1636353,
+      "sha256": "9ca415de9866fb55900c2a90df4d06f67d19630dd5cd3e748f86d18abb872a59"
+    },
+    "/audio/soundfont/bagpipe-mp3.js": {
+      "sourceName": "bagpipe",
+      "sourceFile": "bagpipe-mp3.js",
+      "size": 3005205,
+      "sha256": "53ccae340a630bbcdb5787fb05b6c62245032b662cc6c37c38414faa12b51c7f"
+    },
+    "/audio/soundfont/fiddle-mp3.js": {
+      "sourceName": "fiddle",
+      "sourceFile": "fiddle-mp3.js",
+      "size": 2870964,
+      "sha256": "607b93af0d073de5a941572c0dd03b4ef7ba4c63010230da6727461ea0851077"
+    },
+    "/audio/soundfont/shanai-mp3.js": {
+      "sourceName": "shanai",
+      "sourceFile": "shanai-mp3.js",
+      "size": 2733976,
+      "sha256": "9d769ce21250f65efdf0764df9675e49f447d8c359107391d2149c77832bf0de"
+    },
+    "/audio/soundfont/tinkle_bell-mp3.js": {
+      "sourceName": "tinkle_bell",
+      "sourceFile": "tinkle_bell-mp3.js",
+      "size": 1700181,
+      "sha256": "9dbbcb56271831efdb6c2ca65e037ee364c462c70b545d3018708172b0144445"
+    },
+    "/audio/soundfont/agogo-mp3.js": {
+      "sourceName": "agogo",
+      "sourceFile": "agogo-mp3.js",
+      "size": 1697811,
+      "sha256": "97a2febfc332c481a5ce1010a0ecda703e4d91d0823a5e6700618bd2284f1a33"
+    },
+    "/audio/soundfont/steel_drums-mp3.js": {
+      "sourceName": "steel_drums",
+      "sourceFile": "steel_drums-mp3.js",
+      "size": 1762225,
+      "sha256": "74114b14cb375221b22854998e7dd9f18d5b88bfc9bc5e260e77bae3ab9ad203"
+    },
+    "/audio/soundfont/woodblock-mp3.js": {
+      "sourceName": "woodblock",
+      "sourceFile": "woodblock-mp3.js",
+      "size": 1668743,
+      "sha256": "c538148f65143fdebc14c378ee91e1a8282c6439f240b8dd5b0c4a9e388ce76e"
+    },
+    "/audio/soundfont/taiko_drum-mp3.js": {
+      "sourceName": "taiko_drum",
+      "sourceFile": "taiko_drum-mp3.js",
+      "size": 1689156,
+      "sha256": "2f8ab37521871ec4d29bd4e745fc10806580bfb8101805495b8267593a89de7c"
+    },
+    "/audio/soundfont/melodic_tom-mp3.js": {
+      "sourceName": "melodic_tom",
+      "sourceFile": "melodic_tom-mp3.js",
+      "size": 1702133,
+      "sha256": "34da43e3d7eb39f8c7e2a7d182a66a1af3c09eb9306623c7e317c20f524ddf23"
+    },
+    "/audio/soundfont/synth_drum-mp3.js": {
+      "sourceName": "synth_drum",
+      "sourceFile": "synth_drum-mp3.js",
+      "size": 1686120,
+      "sha256": "d6adbb683801b6d4be062f95e1b8b4767f64317ecfcded5a09c80a9948c33a42"
+    },
+    "/audio/soundfont/reverse_cymbal-mp3.js": {
+      "sourceName": "reverse_cymbal",
+      "sourceFile": "reverse_cymbal-mp3.js",
+      "size": 2505580,
+      "sha256": "23d6c27fdb05a14b0b87fef3ea595aa276b908caa649319cc21f41926cf9dbc1"
+    },
+    "/audio/soundfont/guitar_fret_noise-mp3.js": {
+      "sourceName": "guitar_fret_noise",
+      "sourceFile": "guitar_fret_noise-mp3.js",
+      "size": 1671023,
+      "sha256": "99d5f66d498bb3f2765aa4d590e456d7d1c8a58f0d75d4480a0ad0196876ef74"
+    },
+    "/audio/soundfont/breath_noise-mp3.js": {
+      "sourceName": "breath_noise",
+      "sourceFile": "breath_noise-mp3.js",
+      "size": 1725690,
+      "sha256": "b150a1635e4d57aca0c8507f351f1ac71802ebc04ccd67adf111cba0b565aa92"
+    },
+    "/audio/soundfont/seashore-mp3.js": {
+      "sourceName": "seashore",
+      "sourceFile": "seashore-mp3.js",
+      "size": 3001598,
+      "sha256": "798f92f22911eba65a057303d247c04b7bf6d339dceb5a10f79253cd55d7846b"
+    },
+    "/audio/soundfont/bird_tweet-mp3.js": {
+      "sourceName": "bird_tweet",
+      "sourceFile": "bird_tweet-mp3.js",
+      "size": 1948672,
+      "sha256": "d3fdf3da4f6825a527cc60fc898c0dc19bfe4c71c9c882739694f1abe8828469"
+    },
+    "/audio/soundfont/telephone_ring-mp3.js": {
+      "sourceName": "telephone_ring",
+      "sourceFile": "telephone_ring-mp3.js",
+      "size": 2562264,
+      "sha256": "5ff98de65f6e88a44ce64ac9d5c9bb5b54475698ba670084acbf9fbd53008ae1"
+    },
+    "/audio/soundfont/helicopter-mp3.js": {
+      "sourceName": "helicopter",
+      "sourceFile": "helicopter-mp3.js",
+      "size": 3005208,
+      "sha256": "d08cfe83b25a921475463c3e12aca24a86a31c9ad245d70fef2db3e0bd919801"
+    },
+    "/audio/soundfont/applause-mp3.js": {
+      "sourceName": "applause",
+      "sourceFile": "applause-mp3.js",
+      "size": 2654114,
+      "sha256": "fec6a799a94c0724aa060993e5c7b52ee2ed761cf8c5e59535c20a808825a6fd"
+    },
+    "/audio/soundfont/gunshot-mp3.js": {
+      "sourceName": "gunshot",
+      "sourceFile": "gunshot-mp3.js",
+      "size": 2045873,
+      "sha256": "86f3d222fcec64567c4088f2360644c2587da36ddd17193e41161f9c64d66ae2"
     }
   }
 }

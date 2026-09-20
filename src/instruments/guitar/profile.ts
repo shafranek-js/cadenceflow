@@ -69,6 +69,9 @@ export const guitarProfile: InstrumentProfile = Object.freeze({
       rootPitchClass: input.chord.rootPitchClass,
       baseQuality: input.chord.baseQuality,
       spelling: input.chord.spelling,
+      ...(input.chord.bassPitchClass !== undefined
+        ? { bassPitchClass: input.chord.bassPitchClass }
+        : {}),
       isSeventh,
       isMajor7,
     });

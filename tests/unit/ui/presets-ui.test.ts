@@ -948,7 +948,7 @@ describe("T117 — Presets UI Components", () => {
   });
 
   describe("6. Cadence Formulas & Audition in PresetsPanel", () => {
-    it("renders Cadence Formulas & Quick Starters section with canonical ChordFiles formulas and rationale", () => {
+    it("renders Cadence Formulas & Quick Starters section with canonical formulas and rationale", () => {
       const project = createDefaultProject("p1", "Test", "2026-09-05T00:00:00.000Z");
       const dom = renderToDom(
         el(PresetsPanel, {

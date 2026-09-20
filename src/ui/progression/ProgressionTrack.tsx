@@ -11,8 +11,8 @@ import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/p
 import type { AudioProviderState } from "../../audio/contracts";
 import type { PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
-import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { realizeChord } from "../../domain/harmony/realization";
+import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import {
   formatMusicalDuration,
@@ -190,8 +190,7 @@ export function ProgressionTrack({
   readonly onApplyPreset?: ((preset: FunctionalPreset, mode: PresetApplyMode) => void) | undefined;
   readonly onOpenPresets?: (() => void) | undefined;
   readonly onApplySubstitution?:
-    | ((stepId: string, substitution: ChordSubstitution) => void)
-    | undefined;
+    ((stepId: string, substitution: ChordSubstitution) => void) | undefined;
   readonly onOpenModulation?: ((stepId?: string) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -287,16 +286,17 @@ export function ProgressionTrack({
       }
       const realization = realizeProgressionStepRealization(item.step, project.tonic);
       const chord = realizeChord(item.step.harmonicFunction, project.tonic);
-      const rawLabel = formatChordSymbol({
-        ...chord,
-        variant: item.step.harmonicVariant,
-      });
+      const effectiveChord = withEffectiveBass(
+        {
+          ...chord,
+          variant: item.step.harmonicVariant,
+        },
+        realization.bassPitch,
+      );
+      const label = formatChordSymbol(effectiveChord);
       const isInvertedBass =
         realization.bassPitch !== undefined &&
         realization.bassPitch.pitchClassIdentity !== chord.rootPitchClass;
-      const label = isInvertedBass
-        ? `${rawLabel}/${formatPitchSpelling(realization.bassPitch!.spelling)}`
-        : rawLabel;
       return {
         key: `${item.step.id}-${item.fragmentIndex}`,
         kind: "chord",
@@ -617,7 +617,10 @@ export function ProgressionTrack({
             {project.globalTiming.meter.grouping.join("+")}
           </span>
         </header>
-        <div className="score-system-measure-grid progression-measure-grid" data-testid="progression-measure-grid">
+        <div
+          className="score-system-measure-grid progression-measure-grid"
+          data-testid="progression-measure-grid"
+        >
           {measure.items.map((item: ProgressionMeasureItem, itemIndex) => (
             <div
               key={
@@ -674,7 +677,10 @@ export function ProgressionTrack({
             <strong className="progression-first-use-guidance">
               Choose key → explore Matrix → click to hear → + to add
             </strong>
-            <span>Preview a chord in the Matrix, then press + to add it. Or kickstart with a canonical formula:</span>
+            <span>
+              Preview a chord in the Matrix, then press + to add it. Or kickstart with a canonical
+              formula:
+            </span>
             {onApplyPreset && (
               <div className="quick-starters-container" data-testid="quick-starters-container">
                 <span className="quick-starters-label">⚡ Quick Starters:</span>
@@ -777,9 +783,7 @@ export function ProgressionTrack({
                 onApplySubstitution={
                   onApplySubstitution ? (sub) => onApplySubstitution(step.id, sub) : undefined
                 }
-                onOpenModulation={
-                  onOpenModulation ? () => onOpenModulation(step.id) : undefined
-                }
+                onOpenModulation={onOpenModulation ? () => onOpenModulation(step.id) : undefined}
                 onCreate={() => {
                   setMelodyMenu(null);
                   setMelodyEditorStepId(step.id);

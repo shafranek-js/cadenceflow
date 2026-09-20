@@ -1,8 +1,9 @@
 # CadenceFlow — Project Status / Development Handoff
 
-**Handoff date:** 2026-09-14
-**Current implementation stage:** T188 GM Melody catalog and global/Step-local inheritance authorized
-**Task progress:** 187 accepted tasks, 187 / 188 scheduled tasks; T187 remains unscheduled product backlog
+**Handoff date:** 2026-09-20
+**Current implementation stage:** T190 canonical Matrix topology and N6 projection semantics are
+independently accepted. T191 remains unstarted pending explicit authorization.
+**Task progress:** 197 task IDs: 190 checked and 7 open roadmap tasks in `tasks.md`.
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -10,7 +11,7 @@
 Continue CadenceFlow v1 as a desktop-first harmonic composition studio without changing the approved product scope. User Story 5 (**HQ Piano Realization, Performance Controls & Audio Backend**), User Story 6 (**Exact Musical Timing & Transport Runtime**), and User Story 7 (**Functional Presets as Reusable Composition Material**) are fully accepted across all tasks T077–T118.
 
 The previous milestone **Phase 10: User Story 7** is **ACCEPTED / COMPLETE** across all tasks T112–T118.
-The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** is **ACCEPTED / COMPLETE** for **T141–T149**, including current Staff accessibility expectations, focus/landmark behavior, and the final desktop journey. **Phase 15: User Story 11** is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**. **Phase 17: User Story 13** is **ACCEPTED / COMPLETE** for **T177–T185**, including direct Staff interaction, visual polish, and final responsive Chromium acceptance. **Phase 14** is now **ACCEPTED / COMPLETE** through T157 with SC-001–SC-020 closed from current repository and independent MuseScore evidence.
+The previous milestone **Phase 11: User Story 8** — Save and reopen complete work safely (T119–T129) — is **ACCEPTED / COMPLETE**. **Phase 12: User Story 9** — Transfer the composition to notation and DAW workflows — is implementation code-complete with **T130–T140 ACCEPTED**. **Phase 13: User Story 10** is **ACCEPTED / COMPLETE** for **T141–T149**, including current Staff accessibility expectations, focus/landmark behavior, and the final desktop journey. **Phase 15: User Story 11** is **ACCEPTED / COMPLETE** for **T159–T165**. **Phase 16: User Story 12** is **ACCEPTED / COMPLETE** through **T176**. The **Phase 17 / User Story 13** result is recorded as an accepted historical baseline for **T177–T185**; the current five-view/1–8 contract and Batch 2 documentary changes are also independently accepted. **Phase 14** is **ACCEPTED / COMPLETE** through T157 with SC-001–SC-020 closed from current repository and independent MuseScore evidence.
 
 ## 2. Sources of truth
 
@@ -24,9 +25,9 @@ Use the following precedence when requirements appear ambiguous:
 
 Current spec verification:
 
-- 1342 physical lines / 1203 non-empty lines.
-- FR-001 through FR-220: 220 unique functional requirements.
-- SC-001 through SC-021: 21 unique success criteria.
+- 1560 physical lines / 1406 non-empty lines.
+- FR-001 through FR-243: 243 unique functional requirements.
+- SC-001 through SC-032: 32 unique success criteria.
 - No `TODO`, `TBD`, or `NEEDS CLARIFICATION` placeholders.
 
 ## 3. Completed work
@@ -241,7 +242,7 @@ Defined and verified contract tests in `tests/unit/progression/presets.test.ts` 
   - `replace`: Replaces entire progression; clears selection (`selectedStepId = undefined`).
   - `append`: Appends to end; preserves existing `selectedStepId`.
   - `insert`: Inserts immediately before `selectedStepId`; preserves existing `selectedStepId`. Rejects non-empty progressions without selection with `RangeError`.
-  - For empty progressions, all three modes instantiate steps at the beginning.
+  - For empty progressions, all three insertion modes instantiate steps at the beginning.
 - **Project-Owned Custom Presets**: Custom Presets are owned by `Project.customPresets`, undoable/redoable via standard command patterns, and persisted with the project.
 
 ### US7 Batch B — functional preset domain and neutral built-ins — T113–T114
@@ -577,7 +578,7 @@ The real toolchain and test suite were verified on 2026-09-05:
 1. **Active Git Repository**: development is on `master`; every batch must preserve the current untracked QA/source materials and isolate only its intended tracked diff.
 2. **Playwright Firefox**: Firefox runner encounters an SWGL crash in this headless Windows container environment; Chromium baseline is fully green and accepted.
 3. **HQ piano assets**: the complete 480-region OGG bank verifies 480/480 decoded files. Attribution and the CC BY 3.0 URL are packaged, but no separate full piano-bank license text is currently committed; the final release gate must record an explicit disposition.
-4. **Release acceptance**: the v1 baseline through T189 is accepted; SC-013/SC-014 external interoperability is closed with MuseScore 4.7.4 evidence. T188 is active; T187 remains product backlog.
+4. **Release acceptance:** the v1 baseline through T189 is accepted; SC-013/SC-014 external interoperability is closed with MuseScore 4.7.4 evidence. T188 is independently accepted, and the historical T187 backlog item is now implemented and checked; this entry records the earlier release checkpoint.
 
 ## 8. Phase 16 / US12 — accepted and complete through T176
 
@@ -628,9 +629,10 @@ T159–T165 are implemented and verified. `My Progression` remains a flat author
 
 Verification: full Vitest **69 files / 571 tests**, full Chromium **98 / 98** with `--workers=1 --retries=0`, TypeScript, build, ESLint, Prettier, and `git diff --check` all pass. Build retains the known large-chunk warning only. No schema migration, commit, or push was performed; existing visual-polish worktree changes were preserved.
 
-## 11. Phase 17 / User Story 13 — accepted and complete
+## 11. Phase 17 / User Story 13 — historical baseline accepted
 
-T177–T185 are accepted. My Progression has one persisted global `harmonic | piano | staff` view with no
+T177–T185 record the accepted initial baseline. My Progression then had one persisted global
+`harmonic | piano | staff` view with no
 `Mixed` state. Staff uses a pure meter-aware score-system projection and one VexFlow SVG per system;
 Melody/Harmony share measure boundaries and attack positions, while Harmonic/Piano remain independent
 full-width measure sections. Legacy per-Step `cardView` remains load-compatible but is not used by My
@@ -663,9 +665,10 @@ post-review Inspector rerun **11 / 11**, production build, scoped ESLint/Prettie
 The build retains only the known large-chunk warning. The accepted result remains uncommitted in the
 protected dirty worktree.
 
-Phase 14 robustness T150–T156 and T158 is accepted in the next section. T186 Melody-enrichment Batch A and
-T189 Pitch Motion discovery are independently accepted. T188 is the active controlled batch for the GM
-catalog plus global Melody Track default and optional Step-local inheritance; T187 remains product backlog.
+Phase 14 robustness T150–T156 and T158 is accepted in the next section. T186 Melody-enrichment Batch A,
+T187 Suzuki note colors, T188 GM catalog/inheritance, and T189 Pitch Motion discovery are now independently
+accepted historical work. This paragraph preserves the earlier checkpoint in which T188 was the active
+controlled batch; it is not the current assignment.
 
 ## 13. Phase 14 robustness — T150–T156 and T158 accepted
 
@@ -715,9 +718,9 @@ T157 is independently accepted. Full Vitest passed 93/93 files and 737/737 tests
 480-region HQ-piano verification passed; full Chromium passed 136/136; production build and MusicXML
 validation passed. MuseScore 4.7.4 independently imported and rendered the fresh MIDI/MusicXML exports,
 including grouped meters, tempo, parts/staves, rests, dynamics, velocities, ties/tuplets, and chromatic
-spelling. The accepted v1 baseline and SC-001–SC-021 are closed. T186 Melody enrichment Batch A and T189
-Pitch Motion discovery are also independently accepted. T188 is authorized for implementation; T187 does
-not start without a separate prioritization decision.
+spelling. The accepted v1 baseline and SC-001–SC-021 are closed. T186 Melody enrichment Batch A, T187
+Suzuki note colors, T188 GM catalog/inheritance, and T189 Pitch Motion discovery are independently accepted.
+The former authorization statement for T188/T187 is historical and no longer describes the current state.
 
 ## 14. Phase 18 / Melody enrichment Batch A — T186 accepted
 
@@ -748,14 +751,119 @@ Independent acceptance passed focused Melody/UI/domain Vitest **5 files / 45 tes
 **5 / 5**, production build, scoped ESLint/Prettier, and `git diff --check`. Manual visual review covered the
 normal desktop viewport, 1280×720, and a narrow 640×360 viewport equivalent to the 200% layout pressure:
 tiles remained compact, the gallery used internal scrolling, notation stayed unobstructed, and dialog actions
-remained reachable. The accepted result remains uncommitted in the protected dirty worktree. T188 is the
-next controlled developer assignment.
+remained reachable. The accepted result remains uncommitted in the protected dirty worktree. The former
+statement that T188 was the next controlled developer assignment is historical and superseded by the current
+Batch 2 review boundary.
 
-## 16. Phase 18 / GM Melody catalog and inheritance — T188 active
+## 16. Phase 18 / GM Melody catalog and inheritance — historical T188 acceptance
 
-T188 adds the complete 128-program General MIDI catalog while keeping only the six existing verified local
-FluidR3_GM assets realtime-capable. It introduces schema v5 and an optional Step-local Melody instrument
-override; absence continues to mean inheritance from the Melody Track default. UI, Staff, playback, MIDI,
-and MusicXML consume one pure effective-instrument resolver and event partition: each unique effective
-instrument receives one active-system Staff line, one MIDI track, and one full-score MusicXML part. No assets
-or dependencies are added, and export-only instruments report audio unavailability without silent fallback.
+T188 adds the complete 128-program General MIDI catalog and makes every program realtime-capable through
+lazy local FluidR3_GM sample maps; production playback has no CDN fallback. Schema v5 and the optional
+Step-local Melody instrument override remain unchanged, with absence meaning inheritance from the Melody
+Track default. UI, Staff, playback, MIDI, and MusicXML continue to use the effective-instrument resolver and
+event partition: each unique effective instrument receives one active-system Staff line, one MIDI track, and
+one full-score MusicXML part.
+
+Independent acceptance verified the 128-entry manifest, local files, sizes, SHA-256 hashes, CC-BY-3.0
+license/attribution markers, and byte identity with pinned upstream revision
+`044fab8e1456bfafc5776e86dfd6bb8697149aef`. Focused Vitest passed 8 files / 25 tests; Chromium T188 passed
+7/7 with external SoundFont requests blocked, including Church Organ, 1280×720 submenu containment,
+light/dark, 1920×1080, and 200% layout pressure. The production build, scoped ESLint/Prettier, and
+`git diff --check` passed. The local GM assets total 318,463,450 bytes; the accepted result remains
+uncommitted in the protected dirty worktree.
+
+## 17. Documentary convergence and release audit — Batch 2 independently accepted
+
+Batch 2 reconciles the current product contract with the implementation in the protected dirty worktree.
+The audit covered the last 45 local commits (`git log -45`), the T188-related changes currently in the dirty
+worktree, and the historical
+developer reference at `info source/CadenceFlow_Master_Developer_Reference.html`. The reference remains a
+historical audit input; it is not the current product contract and was not edited.
+
+Current implementation evidence is now recorded as follows:
+
+- **Studio shell and progression views — implemented:** Harmonic, Piano, Staff, Guitar, and Tablature are
+  represented by `ProgressionView`, `ViewModeToggle`, `ChordCard`, `GuitarCardView`, and `TabCardView`.
+  `measuresPerSystem` supports `auto` and manual values 1–8; auto targets 2–6 systems according to
+  `scoreSystemProjection.ts`.
+- **Guitar realization — implemented:** `src/domain/instruments/guitar/` provides tuning, chord voicings,
+  fingering, in-position Scale Tones, and Tab projections; `src/ui/guitar/` renders the fretboard, chord
+  cards, Tab, and hand legend. HQ and SoundFont Guitar playback are separate runtime providers.
+- **Harmony intelligence — implemented:** voice-leading optimization, reharmonization/substitution actions,
+  modulation/key transitions, function semantics, tendency arrows/zoning, deterministic cadence formulas,
+  and the Scales & Modes Explorer are present in the domain/UI paths documented in the spec and plan.
+- **Suzuki note colors — implemented:** the presentation toggle and note-color projection are current UI
+  behavior; they do not add project-state or schema semantics beyond the existing presentation contract.
+- **Melody — implemented:** all 128 manifest-backed local FluidR3_GM programs are realtime-capable through
+  lazy loading. The six stable IDs are compatibility aliases, not the current playback limit. A failed local
+  asset load is reported explicitly; there is no production CDN fallback.
+- **Schema — current baseline:** portable projects remain on schema v5. No schema v6 change is implied by
+  this documentary convergence; the future atomic v5-to-v6 cutover is jointly queued as T192/T197, with
+  engine/tone persistence included alongside `noteColorMode` and no separate engine/tone v7 migration.
+- **Engine settings ownership — current UI rule:** `AudioEnginesInspector` is the sole settings surface for
+  Piano/Guitar engine and SoundFont tone selection. `HarmonyTrackControls` retains Harmony instrument,
+  volume, mute, solo, provider state, and retry only. `PianoAudioStatus` is read-only and exposes Retry only
+  for error/fallback states; it no longer opens a settings popover. These engine/tone fields are active
+  session settings only: the current portable/autosave codec writes instrument, muted, solo, and volume but
+  does not round-trip engine/tone fields. T197 is the open codec/schema/autosave/export/Undo prerequisite.
+- **Deferred roadmap:** T190 now closes the three-zone physical-board and canonical six-column topology.
+  The remaining Batch 4–8 queue (T191–T197) covers strict Don’t Mix/Modal Corridor behavior,
+  Piano Scale Tones/Melody harmonic roles and Target Notes, atomic Explorer Apply, Focus Mode/Card Flip,
+  printable A4/release gate, remaining nylon/PNG provenance/IP evidence, and engine/tone codec persistence.
+
+### Batch 2 asset and IP audit
+
+- **FluidR3_GM Melody:** 128 local sample-map assets are split between six established files under
+  `public/audio/melody/FluidR3_GM/` and 121 generated manifest-backed files under `public/audio/soundfont/`.
+  `public/audio/melody/manifest.json` pins source revision
+  `044fab8e1456bfafc5776e86dfd6bb8697149aef`, records per-file size and SHA-256, and points to the bundled
+  CC BY 3.0 license and attribution files. The verified local total is 318,463,450 bytes.
+- **HQ Piano:** the committed bank contains 480 OGG sample regions (79,497,836 bytes), with provenance pinned
+  to Salamander V3 revision `370497372ece1603d1ca7b9892c82c1da566565e`, Alexander Holm attribution, and the
+  repository's existing `piano-hq-attribution.txt` notice. The historical release audit's note about the
+  absence of a separate full piano-bank license text remains open and is not silently upgraded here.
+- **Guitar audio:** the manifest-backed 128-program inventory is 121 files under
+  `public/audio/soundfont/`, six legacy Melody files under `public/audio/melody/FluidR3_GM/`, and one
+  reused steel Guitar asset at `public/audio/guitar/acoustic_guitar_steel-mp3.js`. The steel asset is
+  evidenced by the T188 manifest with `sourceFile`, size/hash, pinned FluidR3_GM revision, and CC-BY-3.0
+  license/attribution markers. The nylon file is 1,837,439 bytes
+  (`5375FA9E0408D960E12B6E4EC120C42BCE824D80B18E982B27DDAECE146A4F64`); its provenance remains unresolved
+  and no legal sufficiency claim is made for it.
+- **Guitar hand PNG:** `public/images/guitar-hand-fretting.png` and
+  `src/ui/guitar/assets/guitar-hand-fretting.png` are byte-identical at 458,663 bytes with SHA-256
+  `1A8BAC5E11ACE981D08B12886CEA81BC571768585D8D77938A8B0328ACB784E2`. No source revision, license, or
+  attribution file was evidenced in the repository; this remains an explicit T196 release prerequisite.
+
+Protected historical and user-owned material was not rewritten: `info source/`, `CHORDFILES_COMPARISON.md`,
+`graphify-out/`, existing QA screenshots and visual-polish batches, the committed HQ piano bank, the six
+legacy Melody files, and unrelated dirty source/package/test changes. No reset, clean, commit, push, or
+remote status/checklist update was performed.
+
+Independent acceptance confirmed the final 243-FR / 32-SC / 197-task artifact set, the single future
+schema-v5-to-v6 boundary shared by T192/T197, and the physical-board spatial contract now implemented in
+T190 with strict routing behavior remaining in T191.
+Focused UI Vitest passed 14/14 and Chromium passed 2/2; the production build passed with only the known
+large-chunk warning. Scoped Prettier and `git diff --check` passed. Visual inspection confirmed that Matrix
+`AudioEnginesInspector` is the only engine/tone settings surface, All Steps & Measures retains track-local
+controls, and the lower audio status remains read-only. Review also removed the obsolete status-popover CSS.
+
+## 18. Canonical Matrix topology and N6 projections — T190 independently accepted
+
+T190 establishes six stable primary columns for Progressions and Dark Harmony and vertically aligns directed
+sources with their targets. Progressions keeps `subV7` permanently visible as a labeled `Tritone substitution`
+side slot in the same band; Dark Harmony places contextual diminished cards in their target column, using a
+compact labeled same-band side slot only on collision. There are no full-width `Additional` or `Contextual`
+strips. Dark Harmony exposes the V and iv/VI poles, diminished spellings resolve through one canonical alias
+entity, and the semantic topology carries `mixPolicy`, `targetId`, and `bassScaleDegree` without rewriting old
+projects.
+
+N6 is realized as a first-inversion chord with the IV-degree bass. The effective bass is shared by Piano,
+Staff, Guitar, Tablature, playback, and export projections; Matrix Auto displays the slash symbol (for
+example `Db/F`), while authored Root or Custom step bass remains authoritative. Independent review fixed
+an arbitrary-key Guitar slash-bass defect, progression override precedence, and an oversized contextual
+card. Independent acceptance passed focused Vitest (7 files / 32 tests), focused Chromium (7/7 including
+Matrix-width regression coverage), the production build, scoped ESLint/Prettier, and `git diff --check`.
+Visual inspection covered Progressions and Dark Harmony at 1920x1080, 1280x720, dark/light themes, and 200%
+equivalent layout pressure with no page-level overflow. Review kept the accessible no-recommendation status
+but moved it into the fixed bottom status bar so recommendation changes cannot shift the Matrix. T191 was not
+started.

@@ -269,13 +269,25 @@
   background: color-mix(in srgb, var(--previewed) 10%, transparent);
 }
 
-.matrix-no-recommendation {
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border-left: 3px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 0.78rem;
+.chord-card.is-playing {
+  border-color: var(--playing) !important;
+  outline: 2px solid var(--playing) !important;
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--playing) 16%, var(--surface)) !important;
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--playing) 45%, transparent),
+    inset 0 0 0 1px var(--playing) !important;
+}
+
+.chord-card.is-playing .chord-main {
+  background: color-mix(in srgb, var(--playing) 12%, transparent);
+}
+
+.chord-card.is-playing.is-selected {
+  outline-color: var(--playing) !important;
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--playing) 55%, transparent),
+    inset 0 0 0 2px var(--playing) !important;
 }
 
 /* US10 Batch 4 spacing and stable card geometry. */
@@ -394,7 +406,10 @@
   font-size: 0.62rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
   line-height: 1.2;
 }
 
@@ -420,7 +435,8 @@
 }
 
 @keyframes pulse-target-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px color-mix(in srgb, #38bdf8 30%, transparent);
   }
   50% {
@@ -513,14 +529,20 @@
 .chord-card.is-genre-focus {
   outline: 1px solid rgba(56, 189, 248, 0.45);
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
-  transition: box-shadow 0.2s ease, outline-color 0.2s ease, opacity 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    outline-color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 /* Dimmed non-focused cards when a genre filter is active */
 .chord-card.is-genre-dimmed {
   opacity: 0.45;
   filter: grayscale(40%);
-  transition: opacity 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .chord-card.is-genre-dimmed:hover,
@@ -556,4 +578,152 @@
   font-size: 0.85rem;
 }
 
+/* T190 spatial board: one shared six-column coordinate system for all zones. */
+.matrix-spatial-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 2px;
+  scrollbar-gutter: stable;
+}
 
+.matrix-spatial-board > .matrix-layer {
+  min-width: 620px;
+}
+
+.matrix-spatial-board .matrix-layer-heading {
+  min-height: 32px;
+}
+
+.matrix-spatial-board .matrix-layer-cards {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 620px;
+}
+
+.matrix-panel[data-module="progressions"] .matrix-spatial-board > .matrix-layer,
+.matrix-panel[data-module="progressions"] .matrix-spatial-board .matrix-layer-cards {
+  min-width: 720px;
+}
+
+.matrix-panel[data-module="progressions"] .matrix-spatial-board .matrix-layer-cards {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.matrix-panel[data-module="progressions"]
+  .matrix-spatial-board
+  [data-layer="modal-interchange"]
+  .matrix-layer-cards {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--space-3);
+  overflow-x: auto;
+}
+
+.matrix-panel[data-module="progressions"]
+  .matrix-spatial-board
+  [data-layer="modal-interchange"]
+  .chord-card {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.matrix-panel[data-module="dark-harmony"] .matrix-spatial-board .matrix-layer-cards {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.matrix-layer-title-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.matrix-layer-detail {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.matrix-expanded-strip .chord-card {
+  flex: 0 1 164px;
+  width: 164px;
+  min-width: 104px;
+}
+
+.matrix-sidecar {
+  grid-column: 7;
+  grid-row: 1;
+  position: relative;
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-2) 82%, var(--accent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.matrix-sidecar-label {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 0;
+  left: 0;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+  pointer-events: none;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.matrix-sidecar-card {
+  display: flex;
+  min-width: 0;
+}
+
+.matrix-sidecar .chord-card {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--radius-card);
+}
+
+/* Preserve the sidecar outline as a non-layout-affecting decoration. */
+.matrix-contextual-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  border-radius: var(--radius-badge);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .matrix-spatial-board > .matrix-layer,
+  .matrix-spatial-board .matrix-layer-cards {
+    min-width: 620px;
+  }
+
+  .matrix-spatial-board {
+    overscroll-behavior-x: contain;
+  }
+}

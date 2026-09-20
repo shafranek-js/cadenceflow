@@ -1,9 +1,6 @@
-import type { ChordDefinition } from "../../harmony/chord";
+import { formatChordSymbol, type ChordDefinition } from "../../harmony/chord";
 import type { ExactPitch, PitchClassIdentity } from "../../harmony/pitch";
-import {
-  resolveGuitarChordVoicing,
-  type GuitarChordVoicing,
-} from "./voicings";
+import { resolveGuitarChordVoicing, type GuitarChordVoicing } from "./voicings";
 
 export interface GuitarTabPosition {
   /** 1-based guitar string number: 1 (high E) to 6 (low E) */
@@ -14,10 +11,7 @@ export interface GuitarTabPosition {
   readonly finger?: 0 | 1 | 2 | 3 | 4 | undefined;
 }
 
-export {
-  optimizeGuitarMelodyTab,
-  type GuitarMelodyInputNote,
-} from "./fingering";
+export { optimizeGuitarMelodyTab, type GuitarMelodyInputNote } from "./fingering";
 
 const GUITAR_OPEN_MIDI_BY_STRING: Readonly<Record<1 | 2 | 3 | 4 | 5 | 6, number>> = Object.freeze({
   1: 64, // E4
@@ -123,9 +117,9 @@ export function resolveGuitarTabEntry(
   customChordLabel?: string,
   bassPitchClass?: PitchClassIdentity,
 ): GuitarTabEntry {
-  const isSeventh =
-    chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
+  const isSeventh = chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
   const isMajor7 = chord.variant?.seventh === "major7";
+  const resolvedBassPitchClass = bassPitchClass ?? chord.bassPitchClass;
 
   const voicing: GuitarChordVoicing = resolveGuitarChordVoicing({
     rootPitchClass: chord.rootPitchClass,
@@ -133,7 +127,7 @@ export function resolveGuitarTabEntry(
     spelling: chord.spelling,
     isSeventh,
     isMajor7,
-    ...(bassPitchClass !== undefined ? { bassPitchClass } : {}),
+    ...(resolvedBassPitchClass !== undefined ? { bassPitchClass: resolvedBassPitchClass } : {}),
   });
 
   const strings: GuitarTabStringPosition[] = TAB_STRING_ORDER.map((meta) => {
@@ -156,12 +150,10 @@ export function resolveGuitarTabEntry(
   });
 
   const positionLabel = voicing.baseFret > 1 ? `${voicing.baseFret}fr` : undefined;
-  const fretSummary = voicing.frets
-    .map((f) => (f === -1 ? "x" : String(f)))
-    .join(" ");
+  const fretSummary = voicing.frets.map((f) => (f === -1 ? "x" : String(f))).join(" ");
 
   return Object.freeze({
-    chordSymbol: customChordLabel ?? voicing.chordSymbol,
+    chordSymbol: customChordLabel ?? formatChordSymbol(chord),
     baseFret: voicing.baseFret,
     positionLabel,
     strings: Object.freeze(strings),

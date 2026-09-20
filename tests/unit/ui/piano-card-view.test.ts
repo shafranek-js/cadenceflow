@@ -87,6 +87,24 @@ describe("Piano Card keyboard geometry", () => {
     expect(html).not.toContain("tabindex=");
   });
 
+  it("keeps a semantic slash bass visible in the piano projection", () => {
+    const html = renderToString(
+      el(PianoCardView, {
+        chordLabel: "Db/F",
+        chordPitches: [
+          exactPitch(61, { step: "D", alter: -1 }),
+          exactPitch(65, { step: "F", alter: 0 }),
+          exactPitch(68, { step: "A", alter: -1 }),
+        ],
+        bassPitch: exactPitch(41, { step: "F", alter: 0 }),
+      }),
+    );
+
+    expect(html).toContain('class="mini-piano-chord-name">Db/F</strong>');
+    expect(html).toContain('data-midi="41" data-active="true"');
+    expect(html).toContain("F2");
+  });
+
   it("never renders a clipped black key without both adjacent white keys", () => {
     const layout = buildPianoKeyboardLayout([
       exactPitch(60, { step: "C", alter: 0 }),

@@ -1,5 +1,9 @@
 import { EMPTY_HARMONIC_VARIANT, type BaseChordQuality, type ChordDefinition } from "../chord";
-import type { HarmonicFunctionCategory, HarmonicFunctionIdentity } from "../functions";
+import type {
+  HarmonicFunctionCategory,
+  HarmonicFunctionIdentity,
+  MatrixMixPolicy,
+} from "../functions";
 import { normalizePitchClass, type PitchClassIdentity } from "../pitch";
 import { formatPitchSpelling, spellScaleDegree, spellingToPitchClass } from "../spelling";
 import type { HarmonicModuleDefinition } from "./types";
@@ -12,8 +16,11 @@ interface FunctionSpec {
   readonly chromaticAlter?: number;
   readonly quality: BaseChordQuality;
   readonly targetFunctionId?: string;
+  readonly targetId?: string;
+  readonly mixPolicy?: MatrixMixPolicy;
   readonly position: { readonly column: number; readonly row: number };
   readonly baseline?: boolean;
+  readonly auxiliary?: boolean;
 }
 
 export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
@@ -78,7 +85,7 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     position: { column: 5, row: 0 },
     baseline: true,
   },
-  // Diatonic core (Row 1, 3 harmonic pairs in columns 0..5, plus non-baseline vii°)
+  // Diatonic core (Row 1, six aligned cards plus the seventh main chord vii°)
   {
     id: "I",
     layerId: "diatonic-core",
@@ -139,8 +146,10 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     category: "core",
     degree: 7,
     quality: "diminished",
+    targetId: "I",
+    mixPolicy: "must-resolve",
     position: { column: 6, row: 1 },
-    baseline: false,
+    baseline: true,
   },
   // Modal interchange from parallel minor (Row 2, centered across columns 1..4)
   {
@@ -192,18 +201,27 @@ export const PROGRESSIONS_FUNCTIONS: readonly FunctionSpec[] = [
     targetFunctionId: "I",
     position: { column: 6, row: 0 },
     baseline: false,
+    auxiliary: true,
   },
 ];
 
 function identity(spec: FunctionSpec): HarmonicFunctionIdentity {
-  return spec.targetFunctionId
+  const targetId = spec.targetId ?? spec.targetFunctionId;
+  return targetId
     ? {
         moduleId: "progressions",
         functionId: spec.id,
         category: spec.category,
-        targetFunctionId: spec.targetFunctionId,
+        targetFunctionId: targetId,
+        targetId,
+        mixPolicy: spec.mixPolicy ?? "must-resolve",
       }
-    : { moduleId: "progressions", functionId: spec.id, category: spec.category };
+    : {
+        moduleId: "progressions",
+        functionId: spec.id,
+        category: spec.category,
+        mixPolicy: spec.mixPolicy ?? "mix-freely",
+      };
 }
 
 export const PROGRESSIONS_MODULE = {
@@ -218,7 +236,13 @@ export const PROGRESSIONS_MODULE = {
       kind: "functional",
       defaultVisible: true,
     },
-    { id: "diatonic-core", label: "Diatonic Core", kind: "core", defaultVisible: true },
+    {
+      id: "diatonic-core",
+      label: "Diatonic Core",
+      zoneLabel: "Main Chords",
+      kind: "core",
+      defaultVisible: true,
+    },
     {
       id: "modal-interchange",
       label: "Modal Interchange",
@@ -227,12 +251,19 @@ export const PROGRESSIONS_MODULE = {
     },
   ]),
   topology: Object.freeze({
+    columnCount: 6,
+    columnLabels: Object.freeze(["I", "vi", "IV", "ii", "V", "iii"]),
     cards: Object.freeze(
       PROGRESSIONS_FUNCTIONS.map((spec) => ({
         identity: identity(spec),
         layerId: spec.layerId,
         position: spec.position,
         baseline: spec.baseline ?? true,
+        mixPolicy: spec.mixPolicy ?? (spec.targetFunctionId ? "must-resolve" : "mix-freely"),
+        ...((spec.targetId ?? spec.targetFunctionId)
+          ? { targetId: spec.targetId ?? spec.targetFunctionId }
+          : {}),
+        ...(spec.auxiliary ? { auxiliary: true } : {}),
       })),
     ),
     routes: Object.freeze([]),
@@ -255,8 +286,11 @@ export function getProgressionsFunction(functionId: string): FunctionSpec {
         chromaticAlter: -1,
         quality: "dominant",
         targetFunctionId: targetId,
+        targetId,
+        mixPolicy: "must-resolve",
         position: { column: targetSpec.position.column, row: 0 },
         baseline: false,
+        auxiliary: true,
       };
     }
   }

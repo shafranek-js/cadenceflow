@@ -3348,6 +3348,20 @@ export function App() {
     );
   }
 
+  const currentPlayingStepIndex =
+    transportState.currentStepIndex ??
+    (previewPlayingStepId
+      ? project.progression.steps.findIndex((step) => step.id === previewPlayingStepId)
+      : null);
+  const currentPlayingStep =
+    currentPlayingStepIndex !== null && currentPlayingStepIndex !== undefined
+      ? project.progression.steps[currentPlayingStepIndex]
+      : null;
+  const currentPlayingFunctionId =
+    currentPlayingStep?.kind === "chord"
+      ? currentPlayingStep.harmonicFunction.functionId
+      : undefined;
+
   return (
     <StudioWorkspace
       sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
@@ -3459,42 +3473,55 @@ export function App() {
         ) : null
       }
       statusBar={
-        <PianoAudioStatus
-          instrument={
-            isGuitarProgressionView(project.presentation.progressionView) ||
-            project.presentation.globalMatrixCardView === "guitar"
-              ? "guitar"
-              : "piano"
-          }
-          engine={
-            isGuitarProgressionView(project.presentation.progressionView) ||
-            project.presentation.globalMatrixCardView === "guitar"
-              ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
-              : (project.harmonyTrack.pianoEngine ?? "hq-samples")
-          }
-          state={
-            isGuitarProgressionView(project.presentation.progressionView) ||
-            project.presentation.globalMatrixCardView === "guitar"
-              ? project.harmonyTrack.guitarEngine === "soundfont"
-                ? guitarSoundFontState
-                : guitarAudioState
-              : project.harmonyTrack.instrument === "piano" ||
-                  project.harmonyTrack.instrument === "gm-000"
-                ? project.harmonyTrack.pianoEngine === "soundfont"
-                  ? harmonySoundFontState
-                  : audioState
-                : harmonySoundFontState
-          }
-          guitarSoundfontInstrument={project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025"}
-          pianoSoundfontInstrument={project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000"}
-          onSettingsChange={changeHarmonyTrackSettings}
-          onRetry={retryAudio}
-        />
+        <>
+          {recommendations &&
+          !recommendations.bestMatch &&
+          recommendations.alternatives.length === 0 ? (
+            <span
+              className="app-status-message"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="matrix-recommendation-status"
+            >
+              No strong recommendation for this context. Passive choices remain available.
+            </span>
+          ) : null}
+          <PianoAudioStatus
+            instrument={
+              isGuitarProgressionView(project.presentation.progressionView) ||
+              project.presentation.globalMatrixCardView === "guitar"
+                ? "guitar"
+                : "piano"
+            }
+            engine={
+              isGuitarProgressionView(project.presentation.progressionView) ||
+              project.presentation.globalMatrixCardView === "guitar"
+                ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
+                : (project.harmonyTrack.pianoEngine ?? "hq-samples")
+            }
+            state={
+              isGuitarProgressionView(project.presentation.progressionView) ||
+              project.presentation.globalMatrixCardView === "guitar"
+                ? project.harmonyTrack.guitarEngine === "soundfont"
+                  ? guitarSoundFontState
+                  : guitarAudioState
+                : project.harmonyTrack.instrument === "piano" ||
+                    project.harmonyTrack.instrument === "gm-000"
+                  ? project.harmonyTrack.pianoEngine === "soundfont"
+                    ? harmonySoundFontState
+                    : audioState
+                  : harmonySoundFontState
+            }
+            onRetry={retryAudio}
+          />
+        </>
       }
       matrix={
         <HarmonicMatrix
           project={project}
           {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
+          playingFunctionId={currentPlayingFunctionId}
           recommendations={recommendations}
           contextualFunctionIds={contextualFunctions}
           onPreview={preview}
@@ -3803,12 +3830,7 @@ export function App() {
           </div>
           <ProgressionTrack
             project={project}
-            currentPlayingStepIndex={
-              transportState.currentStepIndex ??
-              (previewPlayingStepId
-                ? project.progression.steps.findIndex((step) => step.id === previewPlayingStepId)
-                : null)
-            }
+            currentPlayingStepIndex={currentPlayingStepIndex}
             activeMelodyEventKey={
               transportState.activeMelodyEventKey ?? previewActiveMelodyEventKey
             }

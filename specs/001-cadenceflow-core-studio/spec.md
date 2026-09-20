@@ -35,8 +35,9 @@ surface used to create and refine it, not a separate static theory reference.
 ## Product Principles
 
 - Harmony, progression structure, timing, instrument realization, and export are separate model layers.
-- Piano is the only fully implemented v1 instrument profile, but the harmonic engine and saved
-  progression MUST remain instrument-independent.
+- Piano and Guitar chord-realization profiles are implemented in the current checkout; the harmonic
+  engine and saved progression MUST remain instrument-independent. The 128-program Melody catalog is
+  a separate monophonic track concern, not a replacement for chord Instrument Profiles.
 - Major and Tonal Minor are equal first-class harmonic contexts in v1.
 - v1 MUST expose two first-class harmonic modules built on the same Harmonic Engine: `Progressions`
   and `Dark Harmony`; modules are vocabulary/workflow lenses, not separate musical engines.
@@ -52,10 +53,9 @@ surface used to create and refine it, not a separate static theory reference.
   Colors without redesigning the Matrix. Matrix cards, orthogonal/Manhattan routing, Preview/Add
   semantics, recommendation highlighting, and Inspector behavior remain shared across modules.
 - Matrix Chord Cards use an extensible `Card View` model rather than a literal two-sided front/back
-  implementation. v1 includes a primary Harmonic view plus Piano and Staff visualization views; future
-  Instrument Profiles may contribute additional views such as Guitar fretboard/chord-shape visualization
-  without changing the Chord Card or Harmonic Engine model. Card Views can be switched per card or
-  synchronized across all currently visible Matrix cards through a global view control.
+  implementation. The current checkout includes Harmonic, Piano, Staff, Guitar fretboard/chord-shape,
+  and Tablature projections. Card Views can be switched per card or synchronized across all currently
+  visible Matrix cards through a global view control.
 - Preview/exploration MUST NOT mutate the saved progression unless the user explicitly commits.
 - Repeated occurrences of the same chord MUST be independent progression-step objects.
 - Harmonic recommendations MUST be explainable and advisory, never hard constraints.
@@ -213,10 +213,11 @@ module without creating a separate project or losing the existing progression.
    valid tonicization targets, **Then** it supports secondary diminished relationships for all
    harmonically meaningful target chords in the active Tonal Minor context. The default Matrix MUST
    keep a small stable curated baseline whose card positions do not change as recommendation context
-   changes. Contextually relevant additional targets appear in an extra layer zone / expanded strip,
-   while Best Match and Alternative states are shown by highlighting rather than by rearranging the
-   baseline. Remaining valid targets stay accessible through an expanded layer view or Inspector rather
-   than overcrowding the Matrix.
+   changes. A contextually relevant additional target appears in its target-aligned column when that slot
+   is free; a collision uses a compact, clearly labeled side slot in the same horizontal band. Best Match,
+   Alternative, and Contextual states are shown by badges/highlighting rather than by rearranging the
+   baseline. The Matrix MUST NOT add full-width `Additional` or `Contextual` strips; remaining valid targets
+   stay accessible through Inspector rather than overcrowding the Matrix.
 4. **Given** the `Tonal Minor Core` in Dark Harmony, **When** the core is rendered, **Then**
    the stable primary cards use the functional Tonal Minor realizations `i`, `ii°`, `III`, `iv`, `V/V7`,
    `VI`, and `vii°`. Natural-minor alternatives such as `v` and `VII` MUST remain available as secondary
@@ -453,21 +454,27 @@ As a composer, I want one global presentation mode for My Progression and profes
 systems so that the same musical timeline remains coherent instead of becoming a mixture of unrelated
 per-measure cards.
 
+> Historical acceptance note: T177–T182 established the initial US13 baseline with three Progression
+> Views (`Harmonic`, `Piano`, `Staff`) and manual Staff grouping 1–4. The current contract below is the
+> compatible expansion delivered by subsequent changes: five views and manual grouping 1–8. The historical
+> tasks remain checked as records of that earlier baseline; they do not narrow the current runtime contract.
+
 **Independent Test**: Open legacy uniform and mixed-view projects, switch the global Progression View
-between Harmonic, Piano, and Staff, choose Auto or one to four measures per system, and verify readable
+between Harmonic, Piano, Staff, Guitar, and Tablature, choose Auto or one to eight measures per system, and verify readable
 responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and preserved interactions.
 
 **Acceptance Scenarios**:
 
 1. **Given** My Progression, **When** the user switches its view from any exposed control, **Then** every
-   measure uses the same `Harmonic`, `Piano`, or `Staff` mode and no `Mixed` state is available.
+   measure uses the same `Harmonic`, `Piano`, `Staff`, `Guitar`, or `Tablature` mode and no `Mixed` state
+   is available.
 2. **Given** an older project without `presentation.progressionView`, **When** it is loaded, **Then** a
    uniform saved `step.cardView` initializes that global view, while mixed or absent values initialize
    `Harmonic`; subsequent saves persist the explicit presentation value without rewriting the Steps.
 3. **Given** Staff mode, **When** several measures fit, **Then** they render as a continuous score system
    with common barlines and attack positions rather than independent staff cards.
 4. **Given** a narrow viewport or dense notation, **When** Staff systems are laid out, **Then** Auto or
-   the selected one-to-four measure setting acts as a maximum, reflow reduces the count when needed,
+   the selected one-to-eight measure setting acts as a maximum, reflow reduces the count when needed,
    and a single over-dense measure scrolls internally without widening the page.
 5. **Given** at least one Melody recipe, **When** any Staff system renders, **Then** its Melody staff is
    present and empty spans contain rests; Harmony treble is always present and bass depends only on the
@@ -483,8 +490,60 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
    to the invoking score target after the action or cancellation.
 9. **Given** all selection, Melody, reorder, removal, Rest, trailing-gap, continuation, playback, keyboard,
    and pointer interactions are available directly from Staff, **When** Staff mode renders, **Then** no
-   duplicate Step-card strip is shown below the score; Harmonic and Piano retain their independent
-   measure sections and Step cards.
+   duplicate Step-card strip is shown below the score; Harmonic, Piano, Guitar, and Tablature retain their
+   independent measure sections and Step cards.
+10. **Given** the global All Steps & Measures inspector and the right-side Inspector, **When** the user
+    changes Piano/Guitar engines or SoundFont tones, **Then** only `AudioEnginesInspector` exposes those
+    settings; All Steps retains instrument, volume, mute, solo, provider state, and Retry, while the lower
+    `PianoAudioStatus` remains a read-only status with Retry only for error/fallback.
+
+### User Story 14 - Realize harmony on Guitar and tablature (Priority: P2)
+
+As a composer, I want to inspect chord shapes, in-position scale tones, and tablature alongside the
+harmonic progression so that a guitar-oriented idea remains tied to the same saved chord semantics.
+
+**Independent Test**: Switch My Progression to Guitar or Tablature, inspect a chord shape and its
+fingering/scale-tone overlay, change orientation, and audition the progression with either configured
+Guitar audio engine without changing the harmonic Step data.
+
+**Acceptance Scenarios**:
+
+1. **Given** a chord Step in My Progression, **When** Guitar view is selected, **Then** CadenceFlow
+   renders a deterministic six-string voicing with fret positions, base position, and left-hand
+   fingering metadata derived from the Step's harmonic realization.
+2. **Given** a Guitar voicing and active scale context, **When** the card is rendered, **Then** the
+   in-position `Scale Tones` overlay identifies available non-chord scale pitches without duplicating
+   or mutating the chord shape.
+3. **Given** a chord Step or melody event with an exact pitch, **When** Tablature view is selected,
+   **Then** the projection resolves a playable string/fret/finger position and represents muted/open
+   strings explicitly.
+4. **Given** Guitar playback, **When** the user selects HQ Samples or SoundFont, **Then** playback
+   uses the selected Guitar provider, applies bounded per-string strum timing, and reports provider
+   status without changing Piano or Melody channels.
+
+### User Story 15 - Explore scales, modes, blues, and harmonic formulas (Priority: P2)
+
+As a composer, I want a focused Scales & Modes Explorer with scale tones, characteristic chords, and
+auditionable cadence formulas so that modal and blues material can be tested before it is applied to the
+progression.
+
+**Independent Test**: Open the Explorer, choose a tonic and one of the implemented diatonic, minor,
+pentatonic, or Blues scales, inspect Piano/Guitar note projections and characteristic chords, audition a
+formula, and apply a selected formula to My Progression with an explicit key-switch choice.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Explorer, **When** the user selects a tonic and scale family, **Then** the UI exposes
+   the scale formula, pitch classes, characteristic degree/chords where defined, and the current
+   Piano/Guitar visual projection.
+2. **Given** a visible modal or Blues formula, **When** the user auditions it, **Then** audition uses
+   the current audio path and leaves the saved progression unchanged.
+3. **Given** a user chooses Apply, **When** the Explorer asks about key switching, **Then** applying the
+   formula is an explicit atomic operation that either preserves the project key or applies the chosen
+   tonic and progression replacement together.
+4. **Given** the saved presentation toggle for Suzuki colors, **When** it is enabled, **Then** visible
+   notation noteheads receive the confirmed pitch-color mapping as a decorative cue only; musical data,
+   playback, MIDI, MusicXML, and non-color accessibility text remain unchanged.
 
 ## Edge Cases
 
@@ -605,15 +664,15 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   harmonically meaningful target chords in the active Tonal Minor context. The default Matrix MUST keep
   a small stable curated baseline visible consisting of `vii°7/V`, `vii°7/iv`, and `vii°7/VI`. Other supported
   targets such as `vii°7/III`, `vii°7/VII`, and other contextually valid functions MUST remain eligible for
-  contextual promotion into the expanded strip. Baseline cards MUST preserve stable positions and MUST NOT be
-  displaced, reordered, or spatially shuffled by contextual recommendation changes. Additional supported
-  secondary-diminished targets that become especially relevant to the current saved progression, active
-  preview, or temporary branch MUST appear in an additional layer zone / expanded strip rather than
-  replacing baseline cards. Best Match and Alternative status MUST be expressed through highlighting, not
-  by moving the stable baseline cards. The Matrix MUST NOT fabricate weak candidates merely to fill space;
-  all remaining supported targets MUST remain discoverable through an expanded layer view or Inspector
-  without changing the underlying harmonic model. This behavior MUST preserve user spatial memory and
-  orthogonal/Manhattan routing stability.
+  contextual promotion. Baseline cards MUST preserve stable positions and MUST NOT be displaced, reordered,
+  or spatially shuffled by contextual recommendation changes. An additional supported target that becomes
+  especially relevant to the current saved progression, active preview, or temporary branch MUST appear in
+  its target-aligned column when free, or in a compact labeled side slot in the same horizontal band when
+  that column is occupied. Best Match, Alternative, and Contextual status MUST be expressed through badges
+  and highlighting, not by moving the stable baseline cards. The Matrix MUST NOT add full-width `Additional`
+  or `Contextual` strips or fabricate weak candidates merely to fill space; all remaining supported targets
+  MUST remain discoverable through Inspector without changing the underlying harmonic model. This behavior
+  MUST preserve user spatial memory and orthogonal/Manhattan routing stability.
 - **FR-042**: The `Tonal Minor Core` MUST keep a compact stable primary realization of
   `i`, `ii°`, `III`, `iv`, `V/V7`, `VI`, and `vii°`, using the practical Tonal Minor model in which
   harmonic-minor dominant and leading-tone resources are first-class functional defaults. Natural-minor
@@ -642,11 +701,11 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-050**: The Dark Harmony topology MUST be extensible so future releases can add layers such as
   `Dominant Tension` and `Borrowed / Minor Colors` without redesigning the Matrix, Harmonic Engine,
   saved progression model, or shared module interactions.
-- **FR-051**: The module architecture MUST permit future modules such as `Scales` and `Blues` without
-  redesigning the Harmonic Engine or instrument-independent saved progression model.
-- **FR-052**: `Scales` and `Blues` are NOT implemented v1 modules; they MUST remain deferred while the
-  architecture preserves a path for future instrument-aware presentation such as Guitar fretboard
-  visualization.
+- **FR-051**: The module architecture MUST permit additional modules beyond the implemented Scales &
+  Modes Explorer and Blues scale vocabulary without redesigning the Harmonic Engine or
+  instrument-independent saved progression model.
+- **FR-052**: The current Explorer MUST remain a non-destructive workflow surface: scale/modal audition
+  and formula inspection may be used without changing saved progression state until Apply is explicit.
 
 #### Presentation modes
 
@@ -672,17 +731,17 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   for that card without changing other cards.
 - **FR-063**: Changing Card View MUST be presentational only and MUST NOT mutate harmonic identity,
   recommendation ranking, preview context, Chord Card defaults, Progression Steps, or Temporary Branches.
-- **FR-064**: Card View availability MUST be capability-driven. Future Instrument Profiles MAY register
-  additional views (for example Guitar fretboard/chord-shape visualization) without redesigning the
-  shared Chord Card model; unavailable instrument-specific views MUST NOT be exposed as functional
-  controls.
+- **FR-064**: Card View availability MUST be capability-driven. Current Guitar fretboard/chord-shape and
+  Tablature views register against the shared Chord Card model; future Instrument Profiles MAY register
+  additional views without redesigning that model, and unavailable instrument-specific views MUST NOT be
+  exposed as functional controls.
 - **FR-065**: All non-Harmonic Card Views for the same Chord Card MUST be projections of one shared
   current preview realization. Changing inversion, register, harmonic variant, automatic/manual voicing,
   or another realization-affecting preview setting MUST update every applicable Card View consistently;
   Card Views MUST NOT own separate musical state.
 - **FR-066**: Matrix Chord Cards MUST retain the extensible Card View concept with global selection and
-  optional per-card overrides. My Progression MUST expose a separate single global Progression View,
-  limited in v1 to `Harmonic`, `Piano`, or `Staff`; it MUST NOT expose per-step view selection.
+  optional per-card overrides. My Progression MUST expose a separate single global Progression View with
+  exactly `Harmonic`, `Piano`, `Staff`, `Guitar`, or `Tablature`; it MUST NOT expose per-step view selection.
 - **FR-067**: Every My Progression view MUST project each Step's own independent saved realization and
   performance state, including harmonic variant, exact/manual voicing where present, register, bass,
   dynamics, and notation spelling; it MUST NOT read mutable preview settings from the source Matrix card.
@@ -849,11 +908,12 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 
 #### Piano instrument profile, voicing, bass, articulation, and dynamics
 
-- **FR-130**: Piano MUST be the only fully implemented v1 instrument profile.
+- **FR-130**: Piano and Guitar MUST be supported Instrument Profiles in the current v1 implementation;
+  the 128-program Melody catalog remains a separate monophonic track instrument layer.
 - **FR-131**: Harmonic Engine, Progression, timing, and saved project semantics MUST be separated from
   Instrument Profile implementation.
-- **FR-132**: The architecture MUST allow future Guitar, Ukulele, Melodica, and other Instrument
-  Profiles without redefining saved progression harmonic content.
+- **FR-132**: The architecture MUST allow future Ukulele, Melodica, and other Instrument Profiles
+  without redefining saved progression harmonic content.
 - **FR-133**: Piano automatic voicing MUST be contextual and voice-leading aware, considering adjacent
   steps, preserving common tones where appropriate, and avoiding unnecessary jumps.
 - **FR-134**: Each piano Progression Step MUST support register control `Auto`, `-2`, `-1`, `0`, `+1`,
@@ -871,7 +931,7 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-140**: Bass configuration MUST NOT change harmonic function, step duration, articulation, or
   progression position.
 - **FR-141**: Piano articulation MUST support `Block`, `Arp Up`, `Arp Down`, `Broken Chord`, and
-  `Humanized`; `Strum` MUST be reserved for appropriate future string-instrument profiles.
+  `Humanized`; Guitar realization MUST support bounded `Strum` timing through its audio provider.
 - **FR-142**: Dynamics MUST have one exact numeric MIDI velocity source of truth in the supported range
   1–127 while allowing both musical labels (`pp`, `p`, `mp`, `mf`, `f`, `ff`) and numeric UI views.
 - **FR-143**: Switching between musical and numeric dynamics views MUST NOT discard the exact numeric
@@ -1058,9 +1118,9 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   Melody Instrument before Piano, with its catalog name/clef, concert-pitch notes, rests, tuplets, and
   cross-bar ties. Every Melody part spans the full score with rests when inactive. Projects without melody
   MUST retain the existing MusicXML output.
-- **FR-208**: `PresentationState` MUST persist `progressionView` as `harmonic | piano | staff` and
-  `measuresPerSystem` as `auto | 1 | 2 | 3 | 4`. Both settings MUST be editable by undoable presentation
-  commands that do not change Progression Steps.
+- **FR-208**: `PresentationState` MUST persist `progressionView` as `harmonic | piano | staff | guitar |
+  tablature` and `measuresPerSystem` as `auto | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8`. Both settings MUST be
+  editable by undoable presentation commands that do not change Progression Steps.
 - **FR-209**: The project schema version MUST remain unchanged for US13. When an older project lacks an
   explicit `presentation.progressionView`, a non-empty uniform set of saved Chord Step `cardView` values
   MUST initialize it; mixed, empty, or absent values MUST initialize `harmonic`. The legacy field remains
@@ -1068,8 +1128,8 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - **FR-210**: Staff View MUST render one SVG per score system. A system MUST contain sequential measures
   on one shared horizontal timeline with coincident barlines and equal x positions for simultaneous
   Melody and Harmony attacks.
-- **FR-211**: `measuresPerSystem` MUST apply only to Staff and MUST be a maximum. Manual values `1`–`4`
-  remain hard maximums. For `auto`, Staff MUST calculate the maximum as
+- **FR-211**: `measuresPerSystem` MUST apply only to Staff and MUST be a maximum. Manual values `1`–`8`
+  remain valid hard maximums. For `auto`, Staff MUST calculate the maximum as
   `clamp(floor(16 / measureDurationQuarterBeats), 2, 6)`, where
   `measureDurationQuarterBeats = numerator × 4 / denominator`. Available width and attack density MAY
   reduce the actual count. A normal measure width MUST be proportional to its musical duration at an
@@ -1085,11 +1145,11 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   Melody event MUST not reserve an empty Melody staff. Harmony treble MUST always render; bass MUST render
   exactly when `showBassInStaff=true` and MUST NOT disappear automatically because of available width.
 - **FR-214**: Every Staff system MUST repeat the clef and only the first system MUST show the global time
-  signature. Harmonic/Piano views MUST ignore `measuresPerSystem` and render independent, full-width
-  measure sections in a vertical flow; steps within one measure MUST remain in one horizontal row with
-  measure-local adaptation or scrolling when needed. Neighboring measures MUST NOT be grouped or
-  dimension-matched as a score system. All three modes MUST preserve selection, playback highlighting,
-  drag/reorder, context menus, Rest representation, and trailing-gap actions.
+  signature. Harmonic, Piano, Guitar, and Tablature views MUST ignore `measuresPerSystem` and render
+  independent, full-width measure sections in a vertical flow; steps within one measure MUST remain in one
+  horizontal row with measure-local adaptation or scrolling when needed. Neighboring measures MUST NOT be
+  grouped or dimension-matched as a score system. All five views MUST preserve selection, playback
+  highlighting, drag/reorder, context menus, Rest representation, and trailing-gap actions.
 - **FR-215**: In Staff View, every visible chord/Rest label and sounding event region MUST expose one
   pointer- and keyboard-operable target associated with its canonical Progression Step. Activating the
   target MUST select that Step and drive the existing Selected Step inspector without creating a second
@@ -1132,25 +1192,100 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   Changing either level MUST be undoable, MUST NOT copy the global value into inheriting Steps, and MUST
   leave repeated Step instances independent. Repeat copies an explicit override; remove-Melody removes it.
 - **FR-223**: Portable projects MUST move to schema v5. The explicit v4→v5 migration MUST preserve the
-  existing six track ids, add no Step overrides, and remain sequential with v1→v2→v3→v4 migration.
-  Autosave, recovery, portable encode/decode, Undo/Redo, Temporary Branch Steps, and future-version
-  rejection MUST preserve or validate optional Step-local overrides without serializing effective values.
+  existing six track ids, add the optional Step-local Melody instrument override with absence meaning
+  inheritance from the Melody Track default, and remain sequential with v1→v2→v3→v4 migration. Autosave,
+  recovery, portable encode/decode, Undo/Redo, Temporary Branch Steps, and future-version rejection MUST
+  preserve or validate optional Step-local overrides without serializing effective values.
 - **FR-224**: Melody Track controls and the Melody editor MUST use one compact, searchable, keyboard-
   accessible picker grouped by GM family. The track picker edits the global default; the Step picker starts
   with `Use track instrument` and edits only the selected Step override. Labels MUST expose GM program and
-  `Realtime` or `Export only` availability, preserve draft Apply/Cancel behavior, and remain usable at
+  current local `Realtime` availability, preserve draft Apply/Cancel behavior, and remain usable at
   1280×720, 1920×1080, light/dark, and 200% zoom without page-level overflow.
 - **FR-225**: Realtime Melody playback and preview MUST lazy-load only the effective instruments that have
-  verified local assets. An effective export-only instrument MUST produce an explicit identified audio-
-  unavailable state and MUST NOT silently substitute another timbre, preload the full catalog, stop Harmony
-  playback, corrupt project data, or disable MIDI/MusicXML export. Mixed-instrument progressions MUST retain
-  playable Step timbres while visibly reporting unavailable Step timbres.
+  verified local assets. The current catalog marks all 128 programs as locally available; a failed local
+  load MUST produce an explicit identified audio-unavailable state and MUST NOT silently substitute another
+  timbre, preload the full catalog, stop Harmony playback, corrupt project data, or disable MIDI/MusicXML
+  export. Mixed-instrument progressions MUST retain playable Step timbres while visibly reporting a load
+  failure.
 - **FR-226**: Staff, MIDI, and MusicXML MUST partition Melody events by effective instrument. Each unique
   instrument MUST map to exactly one Staff line per active system, one MIDI track, and one MusicXML part;
   events MUST never be duplicated or merged into another instrument. Instrument ordering MUST be stable by
   first progression occurrence, with GM program then stable id as deterministic tie-breakers. Projects
-  without Melody MUST retain their accepted output, and catalog entries without local audio MUST remain
-  fully exportable.
+  without Melody MUST retain their accepted output. Every current catalog program has a manifest-backed
+  local asset and remains exportable even if realtime loading fails.
+
+#### Current instrument, exploration, and presentation implementation
+
+- **FR-227**: The global `presentation.progressionView` MUST support exactly `harmonic`, `piano`, `staff`,
+  `guitar`, and `tablature`; all five views MUST project the same persisted Steps and MUST NOT introduce
+  a second harmonic or timing model. Guitar and Tablature are presentation projections, not alternate
+  progression data stores.
+- **FR-228**: `presentation.measuresPerSystem` MUST accept `auto` and manual values `1` through `8`.
+  The setting applies to Staff system grouping only; current `auto` uses meter duration and attack
+  density with a 2–6 measure target/cap, while manual 1–8 values remain valid persisted settings.
+  Harmonic, Piano, Guitar, and Tablature views MUST remain independent full-width measure sections.
+- **FR-229**: Guitar Card View MUST expose a deterministic standard-tuning fretboard/chord-shape
+  projection with six-string fret positions, base fret, open/muted-string state, and optional left-hand
+  fingering. Tablature MUST expose the same voicing as string/fret positions and MUST represent muted and
+  open strings explicitly.
+- **FR-230**: Guitar Card View MUST support in-position `Scale Tones` derived from the active scale and
+  chord box. Scale-tone markers MUST be derived UI data and MUST NOT mutate the chord definition,
+  harmonic function, or saved Step performance.
+- **FR-231**: Guitar playback MUST support separately selectable runtime `hq-samples` and `soundfont`
+  engines, lazy local sample loading, provider status, and bounded per-string strum spread. Portable and
+  autosave persistence for the engine/tone fields is a separate open gap; Guitar engine changes MUST NOT
+  alter Piano or Melody provider/channel settings.
+- **FR-232**: Progression editing MUST expose contextual voice-leading/smooth-inversion and bassline
+  strategies that update Step-local performance settings through undoable commands while preserving
+  harmonic identity and canonical Step IDs.
+- **FR-233**: Reharmonization/substitution and modulation workflows MUST present an explicit candidate
+  or transition path, audition it when requested, and apply only through an explicit user action; they
+  MUST preserve source progression semantics until applied and MUST not silently change the project key.
+- **FR-234**: Built-in cadence formulas and Quick Starters MUST remain deterministic functional presets
+  with explicit module/genre metadata, rationale, audition, and Apply behavior. Applying one MUST use
+  existing progression commands rather than storing generated performance events.
+- **FR-235**: The Scales & Modes Explorer MUST expose the implemented diatonic, minor-variant,
+  pentatonic, and Blues scale definitions with formula, pitch, characteristic metadata, modal chords,
+  Piano/Guitar card projections, and the implemented canonical modal cadence library. The Explorer is a
+  presentational/workflow surface and MUST NOT be branded with a third-party reference name.
+- **FR-236**: Explorer formula application MUST be explicit and key-aware; until atomic modal apply is
+  implemented, the current workflow MUST keep audition separate from Apply and MUST surface the selected
+  tonic/key-switch choice rather than silently combining unrelated mutations.
+- **FR-237**: Suzuki note colors MUST be a persisted presentation toggle defaulting off. The mapping is
+  decorative and MUST NOT change semantic notes, playback, MIDI, MusicXML, or accessible pitch labels.
+- **FR-238**: The studio MUST present Matrix, My Progression, Inspector, transport, and project/export
+  actions in the current desktop composition shell. Side panels MAY auto-hide/expand, but the active
+  surface MUST retain keyboard access, compact measure composition, and no page-level horizontal overflow
+  at the accepted desktop sizes.
+- **FR-239**: Schema v5 MUST remain the current portable-project contract. This documentary convergence
+  MUST NOT raise `schemaVersion` or change runtime codec semantics; any future schema-v6 work MUST be a
+  separately accepted migration batch.
+- **FR-240**: The Matrix `AudioEnginesInspector` MUST be the sole user-facing surface that changes Piano or
+  Guitar engines and SoundFont tones. All Steps & Measures MUST retain only Harmony instrument, volume,
+  mute, solo, provider state, and Retry controls. `PianoAudioStatus` MUST remain a read-only status surface
+  with Retry available only for error/fallback states and MUST NOT open an engine-settings popover.
+- **FR-241**: Until the dedicated persistence task is implemented, Piano/Guitar engine and SoundFont tone
+  fields MUST be documented as runtime/session settings rather than portable project settings. The current
+  schema-v5 codec, autosave, export round-trip, and Undo/Redo acceptance MUST NOT claim to preserve them.
+  When persistence is implemented, these fields and `noteColorMode` MUST enter one atomic schema-v5-to-v6
+  cutover; engine/tone persistence MUST NOT introduce a separate schema version.
+
+#### Canonical Progressions Matrix topology and strict routing
+
+- **FR-242**: The future Progressions Matrix MUST preserve a physical-board spatial mental model with
+  three horizontal functional zones in stable semantic order: `Secondary Dominants` above `Main Chords`,
+  and `Modal Interchange` below `Main Chords`. The six primary Main Chord columns MUST retain stable
+  semantic positions; upper source/target cards MUST align vertically with their related Main Chord
+  targets so the relationship remains understandable without opening Inspector. The lower Modal
+  Interchange cards MUST retain meaningful alignment with Main Chord columns, but MUST NOT be padded or
+  stretched solely to create equal card counts. Auxiliary diminished or legacy-compatible elements MAY
+  live outside the six primary columns when that preserves readability and compatibility.
+- **FR-243**: Progressions Matrix routing and strict directed-tension states MUST preserve the semantic
+  source/target order, visible arrow/highlight relationship, and stable column meaning at accepted desktop
+  sizes and under layout pressure. Responsive behavior MAY compress, wrap, or reflow the board, but MUST
+  NOT degrade it into an unrelated independent grid or hide the relationship needed to understand a
+  source/target pair. This requirement concerns equivalent spatial structure and relationship clarity,
+  not pixel-perfect copying, third-party branding, or verbatim reference text.
 
 ### Scope Boundaries
 
@@ -1175,11 +1310,12 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - Contextual Smart Next-Chord Engine with Composition Intent.
 - One Best Match plus up to three strong Alternatives.
 - Beginner / Composer / Expert presentation modes.
-- Extensible Matrix Card Views with per-card and global switching; v1 includes Harmonic, Piano, and
-  Staff views, while future Instrument Profiles can contribute views such as Guitar visualization.
-- One global My Progression View (`Harmonic`, `Piano`, or `Staff`) with no per-step or `Mixed` mode.
-  Harmonic/Piano use independent vertical measure sections; Staff uses responsive continuous score
-  systems, with Auto allowing two to six measures by meter and manual layout capped at four.
+- Extensible Matrix Card Views with per-card and global switching; the current implementation includes
+  Harmonic, Piano, Staff, Guitar fretboard/chord-shape, and Tablature views.
+- One global My Progression View (`Harmonic`, `Piano`, `Staff`, `Guitar`, or `Tablature`) with no
+  per-step or `Mixed` mode. Harmonic/Piano/Guitar/Tablature use independent vertical measure sections;
+  Staff uses responsive continuous score systems, with Auto targeting two to six measures by meter and
+  manual layout accepting one through eight.
 - Multi-step what-if branch from any progression point, Original vs Alternative comparison, rejoin,
   selective or whole-branch commit.
 - Independent Progression Step objects and drag/drop reordering.
@@ -1193,6 +1329,8 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - Piano-first contextual auto voicing plus exact manual Piano Voicing Editor.
 - High-quality sample-based acoustic piano playback with velocity-sensitive timbral response and an
   replaceable Instrument Audio Provider boundary.
+- Guitar chord realization with standard-tuning fretboard, chord shapes, in-position Scale Tones,
+  tablature/fingering projections, and selectable HQ Samples/SoundFont audio engines with strum spread.
 - Independent bass voice, piano-specific articulation, master and per-note velocity, dynamics presets.
 - Functional built-in and Custom Presets with durations.
 - Named projects, autosave/session recovery, portable `.cadenceflow` project file.
@@ -1200,26 +1338,25 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - Automatic Key/Mode-based enharmonic spelling plus targeted manual override.
 - MIDI export.
 - MusicXML export.
+- Scales & Modes Explorer for the implemented diatonic, minor-variant, pentatonic, and Blues scales,
+  characteristic chords, modal cadence formulas, and Piano/Guitar visualization.
+- Persisted Suzuki note-color presentation toggle.
 - Dark/light theme.
-- Instrument-profile architecture for future instruments.
+- Instrument-profile architecture for future instruments beyond the current Piano and Guitar profiles.
 
 #### Explicitly deferred / future
 
-- Guitar Instrument Profile and Guitar-specific Card View (fretboard/chord-shape visualization).
 - Practice curriculum and scored exercises.
 - Dedicated Analyze workspace.
 - Improvisation trainer/scoring.
 - Live MIDI capture/controller workflow.
 - Full saved-progression catalog/library beyond project and Custom Preset persistence.
-- Large genre/harmony-mode selector system.
-- `Scales` module (future scale navigation and scale-based melodic material, including instrument-specific
-  visualizations; this does not defer the accepted Chord-Step-linked melody capability).
-- `Blues` module (future genre-focused harmony, blues scales/notes, riffs, and solo vocabulary).
+- Larger genre/harmony-mode selector systems beyond the current Scales & Modes Explorer.
 - Additional tonal/modal systems beyond Major and Tonal Minor.
 - Dark Harmony expansion with additional layers such as Dominant Tension and Borrowed / Minor Colors,
   including advanced altered-dominant and augmented-sixth vocabularies.
 - Additional functional harmonic layers beyond the v1 module vocabularies.
-- Guitar, Ukulele, Melodica, and other fully implemented instrument profiles.
+- Ukulele, Melodica, and other additional fully implemented instrument profiles.
 - Intra-step bass patterns.
 - Tempo maps/tempo automation inside progression.
 - Meter maps/time-signature changes inside progression.
@@ -1230,7 +1367,8 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
 - Cloud sync, accounts, collaboration, and sharing services.
 - Rendered-audio export to WAV/MP3 (architecture prepared in v1; implementation deferred).
 - User-facing import/management of arbitrary external SF2/SF3/SFZ sound banks; the v1 audio architecture
-  is prepared for alternate providers, but the launch experience ships with a curated piano sound source.
+  is prepared for alternate providers, but the launch experience uses the bundled HQ Piano, Guitar, and
+  FluidR3_GM-derived local providers.
 
 ### Key Entities
 
@@ -1247,8 +1385,9 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   such as Harmonic, Piano, Staff, or a future instrument-specific view. It can be selected globally for
   visible cards or overridden per card without creating a new musical object.
 - **Progression View**: The single project presentation mode used by every measure in My Progression.
-  Harmonic and Piano use independent full-width vertical measure sections with one horizontal step row
-  per measure; Staff groups sequential measures into continuous systems.
+  Harmonic, Piano, Guitar, and Tablature use independent full-width vertical measure sections with one
+  horizontal step row per measure; Staff groups sequential measures into continuous systems. The five
+  values are `Harmonic`, `Piano`, `Staff`, `Guitar`, and `Tablature`.
 - **Score System**: A responsive Staff projection containing one or more consecutive measures and all
   visible Melody/Harmony staves on a shared temporal x-axis.
 - **Chord Definition**: Base harmonic identity/function available in a Harmonic Context, separate from
@@ -1357,10 +1496,45 @@ responsive systems, aligned Melody/Harmony attacks, unchanged musical data, and 
   desktop sizes and 200% zoom.
 - **SC-022**: All 128 GM melodic programs appear exactly once in the shared grouped/searchable picker and
   export with their canonical program/name metadata. Global inheritance and explicit Step overrides survive
-  save/reopen and Undo/Redo, repeated Steps remain independent, all six bundled timbres play without eager
-  loading, and every export-only selection reports unavailability without fallback or blocking export. A
-  mixed-instrument fixture maps every unique effective instrument to exactly one separate Staff line, MIDI
-  track, and MusicXML part, with no missing or duplicated Melody event.
+  save/reopen and Undo/Redo, repeated Steps remain independent, and all 128 manifest-backed local timbres
+  load on demand without eager loading. A mixed-instrument fixture maps every unique effective instrument
+  to exactly one separate Staff line, MIDI track, and MusicXML part, with no missing or duplicated Melody
+  event; a failed local load is reported without fallback or blocking export.
+- **SC-023**: In the Guitar acceptance fixture, Guitar and Tablature views render the same canonical chord
+  shapes, six-string fret positions, mute/open state, and fingering; Scale Tones remain in-position and
+  do not mutate saved harmonic or performance data.
+- **SC-024**: Guitar playback uses the selected HQ Samples or SoundFont provider, applies the configured
+  bounded strum spread, and leaves Piano/Melody audio state unchanged when the active view changes.
+- **SC-025**: Voice-leading, reharmonization, modulation, and cadence-formula actions expose their
+  candidate rationale before explicit apply; applied results are undoable and preserve canonical Step
+  identity and exact timing semantics.
+- **SC-026**: The Scales & Modes Explorer exposes every current scale definition and canonical formula,
+  provides Piano/Guitar projections and audition without implicit mutation, and contains the modal
+  surface at accepted desktop sizes without page-level overflow.
+- **SC-027**: Enabling Suzuki colors changes only visible notehead styling; saved semantic notes, playback,
+  MIDI, MusicXML, and non-color accessibility labels remain byte/behavior compatible.
+- **SC-028**: The current schema v5 codec and JSON Schema continue to validate v5 projects, and this
+  convergence batch does not change `schemaVersion` or runtime codec semantics.
+- **SC-029**: In the global All Steps & Measures Inspector, engine/tone selectors are absent while
+  instrument, volume, mute, solo, provider state, and Retry remain available; `AudioEnginesInspector`
+  contains the Piano/Guitar engine and tone selectors; and clicking `PianoAudioStatus` does not open a
+  settings surface. Error/fallback status exposes Retry without becoming a settings control.
+- **SC-030**: The current v5 portable round-trip explicitly documents engine/tone settings as runtime-only;
+  no acceptance claim treats `pianoEngine`, `guitarEngine`, `pianoSoundfontInstrument`, or
+  `guitarSoundfontInstrument` as preserved until the dedicated codec/schema/autosave/export/Undo task is
+  implemented. That future persistence work shares the single v5-to-v6 cutover with `noteColorMode` and
+  does not create a separate engine/tone schema version.
+- **SC-031**: In a deterministic Progressions Matrix fixture, desktop acceptance shows three horizontal
+  zones (`Secondary Dominants`, `Main Chords`, `Modal Interchange`) and six stable primary columns;
+  secondary-dominant source cards and their Main Chord targets read as vertically related, while Modal
+  Interchange remains meaningfully aligned without artificial equalization. Auxiliary diminished/legacy
+  cards remain readable outside the primary columns when present, and the source/target relationship is
+  understandable without Inspector.
+- **SC-032**: Under deterministic desktop layout pressure, the Progressions Matrix preserves semantic
+  column order, zone order, visible directed-tension arrows/highlights, and source/target relationships
+  through compression or wrapping without becoming an unrelated independent grid. Acceptance verifies
+  this at the supported desktop sizes and a constrained layout-pressure fixture; pixel-perfect reference
+  reproduction, third-party branding, and verbatim reference text are not required.
 
 ## Assumptions
 

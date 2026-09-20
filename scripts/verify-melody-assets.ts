@@ -1,33 +1,38 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, stat } from "node:fs/promises";
-import { isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const publicRoot = join(repositoryRoot, "public");
 const manifestPath = join(publicRoot, "audio", "melody", "manifest.json");
-const samplesRoot = join(publicRoot, "audio", "melody", "FluidR3_GM");
-const expectedAssets = [
-  "violin-mp3.js",
-  "cello-mp3.js",
-  "oboe-mp3.js",
-  "clarinet-mp3.js",
-  "flute-mp3.js",
-  "lead_1_square-mp3.js",
-] as const;
+const expectedSourceRevision = "044fab8e1456bfafc5776e86dfd6bb8697149aef";
 
 interface MelodyAssetRecord {
+  readonly sourceName: string;
+  readonly sourceFile: string;
   readonly size: number;
   readonly sha256: string;
+}
+
+interface MelodyProgramRecord {
+  readonly program: number;
+  readonly instrumentId: string;
+  readonly sourceName: string;
+  readonly asset: string;
 }
 
 interface MelodyManifest {
   readonly schemaVersion: number;
   readonly sourceRepository: string;
   readonly sourceRevision: string;
+  readonly sourceDirectory: string;
+  readonly sourceArtifact: string;
   readonly license: string;
   readonly licenseFile: string;
   readonly attributionFile: string;
+  readonly programCount: number;
+  readonly programs: readonly MelodyProgramRecord[];
   readonly assets: Record<string, MelodyAssetRecord>;
 }
 
@@ -57,44 +62,82 @@ function assertRecord(value: unknown, label: string): asserts value is Record<st
 
 function assertManifest(value: unknown): asserts value is MelodyManifest {
   assertRecord(value, "manifest");
-  if (value.schemaVersion !== 1) throw new Error("manifest schemaVersion must be 1");
+  if (value.schemaVersion !== 2) throw new Error("manifest schemaVersion must be 2");
   if (
     value.sourceRepository !==
-    "https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM"
+    `https://github.com/gleitz/midi-js-soundfonts/tree/${expectedSourceRevision}/FluidR3_GM`
   ) {
     throw new Error("manifest sourceRepository is not the expected FluidR3_GM source");
   }
-  if (value.sourceRevision !== "gh-pages")
-    throw new Error("manifest sourceRevision must be gh-pages");
+  if (value.sourceRevision !== expectedSourceRevision || value.sourceDirectory !== "FluidR3_GM") {
+    throw new Error("manifest source revision/directory is not the expected FluidR3_GM source");
+  }
+  if (value.sourceArtifact !== "FluidR3_GM.sf2") {
+    throw new Error("manifest sourceArtifact must be FluidR3_GM.sf2");
+  }
   if (value.license !== "CC-BY-3.0") throw new Error("manifest license must be CC-BY-3.0");
+  if (value.programCount !== 128) throw new Error("manifest programCount must be 128");
   if (typeof value.licenseFile !== "string" || typeof value.attributionFile !== "string") {
     throw new Error("manifest license and attribution paths are required");
   }
-  assertRecord(value.assets, "manifest assets");
-  const assetNames = Object.keys(value.assets).sort();
-  const expectedNames = [...expectedAssets].sort();
-  if (JSON.stringify(assetNames) !== JSON.stringify(expectedNames)) {
-    throw new Error(`manifest must list exactly ${expectedAssets.length} Melody assets`);
+  if (!Array.isArray(value.programs) || value.programs.length !== 128) {
+    throw new Error("manifest must list exactly 128 GM programs");
   }
-  for (const assetName of expectedAssets) {
-    const asset = value.assets[assetName];
-    assertRecord(asset, `manifest asset ${assetName}`);
+  assertRecord(value.assets, "manifest assets");
+  if (Object.keys(value.assets).length !== 128) {
+    throw new Error("manifest must list exactly 128 unique local assets");
+  }
+
+  const programs = new Set<number>();
+  const assets = new Set<string>();
+  for (const [index, program] of value.programs.entries()) {
+    const programRecord = program as unknown as Record<string, unknown>;
+    assertRecord(programRecord, `manifest program ${index}`);
+    const programNumber = programRecord.program;
     if (
+      typeof programNumber !== "number" ||
+      !Number.isInteger(programNumber) ||
+      programNumber < 0 ||
+      programNumber > 127 ||
+      programs.has(programNumber)
+    ) {
+      throw new Error(`manifest has a missing or duplicate GM program at index ${index}`);
+    }
+    if (
+      typeof programRecord.instrumentId !== "string" ||
+      typeof programRecord.sourceName !== "string" ||
+      typeof programRecord.asset !== "string"
+    ) {
+      throw new Error(`manifest program ${programNumber} metadata is incomplete`);
+    }
+    if (assets.has(programRecord.asset)) {
+      throw new Error(`manifest reuses asset: ${programRecord.asset}`);
+    }
+    programs.add(programNumber);
+    assets.add(programRecord.asset);
+    const asset = value.assets[programRecord.asset];
+    assertRecord(asset, `manifest asset ${programRecord.asset}`);
+    if (
+      asset.sourceName !== programRecord.sourceName ||
+      asset.sourceFile !== `${programRecord.sourceName}-mp3.js` ||
       typeof asset.size !== "number" ||
       !Number.isSafeInteger(asset.size) ||
       asset.size <= 0 ||
       typeof asset.sha256 !== "string" ||
       !/^[a-f0-9]{64}$/.test(asset.sha256)
     ) {
-      throw new Error(`manifest asset ${assetName} must contain a positive size and SHA-256`);
+      throw new Error(`manifest asset ${programRecord.asset} metadata is invalid`);
     }
+  }
+  for (let program = 0; program < 128; program += 1) {
+    if (!programs.has(program)) throw new Error(`manifest is missing GM program ${program}`);
   }
 }
 
 async function sha256(path: string): Promise<string> {
-  const digest = createHash("sha256");
-  digest.update(await readFile(path));
-  return digest.digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 async function verify(): Promise<void> {
@@ -117,39 +160,47 @@ async function verify(): Promise<void> {
   for (const marker of [
     "FluidR3_GM",
     "Creative Commons Attribution 3.0",
-    "https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM",
-    ...expectedAssets,
+    `https://github.com/gleitz/midi-js-soundfonts/tree/${expectedSourceRevision}/FluidR3_GM`,
+    "all 128 General MIDI programs",
+    "manifest.json",
   ]) {
-    if (!attributionText.includes(marker))
+    if (!attributionText.includes(marker)) {
       throw new Error(`attribution is missing marker: ${marker}`);
+    }
   }
 
-  for (const assetName of expectedAssets) {
-    const assetPath = normalize(join(samplesRoot, assetName));
-    if (relative(samplesRoot, assetPath).startsWith("..")) {
-      throw new Error(`asset path escapes FluidR3_GM directory: ${assetName}`);
-    }
+  for (const program of manifest.programs) {
+    const asset = manifest.assets[program.asset]!;
+    const assetPath = publicFilePath(program.asset, `manifest asset ${program.asset}`);
     const file = await stat(assetPath).catch(() => null);
-    if (!file?.isFile()) throw new Error(`Melody asset is missing: ${assetName}`);
-    const expected = manifest.assets[assetName]!;
-    if (file.size !== expected.size) {
-      throw new Error(`${assetName} size mismatch: expected ${expected.size}, got ${file.size}`);
+    if (!file?.isFile()) throw new Error(`Melody asset is missing: ${program.asset}`);
+    if (file.size !== asset.size) {
+      throw new Error(`${program.asset} size mismatch: expected ${asset.size}, got ${file.size}`);
     }
     const actualHash = await sha256(assetPath);
-    if (actualHash !== expected.sha256) {
+    if (actualHash !== asset.sha256) {
       throw new Error(
-        `${assetName} SHA-256 mismatch: expected ${expected.sha256}, got ${actualHash}`,
+        `${program.asset} SHA-256 mismatch: expected ${asset.sha256}, got ${actualHash}`,
       );
     }
   }
 
-  const actualFiles = await readdir(samplesRoot);
-  const extraFiles = actualFiles.filter(
-    (file) => !expectedAssets.includes(file as (typeof expectedAssets)[number]),
+  const soundfontRoot = join(publicRoot, "audio", "soundfont");
+  const managedSoundfontFiles = manifest.programs
+    .map((program) => program.asset)
+    .filter((asset) => asset.startsWith("/audio/soundfont/"))
+    .map((asset) => asset.slice("/audio/soundfont/".length))
+    .sort();
+  const actualSoundfontFiles = (await readdir(soundfontRoot)).sort();
+  if (JSON.stringify(actualSoundfontFiles) !== JSON.stringify(managedSoundfontFiles)) {
+    throw new Error("public/audio/soundfont contains files not covered by the manifest");
+  }
+
+  console.log(
+    `Melody assets verified offline: ${manifest.programs.length} GM programs, ${
+      Object.keys(manifest.assets).length
+    } local assets, hashes, license, and attribution OK.`,
   );
-  if (extraFiles.length > 0)
-    throw new Error(`unexpected files in FluidR3_GM: ${extraFiles.join(", ")}`);
-  console.log("Melody assets verified offline: 6 files, manifest, license, and attribution OK.");
 }
 
 verify().catch((error: unknown) => {

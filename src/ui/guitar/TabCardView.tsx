@@ -3,7 +3,10 @@ import type { ChordDefinition } from "../../domain/harmony/chord";
 import type { PianoArticulation } from "../../domain/progression/step";
 import type { MusicalDuration } from "../../domain/timing/duration";
 import { formatMusicalDuration } from "../../domain/timing/duration";
-import { resolveGuitarTabEntry, type GuitarTabEntry } from "../../domain/instruments/guitar/tablature";
+import {
+  resolveGuitarTabEntry,
+  type GuitarTabEntry,
+} from "../../domain/instruments/guitar/tablature";
 
 export interface TabCardViewProps {
   readonly chord: ChordDefinition;
@@ -37,7 +40,7 @@ export function TabCardView({
   className = "",
 }: TabCardViewProps) {
   const tabEntry: GuitarTabEntry = useMemo(
-    () => resolveGuitarTabEntry(chord, chordLabel),
+    () => resolveGuitarTabEntry(chord, chordLabel, chord.bassPitchClass),
     [chord, chordLabel],
   );
 
@@ -57,16 +60,11 @@ export function TabCardView({
         <strong className="mini-tab-chord-name">{tabEntry.chordSymbol}</strong>
         <div className="mini-tab-meta">
           {tabEntry.positionLabel ? (
-            <span
-              className="mini-tab-position"
-              aria-label={`Position fret ${tabEntry.baseFret}`}
-            >
+            <span className="mini-tab-position" aria-label={`Position fret ${tabEntry.baseFret}`}>
               {tabEntry.positionLabel}
             </span>
           ) : null}
-          {durationLabel ? (
-            <span className="mini-tab-duration">{durationLabel}</span>
-          ) : null}
+          {durationLabel ? <span className="mini-tab-duration">{durationLabel}</span> : null}
           {articulationGlyph ? (
             <span
               className="mini-tab-articulation"
@@ -90,21 +88,20 @@ export function TabCardView({
           data-testid="guitar-tab-svg"
         >
           {/* Card background */}
-          <rect
-            x="8"
-            y="8"
-            width="104"
-            height="90"
-            rx="4"
-            className="guitar-tab-bg"
-          />
+          <rect x="8" y="8" width="104" height="90" rx="4" className="guitar-tab-bg" />
 
           {/* TAB clef on the left */}
           {showClef ? (
             <g className="guitar-tab-clef" aria-hidden="true">
-              <text x="17" y="38" className="guitar-tab-clef-text">T</text>
-              <text x="17" y="58" className="guitar-tab-clef-text">A</text>
-              <text x="17" y="78" className="guitar-tab-clef-text">B</text>
+              <text x="17" y="38" className="guitar-tab-clef-text">
+                T
+              </text>
+              <text x="17" y="58" className="guitar-tab-clef-text">
+                A
+              </text>
+              <text x="17" y="78" className="guitar-tab-clef-text">
+                B
+              </text>
             </g>
           ) : null}
 

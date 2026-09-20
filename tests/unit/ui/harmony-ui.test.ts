@@ -36,7 +36,9 @@ describe("Harmony Track controls", () => {
     ) as HTMLSelectElement;
     expect(instrumentSelect).not.toBeNull();
     expect(instrumentSelect.disabled).toBe(false);
-    expect(mounted.container.querySelector('[aria-label="Harmony Track Instrument search"]')).not.toBeNull();
+    expect(
+      mounted.container.querySelector('[aria-label="Harmony Track Instrument search"]'),
+    ).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Harmony Track Volume"]')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Mute Harmony Track"]')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Solo Harmony Track"]')).not.toBeNull();
@@ -87,53 +89,7 @@ describe("Harmony Track controls", () => {
     mounted.unmount();
   });
 
-  it("toggles Piano and Guitar audio engines and selects guitar soundfont tone", () => {
-    const onChange = vi.fn();
-    const mounted = mount(
-      el(HarmonyTrackControls, {
-        settings: {
-          instrument: "piano",
-          muted: false,
-          solo: false,
-          volume: 100,
-          pianoEngine: "hq-samples",
-          guitarEngine: "soundfont",
-          guitarSoundfontInstrument: "gm-025",
-        },
-        onChange,
-      }),
-    );
-
-    const pianoSoundfontBtn = mounted.container.querySelector(
-      '[data-testid="piano-engine-soundfont-btn"]',
-    ) as HTMLButtonElement;
-    const guitarHqBtn = mounted.container.querySelector(
-      '[data-testid="guitar-engine-hq-btn"]',
-    ) as HTMLButtonElement;
-    const guitarToneSelect = mounted.container.querySelector(
-      '[data-testid="guitar-soundfont-instrument-select"]',
-    ) as HTMLSelectElement;
-
-    expect(pianoSoundfontBtn).not.toBeNull();
-    expect(guitarHqBtn).not.toBeNull();
-    expect(guitarToneSelect).not.toBeNull();
-    expect(guitarToneSelect.value).toBe("gm-025");
-
-    act(() => {
-      pianoSoundfontBtn.click();
-      guitarHqBtn.click();
-      guitarToneSelect.value = "gm-024";
-      guitarToneSelect.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-
-    expect(onChange).toHaveBeenNthCalledWith(1, { pianoEngine: "soundfont" });
-    expect(onChange).toHaveBeenNthCalledWith(2, { guitarEngine: "hq-samples" });
-    expect(onChange).toHaveBeenNthCalledWith(3, { guitarSoundfontInstrument: "gm-024" });
-    mounted.unmount();
-  });
-
-  it("renders piano soundfont tone select when pianoEngine is soundfont and triggers onChange", () => {
-    const onChange = vi.fn();
+  it("keeps engine and tone settings out of the Harmony track controls", () => {
     const mounted = mount(
       el(HarmonyTrackControls, {
         settings: {
@@ -143,24 +99,27 @@ describe("Harmony Track controls", () => {
           volume: 100,
           pianoEngine: "soundfont",
           pianoSoundfontInstrument: "gm-004",
+          guitarEngine: "hq-samples",
+          guitarSoundfontInstrument: "gm-025",
         },
-        onChange,
+        onChange: vi.fn(),
       }),
     );
 
-    const pianoToneSelect = mounted.container.querySelector(
-      '[data-testid="piano-soundfont-instrument-select"]',
-    ) as HTMLSelectElement;
-
-    expect(pianoToneSelect).not.toBeNull();
-    expect(pianoToneSelect.value).toBe("gm-004");
-
-    act(() => {
-      pianoToneSelect.value = "gm-006";
-      pianoToneSelect.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-
-    expect(onChange).toHaveBeenCalledWith({ pianoSoundfontInstrument: "gm-006" });
+    expect(mounted.container.querySelector('[data-testid="piano-engine-hq-btn"]')).toBeNull();
+    expect(
+      mounted.container.querySelector('[data-testid="piano-engine-soundfont-btn"]'),
+    ).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="guitar-engine-hq-btn"]')).toBeNull();
+    expect(
+      mounted.container.querySelector('[data-testid="guitar-engine-soundfont-btn"]'),
+    ).toBeNull();
+    expect(
+      mounted.container.querySelector('[data-testid="piano-soundfont-instrument-select"]'),
+    ).toBeNull();
+    expect(
+      mounted.container.querySelector('[data-testid="guitar-soundfont-instrument-select"]'),
+    ).toBeNull();
     mounted.unmount();
   });
 });

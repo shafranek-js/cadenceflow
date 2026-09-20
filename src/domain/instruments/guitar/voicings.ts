@@ -1,14 +1,6 @@
-import {
-  normalizePitchClass,
-  type ExactPitch,
-  type PitchClassIdentity,
-} from "../../harmony/pitch";
+import { normalizePitchClass, type ExactPitch, type PitchClassIdentity } from "../../harmony/pitch";
 import type { ChordDefinition } from "../../harmony/chord";
-import {
-  GUITAR_STANDARD_TUNING,
-  getFretPitchClass,
-  getGuitarPitch,
-} from "./tuning";
+import { GUITAR_STANDARD_TUNING, getFretPitchClass, getGuitarPitch } from "./tuning";
 
 export type GuitarFretRole = "root" | "chord-tone" | "scale-tone";
 
@@ -399,6 +391,44 @@ function buildVoicing(
 }
 
 /**
+ * Ensures an authored slash-bass is the actual lowest sounding guitar pitch.
+ *
+ * Movable shapes do not have a canonical low-string inversion for every root,
+ * so the semantic bass is placed on the low-E string and any lower sounding
+ * strings are muted. This preserves the existing upper shape while making the
+ * returned pitches truthful instead of relying on bass metadata alone.
+ */
+function ensureLowestBassPitch(
+  frets: readonly number[],
+  bassPitchClass: PitchClassIdentity,
+): readonly number[] {
+  const currentPitches = frets
+    .map((fret, stringIndex) => (fret >= 0 ? getGuitarPitch(stringIndex, fret) : undefined))
+    .filter((pitch): pitch is ExactPitch => pitch !== undefined);
+  const currentLowest = currentPitches.reduce<ExactPitch | undefined>(
+    (lowest, pitch) => (lowest && lowest.midiNumber <= pitch.midiNumber ? lowest : pitch),
+    undefined,
+  );
+  if (currentLowest?.pitchClassIdentity === bassPitchClass) return frets;
+
+  const lowString = GUITAR_STANDARD_TUNING[0]!;
+  const bassFret = (bassPitchClass - lowString.openPitchClass + 12) % 12;
+  const bassMidi = lowString.openMidi + bassFret;
+  const adapted = [...frets];
+  adapted[0] = bassFret;
+
+  // A higher string can still sound below a high low-E fret (for example
+  // A2 below D#2), so mute every competing pitch below the authored bass.
+  for (let stringIndex = 1; stringIndex < adapted.length; stringIndex += 1) {
+    const fret = adapted[stringIndex]!;
+    if (fret >= 0 && GUITAR_STANDARD_TUNING[stringIndex]!.openMidi + fret < bassMidi) {
+      adapted[stringIndex] = -1;
+    }
+  }
+  return Object.freeze(adapted);
+}
+
+/**
  * Resolves the optimal, ergonomic guitar chord voicing for any chord definition or root/quality pair.
  */
 export function resolveGuitarChordVoicing(
@@ -455,12 +485,15 @@ export function resolveGuitarChordVoicing(
         adaptedFrets[0] = -1;
         adaptedFrets[1] = bassFret;
       }
+      const slashFrets = ensureLowestBassPitch(adaptedFrets, bassPc);
+      const slashFingers = [...(baseShape.fingers ?? [])];
+      if (slashFrets[0]! > 0 && slashFrets[0] !== adaptedFrets[0]) slashFingers[0] = 1;
       return buildVoicing(
         chordSymbol,
         rootPc,
         bassPc,
-        adaptedFrets,
-        baseShape.fingers,
+        slashFrets,
+        slashFingers.length > 0 ? slashFingers : undefined,
         baseShape.barres ?? [],
         "slash",
       );
@@ -504,8 +537,10 @@ export function resolveGuitarChordVoicing(
             ? chosenTemplate.diminished
             : chosenTemplate.major;
 
-  const frets = templateConfig.relativeFrets.map((f) => (f === -1 ? -1 : f + fretOffset));
+  const rootFrets = templateConfig.relativeFrets.map((f) => (f === -1 ? -1 : f + fretOffset));
+  const frets = bassPc !== rootPc ? ensureLowestBassPitch(rootFrets, bassPc) : rootFrets;
   const fingers = [...templateConfig.relativeFingers];
+  if (frets[0]! > 0 && frets[0] !== rootFrets[0]) fingers[0] = 1;
 
   const barres: GuitarBarre[] = [];
   if (fretOffset > 0) {

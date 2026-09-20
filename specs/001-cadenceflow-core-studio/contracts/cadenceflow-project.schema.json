@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cadenceflow.local/schema/project-v5.json",
   "title": "CadenceFlow Project v5",
+  "$comment": "Current schema contract as of the documentary convergence: v5 remains unchanged. Presentation supports harmonic, piano, staff, guitar, and tablature views; Melody catalog entries are manifest-backed local GM programs. This comment does not change validation semantics.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,7 +34,10 @@
     "groove": { "$ref": "#/$defs/groove" },
     "harmonyTrack": { "$ref": "#/$defs/harmonyTrack" },
     "melodyTrack": { "$ref": "#/$defs/melodyTrack" },
-    "presentation": { "type": "object" },
+    "presentation": {
+      "type": "object",
+      "$comment": "Presentation-only fields include progressionView harmonic|piano|staff|guitar|tablature and measuresPerSystem auto|1..8; runtime codec remains authoritative for detailed shape."
+    },
     "defaults": { "type": "object" },
     "moduleTemplateStates": {
       "type": "object",
@@ -123,6 +127,7 @@
     },
     "harmonyTrack": {
       "type": "object",
+      "$comment": "Schema v5 lists legacy engine fields where present, but the current portable codec encodes only instrument, muted, solo, and volume; engine/tone round-trip is an open roadmap item.",
       "additionalProperties": false,
       "required": ["instrument", "muted", "solo", "volume"],
       "properties": {

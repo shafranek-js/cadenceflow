@@ -2,6 +2,7 @@ import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { realizeChord } from "../../domain/harmony/realization";
+import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
 import type { ProgressionView } from "../../domain/project/project";
 import type { KeyboardEvent, MouseEvent } from "react";
@@ -56,23 +57,21 @@ export function ProgressionStepCard({
   ) => void;
 }) {
   const realization = realizeProgressionStepRealization(step, tonic);
-  // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
-  const pianoPitches = realization.pitches;
-  const staffPitches =
-    showBassInStaff && realization.bassPitch
-      ? Object.freeze([realization.bassPitch, ...pianoPitches])
-      : pianoPitches;
   const baseChord = {
     ...realizeChord(step.harmonicFunction, tonic),
     variant: step.harmonicVariant,
   };
-  const rawChordLabel = formatChordSymbol(baseChord);
+  // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
+  const pianoPitches = realization.pitches;
+  const displayedChord = withEffectiveBass(baseChord, realization.bassPitch);
+  const chordLabel = formatChordSymbol(displayedChord);
   const isInvertedBass =
     realization.bassPitch !== undefined &&
     realization.bassPitch.pitchClassIdentity !== baseChord.rootPitchClass;
-  const chordLabel = isInvertedBass
-    ? `${rawChordLabel}/${formatPitchSpelling(realization.bassPitch!.spelling)}`
-    : rawChordLabel;
+  const staffPitches =
+    (showBassInStaff || isInvertedBass) && realization.bassPitch
+      ? Object.freeze([realization.bassPitch, ...pianoPitches])
+      : pianoPitches;
   const durationLabel = formatMusicalDuration(step.duration);
   const selectionAriaLabel = `Select progression step ${stepNumber}: ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`;
   const changeStaffOctave = (direction: StaffOctaveDirection) => {
@@ -181,18 +180,22 @@ export function ProgressionStepCard({
               </>
             ) : null}
             {view === "piano" ? (
-              <PianoCardView chordPitches={pianoPitches} chordLabel={chordLabel} />
+              <PianoCardView
+                chordPitches={pianoPitches}
+                bassPitch={isInvertedBass ? realization.bassPitch : undefined}
+                chordLabel={chordLabel}
+              />
             ) : null}
             {view === "guitar" ? (
               <GuitarCardView
-                chord={baseChord}
+                chord={displayedChord}
                 chordLabel={chordLabel}
                 orientation={guitarChordOrientation}
               />
             ) : null}
             {view === "tablature" ? (
               <TabCardView
-                chord={baseChord}
+                chord={displayedChord}
                 chordLabel={chordLabel}
                 duration={step.duration}
                 articulation={step.performance.articulation}

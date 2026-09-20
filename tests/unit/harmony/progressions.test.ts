@@ -64,18 +64,18 @@ describe("Progressions module", () => {
     const modalCards = baselineCards.filter((card) => card.layerId === "modal-interchange");
 
     expect(secDomCards).toHaveLength(6);
-    expect(coreCards).toHaveLength(6);
+    expect(coreCards).toHaveLength(7);
     expect(modalCards).toHaveLength(4);
 
     // Modal interchange chords are centered in columns 1..4
     expect(modalCards.map((c) => c.position.column)).toEqual([1, 2, 3, 4]);
 
-    // vii° is preserved in topology as non-baseline for backward compatibility
+    // vii° is the seventh visible Main Chords card.
     const viiCard = PROGRESSIONS_MODULE.topology.cards.find(
       (card) => card.identity.functionId === "vii°",
     );
     expect(viiCard).toBeDefined();
-    expect(viiCard!.baseline).toBe(false);
+    expect(viiCard!.baseline).toBe(true);
   });
   it("keeps card positions stable", () => {
     const positions = new Set(

@@ -94,32 +94,40 @@ export function resolveBassPitch(
     targetSpelling = rootSpelling;
   } else {
     // choice === "auto"
-    // Prefer Root as default.
-    // If previous bass exists, consider chord tones (root, 3rd) if an inversion yields a smoother stepwise move
-    targetPc = rootPc;
-    targetSpelling = rootSpelling;
+    // A harmonic definition may provide an explicit semantic inversion (for
+    // example N6's IV-degree bass). It is the default only; an authored bass
+    // choice still remains authoritative.
+    if (chord.bassPitchClass !== undefined && chord.bassSpelling) {
+      targetPc = chord.bassPitchClass;
+      targetSpelling = chord.bassSpelling;
+    } else {
+      // Prefer Root as default.
+      // If previous bass exists, consider chord tones (root, 3rd) if an inversion yields a smoother stepwise move
+      targetPc = rootPc;
+      targetSpelling = rootSpelling;
 
-    if (previousBassPitch) {
-      let thirdInterval = 4;
-      if (chord.baseQuality === "minor" || chord.baseQuality === "diminished") {
-        thirdInterval = 3;
-      }
-      const thirdPc = normalizePitchClass(rootPc + thirdInterval);
+      if (previousBassPitch) {
+        let thirdInterval = 4;
+        if (chord.baseQuality === "minor" || chord.baseQuality === "diminished") {
+          thirdInterval = 3;
+        }
+        const thirdPc = normalizePitchClass(rootPc + thirdInterval);
 
-      // Distance from previous bass
-      const rootDist = Math.min(
-        Math.abs((rootPc - previousBassPitch.pitchClassIdentity + 12) % 12),
-        Math.abs((previousBassPitch.pitchClassIdentity - rootPc + 12) % 12),
-      );
-      const thirdDist = Math.min(
-        Math.abs((thirdPc - previousBassPitch.pitchClassIdentity + 12) % 12),
-        Math.abs((previousBassPitch.pitchClassIdentity - thirdPc + 12) % 12),
-      );
+        // Distance from previous bass
+        const rootDist = Math.min(
+          Math.abs((rootPc - previousBassPitch.pitchClassIdentity + 12) % 12),
+          Math.abs((previousBassPitch.pitchClassIdentity - rootPc + 12) % 12),
+        );
+        const thirdDist = Math.min(
+          Math.abs((thirdPc - previousBassPitch.pitchClassIdentity + 12) % 12),
+          Math.abs((previousBassPitch.pitchClassIdentity - thirdPc + 12) % 12),
+        );
 
-      // If third is clearly stepwise (1 or 2 semitones away) while root is a large leap (> 4 semitones)
-      if (thirdDist <= 2 && rootDist > 4) {
-        targetPc = thirdPc;
-        targetSpelling = spellChordTone(rootSpelling, thirdInterval, 3);
+        // If third is clearly stepwise (1 or 2 semitones away) while root is a large leap (> 4 semitones)
+        if (thirdDist <= 2 && rootDist > 4) {
+          targetPc = thirdPc;
+          targetSpelling = spellChordTone(rootSpelling, thirdInterval, 3);
+        }
       }
     }
   }

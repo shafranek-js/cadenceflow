@@ -10,7 +10,9 @@ async function expectMatrixLayersFitSingleRows(page: Page): Promise<void> {
   const evidence = await page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>("[data-layer]")).map((layer) => {
       const track = layer.querySelector<HTMLElement>(".matrix-layer-cards");
-      const cards = Array.from(layer.querySelectorAll<HTMLElement>(".chord-card"));
+      const cards = Array.from(layer.querySelectorAll<HTMLElement>(".chord-card")).filter(
+        (card) => card.getClientRects().length > 0,
+      );
       if (!track || cards.length === 0) throw new Error("Matrix cards are missing");
 
       const trackRect = track.getBoundingClientRect();

@@ -56,7 +56,7 @@ describe("ModesExplorerModal UI Component", () => {
 
     // Title
     const title = mounted.container.querySelector("#modes-modal-title");
-    expect(title?.textContent).toContain("ChordFiles Scales & Modes Explorer");
+    expect(title?.textContent).toContain("Scales & Modes Explorer");
 
     // Tonic selector has 12 pills
     const tonicPills = mounted.container.querySelectorAll(".modes-tonic-pill");

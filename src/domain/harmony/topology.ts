@@ -1,4 +1,8 @@
-import type { HarmonicFunctionIdentity } from "./functions";
+import type { HarmonicFunctionIdentity, MatrixMixPolicy } from "./functions";
+
+export const MATRIX_PRIMARY_COLUMN_COUNT = 6;
+
+export type MatrixPole = "dominant" | "subdominant";
 
 export interface MatrixPosition {
   readonly column: number;
@@ -10,6 +14,12 @@ export interface MatrixCardTopologyEntry {
   readonly layerId: string;
   readonly position: MatrixPosition;
   readonly baseline: boolean;
+  readonly mixPolicy: MatrixMixPolicy;
+  readonly targetId?: string;
+  readonly bassScaleDegree?: number;
+  readonly pole?: MatrixPole;
+  readonly aliases?: readonly string[];
+  readonly auxiliary?: boolean;
 }
 
 export interface MatrixRoute {
@@ -19,8 +29,42 @@ export interface MatrixRoute {
 }
 
 export interface MatrixTopologyDefinition {
+  readonly columnCount: typeof MATRIX_PRIMARY_COLUMN_COUNT;
+  readonly columnLabels: readonly string[];
   readonly cards: readonly MatrixCardTopologyEntry[];
   readonly routes: readonly MatrixRoute[];
+}
+
+export interface DiminishedAliasGroup {
+  readonly id: string;
+  readonly canonicalId: string;
+  readonly aliases: readonly string[];
+}
+
+/**
+ * Diminished spellings/inversion labels are aliases of one harmonic entity.
+ * Keeping the canonical id stable prevents the Matrix from rendering one
+ * harmonic identity once per enharmonic/inversion spelling.
+ */
+export function getDiminishedAliasGroup(functionId: string): DiminishedAliasGroup | undefined {
+  const match = functionId.match(/^(?:vii°7|vii°|viio7|viio)\/(.+)$/);
+  if (!match?.[1]) return undefined;
+  const targetId = match[1];
+  const canonicalId = `vii°7/${targetId}`;
+  return Object.freeze({
+    id: `diminished:${targetId}`,
+    canonicalId,
+    aliases: Object.freeze([
+      canonicalId,
+      `vii°/${targetId}`,
+      `viio7/${targetId}`,
+      `viio/${targetId}`,
+    ]),
+  });
+}
+
+export function canonicalDiminishedFunctionId(functionId: string): string {
+  return getDiminishedAliasGroup(functionId)?.canonicalId ?? functionId;
 }
 
 export function manhattanRoute(
@@ -59,6 +103,10 @@ export function expandedStripEntries(
         layerId,
         position: Object.freeze({ column: startColumn + index, row }),
         baseline: false,
+        mixPolicy: identity.targetId || identity.targetFunctionId ? "must-resolve" : "mix-freely",
+        ...(identity.targetId || identity.targetFunctionId
+          ? { targetId: identity.targetId ?? identity.targetFunctionId }
+          : {}),
       }),
     ),
   );

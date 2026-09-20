@@ -184,10 +184,18 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
   ): ScheduledPlayback {
     const player = this.player;
     if (!player) {
+      if (this.providerState === "error") {
+        throw new Error("Acoustic guitar samples failed to load");
+      }
+      // Still loading — kick off preparation if not already in progress and return a
+      // silent no-op so that the scheduler / transport are not disrupted.
       if (this.providerState !== "loading" && !this.loadPromise) {
         void this.prepare();
       }
-      throw new Error("Acoustic guitar samples are not ready");
+      return {
+        id: `guitar-${scope}-noop-${++this.playbackCounter}`,
+        cancel: () => {},
+      };
     }
 
     const context = this.ensureAudioContext();

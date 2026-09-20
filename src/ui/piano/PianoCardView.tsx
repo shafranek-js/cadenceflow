@@ -23,12 +23,16 @@ const NATURAL_KEY_LABELS: Readonly<Record<number, string>> = Object.freeze({
 
 export function PianoCardView({
   chordPitches,
+  bassPitch,
   chordLabel,
 }: {
   readonly chordPitches: readonly ExactPitch[];
+  readonly bassPitch?: ExactPitch | undefined;
   readonly chordLabel: string;
 }) {
-  const normalizedPitches = normalizeChordPitches(chordPitches);
+  const normalizedPitches = normalizeChordPitches(
+    bassPitch ? [...chordPitches, bassPitch] : chordPitches,
+  );
   const layout = buildPianoKeyboardLayout(normalizedPitches);
   const noteLabel = normalizedPitches.map(formatChordPitch).join(", ");
   const pitchByMidi = new Map(normalizedPitches.map((pitch) => [pitch.midiNumber, pitch]));
