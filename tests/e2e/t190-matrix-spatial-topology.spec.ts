@@ -166,14 +166,8 @@ test.describe("T190 Matrix spatial topology", () => {
 
     const matrixHeightBeforeNoRecommendation = (await panel.boundingBox())?.height;
     await panel.locator('[data-testid="chord-card-subV7"] .chord-main').click();
-    const noRecommendationStatus = page.getByTestId("matrix-recommendation-status");
-    await expect(noRecommendationStatus).toBeVisible();
-    await expect(noRecommendationStatus).toHaveText(
-      "No strong recommendation for this context. Passive choices remain available.",
-    );
-    await expect(
-      page.locator("footer.app-status-bar").getByTestId("matrix-recommendation-status"),
-    ).toBeVisible();
+    await expect(panel.getByTestId("chord-card-I")).toHaveAttribute("data-recommendation", "best");
+    await expect(page.getByTestId("matrix-recommendation-status")).toHaveCount(0);
     await expect(panel.getByTestId("matrix-no-recommendation")).toHaveCount(0);
     expect((await panel.boundingBox())?.height).toBe(matrixHeightBeforeNoRecommendation);
 

@@ -1,7 +1,7 @@
-# Next Developer Assignment — T191 strict harmonic routing
+# Accepted Developer Assignment — T191 strict harmonic routing
 
-**Status:** T190 canonical Matrix topology and N6 projection semantics are independently accepted. T191 is
-the only authorized implementation batch. Do not start T192 or any later task.
+**Status:** T191 is independently accepted. This file is retained as the completed assignment record. No new
+developer batch is currently authorized; do not start T192 or any later task without an explicit user command.
 
 ## Verified baseline
 

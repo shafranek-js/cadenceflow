@@ -12,8 +12,9 @@ export type HarmonicFunctionCategory =
 /**
  * Semantic mixing contract for a harmonic function.
  *
- * This is descriptive in T190. The strict recommendation blocking rules are
- * deliberately deferred to T191.
+ * This carries the semantic contract used by strict T191 routing. Legacy
+ * project identities without targetId remain valid through compatibility
+ * fallbacks in the routing layer.
  */
 export type MatrixMixPolicy = "mix-freely" | "must-resolve";
 

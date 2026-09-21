@@ -65,9 +65,9 @@ export function ChordCard({
   ];
   const noteSummary = noteNames.join(" · ");
   const chordLabel = formatChordSymbol(model.chord);
-  const selectionAriaLabel = `${accessibleDescription ? `${accessibleDescription}; ` : ""}Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click to add to My Progression; Alt-click to reset card settings`;
+  const selectionAriaLabel = `${accessibleDescription ? `${accessibleDescription}; ` : ""}Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings`;
   const selectionTitle =
-    "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings";
+    "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings";
   const describedBy =
     model.recommendationStatus !== "none"
       ? `recommendation-${model.chord.harmonicFunction.functionId}`
@@ -79,12 +79,26 @@ export function ChordCard({
     model.chord.harmonicFunction.targetFunctionId;
   const semanticBassPitch =
     model.chord.bassPitchClass !== undefined ? model.realizedPitches[0] : undefined;
-  const cardTooltip = `${model.chord.harmonicFunction.functionId} · ${semantics.title}\n${semantics.description}\nХарактер: ${semantics.emotionalColor}\nСтили: ${semantics.styleHints.join(", ")}\nПравило: ${semantics.rule}`;
+  const cardTooltip = `${model.chord.harmonicFunction.functionId} · ${semantics.title}\n${semantics.description}\nХарактер: ${semantics.emotionalColor}\nСтили: ${semantics.styleHints.join(", ")}\nПравило: ${semantics.rule}${model.recommendation?.routeMessage ? `\nRoute: ${model.recommendation.routeMessage}` : ""}`;
+  const recommendationLabel =
+    model.recommendationStatus === "best"
+      ? "Best Match"
+      : model.recommendationStatus === "alternative"
+        ? "Alternative"
+        : "Requires confirmation";
+  const recommendationBadgeText =
+    model.recommendationStatus === "blocked" ? "Confirm" : recommendationLabel;
 
   const select = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (event.altKey) onAltClickReset();
     else if (event.ctrlKey) onCtrlClickAdd();
     else onSelect();
+  };
+  const selectFromKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      onCtrlClickAdd();
+    }
   };
 
   return (
@@ -137,10 +151,16 @@ export function ChordCard({
             className={`recommendation-badge recommendation-${model.recommendationStatus}-badge`}
             id={`recommendation-${model.chord.harmonicFunction.functionId}`}
             role="img"
-            aria-label={`Recommendation: ${model.recommendationStatus === "best" ? "Best Match" : "Alternative"}`}
+            aria-label={`${model.recommendationStatus === "blocked" ? "Route status" : "Recommendation"}: ${recommendationLabel}`}
           >
-            <Icon name={model.recommendationStatus === "best" ? "best" : "alternative"} />
-            {model.recommendationStatus === "best" ? "Best Match" : "Alternative"}
+            {model.recommendationStatus === "blocked" ? (
+              <span className="recommendation-blocked-symbol" aria-hidden="true">
+                !
+              </span>
+            ) : (
+              <Icon name={model.recommendationStatus === "best" ? "best" : "alternative"} />
+            )}
+            {recommendationBadgeText}
           </span>
         )}
         {contextual ? (
@@ -168,6 +188,7 @@ export function ChordCard({
           canShiftDown={model.canLowerStaffOctave}
           suzukiColors={suzukiColors}
           onSelect={select}
+          onKeyDown={selectFromKeyboard}
           onOctaveChange={onStaffOctaveChange}
         />
       ) : (
@@ -175,6 +196,7 @@ export function ChordCard({
           className="chord-main"
           type="button"
           onClick={select}
+          onKeyDown={selectFromKeyboard}
           aria-pressed={selected}
           aria-label={selectionAriaLabel}
           title={selectionTitle}

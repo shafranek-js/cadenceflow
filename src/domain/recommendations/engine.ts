@@ -2,10 +2,13 @@ import type { HarmonicModuleId } from "../harmony/functions";
 import { rulesForModule, secondaryDiminishedTarget, secondaryDominantTarget } from "./scoring";
 import type { CompositionIntent } from "../progression/branch";
 import { intentAdjustment } from "./intents";
+import { type GenreFocusId, isFunctionRelevantToGenre } from "../harmony/functionSemantics";
 import {
-  type GenreFocusId,
-  isFunctionRelevantToGenre,
-} from "../harmony/functionSemantics";
+  evaluateHarmonicRoute,
+  isDirectedTensionFunction,
+  semanticTargetForFunction,
+  type HarmonicRouteReasonCode,
+} from "../harmony/routing";
 
 export interface RecommendationFactor {
   readonly code: string;
@@ -17,17 +20,22 @@ export interface RecommendationCandidate {
   readonly functionId: string;
   readonly score: number;
   readonly factors: readonly RecommendationFactor[];
+  readonly routeStatus?: "allowed" | "requires-confirmation";
+  readonly routeReason?: HarmonicRouteReasonCode;
+  readonly routeMessage?: string;
 }
 
 export interface RecommendationResult {
   readonly contextHash: string;
   readonly bestMatch: RecommendationCandidate | null;
   readonly alternatives: readonly RecommendationCandidate[];
+  readonly blockedCandidates: readonly RecommendationCandidate[];
 }
 
 export interface RecommendationContext {
   readonly moduleId?: HarmonicModuleId;
   readonly currentFunctionId: string;
+  readonly currentTargetId?: string;
   readonly recentFunctionIds: readonly string[];
   readonly visibleFunctionIds: readonly string[];
   readonly variantEvidence?: Readonly<Record<string, number>>;
@@ -39,21 +47,25 @@ const MIN_STRONG_SCORE = 68;
 
 const PRIMARY_DIATONIC_PROGRESSIONS = new Set(["I", "IV", "V"]);
 const MODAL_BORROWED_PROGRESSIONS = new Set(["bIII", "bVI", "iv", "bVII"]);
-
-function isTensionChord(functionId: string): boolean {
-  return Boolean(
-    secondaryDominantTarget(functionId) ||
-      secondaryDiminishedTarget(functionId) ||
-      functionId === "N6" ||
-      functionId === "CT°7" ||
-      functionId === "Pass°7",
-  );
+function isTensionChord(functionId: string, targetId?: string): boolean {
+  return isDirectedTensionFunction(functionId, targetId);
 }
 
-function baseScore(moduleId: HarmonicModuleId, from: string, to: string): RecommendationCandidate {
+function baseScore(
+  moduleId: HarmonicModuleId,
+  from: string,
+  to: string,
+  currentTargetId?: string,
+): RecommendationCandidate {
   const factors: RecommendationFactor[] = [];
-  const currentTonicizationTarget =
-    moduleId === "dark-harmony" ? secondaryDiminishedTarget(from) : secondaryDominantTarget(from);
+  const currentTonicizationTarget = semanticTargetForFunction(
+    moduleId,
+    from,
+    currentTargetId ??
+      (moduleId === "dark-harmony"
+        ? secondaryDiminishedTarget(from)
+        : secondaryDominantTarget(from)),
+  );
   let score = 30;
 
   if (currentTonicizationTarget === to) {
@@ -92,17 +104,9 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
     }
   }
 
-  // Don't Mix penalty: chaining tension chords without resolving them
-  if (isTensionChord(from) && isTensionChord(to)) {
-    score = Math.max(10, score - 25);
-    factors.push({
-      code: "dont-mix-tension-chain",
-      contribution: -25,
-      source: "function",
-    });
-  }
-
-  // Modal Corridor preference for the progressions module
+  // Modal Corridor scoring remains descriptive; strict eligibility is applied
+  // by evaluateHarmonicRoute below so weak choices are never promoted merely
+  // to fill an Alternative slot.
   if (moduleId === "progressions") {
     if (PRIMARY_DIATONIC_PROGRESSIONS.has(from) && MODAL_BORROWED_PROGRESSIONS.has(to)) {
       if (score < 72) {
@@ -124,12 +128,26 @@ function baseScore(moduleId: HarmonicModuleId, from: string, to: string): Recomm
 
 export function recommend(context: RecommendationContext): RecommendationResult {
   const moduleId = context.moduleId ?? "progressions";
+  const directedTargetId = semanticTargetForFunction(
+    moduleId,
+    context.currentFunctionId,
+    context.currentTargetId,
+  );
   const candidates = context.visibleFunctionIds
     .filter((id) => id !== context.currentFunctionId)
     .map((id) => {
-      const base = baseScore(moduleId, context.currentFunctionId, id);
+      const base = baseScore(moduleId, context.currentFunctionId, id, context.currentTargetId);
       let score = base.score;
       const factors = [...base.factors];
+      const route = evaluateHarmonicRoute(
+        {
+          moduleId,
+          currentFunctionId: context.currentFunctionId,
+          ...(context.currentTargetId ? { currentTargetId: context.currentTargetId } : {}),
+        },
+        id,
+        semanticTargetForFunction(moduleId, id),
+      );
       const previous = context.recentFunctionIds.at(-2);
       if (previous && previous === id) {
         score -= 8;
@@ -160,17 +178,46 @@ export function recommend(context: RecommendationContext): RecommendationResult 
         functionId: id,
         score,
         factors: Object.freeze(factors),
+        routeStatus: route.status,
+        ...(route.status === "requires-confirmation"
+          ? {
+              routeReason: route.reasonCode,
+              routeMessage: route.message,
+            }
+          : {}),
       } satisfies RecommendationCandidate;
     })
     .sort((a, b) => b.score - a.score || a.functionId.localeCompare(b.functionId));
 
-  const strong = candidates.filter((candidate) => candidate.score >= MIN_STRONG_SCORE);
-  const bestMatch = strong[0] ?? null;
-  const alternatives = bestMatch ? strong.slice(1, 4) : [];
+  const blockedCandidates = candidates.filter(
+    (candidate) => candidate.routeStatus === "requires-confirmation",
+  );
+  const strong = candidates.filter(
+    (candidate) =>
+      candidate.routeStatus !== "requires-confirmation" && candidate.score >= MIN_STRONG_SCORE,
+  );
+  const targetCandidate = directedTargetId
+    ? candidates.find((candidate) => candidate.functionId === directedTargetId)
+    : undefined;
+  const bestMatch = directedTargetId ? (targetCandidate ?? null) : (strong[0] ?? null);
+  const alternatives = bestMatch
+    ? strong
+        .filter(
+          (candidate) =>
+            candidate.functionId !== bestMatch.functionId &&
+            (!directedTargetId ||
+              !isTensionChord(
+                candidate.functionId,
+                semanticTargetForFunction(moduleId, candidate.functionId),
+              )),
+        )
+        .slice(0, 3)
+    : [];
   return {
     contextHash: JSON.stringify([
       moduleId,
       context.currentFunctionId,
+      context.currentTargetId ?? null,
       context.recentFunctionIds,
       context.variantEvidence ?? {},
       context.compositionIntent ?? "neutral",
@@ -178,5 +225,6 @@ export function recommend(context: RecommendationContext): RecommendationResult 
     ]),
     bestMatch,
     alternatives: Object.freeze(alternatives),
+    blockedCandidates: Object.freeze(blockedCandidates),
   };
 }

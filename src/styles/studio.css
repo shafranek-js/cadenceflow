@@ -1243,6 +1243,22 @@
   border-radius: var(--radius-panel);
   background: var(--surface);
 }
+.route-warning-dialog {
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.route-warning-dialog h2 {
+  margin-top: 0;
+}
+.route-warning-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
 .module-switch-dialog h2 {
   margin-top: 0;
 }
@@ -3362,6 +3378,11 @@ summary:focus-visible,
   box-shadow: inset 0 0 0 1px var(--recommendation-alternative);
 }
 
+.chord-card.recommendation-blocked {
+  border-color: #f59e0b;
+  box-shadow: inset 0 0 0 1px #f59e0b;
+}
+
 .recommendation-badge {
   display: inline-flex;
   align-items: center;
@@ -3379,6 +3400,17 @@ summary:focus-visible,
 
 .recommendation-alternative-badge {
   color: var(--recommendation-alternative);
+}
+
+.recommendation-blocked-badge {
+  color: #fbbf24;
+}
+
+.recommendation-blocked-symbol {
+  display: inline-grid;
+  width: 1em;
+  place-items: center;
+  font-weight: 900;
 }
 
 .card-view-switcher button[aria-pressed="true"] {
@@ -3717,6 +3749,23 @@ summary:focus-visible,
 
 .recommendation-inspector-body {
   padding: 0 var(--panel-padding) var(--panel-padding);
+}
+
+.recommendation-blocked-routes {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.recommendation-blocked-routes h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--warning);
+  font-size: 0.8rem;
+}
+
+.recommendation-blocked-routes ul {
+  margin: 0;
+  padding-inline-start: 1.1rem;
 }
 
 .harmony-details {
@@ -4998,6 +5047,7 @@ body {
 .project-menu,
 .matrix-reset-menu > div,
 .module-switch-dialog,
+.route-warning-dialog,
 .project-dialog,
 .voicing-editor-card {
   border-radius: var(--radius-panel);

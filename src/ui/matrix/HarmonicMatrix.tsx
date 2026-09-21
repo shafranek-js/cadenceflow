@@ -73,6 +73,9 @@ export function HarmonicMatrix({
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
   const alternatives = new Set(recommendations?.alternatives.map((item) => item.functionId) ?? []);
+  const blocked = new Map(
+    recommendations?.blockedCandidates.map((item) => [item.functionId, item]) ?? [],
+  );
   const workbenchRef = useRef<HTMLDivElement>(null);
   const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
 
@@ -113,7 +116,8 @@ export function HarmonicMatrix({
     const candidate =
       recommendations?.bestMatch?.functionId === identity.functionId
         ? recommendations.bestMatch
-        : recommendations?.alternatives.find((item) => item.functionId === identity.functionId);
+        : (recommendations?.alternatives.find((item) => item.functionId === identity.functionId) ??
+          blocked.get(identity.functionId));
 
     const targetIdForCard =
       semanticEntry?.targetId ?? identity.targetId ?? identity.targetFunctionId;
@@ -161,7 +165,9 @@ export function HarmonicMatrix({
               ? "best"
               : alternatives.has(identity.functionId)
                 ? "alternative"
-                : "none",
+                : blocked.has(identity.functionId)
+                  ? "blocked"
+                  : "none",
           ...(candidate ? { recommendation: candidate } : {}),
         }}
         view={view}

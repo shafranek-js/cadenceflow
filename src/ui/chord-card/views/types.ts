@@ -12,6 +12,6 @@ export interface ChordCardViewModel {
   readonly duration: MusicalDuration;
   readonly canRaiseStaffOctave: boolean;
   readonly canLowerStaffOctave: boolean;
-  readonly recommendationStatus: "best" | "alternative" | "none";
+  readonly recommendationStatus: "best" | "alternative" | "blocked" | "none";
   readonly recommendation?: RecommendationCandidate;
 }

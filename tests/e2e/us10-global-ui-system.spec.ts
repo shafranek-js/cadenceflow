@@ -110,7 +110,7 @@ test.describe("US10 Batch 4 — global UI system", () => {
     await chordMain.scrollIntoViewIfNeeded();
     await expect(chordMain).toHaveAttribute(
       "title",
-      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
     );
     const before = await chordMain.boundingBox();
     expect(before).not.toBeNull();

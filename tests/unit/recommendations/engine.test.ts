@@ -31,7 +31,7 @@ describe("Recommendation engine", () => {
     expect(result.bestMatch?.functionId).toBe("V");
   });
 
-  it("penalizes chaining tension chords without resolution (Don't Mix rule)", () => {
+  it("excludes tension-to-tension chains from ordinary recommendations", () => {
     const result = recommend({
       currentFunctionId: "V7/vi",
       recentFunctionIds: ["I", "V7/vi"],
@@ -40,10 +40,9 @@ describe("Recommendation engine", () => {
     expect(result.bestMatch?.functionId).toBe("vi");
     expect(result.bestMatch?.score).toBe(112);
 
-    // V7/ii is a chained tension chord without resolution
-    const v7ii = [...result.alternatives, result.bestMatch].find((c) => c?.functionId === "V7/ii");
-    // Since score is 10 (< MIN_STRONG_SCORE 68), it should not be in strong candidates
-    expect(v7ii).toBeUndefined();
+    const v7ii = result.blockedCandidates.find((c) => c.functionId === "V7/ii");
+    expect(v7ii?.routeStatus).toBe("requires-confirmation");
+    expect(v7ii?.routeReason).toBe("directed-tension-route-blocked");
   });
 
   it("boosts modal interchange entry and return in progressions", () => {
@@ -65,12 +64,15 @@ describe("Recommendation engine", () => {
       recentFunctionIds: ["IV", "bIII"],
       visibleFunctionIds: visible,
     });
-    expect(returnResult.bestMatch?.functionId).toBe("bVI"); // existing rule 84
-    const returnToI = returnResult.alternatives.find((c) => c.functionId === "I");
-    expect(returnToI?.score).toBe(78);
-    expect(returnToI?.factors).toContainEqual(
+    expect(returnResult.bestMatch?.functionId).toBe("I");
+    expect(returnResult.bestMatch?.score).toBe(78);
+    expect(returnResult.bestMatch?.factors).toContainEqual(
       expect.objectContaining({ code: "modal-corridor-return" }),
     );
+    expect(returnResult.blockedCandidates.find((c) => c.functionId === "bVI")).toMatchObject({
+      routeStatus: "requires-confirmation",
+      routeReason: "modal-corridor-return",
+    });
   });
 
   it("boosts recommendations matching active genreFocus with genre-affinity", () => {

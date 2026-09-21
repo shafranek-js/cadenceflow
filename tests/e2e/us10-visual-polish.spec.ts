@@ -47,7 +47,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await expect(card.getByTestId("chord-card-notes")).toContainText("C");
     await expect(card.locator(".chord-main")).toHaveAttribute(
       "title",
-      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
     );
     await expect(page.getByLabel("Global Card View")).toBeVisible();
     await expect(card.getByRole("group", { name: "View for I" })).toHaveCount(0);

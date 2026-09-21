@@ -25,21 +25,24 @@ export const MATRIX_ZONES: Readonly<Record<MatrixZoneId, MatrixZoneInfo>> = Obje
     id: "tension",
     badge: "Don't Mix",
     symbol: "⊘",
-    tooltip: "Tension chords must not be chained together — follow the resolution arrow to the target chord.",
-    rule: "Follow arrow to target chord",
+    tooltip:
+      "Directed tension recommends its canonical target; other tension routes require confirmation.",
+    rule: "Follow the arrow; manual overrides require confirmation",
   }),
   core: Object.freeze({
     id: "core",
     badge: "Mix Chords",
     symbol: "∞",
-    tooltip: "Diatonic core chords provide the harmonic foundation and can be freely mixed and sequenced.",
+    tooltip:
+      "Diatonic core chords provide the harmonic foundation and can be freely mixed and sequenced.",
     rule: "Freely mixable harmonic core",
   }),
   color: Object.freeze({
     id: "color",
     badge: "Modal Color",
     symbol: "≈",
-    tooltip: "Modal interchange and chromatic chords expand harmonic color; resolve toward I, IV, or V.",
+    tooltip:
+      "Modal interchange and chromatic chords expand harmonic color; resolve toward I, IV, or V.",
     rule: "Chromatic color / borrowed chords",
   }),
 });
@@ -67,14 +70,14 @@ export function getZoneForLayer(layerId: string): MatrixZoneInfo {
  * Canonical dictionary of resolution targets for tension / secondary chords.
  */
 const CANONICAL_RESOLUTION_TARGETS: Readonly<Record<string, string>> = Object.freeze({
-  "V7": "I",
+  V7: "I",
   "V7/I": "I",
   "V7/ii": "ii",
   "V7/iii": "iii",
   "V7/IV": "IV",
   "V7/V": "V",
   "V7/vi": "vi",
-  "N6": "V",
+  N6: "V",
 });
 
 /**

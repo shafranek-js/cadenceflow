@@ -646,7 +646,7 @@ code/reference/spec convergence and must not be treated as implementation accept
   desktop topology/layout-pressure acceptance, stable
   routing positions, all required fixtures, and old-project preservation before changing existing Matrix
   behavior (missing).
-- [ ] T191 [Batch 4] Replace advisory Don't Mix and Modal Corridor heuristics with the strict rule contract
+- [x] T191 [Batch 4] Replace advisory Don't Mix and Modal Corridor heuristics with the strict rule contract
   per FR-026–FR-036 and FR-243: after directed tension, `targetId` is the sole best candidate, other
   tension chords are excluded, and the strict I/IV/V corridor is enforced with a warning plus explicit
   `Add anyway`. Keep arrow/highlight direction and source/target column relationships visible without

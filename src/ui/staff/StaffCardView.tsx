@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import type { DiatonicStep, ExactPitch } from "../../domain/harmony/pitch";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { formatMusicalDuration, type MusicalDuration } from "../../domain/timing/duration";
@@ -26,6 +26,7 @@ export function StaffCardView({
   canShiftUp = true,
   canShiftDown = true,
   onSelect,
+  onKeyDown,
   onOctaveChange,
   hasContextMenu = false,
   suzukiColors = false,
@@ -44,6 +45,7 @@ export function StaffCardView({
   readonly canShiftUp?: boolean;
   readonly canShiftDown?: boolean;
   readonly onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
+  readonly onKeyDown?: ((event: KeyboardEvent<HTMLButtonElement>) => void) | undefined;
   readonly onOctaveChange: (direction: StaffOctaveDirection) => void;
   readonly hasContextMenu?: boolean;
   readonly suzukiColors?: boolean;
@@ -94,6 +96,7 @@ export function StaffCardView({
         data-progression-step-select={stepId ? "" : undefined}
         data-step-id={stepId}
         onClick={onSelect}
+        onKeyDown={onKeyDown}
         aria-label={selectionAriaLabel}
         aria-pressed={selected}
         aria-current={playing ? "step" : undefined}

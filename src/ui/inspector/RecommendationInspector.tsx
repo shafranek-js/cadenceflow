@@ -17,9 +17,11 @@ function readDisclosureState(): boolean {
 
 export function RecommendationInspector({
   candidate,
+  blockedCandidates = [],
   mode,
 }: {
   readonly candidate: RecommendationCandidate | null;
+  readonly blockedCandidates?: readonly RecommendationCandidate[];
   readonly mode: PresentationMode;
 }) {
   const [open, setOpen] = useState(readDisclosureState);
@@ -69,6 +71,25 @@ export function RecommendationInspector({
             </ul>
           </>
         )}
+        {blockedCandidates.length > 0 ? (
+          <section
+            className="recommendation-blocked-routes"
+            aria-label="Routes requiring confirmation"
+            data-testid="recommendation-blocked-routes"
+          >
+            <h3>Requires confirmation</h3>
+            <ul>
+              {blockedCandidates.map((blocked) => {
+                const blockedExplanation = explainRecommendation(blocked, mode);
+                return (
+                  <li key={blocked.functionId}>
+                    <strong>{blocked.functionId}</strong>: {blockedExplanation.details[0]}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ) : null}
       </div>
     </details>
   );

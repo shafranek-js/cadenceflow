@@ -13,10 +13,7 @@ export interface HarmonicFunctionSemantics {
   readonly styleHints: readonly string[];
   readonly rule: string;
   readonly tendencyType:
-    | "dominant-resolution"
-    | "free-combinatorial"
-    | "modal-color"
-    | "diminished-tension";
+    "dominant-resolution" | "free-combinatorial" | "modal-color" | "diminished-tension";
 }
 
 const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = Object.freeze({
@@ -24,7 +21,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   V7: Object.freeze({
     functionId: "V7",
     title: "Первичный доминантсептаккорд к тонике I",
-    description: "Создает максимальное доминантовое напряжение, требующее прямого разрешения в тонику I.",
+    description:
+      "Создает максимальное доминантовое напряжение, требующее прямого разрешения в тонику I.",
     emotionalColor: "Напряжённое ожидание опоры (Expectant pull)",
     styleHints: Object.freeze(["Blues", "Jazz", "Classical", "Pop Standard"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в тонику I",
@@ -33,7 +31,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   "V7/vi": Object.freeze({
     functionId: "V7/vi",
     title: "Вторичная доминанта к параллельному минору vi",
-    description: "Подготавливает параллельный минор vi, создавая мягкий романтический или ностальгический переход.",
+    description:
+      "Подготавливает параллельный минор vi, создавая мягкий романтический или ностальгический переход.",
     emotionalColor: "Теплота, ностальгия, лирика (Warm nostalgia)",
     styleHints: Object.freeze(["Pop Ballad", "Neo-Soul", "R&B", "Classical"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в vi",
@@ -42,7 +41,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   "V7/IV": Object.freeze({
     functionId: "V7/IV",
     title: "Вторичная доминанта к субдоминанте IV",
-    description: "Тонизирует субдоминанту IV через мажорный септаккорд на 1-й ступени (I7), создавая яркий гармонический подъём.",
+    description:
+      "Тонизирует субдоминанту IV через мажорный септаккорд на 1-й ступени (I7), создавая яркий гармонический подъём.",
     emotionalColor: "Яркий подъём, предвкушение кульминации (Bright lift)",
     styleHints: Object.freeze(["Gospel", "Blues", "Soul", "Classic Rock"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в IV",
@@ -51,7 +51,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   "V7/ii": Object.freeze({
     functionId: "V7/ii",
     title: "Вторичная доминанта ко второй ступени ii",
-    description: "Мажорный аккорд на 6-й ступени (VI7) с хроматическим движением в субдоминантовую пре-доминанту ii.",
+    description:
+      "Мажорный аккорд на 6-й ступени (VI7) с хроматическим движением в субдоминантовую пре-доминанту ii.",
     emotionalColor: "Элегантный джазовый разворот (Sophisticated turnaround)",
     styleHints: Object.freeze(["Jazz Standard", "Bossa Nova", "Lo-Fi", "Neo-Soul"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в ii",
@@ -60,7 +61,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   "V7/V": Object.freeze({
     functionId: "V7/V",
     title: "Двойная доминанта (доминанта к V)",
-    description: "Мажорный аккорд на 2-й ступени (II7), создающий мощный хроматический импульс в доминанту V.",
+    description:
+      "Мажорный аккорд на 2-й ступени (II7), создающий мощный хроматический импульс в доминанту V.",
     emotionalColor: "Энергичный разгон, решительность (Energetic drive)",
     styleHints: Object.freeze(["Rock", "Classical", "Pop", "Country"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в V",
@@ -69,7 +71,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   "V7/iii": Object.freeze({
     functionId: "V7/iii",
     title: "Вторичная доминанта к третьей ступени iii",
-    description: "Подготавливает минорную медианту iii, обостряя гармонический драматизм и ладовое напряжение.",
+    description:
+      "Подготавливает минорную медианту iii, обостряя гармонический драматизм и ладовое напряжение.",
     emotionalColor: "Драматический мистицизм (Dramatic tension)",
     styleHints: Object.freeze(["Cinematic", "Progressive Rock", "Neo-Soul"]),
     rule: "Don't Mix (⊘): Разрешается строго вниз в iii",
@@ -80,7 +83,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   I: Object.freeze({
     functionId: "I",
     title: "Главная тоническая опора мажора",
-    description: "Центральный узел стабильности и покоя, окончательный пункт назначения всех тяготений.",
+    description:
+      "Центральный узел стабильности и покоя, окончательный пункт назначения всех тяготений.",
     emotionalColor: "Полная стабильность и покой (Tonic resolution)",
     styleHints: Object.freeze(["All Genres", "Pop", "Classical", "Acoustic"]),
     rule: "Mix Chords (∞): Свободная гармоническая комбинаторика",
@@ -89,7 +93,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   vi: Object.freeze({
     functionId: "vi",
     title: "Параллельный минор тоники",
-    description: "Мягкий минорный центр, идеально подходящий для куплетов и элегических контрастов.",
+    description:
+      "Мягкий минорный центр, идеально подходящий для куплетов и элегических контрастов.",
     emotionalColor: "Меланхоличная глубина (Elegiac warmth)",
     styleHints: Object.freeze(["Pop", "Indie Rock", "Folk", "Ballad"]),
     rule: "Mix Chords (∞): Свободная гармоническая комбинаторика",
@@ -98,7 +103,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   IV: Object.freeze({
     functionId: "IV",
     title: "Субдоминанта (гармонический подъём)",
-    description: "Создает ощущение движения вперед, раскрытия пространства и эмоционального подъема.",
+    description:
+      "Создает ощущение движения вперед, раскрытия пространства и эмоционального подъема.",
     emotionalColor: "Светлый оптимизм, полёт (Uplifting breath)",
     styleHints: Object.freeze(["Pop Rock", "Anthem", "Country", "Worship"]),
     rule: "Mix Chords (∞): Свободная гармоническая комбинаторика",
@@ -116,7 +122,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   V: Object.freeze({
     functionId: "V",
     title: "Доминанта (тяготение в тонику)",
-    description: "Квинтэссенция функционального тяготения, максимально стремящаяся разрешиться в тонику I.",
+    description:
+      "Квинтэссенция функционального тяготения, максимально стремящаяся разрешиться в тонику I.",
     emotionalColor: "Энергичное ожидание разрешения (Culmination)",
     styleHints: Object.freeze(["All Genres", "Classical", "Rock", "Pop"]),
     rule: "Mix Chords (∞): Свободная гармоническая комбинаторика",
@@ -145,7 +152,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   bIII: Object.freeze({
     functionId: "bIII",
     title: "Низкая терция (заимствование из параллельного минора)",
-    description: "Эпический мажорный аккорд параллельного минора, создающий мощный эмоциональный взлёт.",
+    description:
+      "Эпический мажорный аккорд параллельного минора, создающий мощный эмоциональный взлёт.",
     emotionalColor: "Эпический подъём, героизм (Epic lift)",
     styleHints: Object.freeze(["Cinematic", "Alternative Rock", "Post-Rock", "Epic Pop"]),
     rule: "Modal Color (≈): Вход из I, IV, V; выход обратно в I, IV, V",
@@ -154,7 +162,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   bVI: Object.freeze({
     functionId: "bVI",
     title: "Низкая секста (заимствование из параллельного минора)",
-    description: "Драматический аккорд параллельного минора, создающий мощный хроматический контраст перед V или I.",
+    description:
+      "Драматический аккорд параллельного минора, создающий мощный хроматический контраст перед V или I.",
     emotionalColor: "Драматическая глубина, тайна (Dramatic grandeur)",
     styleHints: Object.freeze(["Cinematic", "Film Score", "Neo-Soul", "Dark Pop", "Synthwave"]),
     rule: "Modal Color (≈): Вход из I, IV, V; выход обратно в I, IV, V",
@@ -163,7 +172,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   iv: Object.freeze({
     functionId: "iv",
     title: "Минорная субдоминанта (ностальгический окрас)",
-    description: "Золотой стандарт романтической меланхолии и разрешения в тонику (цепочка IV – iv – I).",
+    description:
+      "Золотой стандарт романтической меланхолии и разрешения в тонику (цепочка IV – iv – I).",
     emotionalColor: "Ностальгия, щемящая грусть (Bitter-sweet nostalgia)",
     styleHints: Object.freeze(["Beatles-style", "Lo-Fi Hip-Hop", "Indie Pop", "Ballad", "Gospel"]),
     rule: "Modal Color (≈): Вход из I, IV, V; выход обратно в I, IV, V",
@@ -183,7 +193,8 @@ const FUNCTION_SEMANTICS: Readonly<Record<string, HarmonicFunctionSemantics>> = 
   N6: Object.freeze({
     functionId: "N6",
     title: "Неаполитанский секстаккорд (♭II с басом на 4 ступени)",
-    description: "Хроматическая субдоминанта в первом обращении (B♭/D в Am), мягко ведущая бас в доминанту V.",
+    description:
+      "Хроматическая субдоминанта в первом обращении (B♭/D в Am), мягко ведущая бас в доминанту V.",
     emotionalColor: "Трагическое величие (Tragic elegance)",
     styleHints: Object.freeze(["Classical", "Cinematic", "Gothic", "Metal"]),
     rule: "Don't Mix (⊘): Разрешается в V",
@@ -238,13 +249,7 @@ export function getFunctionSemantics(functionId: string): HarmonicFunctionSemant
 }
 
 export type GenreFocusId =
-  | "all"
-  | "neo-soul"
-  | "jazz"
-  | "gospel"
-  | "pop-ballad"
-  | "cinematic"
-  | "rock";
+  "all" | "neo-soul" | "jazz" | "gospel" | "pop-ballad" | "cinematic" | "rock";
 
 export interface GenreFocusOption {
   readonly id: GenreFocusId;
@@ -264,7 +269,8 @@ export const GENRE_FOCUS_OPTIONS: readonly GenreFocusOption[] = Object.freeze([
     id: "neo-soul",
     label: "Neo-Soul",
     tags: Object.freeze(["Neo-Soul", "R&B", "Soul", "Lo-Fi", "Bossa Nova"]),
-    description: "Rich extensions, secondary dominants (V7/ii, V7/vi), and warm minor substitutions",
+    description:
+      "Rich extensions, secondary dominants (V7/ii, V7/vi), and warm minor substitutions",
   },
   {
     id: "jazz",
@@ -282,7 +288,8 @@ export const GENRE_FOCUS_OPTIONS: readonly GenreFocusOption[] = Object.freeze([
     id: "pop-ballad",
     label: "Pop / Ballad",
     tags: Object.freeze(["Pop", "Pop Ballad", "Pop Standard", "Country", "Folk"]),
-    description: "Emotional diatonic cores (I-V-vi-IV), warm deceptive resolutions, and acoustic balance",
+    description:
+      "Emotional diatonic cores (I-V-vi-IV), warm deceptive resolutions, and acoustic balance",
   },
   {
     id: "cinematic",
@@ -293,8 +300,16 @@ export const GENRE_FOCUS_OPTIONS: readonly GenreFocusOption[] = Object.freeze([
   {
     id: "rock",
     label: "Rock",
-    tags: Object.freeze(["Rock", "Classic Rock", "Alternative Rock", "Metal", "Post-Rock", "Synthwave"]),
-    description: "Powerful borrowed modal chords (bVII, bVI, bIII), double dominant (V7/V), and minor roots",
+    tags: Object.freeze([
+      "Rock",
+      "Classic Rock",
+      "Alternative Rock",
+      "Metal",
+      "Post-Rock",
+      "Synthwave",
+    ]),
+    description:
+      "Powerful borrowed modal chords (bVII, bVI, bIII), double dominant (V7/V), and minor roots",
   },
 ]);
 

@@ -33,7 +33,13 @@ import {
   baselineFunctionIdentities,
   getHarmonicModule,
   recommendationVocabulary,
+  topologyEntryForFunction,
 } from "../domain/harmony/moduleRegistry";
+import {
+  evaluateHarmonicRoute,
+  semanticTargetForFunction,
+  type HarmonicRouteDecision,
+} from "../domain/harmony/routing";
 import { planModuleSwitch, type ModuleSwitchPlan } from "../domain/harmony/moduleSwitch";
 import {
   modeForModule,
@@ -55,6 +61,7 @@ import {
 } from "../domain/progression/step";
 import { HarmonicMatrix } from "../ui/matrix/HarmonicMatrix";
 import { ModuleSwitchDialog } from "../ui/matrix/ModuleSwitchDialog";
+import { RouteWarningDialog } from "../ui/matrix/RouteWarningDialog";
 import { RecommendationInspector } from "../ui/inspector/RecommendationInspector";
 import { HarmonyDetails } from "../ui/inspector/HarmonyDetails";
 import { CompositionIntentControl } from "../ui/inspector/CompositionIntentControl";
@@ -306,6 +313,13 @@ export function App() {
   );
   const { project, matrixSession } = useStore(store);
   const [pendingSwitch, setPendingSwitch] = useState<ModuleSwitchPlan | null>(null);
+  const [pendingRouteWarning, setPendingRouteWarning] = useState<{
+    readonly functionId: string;
+    readonly decision: HarmonicRouteDecision;
+    readonly branch: boolean;
+    readonly restoreMatrixPreview: string | undefined;
+    readonly clearMatrixPreviewOnCancel: boolean;
+  } | null>(null);
   const [selectedBranchStepIds, setSelectedBranchStepIds] = useState<readonly string[]>(
     Object.freeze([]),
   );
@@ -1007,6 +1021,15 @@ export function App() {
   const current = project.temporaryBranch
     ? pathFunctionIds.at(-1)
     : (matrixSession.previewFunctionId ?? pathFunctionIds.at(-1));
+  const currentTopologyEntry = current
+    ? topologyEntryForFunction(project.activeModule, current)
+    : undefined;
+  const currentTargetId = current
+    ? (currentTopologyEntry?.targetId ??
+      currentTopologyEntry?.identity.targetId ??
+      currentTopologyEntry?.identity.targetFunctionId ??
+      semanticTargetForFunction(project.activeModule, current))
+    : undefined;
   const recommendationHistory = project.temporaryBranch
     ? pathFunctionIds
     : [
@@ -1017,6 +1040,7 @@ export function App() {
     ? recommend({
         moduleId: project.activeModule,
         currentFunctionId: current,
+        ...(currentTargetId ? { currentTargetId } : {}),
         recentFunctionIds: recommendationHistory,
         visibleFunctionIds: vocabulary.map((identity) => identity.functionId),
         compositionIntent: project.temporaryBranch?.compositionIntent ?? "neutral",
@@ -1024,8 +1048,18 @@ export function App() {
       })
     : null;
 
+  const routeContext = {
+    moduleId: project.activeModule,
+    ...(current ? { currentFunctionId: current } : {}),
+    ...(currentTargetId ? { currentTargetId } : {}),
+  } as const;
+
   const contextualIds = new Set<string>();
-  for (const candidate of [recommendations?.bestMatch, ...(recommendations?.alternatives ?? [])]) {
+  for (const candidate of [
+    recommendations?.bestMatch,
+    ...(recommendations?.alternatives ?? []),
+    ...(recommendations?.blockedCandidates ?? []),
+  ]) {
     if (candidate?.functionId.startsWith("vii°7/") && !baselineIds.has(candidate.functionId))
       contextualIds.add(candidate.functionId);
   }
@@ -1065,6 +1099,48 @@ export function App() {
     };
     store.dispatch(command, addBranchPreview);
   };
+  const addWithRouteGuard = (functionId: string, branch: boolean): boolean => {
+    // A card may already be the active preview when the user explicitly adds it.
+    // In that case the real append transition starts at the committed progression
+    // endpoint, not at the preview itself; otherwise a blocked X -> Y route could
+    // be mistaken for the harmless Y -> Y identity transition.
+    const sourceFunctionId =
+      !branch && routeContext.currentFunctionId === functionId
+        ? pathFunctionIds.at(-1)
+        : routeContext.currentFunctionId;
+    const sourceEntry = sourceFunctionId
+      ? topologyEntryForFunction(project.activeModule, sourceFunctionId)
+      : undefined;
+    const sourceTargetId = sourceFunctionId
+      ? (sourceEntry?.targetId ??
+        sourceEntry?.identity.targetId ??
+        sourceEntry?.identity.targetFunctionId ??
+        semanticTargetForFunction(project.activeModule, sourceFunctionId))
+      : undefined;
+    const targetEntry = topologyEntryForFunction(project.activeModule, functionId);
+    const decision = evaluateHarmonicRoute(
+      {
+        moduleId: project.activeModule,
+        ...(sourceFunctionId ? { currentFunctionId: sourceFunctionId } : {}),
+        ...(sourceTargetId ? { currentTargetId: sourceTargetId } : {}),
+      },
+      functionId,
+      targetEntry?.targetId ?? targetEntry?.identity.targetId,
+    );
+    if (decision.status === "requires-confirmation") {
+      setPendingRouteWarning({
+        functionId,
+        decision,
+        branch,
+        restoreMatrixPreview: branch ? undefined : matrixSession.previewFunctionId,
+        clearMatrixPreviewOnCancel: !branch,
+      });
+      return false;
+    }
+    if (branch) addToBranch(functionId);
+    else addToProgression(functionId);
+    return true;
+  };
   const auditionMatrixCard = (functionId: string) => {
     if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === "suspended") {
       void sharedAudioContextRef.current.resume();
@@ -1102,7 +1178,7 @@ export function App() {
     setSettingsFunctionId(null);
     setVoicingEditorOpen(false);
     if (project.temporaryBranch) {
-      addToBranch(functionId);
+      if (!addWithRouteGuard(functionId, true)) return;
     } else {
       store.selectMatrixPreview(functionId);
     }
@@ -1111,8 +1187,27 @@ export function App() {
   const add = (functionId: string) => {
     setSettingsFunctionId(null);
     setVoicingEditorOpen(false);
-    if (project.temporaryBranch) addToBranch(functionId);
-    else addToProgression(functionId);
+    if (project.temporaryBranch) addWithRouteGuard(functionId, true);
+    else addWithRouteGuard(functionId, false);
+  };
+  const confirmPendingRoute = () => {
+    const pending = pendingRouteWarning;
+    if (!pending) return;
+    setPendingRouteWarning(null);
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
+    if (pending.branch) {
+      addToBranch(pending.functionId);
+      auditionMatrixCard(pending.functionId);
+    } else {
+      addToProgression(pending.functionId);
+    }
+  };
+  const cancelPendingRoute = () => {
+    const pending = pendingRouteWarning;
+    setPendingRouteWarning(null);
+    if (pending?.restoreMatrixPreview) store.selectMatrixPreview(pending.restoreMatrixPreview);
+    else if (pending?.clearMatrixPreviewOnCancel) store.clearMatrixPreview();
   };
 
   const patchTemplatePerformance = (overrides: StepPerformanceOverrides) => {
@@ -3484,7 +3579,9 @@ export function App() {
               aria-atomic="true"
               data-testid="matrix-recommendation-status"
             >
-              No strong recommendation for this context. Passive choices remain available.
+              {recommendations.blockedCandidates.length > 0
+                ? "Strict route requires confirmation. Visible choices remain available."
+                : "No strong recommendation for this context. Passive choices remain available."}
             </span>
           ) : null}
           <PianoAudioStatus
@@ -3544,6 +3641,7 @@ export function App() {
           {globalSettingsVisibility.showRecommendationContext ? (
             <RecommendationInspector
               candidate={inspected}
+              blockedCandidates={recommendations?.blockedCandidates ?? []}
               mode={project.presentation.expertiseMode}
             />
           ) : null}
@@ -3965,6 +4063,13 @@ export function App() {
       }
       overlays={
         <>
+          {pendingRouteWarning ? (
+            <RouteWarningDialog
+              decision={pendingRouteWarning.decision}
+              onCancel={cancelPendingRoute}
+              onConfirm={confirmPendingRoute}
+            />
+          ) : null}
           {pendingSwitch ? (
             <ModuleSwitchDialog
               plan={pendingSwitch}

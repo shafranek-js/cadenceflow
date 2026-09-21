@@ -1,9 +1,9 @@
 # CadenceFlow — Project Status / Development Handoff
 
 **Handoff date:** 2026-09-20
-**Current implementation stage:** T190 canonical Matrix topology and N6 projection semantics are
-independently accepted. T191 remains unstarted pending explicit authorization.
-**Task progress:** 197 task IDs: 190 checked and 7 open roadmap tasks in `tasks.md`.
+**Current implementation stage:** T191 strict directed-tension and Modal Corridor routing is independently
+accepted. T192 and later roadmap batches remain unauthorized pending explicit user direction.
+**Task progress:** 197 task IDs: 191 checked and 6 open roadmap tasks in `tasks.md`.
 **Authoritative feature:** `specs/001-cadenceflow-core-studio/`
 
 ## 1. Current goal
@@ -806,8 +806,8 @@ Current implementation evidence is now recorded as follows:
   for error/fallback states; it no longer opens a settings popover. These engine/tone fields are active
   session settings only: the current portable/autosave codec writes instrument, muted, solo, and volume but
   does not round-trip engine/tone fields. T197 is the open codec/schema/autosave/export/Undo prerequisite.
-- **Deferred roadmap:** T190 now closes the three-zone physical-board and canonical six-column topology.
-  The remaining Batch 4–8 queue (T191–T197) covers strict Don’t Mix/Modal Corridor behavior,
+- **Deferred roadmap:** T190 closes the three-zone physical-board and canonical six-column topology, and
+  T191 closes strict Don’t Mix/Modal Corridor behavior. The remaining Batch 5–8 queue (T192–T197) covers
   Piano Scale Tones/Melody harmonic roles and Target Notes, atomic Explorer Apply, Focus Mode/Card Flip,
   printable A4/release gate, remaining nylon/PNG provenance/IP evidence, and engine/tone codec persistence.
 
@@ -841,7 +841,7 @@ remote status/checklist update was performed.
 
 Independent acceptance confirmed the final 243-FR / 32-SC / 197-task artifact set, the single future
 schema-v5-to-v6 boundary shared by T192/T197, and the physical-board spatial contract now implemented in
-T190 with strict routing behavior remaining in T191.
+T190 and the strict routing behavior independently accepted in T191.
 Focused UI Vitest passed 14/14 and Chromium passed 2/2; the production build passed with only the known
 large-chunk warning. Scoped Prettier and `git diff --check` passed. Visual inspection confirmed that Matrix
 `AudioEnginesInspector` is the only engine/tone settings surface, All Steps & Measures retains track-local
@@ -865,5 +865,22 @@ card. Independent acceptance passed focused Vitest (7 files / 32 tests), focused
 Matrix-width regression coverage), the production build, scoped ESLint/Prettier, and `git diff --check`.
 Visual inspection covered Progressions and Dark Harmony at 1920x1080, 1280x720, dark/light themes, and 200%
 equivalent layout pressure with no page-level overflow. Review kept the accessible no-recommendation status
-but moved it into the fixed bottom status bar so recommendation changes cannot shift the Matrix. T191 was not
-started.
+but moved it into the fixed bottom status bar so recommendation changes cannot shift the Matrix.
+
+## 19. Strict directed-tension and Modal Corridor routing — T191 independently accepted
+
+T191 makes topology `targetId` the sole Best Match after directed tension, removes other tension chords from
+ordinary Alternatives, and keeps every valid visible card selectable through an explicit confirmation path.
+Progressions Modal Interchange now enters and returns through I, IV, or V; manual violations open a focused
+`Add anyway` dialog and Cancel restores the prior preview without mutating the progression or a temporary
+branch. The physical-board label remains `Don't Mix`, while explanations describe the directed-tension rule.
+
+Independent review fixed three acceptance gaps: blocked-route badges were shortened to a compact `Confirm`
+state, blocked rationale was added to the optional Recommendation Inspector, and `Ctrl+Enter` now follows the
+same guarded Add path in every Matrix card view. Review also closed a preview-first bypass in which adding an
+already-previewed forbidden card could be misread as a same-card transition. Focused Vitest passed 5 files / 34
+tests; focused Chromium passed the final T191 suite 4/4 plus the T190/T191 regression run 8/8. The production
+build, scoped Prettier, scoped ESLint with zero errors, and `git diff --check` passed. The only remaining build
+diagnostic is the known large JavaScript chunk warning; scoped ESLint retains three pre-existing `App.tsx`
+hook warnings outside this batch. Visual review confirmed compact dark-theme Matrix states, keyboard focus,
+the warning dialog, stable columns, and no new layout shift. No T192 or later work was started.

@@ -7,10 +7,10 @@ const BEGINNER: Readonly<Record<string, string>> = {
   "secondary-dominant-resolution": "This dominant strongly points to its target chord.",
   "deceptive-resolution": "Avoids the expected tonic for a softer surprise.",
   "minor-plagal-resolution": "A darker borrowed chord resolves warmly to the tonic.",
-  "dont-mix-tension-chain": "Avoid chaining tension chords without resolving them.",
   "modal-corridor-entry": "Steps into an expressive borrowed chord from the parallel minor.",
   "modal-corridor-return": "Smooth return from modal coloration back to the primary key.",
-  "secondary-diminished-resolution": "This diminished chord creates intense pull directly into its target.",
+  "secondary-diminished-resolution":
+    "This diminished chord creates intense pull directly into its target.",
   "approach-via-secondary-diminished": "Uses a dramatic diminished approach toward a key harmony.",
   "genre-affinity": "Aligns naturally with the selected musical style.",
 };
@@ -24,6 +24,24 @@ export function explainRecommendation(
   candidate: RecommendationCandidate,
   mode: PresentationMode,
 ): RecommendationExplanation {
+  if (candidate.routeStatus === "requires-confirmation") {
+    if (mode === "beginner") {
+      return {
+        headline: "Requires confirmation",
+        details: [candidate.routeMessage ?? "This route is outside the current harmonic corridor."],
+      };
+    }
+    if (mode === "composer") {
+      return {
+        headline: "requires confirmation",
+        details: [candidate.routeMessage ?? "This route overrides the current harmonic corridor."],
+      };
+    }
+    return {
+      headline: `${candidate.routeReason ?? "route-blocked"} · score ${candidate.score}`,
+      details: [candidate.routeMessage ?? "The route requires explicit confirmation."],
+    };
+  }
   const top = [...candidate.factors].sort(
     (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution),
   );

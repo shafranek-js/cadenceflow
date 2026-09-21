@@ -345,7 +345,7 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(cardBodyButton).not.toBeNull();
     expect(container.querySelector(".add-chord")).toBeNull();
     expect(cardBodyButton.title).toBe(
-      "Click to preview; Ctrl-click to add to My Progression; Alt-click to reset card settings",
+      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
     );
 
     // Baseline: 0 invocations
@@ -389,11 +389,18 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(onAddSpy).toHaveBeenCalledTimes(2);
     expect(onSelectSpy).toHaveBeenCalledTimes(7);
 
-    // 8. Alt-click resets the card template without previewing or adding a step
+    // 8. Ctrl+Enter follows the same explicit add path and does not rely on a synthetic click.
+    cardBodyButton.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, ctrlKey: true, key: "Enter" }),
+    );
+    expect(onAddSpy).toHaveBeenCalledTimes(3);
+    expect(onSelectSpy).toHaveBeenCalledTimes(8);
+
+    // 9. Alt-click resets the card template without previewing or adding a step
     cardBodyButton.dispatchEvent(new MouseEvent("click", { bubbles: true, altKey: true }));
     expect(onResetSpy).toHaveBeenCalledTimes(1);
-    expect(onSelectSpy).toHaveBeenCalledTimes(7);
-    expect(onAddSpy).toHaveBeenCalledTimes(2);
+    expect(onSelectSpy).toHaveBeenCalledTimes(8);
+    expect(onAddSpy).toHaveBeenCalledTimes(3);
 
     act(() => {
       root.unmount();

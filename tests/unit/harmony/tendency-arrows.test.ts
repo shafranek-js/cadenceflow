@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  MATRIX_ZONES,
-  getZoneForLayer,
-  getResolutionTarget,
-} from "../../../src/domain/harmony/tendencyArrows";
+import { getZoneForLayer, getResolutionTarget } from "../../../src/domain/harmony/tendencyArrows";
 
 describe("Harmonic tendency arrows and functional zoning", () => {
   describe("getZoneForLayer", () => {
