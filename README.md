@@ -22,6 +22,11 @@
 
 Whether you are exploring modal interchange in jazz, writing a classical chorale, arranging chord progressions for a song, or learning functional harmony, CadenceFlow provides a unified, highly responsive canvas with exact rational timing, continuous multi-measure score systems, contextual harmonic recommendations, voice-leading automation, and DAW-grade MIDI and MusicXML export.
 
+The accepted implementation currently extends through **T191**. The remaining roadmap is tracked in
+[`PROJECT_STATUS.md`](PROJECT_STATUS.md) and
+[`specs/001-cadenceflow-core-studio/tasks.md`](specs/001-cadenceflow-core-studio/tasks.md); schema v5 remains
+the current portable project format.
+
 ---
 
 ## Key Features
@@ -33,6 +38,8 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
   - **Tonal Minor**: Natural, harmonic, and melodic minor systems with bounded chromatic color chords; advanced augmented-sixth vocabulary remains deferred.
   - **Dark Harmony**: Minor-dominant modal topologies, Neapolitan chords ($N^6$), and chromatic voice-leading substitutions.
 - **Contextual Recommendation Engine**: Analyzes your progression in real time and proposes **Best Match** and **Alternative** continuations with explainable theoretical rationale.
+- **Canonical Matrix Topology**: Progressions and Dark Harmony use six stable semantic columns with vertically aligned Secondary Dominants, Main Chords, and Modal Interchange relationships. Auxiliary substitutions stay visible in labeled side slots rather than separate `Additional` rows.
+- **Strict Harmonic Routing**: Directed-tension chords expose their canonical `targetId` as the sole Best Match. Modal Interchange follows an I/IV/V corridor, while intentional departures remain possible through an explicit, non-mutating `Add anyway` confirmation.
 - **Safe Mode & Key Switching**: Dynamic re-realization across keys (e.g., $C \to D$) and modes with preservation of harmonic function and pitch spelling.
 - **Audition vs. Commit Isolation**: Clicking a chord card in the Matrix auditions it immediately in context without polluting project history or mutating the progression until explicitly added.
 
@@ -54,7 +61,7 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **88-Key Coverage**: Nearest-sample transposition across 30 recorded roots for pristine sample fidelity.
 - **Zero-Drift WebAudio Look-Ahead Scheduler**: Decoupled from the React render loop to guarantee sample-accurate event dispatching.
 - **128 MB LRU Decoded PCM Audio Cache**: Keeps active samples in memory with automatic eviction and zero playback stalling.
-- **SoundFont Compatibility Fallback**: SF2/SF3 compatibility provider ensures playback availability on low-spec devices or offline setups.
+- **Selectable Audio Engines**: Piano and Guitar can use their HQ sample engine or a SoundFont engine. Engine and tone selection live in the Matrix Audio Engines inspector; track controls remain focused on instrument, volume, Mute/Solo, status, and retry.
 - **Live Status Indicator**: Real-time header badge reflecting audio provider states (`loading`, `ready`, `fallback`, `error`).
 
 ### 4. Dedicated Melody Track & Derived Staff View
@@ -63,7 +70,10 @@ Whether you are exploring modal interchange in jazz, writing a classical chorale
 - **Derived Staff View**: Display the progression and optional Melody layer as VexFlow grand-staff notation with clefs, chord symbols, noteheads, selection, context actions, and playback highlighting.
 - **128-Program Melody Catalog**: Choose any General MIDI melodic program from the grouped picker. All 128
   entries resolve to manifest-backed local FluidR3_GM sample maps and load on demand; the six historical
-  ids remain stable compatibility identifiers.
+  ids remain stable compatibility identifiers. Production playback has no CDN fallback.
+- **Global and Step-Local Instruments**: A Melody Track instrument acts as the default, while individual Chord
+  Steps can override it. Staff, playback, MIDI, and MusicXML partition Melody events by effective instrument,
+  so unrelated notes remain on their own instrument lines and tracks.
 - **Guitar & Tablature Views**: Inspect deterministic chord shapes, fingering, in-position Scale Tones,
   and tablature, with independent HQ Samples/SoundFont Guitar engines and bounded strum timing.
 - **Scales & Modes Explorer**: Explore diatonic, minor-variant, pentatonic, and Blues scales with
@@ -205,14 +215,15 @@ pnpm run format:check
 
 ## Keyboard Shortcuts
 
-| Shortcut                                                                          | Context         | Action                           |
-| :-------------------------------------------------------------------------------- | :-------------- | :------------------------------- |
-| <kbd>Space</kbd>                                                                  | Global          | Play / Pause transport           |
-| <kbd>Enter</kbd> / <kbd>Space</kbd>                                               | Harmonic Matrix | Audition focused chord card      |
-| <kbd>Escape</kbd>                                                                 | Global          | Dismiss selection / Close modals |
-| <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Cmd</kbd> + <kbd>Z</kbd>                    | Global          | Undo last action                 |
-| <kbd>Ctrl</kbd> + <kbd>Y</kbd> / <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Global          | Redo last undone action          |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd>                                | Modal Dialogs   | Accessible focus navigation trap |
+| Shortcut                                                                          | Context         | Action                             |
+| :-------------------------------------------------------------------------------- | :-------------- | :--------------------------------- |
+| <kbd>Space</kbd>                                                                  | Global          | Play / Pause transport             |
+| <kbd>Enter</kbd> / <kbd>Space</kbd>                                               | Harmonic Matrix | Audition focused chord card        |
+| <kbd>Ctrl</kbd> + <kbd>Enter</kbd>                                                | Harmonic Matrix | Add focused chord with route guard |
+| <kbd>Escape</kbd>                                                                 | Global          | Dismiss selection / Close modals   |
+| <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Cmd</kbd> + <kbd>Z</kbd>                    | Global          | Undo last action                   |
+| <kbd>Ctrl</kbd> + <kbd>Y</kbd> / <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Global          | Redo last undone action            |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd>                                | Modal Dialogs   | Accessible focus navigation trap   |
 
 ---
 
