@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalSampleMapBytes } from "./lib/canonicalSampleMapBytes";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const publicRoot = join(repositoryRoot, "public");
@@ -23,6 +24,10 @@ interface ManifestAsset {
   readonly sourceFile: string;
   readonly size: number;
   readonly sha256: string;
+  readonly sourceSize?: number;
+  readonly sourceSha256?: string;
+  readonly sourceUrl?: string;
+  readonly derivation?: string;
 }
 
 interface ManifestProgram {
@@ -32,10 +37,8 @@ interface ManifestProgram {
   readonly asset: string;
 }
 
-async function sha256(path: string): Promise<string> {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
+function sha256(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function localAssetPath(program: number, sourceName: string): string {
@@ -71,12 +74,31 @@ async function main(): Promise<void> {
     const filePath = join(publicRoot, relativePath);
     const file = await stat(filePath);
     if (!file.isFile()) throw new Error(`Manifest asset is not a file: ${entry.asset}`);
+    const canonicalBytes = canonicalSampleMapBytes(await readFile(filePath));
     assets[entry.asset] = {
       sourceName: entry.sourceName,
       sourceFile: `${entry.sourceName}-mp3.js`,
-      size: file.size,
-      sha256: await sha256(filePath),
+      size: canonicalBytes.byteLength,
+      sha256: sha256(canonicalBytes),
     };
+    if (entry.sourceName === "acoustic_guitar_nylon") {
+      if (
+        canonicalBytes.byteLength !== 1837439 ||
+        sha256(canonicalBytes) !==
+          "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64"
+      ) {
+        throw new Error("nylon guitar sample map does not match the pinned canonical source");
+      }
+      assets[entry.asset] = {
+        ...assets[entry.asset],
+        sourceSize: 1837439,
+        sourceSha256: "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64",
+        sourceUrl:
+          "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM/acoustic_guitar_nylon-mp3.js",
+        derivation:
+          "Pinned upstream LF bytes; Git may convert the 94 LF line endings to CRLF in Windows checkouts. Sample data unchanged.",
+      };
+    }
   }
 
   const manifest = {
@@ -84,6 +106,8 @@ async function main(): Promise<void> {
     instrumentId: "fluidr3-gm-midi-js-samples",
     displayName: "FluidR3 GM sampled melody instruments",
     format: "MIDI.js MP3 sample maps",
+    bytePolicy:
+      "Asset size and SHA-256 use canonical LF bytes. Verification also accepts the exact CRLF checkout derivation produced by Git on Windows.",
     sourceRepository: `https://github.com/gleitz/midi-js-soundfonts/tree/${sourceRevision}/FluidR3_GM`,
     sourceRevision,
     sourceDirectory: "FluidR3_GM",

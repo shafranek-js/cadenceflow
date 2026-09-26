@@ -197,7 +197,7 @@ export function createRichProjectFixture(): Project {
       progressionView: "harmonic",
       measuresPerSystem: "auto",
       showBassInStaff: false,
-      suzukiColors: false,
+      noteColorMode: "standard",
       resolutionArrows: true,
       genreFocus: "all",
     }),

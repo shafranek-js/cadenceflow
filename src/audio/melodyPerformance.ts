@@ -100,6 +100,15 @@ export function realizeProgressionMelodyPerformance(
     }
 
     const recipe = validateChordMelodyRecipe(step.melody);
+    const nextRealization = realizations
+      .slice(stepIndex + 1)
+      .find((candidate) => candidate !== null);
+    const targetPitches = nextRealization
+      ? [
+          ...nextRealization.upperPitches,
+          ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
+        ]
+      : [];
     const instrument = resolveEffectiveMelodyInstrument(
       step.melodyInstrumentOverride,
       trackInstrument,
@@ -109,6 +118,7 @@ export function realizeProgressionMelodyPerformance(
       upperPitches: realization.upperPitches,
       durationBeats: timing.durationBeats,
       recipe,
+      targetPitches,
     });
     const canSwing =
       recipe.rhythm === "even" &&

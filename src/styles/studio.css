@@ -575,6 +575,97 @@
     inset 0 0 0 1px color-mix(in srgb, var(--piano-pressed-key-border) 44%, transparent);
 }
 
+.mini-key.harmonic-role-root,
+.mini-key.harmonic-role-chord-tone,
+.mini-key.harmonic-role-scale-tone,
+.mini-key.harmonic-role-altered {
+  outline: 1px solid color-mix(in srgb, var(--harmonic-role-color) 78%, #17202a);
+  outline-offset: -1px;
+}
+
+.mini-white-key.harmonic-role-root {
+  --harmonic-role-color: #e76f51;
+  background: #f8c6b7;
+}
+.mini-white-key.harmonic-role-chord-tone {
+  --harmonic-role-color: #2f6fbb;
+  background: #c2ddfb;
+}
+.mini-white-key.harmonic-role-scale-tone {
+  --harmonic-role-color: #27866a;
+  background: #c0ead9;
+}
+.mini-white-key.harmonic-role-altered {
+  --harmonic-role-color: #8b5aa7;
+  background: #e6d1f0;
+}
+.mini-black-key.harmonic-role-root {
+  --harmonic-role-color: #e76f51;
+  background: #8c3d2e;
+}
+.mini-black-key.harmonic-role-chord-tone {
+  --harmonic-role-color: #2f6fbb;
+  background: #264c79;
+}
+.mini-black-key.harmonic-role-scale-tone {
+  --harmonic-role-color: #27866a;
+  background: #23604e;
+}
+.mini-black-key.harmonic-role-altered {
+  --harmonic-role-color: #8b5aa7;
+  background: #563769;
+}
+
+.mini-key.harmonic-role-root::after,
+.mini-key.harmonic-role-chord-tone::after,
+.mini-key.harmonic-role-scale-tone::after,
+.mini-key.harmonic-role-altered::after {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  left: 0;
+  color: #fff;
+  font-size: 0.38rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 1px #000;
+}
+.mini-key.harmonic-role-root::after {
+  content: "●";
+}
+.mini-key.harmonic-role-chord-tone::after {
+  content: "◆";
+}
+.mini-key.harmonic-role-scale-tone::after {
+  content: "○";
+}
+.mini-key.harmonic-role-altered::after {
+  content: "△";
+}
+.mini-key.is-target-next::before {
+  position: absolute;
+  z-index: 2;
+  top: 1px;
+  left: 1px;
+  color: #fff;
+  content: "→";
+  font-size: 0.4rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 1px #000;
+}
+
+.mini-piano-role-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 5px;
+  color: var(--text-muted);
+  font-size: 0.48rem;
+  line-height: 1.2;
+}
+
 .mini-black-key.is-pressed {
   z-index: 1;
   border-top: 0;
@@ -7048,6 +7139,38 @@ summary:focus-visible,
   margin-top: 2px;
 }
 
+.modes-formula-apply-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--error) 36%, transparent);
+  border-radius: 6px;
+  background: var(--surface-error);
+  color: var(--error);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.modes-formula-apply-error p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.modes-switch-and-apply-button {
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid var(--error);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--error) 10%, var(--surface-1));
+  color: var(--error);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: normal;
+  cursor: pointer;
+}
+
 .formula-audition-btn {
   padding: 4px 10px;
   font-size: 0.72rem;
@@ -7320,4 +7443,149 @@ summary:focus-visible,
 .audio-status-retry-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* T194: Matrix Focus Mode and transient harmonic-card disclosure. */
+.matrix-focus-toggle {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control, 6px);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.matrix-focus-toggle:hover,
+.matrix-focus-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.matrix-panel[data-focus-mode="true"] .module-selector,
+.matrix-panel[data-focus-mode="true"] .tonic-selector,
+.matrix-panel[data-focus-mode="true"] .matrix-formulas-btn,
+.matrix-panel[data-focus-mode="true"] .matrix-modes-btn {
+  display: none;
+}
+
+.matrix-panel[data-focus-mode="true"] .matrix-toolbar-actions {
+  flex: 1 1 auto;
+  margin-left: 0;
+  align-items: center;
+}
+
+.studio-grid:has(.matrix-panel[data-focus-mode="true"]) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "matrix";
+  column-gap: 0;
+}
+
+.studio-grid:has(.matrix-panel[data-focus-mode="true"]) > :not(.studio-matrix-area) {
+  display: none;
+}
+
+.studio-grid:has(.matrix-panel[data-focus-mode="true"]) > .studio-matrix-area {
+  width: 100%;
+  max-width: 100%;
+}
+
+.chord-card-focus-details {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.chord-card-identity .chord-card-focus-tendency {
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.chord-card-focus-tendency strong {
+  color: var(--accent);
+}
+
+.matrix-card-flip-back {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: center;
+  align-content: center;
+}
+
+.matrix-card-flip-back[hidden],
+.chord-card-identity[hidden] {
+  display: none !important;
+}
+
+.matrix-card-flip-button {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 1px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.62rem;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.matrix-card-flip-button:hover,
+.matrix-card-flip-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.matrix-card-flip-button:focus-visible,
+.matrix-focus-toggle:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.matrix-card-flip-back,
+.chord-card-focus-details {
+  animation: matrix-card-disclosure-in 150ms ease-out;
+}
+
+@keyframes matrix-card-disclosure-in {
+  from {
+    opacity: 0.72;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matrix-card-flip-button,
+  .matrix-card-flip-back,
+  .chord-card-focus-details {
+    animation: none;
+    transition: none;
+  }
 }

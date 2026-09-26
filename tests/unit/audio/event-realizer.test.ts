@@ -176,9 +176,13 @@ describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont reali
     expect(result.events[0]!.instrument).toBe("gm-025");
     expect(result.events[0]!.channelRole).toBe("bass");
 
-    // Subsequent notes staggered by downstrum offset (0.016s per string)
+    // The first-to-last onset spread stays 30ms, independent of chord voicing size.
+    expect(result.events.at(-1)!.startSeconds - result.events[0]!.startSeconds).toBeCloseTo(0.03);
     for (let i = 1; i < result.events.length; i++) {
       expect(result.events[i]!.startSeconds).toBeGreaterThan(result.events[i - 1]!.startSeconds);
+      expect(result.events[i]!.startSeconds - result.events[i - 1]!.startSeconds).toBeCloseTo(
+        0.03 / (result.events.length - 1),
+      );
       expect(result.events[i]!.channelRole).toBe("upper");
       expect(result.events[i]!.instrument).toBe("gm-025");
     }
@@ -230,7 +234,7 @@ describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont reali
 
     expect(firstNote.startSeconds).toBe(0);
     // Upper group delayed by ~110ms
-    expect(lastNote.startSeconds).toBeGreaterThanOrEqual(0.10);
+    expect(lastNote.startSeconds).toBeGreaterThanOrEqual(0.1);
   });
 
   it("realizes humanized articulation with deterministic jitter and dynamics", () => {

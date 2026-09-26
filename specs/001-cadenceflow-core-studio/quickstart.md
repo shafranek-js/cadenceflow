@@ -86,13 +86,15 @@ Verify the committed audio assets offline:
 
 ```bash
 pnpm run verify:melody-assets
+pnpm run verify:guitar-asset-provenance
 pnpm run verify:piano-bank
 ```
 
 The Melody manifest and Guitar providers use local repository assets at runtime; no production CDN
-dependency is required. Guitar's two sample-backed variants and the Guitar hand illustration are covered
-by the Batch 2 asset/IP audit in `PROJECT_STATUS.md`; the repository currently lacks provenance/license
-files for those Guitar additions, so no legal sufficiency claim is made for them.
+dependency is required. The T196 asset audit records the pinned nylon-sample source and canonical byte
+hash, Git's exact LF-to-CRLF checkout form, and the user's authorship statement for the Guitar hand
+illustration. Its original PSD is unavailable; the notice does not assign a third-party license or make a
+legal sufficiency claim. Run `verify:guitar-asset-provenance` to check both nylon copies and both PNG copies.
 
 `verify:melody-assets` checks the 128 manifest-backed local FluidR3 GM assets,
 per-file sizes and SHA-256 values, manifest provenance, license, and attribution.

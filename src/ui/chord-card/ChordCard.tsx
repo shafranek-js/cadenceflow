@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { CardViewId } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -10,15 +11,20 @@ import { Icon } from "../common/Icon";
 import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
 import type { StaffOctaveDirection } from "../staff/staffOctave";
 import type { MatrixCardTopologyEntry } from "../../domain/harmony/topology";
+import type { HarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
+import type { NoteColorMode } from "../../domain/project/project";
 
 export function ChordCard({
   model,
   view,
+  isFocusMode = false,
   selected,
   playing = false,
   customizedCount,
   showBassInStaff = false,
   suzukiColors = false,
+  noteColorMode = suzukiColors ? "suzuki" : "standard",
+  roleContext,
   guitarChordOrientation = "vertical",
   resolutionTargetSymbol,
   isResolutionTarget,
@@ -38,11 +44,14 @@ export function ChordCard({
 }: {
   readonly model: ChordCardViewModel;
   readonly view: CardViewId;
+  readonly isFocusMode?: boolean;
   readonly selected: boolean;
   readonly playing?: boolean | undefined;
   readonly customizedCount: number;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
+  readonly noteColorMode?: NoteColorMode;
+  readonly roleContext?: HarmonicNoteRoleContext;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly resolutionTargetSymbol?: string | undefined;
   readonly isResolutionTarget?: boolean | undefined;
@@ -60,14 +69,15 @@ export function ChordCard({
   readonly onAltClickReset: () => void;
   readonly onStaffOctaveChange: (direction: StaffOctaveDirection) => void;
 }) {
+  const [isGuitarBackVisible, setIsGuitarBackVisible] = useState(false);
   const noteNames = [
     ...new Set(model.pianoPitches.map((pitch) => formatPitchSpelling(pitch.spelling))),
   ];
   const noteSummary = noteNames.join(" · ");
   const chordLabel = formatChordSymbol(model.chord);
-  const selectionAriaLabel = `${accessibleDescription ? `${accessibleDescription}; ` : ""}Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings`;
+  const selectionAriaLabel = `${accessibleDescription ? `${accessibleDescription}; ` : ""}Preview ${model.chord.harmonicFunction.functionId} ${model.chord.spelling.symbol}; Notes: ${noteNames.join(", ")}; Ctrl-click or Ctrl+Enter to add; when selected, press plus to add to My Progression; Alt-click to reset card settings`;
   const selectionTitle =
-    "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings";
+    "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add; when selected, press + to add to My Progression; Alt-click to reset card settings";
   const describedBy =
     model.recommendationStatus !== "none"
       ? `recommendation-${model.chord.harmonicFunction.functionId}`
@@ -88,6 +98,15 @@ export function ChordCard({
         : "Requires confirmation";
   const recommendationBadgeText =
     model.recommendationStatus === "blocked" ? "Confirm" : recommendationLabel;
+  const canFlipToGuitarShape = isFocusMode && view === "harmonic";
+  const guitarBackPanelId = `matrix-card-guitar-back-${encodeURIComponent(model.chord.harmonicFunction.functionId)}`;
+  const cardTendency = resolutionTargetSymbol
+    ? `Directed toward ${resolutionTargetSymbol}`
+    : semantics.rule;
+
+  useEffect(() => {
+    if (!canFlipToGuitarShape) setIsGuitarBackVisible(false);
+  }, [canFlipToGuitarShape]);
 
   const select = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (event.altKey) onAltClickReset();
@@ -103,7 +122,7 @@ export function ChordCard({
 
   return (
     <article
-      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${playing ? "is-playing" : ""} ${isResolutionTarget ? "is-resolution-target" : ""} ${isGenreFocused ? "is-genre-focus" : ""} ${isGenreDimmed ? "is-genre-dimmed" : ""}`.trim()}
+      className={`chord-card recommendation-${model.recommendationStatus} ${selected ? "is-selected is-previewed" : ""} ${playing ? "is-playing" : ""} ${isResolutionTarget ? "is-resolution-target" : ""} ${isGenreFocused ? "is-genre-focus" : ""} ${isGenreDimmed ? "is-genre-dimmed" : ""} ${isGuitarBackVisible ? "is-focus-guitar-back" : ""}`.trim()}
       style={style}
       title={cardTooltip}
       data-testid={`chord-card-${model.chord.harmonicFunction.functionId}`}
@@ -186,7 +205,7 @@ export function ChordCard({
           {...(describedBy ? { selectionDescribedBy: describedBy } : {})}
           canShiftUp={model.canRaiseStaffOctave}
           canShiftDown={model.canLowerStaffOctave}
-          suzukiColors={suzukiColors}
+          suzukiColors={noteColorMode === "suzuki"}
           onSelect={select}
           onKeyDown={selectFromKeyboard}
           onOctaveChange={onStaffOctaveChange}
@@ -203,20 +222,55 @@ export function ChordCard({
           aria-describedby={describedBy}
         >
           {view === "harmonic" && (
-            <span className="chord-card-identity" title={cardTooltip}>
-              <strong>{model.chord.harmonicFunction.functionId}</strong>
-              <span>{chordLabel}</span>
-              <span className="chord-card-notes-label">Notes</span>
-              <span className="chord-card-notes" data-testid="chord-card-notes">
-                {noteSummary || "—"}
+            <>
+              <span
+                className="chord-card-identity"
+                title={cardTooltip}
+                hidden={canFlipToGuitarShape && isGuitarBackVisible}
+              >
+                <strong>{model.chord.harmonicFunction.functionId}</strong>
+                <span>{chordLabel}</span>
+                <span className="chord-card-notes-label">Notes</span>
+                <span className="chord-card-notes" data-testid="chord-card-notes">
+                  {noteSummary || "—"}
+                </span>
+                {isFocusMode ? (
+                  <span
+                    className="chord-card-focus-details"
+                    data-testid="matrix-card-focus-details"
+                  >
+                    <span>{semantics.description}</span>
+                    <span className="chord-card-focus-tendency">
+                      <strong>Tendency:</strong> {cardTendency}
+                    </span>
+                  </span>
+                ) : null}
               </span>
-            </span>
+              {canFlipToGuitarShape ? (
+                <div
+                  id={guitarBackPanelId}
+                  className="matrix-card-flip-back"
+                  aria-label={`${chordLabel} canonical guitar shape`}
+                  hidden={!isGuitarBackVisible}
+                >
+                  {isGuitarBackVisible ? (
+                    <GuitarCardView
+                      chord={model.chord}
+                      chordLabel={chordLabel}
+                      orientation={guitarChordOrientation}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           )}
           {view === "piano" && (
             <PianoCardView
               chordPitches={model.pianoPitches}
               bassPitch={semanticBassPitch}
               chordLabel={chordLabel}
+              noteColorMode={noteColorMode}
+              {...(roleContext ? { roleContext } : {})}
             />
           )}
           {view === "guitar" && (
@@ -229,6 +283,27 @@ export function ChordCard({
         </button>
       )}
       <div className="chord-card-actions">
+        {canFlipToGuitarShape ? (
+          <button
+            type="button"
+            className="matrix-card-flip-button"
+            data-testid={`matrix-card-flip-${model.chord.harmonicFunction.functionId}`}
+            aria-label={
+              isGuitarBackVisible
+                ? `Show function and tendency for ${model.chord.harmonicFunction.functionId}`
+                : `Show guitar fingering for ${model.chord.harmonicFunction.functionId}`
+            }
+            aria-expanded={isGuitarBackVisible}
+            aria-controls={guitarBackPanelId}
+            title={
+              isGuitarBackVisible ? "Show function and tendency" : "Show canonical guitar fingering"
+            }
+            onClick={() => setIsGuitarBackVisible((visible) => !visible)}
+          >
+            <span aria-hidden="true">↻</span>
+            <span>Flip</span>
+          </button>
+        ) : null}
         {customizedCount > 0 ? (
           <span className="chord-card-customized-indicator">
             <CustomizedIndicator count={customizedCount} />

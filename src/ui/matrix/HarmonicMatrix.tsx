@@ -24,6 +24,7 @@ import {
 } from "../../domain/harmony/functionSemantics";
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
+import { createHarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
 
 function cardKey(identity: HarmonicFunctionIdentity): string {
   return identity.functionId;
@@ -77,9 +78,16 @@ export function HarmonicMatrix({
     recommendations?.blockedCandidates.map((item) => [item.functionId, item]) ?? [],
   );
   const workbenchRef = useRef<HTMLDivElement>(null);
+  const focusModeToggleRef = useRef<HTMLButtonElement>(null);
   const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   const previousHarmonicContext = resolvePreviousHarmonicContext(project);
+
+  const addCardThroughExistingRoute = (functionId: string) => {
+    onPreview(functionId);
+    if (!project.temporaryBranch) onAdd(functionId);
+  };
 
   const activeSourceFunctionId = hoveredFunctionId ?? previewFunctionId ?? null;
   const activeSourceEntry = activeSourceFunctionId
@@ -171,8 +179,15 @@ export function HarmonicMatrix({
           ...(candidate ? { recommendation: candidate } : {}),
         }}
         view={view}
+        isFocusMode={isFocusMode}
         showBassInStaff={project.presentation.showBassInStaff}
-        suzukiColors={project.presentation.suzukiColors ?? false}
+        noteColorMode={project.presentation.noteColorMode}
+        roleContext={createHarmonicNoteRoleContext({
+          tonic: project.tonic,
+          moduleId: project.activeModule,
+          rootPitchClass: preview.chord.rootPitchClass,
+          chordPitches: preview.upperPitches,
+        })}
         guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
         selected={previewFunctionId === identity.functionId}
         playing={playingFunctionId === identity.functionId}
@@ -201,8 +216,7 @@ export function HarmonicMatrix({
           onTemplateOpen(identity.functionId);
         }}
         onCtrlClickAdd={() => {
-          onPreview(identity.functionId);
-          if (!project.temporaryBranch) onAdd(identity.functionId);
+          addCardThroughExistingRoute(identity.functionId);
         }}
         onAltClickReset={() => {
           onTemplateReset(identity.functionId);
@@ -224,6 +238,42 @@ export function HarmonicMatrix({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const isAddShortcut = event.key === "+" || event.code === "NumpadAdd";
+    if (
+      isAddShortcut &&
+      !event.repeat &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.defaultPrevented &&
+      !isAppShortcutProtectedTarget(event.target) &&
+      previewFunctionId
+    ) {
+      const selectedCard = Array.from(
+        event.currentTarget.querySelectorAll<HTMLElement>(".chord-card"),
+      ).find(
+        (card) =>
+          card.getAttribute("data-testid") === `chord-card-${previewFunctionId}` &&
+          !card.closest('[hidden], [aria-hidden="true"]') &&
+          getComputedStyle(card).display !== "none" &&
+          getComputedStyle(card).visibility !== "hidden",
+      );
+      if (selectedCard) {
+        event.preventDefault();
+        event.stopPropagation();
+        addCardThroughExistingRoute(previewFunctionId);
+      }
+      return;
+    }
+
+    if (event.key === "Escape" && isFocusMode) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsFocusMode(false);
+      focusModeToggleRef.current?.focus();
+      return;
+    }
+
     if (
       isAppShortcutProtectedTarget(event.target) ||
       event.key !== "Escape" ||
@@ -249,6 +299,7 @@ export function HarmonicMatrix({
       aria-label="Harmonic Matrix"
       data-module={project.activeModule}
       data-topology-columns={String(module.topology.columnCount)}
+      data-focus-mode={isFocusMode ? "true" : undefined}
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
     >
@@ -290,6 +341,18 @@ export function HarmonicMatrix({
               <span className="btn-label">Modes</span>
             </button>
           )}
+          <button
+            ref={focusModeToggleRef}
+            type="button"
+            className="matrix-focus-toggle"
+            data-testid="matrix-focus-toggle"
+            aria-label={isFocusMode ? "Exit Matrix Focus Mode" : "Enter Matrix Focus Mode"}
+            aria-pressed={isFocusMode}
+            title={isFocusMode ? "Exit Focus Mode (Escape)" : "Focus on the Harmonic Matrix"}
+            onClick={() => setIsFocusMode((current) => !current)}
+          >
+            {isFocusMode ? "Exit Focus" : "Focus"}
+          </button>
           <ViewModeToggle
             currentView={project.presentation.globalMatrixCardView}
             onChangeView={onGlobalView}

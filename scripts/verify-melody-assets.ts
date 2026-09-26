@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalSampleMapBytes } from "./lib/canonicalSampleMapBytes";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const publicRoot = join(repositoryRoot, "public");
@@ -13,6 +14,10 @@ interface MelodyAssetRecord {
   readonly sourceFile: string;
   readonly size: number;
   readonly sha256: string;
+  readonly sourceSize?: number;
+  readonly sourceSha256?: string;
+  readonly sourceUrl?: string;
+  readonly derivation?: string;
 }
 
 interface MelodyProgramRecord {
@@ -28,6 +33,7 @@ interface MelodyManifest {
   readonly sourceRevision: string;
   readonly sourceDirectory: string;
   readonly sourceArtifact: string;
+  readonly bytePolicy: string;
   readonly license: string;
   readonly licenseFile: string;
   readonly attributionFile: string;
@@ -74,6 +80,12 @@ function assertManifest(value: unknown): asserts value is MelodyManifest {
   }
   if (value.sourceArtifact !== "FluidR3_GM.sf2") {
     throw new Error("manifest sourceArtifact must be FluidR3_GM.sf2");
+  }
+  if (
+    value.bytePolicy !==
+    "Asset size and SHA-256 use canonical LF bytes. Verification also accepts the exact CRLF checkout derivation produced by Git on Windows."
+  ) {
+    throw new Error("manifest bytePolicy is missing or incorrect");
   }
   if (value.license !== "CC-BY-3.0") throw new Error("manifest license must be CC-BY-3.0");
   if (value.programCount !== 128) throw new Error("manifest programCount must be 128");
@@ -128,16 +140,34 @@ function assertManifest(value: unknown): asserts value is MelodyManifest {
     ) {
       throw new Error(`manifest asset ${programRecord.asset} metadata is invalid`);
     }
+    const hasSourceProvenance =
+      asset.sourceSize !== undefined ||
+      asset.sourceSha256 !== undefined ||
+      asset.sourceUrl !== undefined ||
+      asset.derivation !== undefined;
+    if (
+      hasSourceProvenance &&
+      (typeof asset.sourceSize !== "number" ||
+        !Number.isSafeInteger(asset.sourceSize) ||
+        asset.sourceSize <= 0 ||
+        typeof asset.sourceSha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(asset.sourceSha256) ||
+        (asset.sourceUrl !== undefined &&
+          asset.sourceUrl !==
+            "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM/acoustic_guitar_nylon-mp3.js") ||
+        typeof asset.derivation !== "string" ||
+        asset.derivation.length === 0)
+    ) {
+      throw new Error(`manifest asset ${programRecord.asset} source provenance is invalid`);
+    }
   }
   for (let program = 0; program < 128; program += 1) {
     if (!programs.has(program)) throw new Error(`manifest is missing GM program ${program}`);
   }
 }
 
-async function sha256(path: string): Promise<string> {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
+function sha256(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 async function verify(): Promise<void> {
@@ -163,10 +193,27 @@ async function verify(): Promise<void> {
     `https://github.com/gleitz/midi-js-soundfonts/tree/${expectedSourceRevision}/FluidR3_GM`,
     "all 128 General MIDI programs",
     "manifest.json",
+    "canonical LF sizes and SHA-256 digests",
+    "94 LF line endings to CRLF",
   ]) {
     if (!attributionText.includes(marker)) {
       throw new Error(`attribution is missing marker: ${marker}`);
     }
+  }
+
+  const nylonAsset = manifest.assets["/audio/soundfont/acoustic_guitar_nylon-mp3.js"];
+  if (
+    nylonAsset?.size !== 1837439 ||
+    nylonAsset.sha256 !== "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64" ||
+    nylonAsset?.sourceSize !== 1837439 ||
+    nylonAsset.sourceSha256 !==
+      "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64" ||
+    nylonAsset.sourceUrl !==
+      "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM/acoustic_guitar_nylon-mp3.js" ||
+    nylonAsset.derivation !==
+      "Pinned upstream LF bytes; Git may convert the 94 LF line endings to CRLF in Windows checkouts. Sample data unchanged."
+  ) {
+    throw new Error("nylon guitar source provenance is missing or incorrect");
   }
 
   for (const program of manifest.programs) {
@@ -174,13 +221,16 @@ async function verify(): Promise<void> {
     const assetPath = publicFilePath(program.asset, `manifest asset ${program.asset}`);
     const file = await stat(assetPath).catch(() => null);
     if (!file?.isFile()) throw new Error(`Melody asset is missing: ${program.asset}`);
-    if (file.size !== asset.size) {
-      throw new Error(`${program.asset} size mismatch: expected ${asset.size}, got ${file.size}`);
+    const canonicalBytes = canonicalSampleMapBytes(await readFile(assetPath));
+    if (canonicalBytes.byteLength !== asset.size) {
+      throw new Error(
+        `${program.asset} canonical size mismatch: expected ${asset.size}, got ${canonicalBytes.byteLength}`,
+      );
     }
-    const actualHash = await sha256(assetPath);
+    const actualHash = sha256(canonicalBytes);
     if (actualHash !== asset.sha256) {
       throw new Error(
-        `${program.asset} SHA-256 mismatch: expected ${asset.sha256}, got ${actualHash}`,
+        `${program.asset} canonical SHA-256 mismatch: expected ${asset.sha256}, got ${actualHash}`,
       );
     }
   }

@@ -24,6 +24,9 @@ import type {
 import type { AudioProviderState } from "../../audio/contracts";
 import type { ChordStep } from "../../domain/progression/step";
 import type { Project } from "../../domain/project/project";
+import type { ExactPitch } from "../../domain/harmony/pitch";
+import { formatPitchSpelling } from "../../domain/harmony/spelling";
+import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
@@ -46,6 +49,14 @@ export const DEFAULT_MELODY_RECIPE: ChordMelodyRecipe = Object.freeze({
 });
 
 const OCTAVE_OFFSETS: readonly MelodyOctaveOffset[] = Object.freeze([-2, -1, 0, 1, 2]);
+
+function targetPitchLabel(pitch: ExactPitch): string {
+  return `${formatPitchSpelling(pitch.spelling)}${pitch.octave}`;
+}
+
+function targetPitchClass(pitch: ExactPitch): number {
+  return ((pitch.midiNumber % 12) + 12) % 12;
+}
 
 function previewProject(
   project: Project,
@@ -119,6 +130,8 @@ export function MelodyEditorDialog({
     step.melodyInstrumentOverride,
   );
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [targetSuggestions, setTargetSuggestions] = useState<readonly ExactPitch[]>([]);
+  const [pendingTargetPitchClass, setPendingTargetPitchClass] = useState<number | undefined>();
 
   const closeGallery = useCallback(() => {
     galleryOpenRef.current = false;
@@ -146,6 +159,8 @@ export function MelodyEditorDialog({
     if (!isOpen) return;
     setRecipe(step.melody ? validateChordMelodyRecipe(step.melody) : { ...DEFAULT_MELODY_RECIPE });
     setInstrumentOverride(step.melodyInstrumentOverride);
+    setTargetSuggestions([]);
+    setPendingTargetPitchClass(step.melody?.targetNextPitchClass);
   }, [isOpen, project.melodyTrack.instrument, step]);
 
   useEffect(() => {
@@ -195,6 +210,53 @@ export function MelodyEditorDialog({
     event.preventDefault();
     if (applyDisabled) return;
     onApply(recipe, instrumentOverride);
+  };
+
+  const suggestTargetNotes = () => {
+    const stepIndex = project.progression.steps.findIndex((candidate) => candidate.id === step.id);
+    const nextStep = project.progression.steps
+      .slice(stepIndex + 1)
+      .find((candidate): candidate is ChordStep => candidate.kind === "chord");
+    if (!nextStep) {
+      setTargetSuggestions([]);
+      setPendingTargetPitchClass(undefined);
+      return;
+    }
+    const realization = realizeProgressionStepRealization(nextStep, project.tonic);
+    const lastMelodyPitch =
+      preview.kind === "ready"
+        ? preview.timeline.events.filter((event) => event.sourceStepId === step.id).at(-1)?.pitch
+            .midiNumber
+        : undefined;
+    const candidates = [
+      ...realization.pitches,
+      ...(realization.bassPitch ? [realization.bassPitch] : []),
+    ];
+    const unique = [
+      ...new Map(candidates.map((pitch) => [targetPitchClass(pitch), pitch])).values(),
+    ];
+    unique.sort((a, b) => {
+      if (lastMelodyPitch === undefined) return a.midiNumber - b.midiNumber;
+      return (
+        Math.abs(a.midiNumber - lastMelodyPitch) - Math.abs(b.midiNumber - lastMelodyPitch) ||
+        a.midiNumber - b.midiNumber
+      );
+    });
+    setTargetSuggestions(Object.freeze(unique));
+    setPendingTargetPitchClass(step.melody?.targetNextPitchClass);
+  };
+
+  const previewSelectedTarget = () => {
+    if (pendingTargetPitchClass === undefined) return;
+    setRecipe((current) => ({ ...current, targetNextPitchClass: pendingTargetPitchClass }));
+  };
+
+  const clearTargetNote = () => {
+    setPendingTargetPitchClass(undefined);
+    setRecipe((current) => {
+      const { targetNextPitchClass: _target, ...withoutTarget } = current;
+      return withoutTarget;
+    });
   };
 
   return (
@@ -353,6 +415,79 @@ export function MelodyEditorDialog({
                 />
               </label>
             </div>
+            <section
+              className="melody-target-notes"
+              aria-label="Target Notes"
+              data-testid="melody-target-notes"
+            >
+              <div className="melody-target-notes-heading">
+                <div>
+                  <strong>Target Notes</strong>
+                  <span>Choose a note from the next chord for the phrase ending.</span>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="melody-target-suggest"
+                  onClick={suggestTargetNotes}
+                >
+                  Suggest
+                </button>
+              </div>
+              {targetSuggestions.length > 0 ? (
+                <div
+                  className="melody-target-note-options"
+                  role="group"
+                  aria-label="Suggested target notes"
+                >
+                  {targetSuggestions.map((pitch) => {
+                    const pitchClass = targetPitchClass(pitch);
+                    return (
+                      <button
+                        key={pitchClass}
+                        type="button"
+                        className={`secondary-btn melody-target-note-option${pendingTargetPitchClass === pitchClass ? " is-selected" : ""}`}
+                        aria-pressed={pendingTargetPitchClass === pitchClass}
+                        data-testid={`melody-target-option-${pitchClass}`}
+                        onClick={() => setPendingTargetPitchClass(pitchClass)}
+                      >
+                        {targetPitchLabel(pitch)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="melody-target-notes-empty" role="status">
+                  Suggest notes from the next chord.
+                </p>
+              )}
+              <div className="melody-target-notes-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="melody-target-preview"
+                  disabled={pendingTargetPitchClass === undefined || applyDisabled}
+                  onClick={previewSelectedTarget}
+                >
+                  Preview selected target
+                </button>
+                {recipe.targetNextPitchClass !== undefined ? (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    data-testid="melody-target-clear"
+                    onClick={clearTargetNote}
+                  >
+                    Clear target
+                  </button>
+                ) : null}
+                <span role="status" aria-live="polite" data-testid="melody-target-status">
+                  {recipe.targetNextPitchClass !== undefined
+                    ? `Phrase ending targets pitch class ${recipe.targetNextPitchClass}; preview remains a draft until Apply Melody.`
+                    : "Preview and audition do not change the project."}
+                </span>
+              </div>
+            </section>
             {isGalleryOpen ? (
               <MelodyPitchMotionGallery
                 value={recipe.pitchMotion}

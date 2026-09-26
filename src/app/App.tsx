@@ -73,6 +73,11 @@ import type { ModulationPath } from "../domain/harmony/modulation";
 import { ModesExplorerModal } from "../ui/modes/ModesExplorerModal";
 import type { ModalCadenceFormula } from "../domain/harmony/modes";
 import { getModalParentKeyAndFunction } from "../domain/harmony/modes";
+import {
+  applyModesFormula,
+  createModesFormulaSteps,
+  type ApplyModesFormulaCommand,
+} from "./commands/modesExplorerCommands";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
 import {
   optimizeProgressionVoiceLeading,
@@ -93,6 +98,7 @@ import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
 import { AcousticGuitarProvider } from "../audio/guitar/AcousticGuitarProvider";
+import { guitarStrumOffsetSeconds } from "../audio/guitar/strumTiming";
 import {
   formatMelodyPreparationNotice,
   MelodySoundFontProvider,
@@ -253,7 +259,7 @@ import {
   setStaffBassVisibility,
   setProgressionView,
   setMeasuresPerSystem,
-  setSuzukiColors,
+  setNoteColorMode,
   setResolutionArrows,
   setGenreFocus,
   setGuitarChordOrientation,
@@ -263,7 +269,7 @@ import {
   type SetStaffBassVisibilityCommand,
   type SetProgressionViewCommand,
   type SetMeasuresPerSystemCommand,
-  type SetSuzukiColorsCommand,
+  type SetNoteColorModeCommand,
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetGuitarChordOrientationCommand,
@@ -276,6 +282,7 @@ import type {
   ThemeMode,
   Project,
   ProgressionView,
+  NoteColorMode,
 } from "../domain/project/project";
 import type {
   ChordMelodyRecipe,
@@ -1885,8 +1892,10 @@ export function App() {
         pitch: p.midiNumber,
         channelRole: isGuitar && idx === 0 ? "bass" : "upper",
         velocity: 82,
-        startSeconds: isGuitar ? idx * 0.016 : 0,
-        durationSeconds: isGuitar ? Math.max(0.2, 1.8 - idx * 0.016) : 1.8,
+        startSeconds: isGuitar ? guitarStrumOffsetSeconds(idx, pitches.length) : 0,
+        durationSeconds: isGuitar
+          ? Math.max(0.2, 1.8 - guitarStrumOffsetSeconds(idx, pitches.length))
+          : 1.8,
         ...(isGuitar || isSoundFontPiano ? { instrument: sfInst } : {}),
       }));
       const controller = isGuitar
@@ -1984,44 +1993,35 @@ export function App() {
       const currentProject = store.project;
       const nowIso = new Date().toISOString();
       const { parentTonic } = getModalParentKeyAndFunction(modalTonic, formula.modeId, 1);
-
-      const targetTonic = switchKey ? parentTonic : currentProject.tonic;
-
-      const newSteps: ChordStep[] = formula.steps.map((formulaStep, idx) => {
-        const { functionId, moduleId } = getModalParentKeyAndFunction(
-          modalTonic,
-          formula.modeId,
-          formulaStep.degree,
-        );
-        const stepId = `step-mode-${Date.now().toString(36)}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
-        const step = createMatrixChordStep(currentProject, functionId, stepId, moduleId);
-        if (formulaStep.seventh) {
-          return Object.freeze({
-            ...step,
-            harmonicVariant: Object.freeze({
-              ...step.harmonicVariant,
-              seventh: formulaStep.seventh,
-            }),
-          });
-        }
-        return step;
-      });
-
-      const command: AppendStepsCommand = {
-        type: "progression/append-steps",
+      const steps = createModesFormulaSteps(
+        currentProject,
+        formula,
+        modalTonic,
+        formula.steps.map(() => `step-mode-${crypto.randomUUID()}`),
+      );
+      const command: ApplyModesFormulaCommand = {
+        type: "modes/apply-formula",
         payload: {
-          steps: newSteps,
+          formulaId: formula.id,
+          modeId: formula.modeId,
+          modalTonic,
+          parentTonic,
+          switchKey,
+          steps,
           nowIso,
         },
       };
-      store.dispatch(command, appendSteps);
-
-      if (switchKey && currentProject.tonic !== targetTonic) {
-        const tonicCommand: SetTonicCommand = {
-          type: "harmony/set-tonic",
-          payload: { tonic: targetTonic, nowIso },
+      try {
+        store.dispatch(command, applyModesFormula);
+        return { success: true as const };
+      } catch (error) {
+        return {
+          success: false as const,
+          reason:
+            error instanceof Error
+              ? error.message
+              : "The formula could not be applied. The project was not changed.",
         };
-        store.dispatch(tonicCommand, setTonic);
       }
     },
     [store],
@@ -2834,14 +2834,16 @@ export function App() {
     };
     store.dispatch(command, setMeasuresPerSystem);
   };
-  const changeSuzukiColors = (enabled: boolean) => {
-    if (enabled === (project.presentation.suzukiColors ?? false)) return;
-    const command: SetSuzukiColorsCommand = {
-      type: "presentation/set-suzuki-colors",
-      payload: { enabled, nowIso: new Date().toISOString() },
+  const changeNoteColorMode = (mode: NoteColorMode) => {
+    if (mode === project.presentation.noteColorMode) return;
+    const command: SetNoteColorModeCommand = {
+      type: "presentation/set-note-color-mode",
+      payload: { mode, nowIso: new Date().toISOString() },
     };
-    store.dispatch(command, setSuzukiColors);
+    store.dispatch(command, setNoteColorMode);
   };
+  const changeSuzukiColors = (enabled: boolean) =>
+    changeNoteColorMode(enabled ? "suzuki" : "standard");
   const changeResolutionArrows = (enabled: boolean) => {
     if (enabled === (project.presentation.resolutionArrows !== false)) return;
     const command: SetResolutionArrowsCommand = {
@@ -3514,7 +3516,7 @@ export function App() {
                 onProgressionViewChange={changeProgressionView}
                 showBassInStaff={project.presentation.showBassInStaff}
                 onShowBassInStaffChange={changeStaffBassVisibility}
-                suzukiColors={project.presentation.suzukiColors ?? false}
+                suzukiColors={project.presentation.noteColorMode === "suzuki"}
                 onSuzukiColorsChange={changeSuzukiColors}
                 resolutionArrows={project.presentation.resolutionArrows !== false}
                 onResolutionArrowsChange={changeResolutionArrows}
@@ -3848,7 +3850,7 @@ export function App() {
             onSetLoopRange={handleSetLoopRange}
             onOpenPresets={() => setPresetsPanelOpen(true)}
             onSaveAsPreset={() => setSavePresetDialogOpen(true)}
-            onToggleSuzukiColors={changeSuzukiColors}
+            onSetNoteColorMode={changeNoteColorMode}
           />
         )
       }
@@ -4047,7 +4049,7 @@ export function App() {
             onClearMelodySystem={clearMelodySystem}
             onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
             onToggleSuzukiColors={() =>
-              changeSuzukiColors(!(project.presentation.suzukiColors ?? false))
+              changeSuzukiColors(project.presentation.noteColorMode !== "suzuki")
             }
             onApplyPreset={handleApplyPreset}
             onOpenPresets={() => setPresetsPanelOpen(true)}
@@ -4230,9 +4232,9 @@ export function App() {
               onToggleBassInStaff={() =>
                 changeStaffBassVisibility(!project.presentation.showBassInStaff)
               }
-              suzukiColors={project.presentation.suzukiColors ?? false}
+              suzukiColors={project.presentation.noteColorMode === "suzuki"}
               onToggleSuzukiColors={() =>
-                changeSuzukiColors(!(project.presentation.suzukiColors ?? false))
+                changeSuzukiColors(project.presentation.noteColorMode !== "suzuki")
               }
               resolutionArrows={project.presentation.resolutionArrows !== false}
               onToggleResolutionArrows={() =>

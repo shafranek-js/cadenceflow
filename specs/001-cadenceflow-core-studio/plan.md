@@ -495,13 +495,16 @@ Exit gate:
 - Migrations are pure functions `vN -> vN+1`, fixture tested.
 - Autosave writes the current schema only.
 - Unsupported future schema versions fail with an explicit compatibility message; never silently discard unknown musical data.
-- The only planned future cutover is one atomic `schema v5 -> v6` migration: T197 must land before or jointly
-  with T192, adding Piano/Guitar engine and SoundFont tone persistence together with T192's `noteColorMode`.
-  T197 MUST NOT introduce a separate schema version or a later engine/tone `v7` migration.
+- T197+T192 owns the single atomic `schema v5 -> v6` migration for Piano/Guitar engine and SoundFont tone
+  persistence plus `noteColorMode`. Engine/tone persistence has no separate migration and does not create a
+  later engine/tone `v7` migration.
 
 ## Accessibility/Interaction Strategy
 
 - Chord cards and their `+`/settings/reset affordances are keyboard reachable.
+- T211 adds a separate `+`/keypad Add shortcut for the currently selected visible Matrix card after
+  T194 acceptance. It reuses the existing guarded add action and one history transaction; it is
+  inactive in editable controls and dialogs and does not change the Project schema.
 - Recommendation state uses text/icon/shape in addition to color.
 - Global/per-card Card View switching preserves focus logically.
 - The global Progression View and measures-per-system controls preserve focus logically and never expose
@@ -526,3 +529,16 @@ Exit gate:
 ## Complexity Tracking
 
 No constitution violations. No exceptions required.
+
+
+## Composition UX Program architecture (future; starts after T195)
+
+Use the established Project/command/history model as the only writable source of truth. A Composition Editor adapter converts canonical Steps, exact Rational timing, and resolved Melody into screen projections. Pointer/keyboard gestures update transient interaction state; cancel discards it; commit emits a single domain command and therefore one history entry. Convert screen-space floating-point coordinates through the adapter into exact Rational values before validation; the validated gesture becomes one canonical command. Preview and audition must not alter Project, autosave, or history.
+
+Matrix supports harmonic search and recommendation. My Progression owns temporal edits on a unified Harmony/Melody axis. T198 defines the contract before interaction work; T199 is a disposable Signal MIT gesture spike kept separate from the production UI. Use it only to test candidate gestures and the screen-float → Rational → single-command conversion; do not integrate the spike surface into production. Adapt only useful gestures later through the adapter and retain source/license notices and per-file provenance comments. Numeric MIDI ticks, Signal stores/history/audio, and external domain models are prohibited. If CodeGraph is needed for implementation preparation, initialize it locally in the active worktree when absent; `.codegraph/` is ignored and the index must never be committed.
+
+Adopt one explicit Rational resize snap rule across pointer and keyboard operations. T201 and T202 establish duration and range semantics before Song Sections. T206 is read-only; T207 then introduces authored notes and the sole effective-phrase resolver. Schema evolution is staged: v6 = T197 + T192 only; v7 = Authored Melody; v8 = Song Sections. Web MIDI in T210 is explicit step input with quantized preview and insert, not realtime recording. AI and literal copying of Hookpad/Signal are out of scope.
+
+Release order is T197 + T192 → T193 → T194 → T211 → T196 → T195. T211 is the user-requested
+Matrix keyboard shortcut and remains a separate batch from T194. Composition UX 1.1 (T198–T205),
+1.2 (T206–T208), and 1.3 (T209–T210) begin only after T195 acceptance.

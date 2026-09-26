@@ -840,6 +840,12 @@ function buildMelodyParts(
         `Missing contextual Piano realization for Melody step ${entry.step.id}.`,
       );
     }
+    const nextChordEntry = timeline.steps
+      .slice(entry.stepIndex + 1)
+      .find((candidate) => candidate.step.kind === "chord");
+    const targetPitches = nextChordEntry
+      ? (projectedChords.get(nextChordEntry.stepIndex)?.pitches.map((item) => item.pitch) ?? [])
+      : [];
 
     try {
       const phrase = realizeChordMelody({
@@ -849,6 +855,7 @@ function buildMelodyParts(
           .map((item) => item.pitch),
         durationBeats: entry.durationBeats,
         recipe,
+        targetPitches,
       });
       phrase.events.forEach((event) => {
         const startBeats = addRational(entry.startBeats, event.startOffsetBeats);

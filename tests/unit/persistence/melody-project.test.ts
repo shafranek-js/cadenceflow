@@ -59,12 +59,12 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-describe("T188 — US12 Project schema v5, migration, and persistence", () => {
-  it("creates v5 projects with frozen default Harmony and Melody Track settings", () => {
+describe("T188 — US12 Project schema v6, migration, and persistence", () => {
+  it("creates v6 projects with frozen default Harmony and Melody Track settings", () => {
     const project = createDefaultProject("melody-defaults", "Melody Defaults");
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(5);
-    expect(project.schemaVersion).toBe(5);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(6);
+    expect(project.schemaVersion).toBe(6);
     expect(project.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(project.melodyTrack).toEqual({
       instrument: "flute",
@@ -99,14 +99,14 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     expect(() => validateMelodyTrackSettings({ ...settings, volume: 127.5 })).toThrow();
   });
 
-  it("migrates v1 to v5 without mutating the root, progression, or steps", () => {
+  it("migrates v1 to v6 without mutating the root, progression, or steps", () => {
     const v1 = createV1Payload();
     const before = clone(v1);
     const migrated = migrateProjectData(v1);
 
     expect(v1).toEqual(before);
     expect(migrated).not.toBe(v1);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(migrated.melodyTrack).toEqual({
       instrument: "flute",
@@ -142,7 +142,7 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     const before = clone(v3);
     const migrated = migrateProjectData(v3);
 
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated).not.toBe(v3);
     expect(v3).toEqual(before);
     expect(
@@ -163,7 +163,7 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
       grid: "quarter",
       octaveOffset: 0,
     });
-    expect(() => migrateProjectData({ ...v3, schemaVersion: 6 })).toThrow(
+    expect(() => migrateProjectData({ ...v3, schemaVersion: 7 })).toThrow(
       UnsupportedProjectVersionError,
     );
   });
@@ -194,12 +194,16 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     const raw = JSON.parse(first) as MutableProjectPayload;
 
     expect(first).toBe(second);
-    expect(raw.schemaVersion).toBe(5);
+    expect(raw.schemaVersion).toBe(6);
     expect(raw.harmonyTrack).toEqual({
       instrument: "piano",
       muted: false,
       solo: false,
       volume: 100,
+      pianoEngine: "hq-samples",
+      guitarEngine: "hq-samples",
+      pianoSoundfontInstrument: "gm-000",
+      guitarSoundfontInstrument: "gm-025",
     });
     expect(raw.melodyTrack).toEqual({
       instrument: "violin",
@@ -249,7 +253,7 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     expect(saved.progression.steps[0]?.melody).toEqual(restored.progression.steps[0]?.melody);
   });
 
-  it("rejects a legacy recipe on the current v5 wire schema", () => {
+  it("rejects a legacy recipe on the current v6 wire schema", () => {
     const raw = JSON.parse(
       encodePortableProject(createRichProjectFixture()),
     ) as MutableProjectPayload;
@@ -356,7 +360,7 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     await repo.setLastActiveProjectId(v1.id);
 
     const recovered = await autosave.loadAutosavedProject();
-    expect(recovered?.schemaVersion).toBe(5);
+    expect(recovered?.schemaVersion).toBe(6);
     expect(recovered?.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(recovered?.melodyTrack).toEqual(createDefaultMelodyTrackSettings());
     expect(recovered?.progression.steps[0]).not.toHaveProperty("melody");
@@ -364,8 +368,8 @@ describe("T188 — US12 Project schema v5, migration, and persistence", () => {
     if (recovered) await repo.saveProject(recovered);
     expect(await db.projects.count()).toBe(1);
     const stored = await db.projects.get(v1.id);
-    expect(stored?.schemaVersion).toBe(5);
-    expect(JSON.parse(stored!.payload).schemaVersion).toBe(5);
+    expect(stored?.schemaVersion).toBe(6);
+    expect(JSON.parse(stored!.payload).schemaVersion).toBe(6);
 
     autosave.dispose();
     await db.delete();

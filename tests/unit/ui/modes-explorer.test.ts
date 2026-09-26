@@ -152,4 +152,46 @@ describe("ModesExplorerModal UI Component", () => {
 
     mounted.unmount();
   });
+
+  it("explains an invalid old-key apply and exposes an explicit switch-key retry", () => {
+    const onClose = vi.fn();
+    const onApplyFormulaToProgression = vi.fn((_formula, _tonic, switchKey) =>
+      switchKey
+        ? { success: true as const }
+        : {
+            success: false as const,
+            reason:
+              "The formula requires Bb major. Switch the project key to preserve its pitches.",
+          },
+    );
+    const mounted = mount(
+      el(ModesExplorerModal, {
+        isOpen: true,
+        project,
+        onClose,
+        onApplyFormulaToProgression,
+      }),
+    );
+
+    const keyChoice = mounted.container.querySelector<HTMLInputElement>(
+      ".modes-switch-key-label input",
+    );
+    act(() => keyChoice?.click());
+    const applyButton = mounted.container.querySelector<HTMLButtonElement>(".formula-apply-btn");
+    act(() => applyButton?.click());
+
+    expect(onApplyFormulaToProgression).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(mounted.container.querySelector('[role="alert"]')?.textContent).toContain("B♭ major");
+
+    const retryButton = mounted.container.querySelector<HTMLButtonElement>(
+      ".modes-switch-and-apply-button",
+    );
+    expect(retryButton).not.toBeNull();
+    act(() => retryButton?.click());
+
+    expect(onApplyFormulaToProgression.mock.calls[0]?.[2]).toBe(true);
+    expect(onClose).toHaveBeenCalledOnce();
+    mounted.unmount();
+  });
 });

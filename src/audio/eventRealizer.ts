@@ -25,6 +25,7 @@ import {
   resolveEffectiveNoteVelocity,
 } from "../instruments/piano/dynamics";
 import { realizeOrderedPianoProgression } from "../instruments/piano/progressionRealization";
+import { guitarStrumOffsetSeconds } from "./guitar/strumTiming";
 
 const PERFORMANCE_GATE_RATIO = rational(19, 20);
 const NUMBER_RATIONAL_PRECISION = 1_000_000;
@@ -552,9 +553,9 @@ export function realizeGuitarStepAudioEvents(
 
     case "block":
     default: {
-      // Natural guitar downstrum stagger (16ms per string)
+      // Natural guitar downstrum keeps the total chord spread to 30ms.
       pitches.forEach((pitch, idx) => {
-        const offset = idx * 0.016;
+        const offset = guitarStrumOffsetSeconds(idx, pitches.length);
         const dur = Math.max(0.2, (totalDurationSeconds - offset) * 0.95);
         const vel = resolveEffectiveNoteVelocity(
           masterVelocity,

@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import type { MeasuresPerSystem, Project, ProgressionView } from "../../domain/project/project";
+import type {
+  MeasuresPerSystem,
+  NoteColorMode,
+  Project,
+  ProgressionView,
+} from "../../domain/project/project";
 import type {
   BassChoice,
   BassOctaveOffset,
@@ -55,8 +60,7 @@ const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
 const GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-groove-disclosure-open";
-const GLOBAL_LOOP_DISCLOSURE_STORAGE_KEY =
-  "cadenceflow.ui.progression-global-loop-disclosure-open";
+const GLOBAL_LOOP_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.progression-global-loop-disclosure-open";
 const GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-tracks-disclosure-open";
 const GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY =
@@ -133,7 +137,7 @@ export interface ProgressionGlobalInspectorProps {
   readonly onSetLoopRange?: ((startStepId: string, endStepId: string) => void) | undefined;
   readonly onOpenPresets?: (() => void) | undefined;
   readonly onSaveAsPreset?: (() => void) | undefined;
-  readonly onToggleSuzukiColors?: ((enabled: boolean) => void) | undefined;
+  readonly onSetNoteColorMode?: ((mode: NoteColorMode) => void) | undefined;
 }
 
 export function ProgressionGlobalInspector({
@@ -158,7 +162,7 @@ export function ProgressionGlobalInspector({
   onSetLoopRange,
   onOpenPresets,
   onSaveAsPreset,
-  onToggleSuzukiColors,
+  onSetNoteColorMode,
 }: ProgressionGlobalInspectorProps) {
   const [tracksOpen, setTracksOpen] = useState(() =>
     readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
@@ -749,7 +753,7 @@ export function ProgressionGlobalInspector({
         ) : null;
 
       case "view":
-        return onSetProgressionView || onToggleSuzukiColors ? (
+        return onSetProgressionView || onSetNoteColorMode ? (
           <details
             className="inspector-disclosure progression-view-disclosure"
             open={progressionViewOpen}
@@ -771,7 +775,9 @@ export function ProgressionGlobalInspector({
               </span>
               <span className="disclosure-status">
                 {project.presentation.progressionView}
-                {project.presentation.suzukiColors ? " · Suzuki" : ""}
+                {project.presentation.noteColorMode !== "standard"
+                  ? ` · ${project.presentation.noteColorMode === "suzuki" ? "Suzuki" : "Harmonic roles"}`
+                  : ""}
               </span>
             </summary>
             <div className="inspector-disclosure-body" style={{ display: "grid", gap: "10px" }}>
@@ -783,7 +789,9 @@ export function ProgressionGlobalInspector({
                 >
                   <button
                     type="button"
-                    className={project.presentation.progressionView === "harmonic" ? "is-active" : ""}
+                    className={
+                      project.presentation.progressionView === "harmonic" ? "is-active" : ""
+                    }
                     onClick={() => onSetProgressionView("harmonic")}
                     aria-label="Harmonic view"
                   >
@@ -815,7 +823,9 @@ export function ProgressionGlobalInspector({
                   </button>
                   <button
                     type="button"
-                    className={project.presentation.progressionView === "tablature" ? "is-active" : ""}
+                    className={
+                      project.presentation.progressionView === "tablature" ? "is-active" : ""
+                    }
                     onClick={() => onSetProgressionView("tablature")}
                     aria-label="Tablature view"
                   >
@@ -823,19 +833,22 @@ export function ProgressionGlobalInspector({
                   </button>
                 </div>
               ) : null}
-              {onToggleSuzukiColors ? (
-                <label className="global-setting-option" style={{ marginTop: "2px" }}>
-                  <input
-                    type="checkbox"
-                    checked={project.presentation.suzukiColors ?? false}
-                    aria-label="Suzuki note colors"
-                    data-testid="toggle-suzuki-colors"
-                    onChange={(event) => onToggleSuzukiColors(event.target.checked)}
-                  />
+              {onSetNoteColorMode ? (
+                <label className="global-setting-option progression-note-color-mode">
                   <span>
-                    <strong>Suzuki note colors</strong>
-                    <small>Color noteheads by pitch (C=Red, D=Orange, etc.)</small>
+                    <strong>Note colors</strong>
+                    <small>Roles also use shapes and accessible note labels.</small>
                   </span>
+                  <select
+                    aria-label="Note color mode"
+                    data-testid="note-color-mode"
+                    value={project.presentation.noteColorMode}
+                    onChange={(event) => onSetNoteColorMode(event.target.value as NoteColorMode)}
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="suzuki">Suzuki</option>
+                    <option value="harmonic-role">Harmonic role</option>
+                  </select>
                 </label>
               ) : null}
             </div>

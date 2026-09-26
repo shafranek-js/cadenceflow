@@ -49,7 +49,7 @@ export function createDefaultProject(
       progressionView: "harmonic",
       measuresPerSystem: "auto",
       showBassInStaff: false,
-      suzukiColors: false,
+      noteColorMode: "standard",
       resolutionArrows: true,
       genreFocus: "all",
       guitarChordOrientation: "vertical",

@@ -26,6 +26,10 @@ describe("Harmony Track commands", () => {
       muted: false,
       solo: false,
       volume: 64,
+      pianoEngine: "hq-samples",
+      guitarEngine: "hq-samples",
+      pianoSoundfontInstrument: "gm-000",
+      guitarSoundfontInstrument: "gm-025",
     });
     expect(applied.project.updatedAt).toBe(T1);
     expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
@@ -47,6 +51,10 @@ describe("Harmony Track commands", () => {
       muted: false,
       solo: true,
       volume: 100,
+      pianoEngine: "hq-samples",
+      guitarEngine: "hq-samples",
+      pianoSoundfontInstrument: "gm-000",
+      guitarSoundfontInstrument: "gm-025",
     });
   });
 
@@ -64,6 +72,10 @@ describe("Harmony Track commands", () => {
       muted: false,
       solo: false,
       volume: 100,
+      pianoEngine: "hq-samples",
+      guitarEngine: "hq-samples",
+      pianoSoundfontInstrument: "gm-000",
+      guitarSoundfontInstrument: "gm-025",
     });
     expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
   });

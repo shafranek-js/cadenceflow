@@ -4,12 +4,12 @@ import { AppStore } from "../../src/app/appStore";
 import {
   setExpertiseMode,
   setStaffBassVisibility,
-  setSuzukiColors,
+  setNoteColorMode,
   setTheme,
   setSidePanelMode,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
-  type SetSuzukiColorsCommand,
+  type SetNoteColorModeCommand,
   type SetThemeCommand,
   type SetSidePanelModeCommand,
 } from "../../src/app/commands/presentationCommands";
@@ -86,10 +86,10 @@ describe("US10 presentation persistence", () => {
     );
     store.dispatch(
       {
-        type: "presentation/set-suzuki-colors",
-        payload: { enabled: true, nowIso: "2026-09-08T12:02:45.000Z" },
-      } satisfies SetSuzukiColorsCommand,
-      setSuzukiColors,
+        type: "presentation/set-note-color-mode",
+        payload: { mode: "suzuki", nowIso: "2026-09-08T12:02:45.000Z" },
+      } satisfies SetNoteColorModeCommand,
+      setNoteColorMode,
     );
     store.dispatch(
       {
@@ -105,7 +105,7 @@ describe("US10 presentation persistence", () => {
     expect(reloaded?.presentation.theme).toBe("light");
     expect(reloaded?.presentation.expertiseMode).toBe("expert");
     expect(reloaded?.presentation.showBassInStaff).toBe(true);
-    expect(reloaded?.presentation.suzukiColors).toBe(true);
+    expect(reloaded?.presentation.noteColorMode).toBe("suzuki");
     expect(reloaded?.presentation.sidePanelMode).toBe("fixed");
     expect(reloaded?.tonic).toBe(initial.tonic);
     expect(reloaded?.activeModule).toBe(initial.activeModule);

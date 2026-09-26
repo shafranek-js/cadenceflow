@@ -12,11 +12,19 @@ import {
 } from "./timingCommands";
 import {
   restoreProgression,
+  removeStep,
   type RestoreProgressionCommand,
+  type RemoveStepCommand,
   repeatChordStep,
   type RepeatChordStepCommand,
 } from "./progressionCommands";
-import { restoreBranchState, type RestoreBranchStateCommand } from "./branchCommands";
+import {
+  addBranchPreview,
+  restoreBranchState,
+  type AddBranchPreviewCommand,
+  type RestoreBranchStateCommand,
+} from "./branchCommands";
+import { addMatrixPreview, type AddMatrixPreviewCommand } from "./matrixCommands";
 import {
   restoreModuleTemplate,
   restoreAllTemplates,
@@ -32,6 +40,12 @@ import {
   type SetCardViewOverrideCommand,
 } from "./matrixViewCommands";
 import { setTonic, type SetTonicCommand } from "./harmonyContextCommands";
+import {
+  applyModesFormula,
+  restoreModesFormulaState,
+  type ApplyModesFormulaCommand,
+  type RestoreModesFormulaStateCommand,
+} from "./modesExplorerCommands";
 import { restoreCustomPresets, type RestoreCustomPresetsCommand } from "./presetCommands";
 import { renameProject, type RenameProjectCommand } from "./projectCommands";
 import {
@@ -40,6 +54,7 @@ import {
   setStaffBassVisibility,
   setProgressionView,
   setMeasuresPerSystem,
+  setNoteColorMode,
   setSuzukiColors,
   setResolutionArrows,
   setGenreFocus,
@@ -50,6 +65,7 @@ import {
   type SetStaffBassVisibilityCommand,
   type SetProgressionViewCommand,
   type SetMeasuresPerSystemCommand,
+  type SetNoteColorModeCommand,
   type SetSuzukiColorsCommand,
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
@@ -71,12 +87,18 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setStepDuration(project, command as SetStepDurationCommand).project;
     case "progression/restore":
       return restoreProgression(project, command as RestoreProgressionCommand).project;
+    case "progression/remove-step":
+      return removeStep(project, command as RemoveStepCommand).project;
     case "progression/repeat-chord":
       return repeatChordStep(project, command as RepeatChordStepCommand).project;
     case "presets/restore-custom":
       return restoreCustomPresets(project, command as RestoreCustomPresetsCommand).project;
     case "branch/restore-state":
       return restoreBranchState(project, command as RestoreBranchStateCommand).project;
+    case "branch/add-preview":
+      return addBranchPreview(project, command as AddBranchPreviewCommand).project;
+    case "matrix/add-preview":
+      return addMatrixPreview(project, command as AddMatrixPreviewCommand).project;
     case "matrix-template/restore-module":
       return restoreModuleTemplate(project, command as RestoreModuleTemplateCommand).project;
     case "matrix-template/restore-all":
@@ -90,6 +112,10 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setCardViewOverride(project, command as SetCardViewOverrideCommand).project;
     case "harmony/set-tonic":
       return setTonic(project, command as SetTonicCommand).project;
+    case "modes/apply-formula":
+      return applyModesFormula(project, command as ApplyModesFormulaCommand).project;
+    case "modes/restore-formula-state":
+      return restoreModesFormulaState(project, command as RestoreModesFormulaStateCommand).project;
     case "project/rename":
       return renameProject(project, command as RenameProjectCommand).project;
     case "presentation/set-theme":
@@ -102,6 +128,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setProgressionView(project, command as SetProgressionViewCommand).project;
     case "presentation/set-measures-per-system":
       return setMeasuresPerSystem(project, command as SetMeasuresPerSystemCommand).project;
+    case "presentation/set-note-color-mode":
+      return setNoteColorMode(project, command as SetNoteColorModeCommand).project;
     case "presentation/set-suzuki-colors":
       return setSuzukiColors(project, command as SetSuzukiColorsCommand).project;
     case "presentation/set-resolution-arrows":

@@ -4,7 +4,7 @@ import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
 import {
   setExpertiseMode,
   setStaffBassVisibility,
-  setSuzukiColors,
+  setNoteColorMode,
   setResolutionArrows,
   setGenreFocus,
   setTheme,
@@ -12,7 +12,7 @@ import {
   setSidePanelMode,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
-  type SetSuzukiColorsCommand,
+  type SetNoteColorModeCommand,
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetThemeCommand,
@@ -89,29 +89,29 @@ describe("US10 presentation commands", () => {
     expect(store.project.presentation.showBassInStaff).toBe(true);
   });
 
-  it("keeps Suzuki note colors disabled by default and supports undo/redo and inverse", () => {
+  it("keeps standard note colors by default and supports mode undo/redo and inverse", () => {
     const initial = createDefaultProject("presentation-suzuki", "Suzuki Project");
     const store = new AppStore(initial);
-    const command: SetSuzukiColorsCommand = {
-      type: "presentation/set-suzuki-colors",
-      payload: { enabled: true, nowIso },
+    const command: SetNoteColorModeCommand = {
+      type: "presentation/set-note-color-mode",
+      payload: { mode: "suzuki", nowIso },
     };
 
-    expect(initial.presentation.suzukiColors).toBe(false);
-    store.dispatch(command, setSuzukiColors);
-    expect(store.project.presentation.suzukiColors).toBe(true);
+    expect(initial.presentation.noteColorMode).toBe("standard");
+    store.dispatch(command, setNoteColorMode);
+    expect(store.project.presentation.noteColorMode).toBe("suzuki");
     expect(store.project.progression).toBe(initial.progression);
     expect(store.project.defaults).toBe(initial.defaults);
     expect(store.project.tonic).toBe(initial.tonic);
 
     expect(store.undo()).toBe(true);
-    expect(store.project.presentation.suzukiColors).toBe(false);
+    expect(store.project.presentation.noteColorMode).toBe("standard");
     expect(store.redo()).toBe(true);
-    expect(store.project.presentation.suzukiColors).toBe(true);
+    expect(store.project.presentation.noteColorMode).toBe("suzuki");
 
-    const inverseResult = setSuzukiColors(initial, command);
+    const inverseResult = setNoteColorMode(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
-    expect(undone.presentation.suzukiColors).toBe(false);
+    expect(undone.presentation.noteColorMode).toBe("standard");
   });
 
   it("enables resolution arrows by default and supports toggling, undo/redo, and inverse", () => {

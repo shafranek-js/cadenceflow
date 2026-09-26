@@ -58,9 +58,12 @@ export interface ModesExplorerModalProps {
     formula: ModalCadenceFormula,
     tonic: PitchClassIdentity,
     switchKey: boolean,
-  ) => void;
+  ) => ModalFormulaApplyResult | void;
   readonly onApplyKeyToProject?: (tonic: PitchClassIdentity) => void;
 }
+
+export type ModalFormulaApplyResult =
+  { readonly success: true } | { readonly success: false; readonly reason: string };
 
 export function ModesExplorerModal({
   isOpen,
@@ -86,6 +89,9 @@ export function ModesExplorerModal({
   const [selectedScaleId, setSelectedScaleId] = useState<ExtendedScaleId>("dorian");
   const [cardVisualView, setCardVisualView] = useState<"piano" | "guitar">("piano");
   const [switchKeyOnApply, setSwitchKeyOnApply] = useState<boolean>(true);
+  const [applyError, setApplyError] = useState<
+    { readonly formulaId: string; readonly reason: string; readonly canSwitch: boolean } | undefined
+  >();
 
   const scaleDef = useMemo(() => getScaleDefinition(selectedScaleId), [selectedScaleId]);
 
@@ -110,6 +116,12 @@ export function ModesExplorerModal({
   }, [selectedScaleId]);
 
   const currentTonicLabel = TONIC_PITCH_CLASSES.find((t) => t.pc === selectedTonic)?.label ?? "C";
+  const parentTonic = useMemo(
+    () => getModalParentKeyAndFunction(selectedTonic, selectedScaleId, 1).parentTonic,
+    [selectedTonic, selectedScaleId],
+  );
+  const parentTonicLabel = TONIC_PITCH_CLASSES.find((t) => t.pc === parentTonic)?.label ?? "C";
+  const projectTonicLabel = TONIC_PITCH_CLASSES.find((t) => t.pc === project.tonic)?.label ?? "C";
 
   // Audio audition for scale notes
   const handlePlayScale = useCallback(() => {
@@ -149,12 +161,49 @@ export function ModesExplorerModal({
   );
 
   const handleApplyFormula = useCallback(
-    (formula: ModalCadenceFormula) => {
+    (formula: ModalCadenceFormula, useSwitchKey = switchKeyOnApply) => {
       if (!onApplyFormulaToProgression) return;
-      onApplyFormulaToProgression(formula, selectedTonic, switchKeyOnApply);
+      const formulaParentTonic = getModalParentKeyAndFunction(
+        selectedTonic,
+        formula.modeId,
+        1,
+      ).parentTonic;
+      if (!useSwitchKey && project.tonic !== formulaParentTonic) {
+        const formulaParentLabel =
+          TONIC_PITCH_CLASSES.find((tonic) => tonic.pc === formulaParentTonic)?.label ?? "C";
+        setApplyError({
+          formulaId: formula.id,
+          canSwitch: true,
+          reason: `This formula is derived from ${formulaParentLabel} major, but the project key is ${projectTonicLabel}. Switch the project key to ${formulaParentLabel} to preserve the selected pitches.`,
+        });
+        return;
+      }
+
+      const result = onApplyFormulaToProgression(formula, selectedTonic, useSwitchKey);
+      if (result && !result.success) {
+        setApplyError({
+          formulaId: formula.id,
+          canSwitch: !useSwitchKey && project.tonic !== formulaParentTonic,
+          reason: result.reason,
+        });
+        return;
+      }
+      setApplyError(undefined);
       onClose();
     },
-    [onApplyFormulaToProgression, selectedTonic, switchKeyOnApply, onClose],
+    [
+      onApplyFormulaToProgression,
+      selectedTonic,
+      switchKeyOnApply,
+      project.tonic,
+      projectTonicLabel,
+      onClose,
+    ],
+  );
+
+  const handleSwitchAndApplyFormula = useCallback(
+    (formula: ModalCadenceFormula) => handleApplyFormula(formula, true),
+    [handleApplyFormula],
   );
 
   const handleApplyKey = useCallback(() => {
@@ -228,7 +277,10 @@ export function ModesExplorerModal({
                       className={`modes-tonic-pill ${isSelected ? "is-active" : ""}`}
                       role="radio"
                       aria-checked={isSelected}
-                      onClick={() => setSelectedTonic(item.pc)}
+                      onClick={() => {
+                        setSelectedTonic(item.pc);
+                        setApplyError(undefined);
+                      }}
                     >
                       {item.label}
                     </button>
@@ -251,6 +303,7 @@ export function ModesExplorerModal({
                   onClick={() => {
                     setActiveFamily("diatonic");
                     setSelectedScaleId("dorian");
+                    setApplyError(undefined);
                   }}
                 >
                   7 Diatonic Church Modes
@@ -263,6 +316,7 @@ export function ModesExplorerModal({
                   onClick={() => {
                     setActiveFamily("minor-variants");
                     setSelectedScaleId("harmonic-minor");
+                    setApplyError(undefined);
                   }}
                 >
                   Minor Variants (Harmonic & Melodic)
@@ -275,6 +329,7 @@ export function ModesExplorerModal({
                   onClick={() => {
                     setActiveFamily("pentatonic-blues");
                     setSelectedScaleId("blues");
+                    setApplyError(undefined);
                   }}
                 >
                   Pentatonic & Blues
@@ -291,7 +346,10 @@ export function ModesExplorerModal({
                       className={`modes-scale-pill ${isSelected ? "is-active" : ""}`}
                       role="radio"
                       aria-checked={isSelected}
-                      onClick={() => setSelectedScaleId(scale.id)}
+                      onClick={() => {
+                        setSelectedScaleId(scale.id);
+                        setApplyError(undefined);
+                      }}
                     >
                       <span className="pill-name">{scale.name}</span>
                       {scale.characteristicInterval && (
@@ -500,6 +558,20 @@ export function ModesExplorerModal({
                             <span aria-hidden="true">➕</span> Apply to Progression
                           </button>
                         </div>
+                        {applyError?.formulaId === formula.id ? (
+                          <div className="modes-formula-apply-error" role="alert">
+                            <p>{applyError.reason}</p>
+                            {applyError.canSwitch ? (
+                              <button
+                                type="button"
+                                className="modes-switch-and-apply-button"
+                                onClick={() => handleSwitchAndApplyFormula(formula)}
+                              >
+                                Switch key to {parentTonicLabel} and apply
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -525,14 +597,18 @@ export function ModesExplorerModal({
             <input
               type="checkbox"
               checked={switchKeyOnApply}
-              onChange={(e) => setSwitchKeyOnApply(e.target.checked)}
+              aria-label={`Switch project key to ${parentTonicLabel} when applying`}
+              onChange={(e) => {
+                setSwitchKeyOnApply(e.target.checked);
+                setApplyError(undefined);
+              }}
             />
-            <span>Синхронизировать тональность проекта при вставке</span>
+            <span>Switch project key to {parentTonicLabel} when applying</span>
           </label>
           <div className="modes-footer-actions">
             {onApplyKeyToProject && (
               <button type="button" className="modes-apply-key-btn" onClick={handleApplyKey}>
-                Set Project Key ({currentTonicLabel} {scaleDef.name})
+                Set Project Key ({parentTonicLabel})
               </button>
             )}
             <button type="button" className="btn btn-primary modes-done-btn" onClick={onClose}>

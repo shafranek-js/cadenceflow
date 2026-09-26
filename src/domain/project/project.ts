@@ -19,6 +19,7 @@ import {
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
 export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar" | "tablature";
+export type NoteColorMode = "standard" | "suzuki" | "harmonic-role";
 export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface PresentationState {
@@ -31,8 +32,8 @@ export interface PresentationState {
   readonly measuresPerSystem: MeasuresPerSystem;
   /** Whether Staff View includes the independently voiced bass note. */
   readonly showBassInStaff: boolean;
-  /** Whether notation surfaces display decorative pitch-colored Suzuki noteheads. */
-  readonly suzukiColors?: boolean;
+  /** Notation and Piano card note color/accessibility presentation. */
+  readonly noteColorMode: NoteColorMode;
   /** Whether the Harmonic Matrix displays resolution tendency arrows and targets. */
   readonly resolutionArrows?: boolean;
   /** Active musical genre focus filtering and highlighting the matrix. */

@@ -14,3 +14,22 @@ The application loads only the local copies committed with CadenceFlow. It does 
 The committed local sample maps contain all 128 General MIDI programs. The
 program-to-file mapping, file sizes, and SHA-256 digests are recorded in
 public/audio/melody/manifest.json and verified by the offline asset checker.
+
+For the 122 sample maps checked out with Git's automatic line-ending
+conversion, canonical LF sizes and SHA-256 digests are recorded in the
+manifest. The generator and verifier accept only those canonical bytes or
+their exact CRLF checkout form. No sample-map data is modified by this
+line-ending conversion.
+
+The upstream acoustic_guitar_nylon-mp3.js at the pinned revision is 1,837,439
+bytes with SHA-256
+5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64.
+Source file:
+https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM/acoustic_guitar_nylon-mp3.js
+Git may convert its 94 LF line endings to CRLF in Windows checkouts; the encoded
+sample data is unchanged. That Windows checkout form is 1,837,533 bytes with
+SHA-256 623c8109bd17d184c43c6578dfc01170f1e85000ee522f2c580d5fbeeb9298ce.
+The two paths below contain the same sample map:
+
+- public/audio/soundfont/acoustic_guitar_nylon-mp3.js
+- public/audio/guitar/acoustic_guitar_nylon-mp3.js

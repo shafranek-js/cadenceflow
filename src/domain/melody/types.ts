@@ -34,6 +34,8 @@ export interface ChordMelodyRecipe {
   readonly connection: MelodyConnection;
   readonly grid: MelodyGrid;
   readonly octaveOffset: MelodyOctaveOffset;
+  /** Optional target pitch class applied to the final generated note when it fits the next chord. */
+  readonly targetNextPitchClass?: number;
 }
 
 /** Pre-T186 wire shape retained only as a load/command compatibility input. */
@@ -148,16 +150,28 @@ export function validateChordMelodyRecipe(value: unknown): ChordMelodyRecipe {
   const pattern = isRecord(value) ? value.pattern : undefined;
   const grid = isRecord(value) ? value.grid : undefined;
   const octaveOffset = isRecord(value) ? value.octaveOffset : undefined;
+  const targetNextPitchClass = isRecord(value) ? value.targetNextPitchClass : undefined;
 
   const canonical =
     isRecord(value) &&
-    hasOnlyKeys(value, ["pitchMotion", "rhythm", "connection", "grid", "octaveOffset"]);
+    hasOnlyKeys(value, [
+      "pitchMotion",
+      "rhythm",
+      "connection",
+      "grid",
+      "octaveOffset",
+      "targetNextPitchClass",
+    ]);
   const legacy = isRecord(value) && hasOnlyKeys(value, ["pattern", "grid", "octaveOffset"]);
   const validCommon =
     MELODY_GRIDS.includes(grid as MelodyGrid) &&
     Number.isInteger(octaveOffset) &&
     (octaveOffset as number) >= -2 &&
-    (octaveOffset as number) <= 2;
+    (octaveOffset as number) <= 2 &&
+    (targetNextPitchClass === undefined ||
+      (Number.isInteger(targetNextPitchClass) &&
+        (targetNextPitchClass as number) >= 0 &&
+        (targetNextPitchClass as number) <= 11));
 
   if (
     !isRecord(value) ||
@@ -181,6 +195,9 @@ export function validateChordMelodyRecipe(value: unknown): ChordMelodyRecipe {
     connection: (canonical ? connection : "retrigger") as MelodyConnection,
     grid: grid as MelodyGrid,
     octaveOffset: octaveOffset as MelodyOctaveOffset,
+    ...(targetNextPitchClass !== undefined
+      ? { targetNextPitchClass: targetNextPitchClass as number }
+      : {}),
   });
 }
 

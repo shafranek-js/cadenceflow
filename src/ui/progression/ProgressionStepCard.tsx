@@ -4,10 +4,12 @@ import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
-import type { ProgressionView } from "../../domain/project/project";
+import type { NoteColorMode, ProgressionView } from "../../domain/project/project";
+import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { formatMusicalDuration } from "../../domain/timing/duration";
+import { createHarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
 import { PianoCardView } from "../piano/PianoCardView";
 import { GuitarCardView } from "../guitar/GuitarCardView";
 import { TabCardView } from "../guitar/TabCardView";
@@ -30,6 +32,9 @@ export function ProgressionStepCard({
   inLoop = false,
   showBassInStaff = false,
   suzukiColors = false,
+  noteColorMode = suzukiColors ? "suzuki" : "standard",
+  activeModule = "progressions",
+  nextStep,
   guitarChordOrientation = "vertical",
   onSelect,
   onPerformanceChange,
@@ -47,6 +52,9 @@ export function ProgressionStepCard({
   readonly inLoop?: boolean;
   readonly showBassInStaff?: boolean;
   readonly suzukiColors?: boolean;
+  readonly noteColorMode?: NoteColorMode;
+  readonly activeModule?: HarmonicModuleId;
+  readonly nextStep?: ChordStep | undefined;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
@@ -64,6 +72,19 @@ export function ProgressionStepCard({
   // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
   const pianoPitches = realization.pitches;
   const displayedChord = withEffectiveBass(baseChord, realization.bassPitch);
+  const nextRealization = nextStep ? realizeProgressionStepRealization(nextStep, tonic) : undefined;
+  const roleContext = createHarmonicNoteRoleContext({
+    tonic,
+    moduleId: activeModule,
+    rootPitchClass: baseChord.rootPitchClass,
+    chordPitches: [...pianoPitches, ...(realization.bassPitch ? [realization.bassPitch] : [])],
+    nextChordPitches: nextRealization
+      ? [
+          ...nextRealization.pitches,
+          ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
+        ]
+      : [],
+  });
   const chordLabel = formatChordSymbol(displayedChord);
   const isInvertedBass =
     realization.bassPitch !== undefined &&
@@ -143,7 +164,7 @@ export function ProgressionStepCard({
             onSelect();
           }}
           hasContextMenu={Boolean(onOpenMelodyMenu)}
-          suzukiColors={suzukiColors}
+          suzukiColors={noteColorMode === "suzuki"}
           onOctaveChange={changeStaffOctave}
         />
       ) : (
@@ -184,6 +205,8 @@ export function ProgressionStepCard({
                 chordPitches={pianoPitches}
                 bassPitch={isInvertedBass ? realization.bassPitch : undefined}
                 chordLabel={chordLabel}
+                noteColorMode={noteColorMode}
+                roleContext={roleContext}
               />
             ) : null}
             {view === "guitar" ? (

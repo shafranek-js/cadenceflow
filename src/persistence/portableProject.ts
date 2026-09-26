@@ -2,6 +2,7 @@ import type {
   MeasuresPerSystem,
   MatrixCardTemplateState,
   ModuleTemplateState,
+  NoteColorMode,
   PresentationState,
   ProgressionView,
   Project,
@@ -209,6 +210,9 @@ function encodeMelodyRecipe(recipe: ChordMelodyRecipe): Record<string, unknown> 
     connection: snapshot.connection,
     grid: snapshot.grid,
     octaveOffset: snapshot.octaveOffset,
+    ...(snapshot.targetNextPitchClass !== undefined
+      ? { targetNextPitchClass: snapshot.targetNextPitchClass }
+      : {}),
   };
 }
 
@@ -306,6 +310,10 @@ function encodeHarmonyTrackSettings(settings: HarmonyTrackSettings): Record<stri
     muted: snapshot.muted,
     solo: snapshot.solo,
     volume: snapshot.volume,
+    pianoEngine: snapshot.pianoEngine,
+    guitarEngine: snapshot.guitarEngine,
+    pianoSoundfontInstrument: snapshot.pianoSoundfontInstrument,
+    guitarSoundfontInstrument: snapshot.guitarSoundfontInstrument,
   };
 }
 
@@ -476,7 +484,7 @@ export function encodePortableProject(project: Project): string {
       progressionView: project.presentation.progressionView,
       measuresPerSystem: project.presentation.measuresPerSystem,
       showBassInStaff: project.presentation.showBassInStaff,
-      suzukiColors: project.presentation.suzukiColors === true,
+      noteColorMode: project.presentation.noteColorMode,
       resolutionArrows: project.presentation.resolutionArrows !== false,
       genreFocus: project.presentation.genreFocus ?? "all",
       ...(project.presentation.guitarChordOrientation !== undefined
@@ -725,7 +733,11 @@ export function decodePortableProject(jsonString: string): Project {
         measuresPerSystem: decodeMeasuresPerSystem(presentation),
         // Portable projects created before this preference default to chord notes only.
         showBassInStaff: presentation["showBassInStaff"] === true,
-        suzukiColors: presentation["suzukiColors"] === true,
+        noteColorMode:
+          presentation["noteColorMode"] === "suzuki" ||
+          presentation["noteColorMode"] === "harmonic-role"
+            ? (presentation["noteColorMode"] as NoteColorMode)
+            : "standard",
         resolutionArrows: presentation["resolutionArrows"] !== false,
         genreFocus:
           typeof presentation["genreFocus"] === "string"

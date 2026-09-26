@@ -26,6 +26,26 @@ function formatPitch(entry: Extract<MelodyStaffEntry, { kind: "note" }>): string
   return `${formatPitchSpelling(entry.pitch.spelling)}${entry.pitch.octave}`;
 }
 
+function roleLabel(entry: Extract<MelodyStaffEntry, { kind: "note" }>): string {
+  const primary = entry.harmonicRole.primary.replace("-", " ");
+  return `role ${primary}${entry.harmonicRole.targetNext ? ", target for next chord" : ""}`;
+}
+
+function roleMarker(
+  primary: Extract<MelodyStaffEntry, { kind: "note" }>["harmonicRole"]["primary"],
+): string {
+  switch (primary) {
+    case "root":
+      return "●";
+    case "chord-tone":
+      return "◆";
+    case "scale-tone":
+      return "○";
+    case "altered":
+      return "△";
+  }
+}
+
 function sourceChordLabel(project: Project, stepId: string): string {
   const step = project.progression.steps.find(
     (candidate) => candidate.id === stepId && candidate.kind === "chord",
@@ -109,7 +129,7 @@ export function MelodyStaffView({
         },
         {
           clef: lane?.clef ?? timeline.clef,
-          suzukiColors: project.presentation.suzukiColors ?? false,
+          suzukiColors: project.presentation.noteColorMode === "suzuki",
         },
       );
     };
@@ -120,7 +140,13 @@ export function MelodyStaffView({
       observer?.disconnect();
       cleanup();
     };
-  }, [lane?.clef, project.globalTiming.meter, project.presentation.suzukiColors, sequence, timeline.clef]);
+  }, [
+    lane?.clef,
+    project.globalTiming.meter,
+    project.presentation.noteColorMode,
+    sequence,
+    timeline.clef,
+  ]);
 
   const barLength = rationalToNumber(
     rational(project.globalTiming.meter.numerator * 4, project.globalTiming.meter.denominator),
@@ -164,7 +190,8 @@ export function MelodyStaffView({
             const pitch = formatPitch(entry);
             const source = sourceChordLabel(project, entry.sourceStepId);
             const entryInstrument = melodyInstrumentLabel(entry.instrument);
-            const label = `Melody ${entryInstrument}, ${pitch}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${source}`;
+            const label = `Melody ${entryInstrument}, ${pitch}, ${roleLabel(entry)}, onset ${exact(entry.startBeats)} beats, duration ${exact(entry.durationBeats)} beats, source chord ${source}`;
+            const harmonicRoleMode = project.presentation.noteColorMode === "harmonic-role";
             const style = {
               "--melody-staff-event-x": `${Math.min(Math.max(xRatio, 0), 1) * 100}%`,
             } as CSSProperties;
@@ -172,8 +199,10 @@ export function MelodyStaffView({
               <button
                 key={entry.key}
                 type="button"
-                className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"}`.trim()}
+                className={`melody-staff-note ${selected ? "is-selected" : ""} ${active ? "is-active" : ""} ${entry.startsHere ? "" : "is-continuation"} ${harmonicRoleMode ? `role-${entry.harmonicRole.primary}` : ""} ${harmonicRoleMode && entry.harmonicRole.targetNext ? "is-target-next" : ""}`.trim()}
                 style={style}
+                data-harmonic-role={entry.harmonicRole.primary}
+                data-target-next={entry.harmonicRole.targetNext ? "true" : "false"}
                 data-melody-event-key={entry.eventKey}
                 data-melody-fragment-key={entry.key}
                 aria-label={label}
@@ -181,7 +210,14 @@ export function MelodyStaffView({
                 aria-current={active ? "step" : undefined}
                 title={label}
                 onClick={() => onSelectStep(entry.sourceStepId)}
-              />
+              >
+                {harmonicRoleMode ? (
+                  <span className="melody-staff-role-marker" aria-hidden="true">
+                    {roleMarker(entry.harmonicRole.primary)}
+                    {entry.harmonicRole.targetNext ? <span>→</span> : null}
+                  </span>
+                ) : null}
+              </button>
             );
           })}
         </div>

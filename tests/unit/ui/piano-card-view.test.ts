@@ -87,6 +87,22 @@ describe("Piano Card keyboard geometry", () => {
     expect(html).not.toContain("tabindex=");
   });
 
+  it("keeps the legacy comma-separated aria-label in Suzuki mode without role context", () => {
+    const html = renderToString(
+      el(PianoCardView, {
+        chordLabel: "C",
+        noteColorMode: "suzuki",
+        chordPitches: [
+          exactPitch(60, { step: "C", alter: 0 }),
+          exactPitch(64, { step: "E", alter: 0 }),
+          exactPitch(67, { step: "G", alter: 0 }),
+        ],
+      }),
+    );
+
+    expect(html).toContain('aria-label="C chord on piano: C4, E4, G4"');
+  });
+
   it("keeps a semantic slash bass visible in the piano projection", () => {
     const html = renderToString(
       el(PianoCardView, {

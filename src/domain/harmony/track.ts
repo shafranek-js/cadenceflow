@@ -1,7 +1,4 @@
-import {
-  validateMelodyInstrumentId,
-  type MelodyInstrumentId,
-} from "../melody/instrumentCatalog";
+import { validateMelodyInstrumentId, type MelodyInstrumentId } from "../melody/instrumentCatalog";
 
 export type HarmonyInstrument = "piano" | MelodyInstrumentId;
 
@@ -12,10 +9,10 @@ export interface HarmonyTrackSettings {
   readonly muted: boolean;
   readonly solo: boolean;
   readonly volume: number;
-  readonly pianoEngine?: AudioEngineType;
-  readonly guitarEngine?: AudioEngineType;
-  readonly guitarSoundfontInstrument?: MelodyInstrumentId;
-  readonly pianoSoundfontInstrument?: MelodyInstrumentId;
+  readonly pianoEngine: AudioEngineType;
+  readonly guitarEngine: AudioEngineType;
+  readonly guitarSoundfontInstrument: MelodyInstrumentId;
+  readonly pianoSoundfontInstrument: MelodyInstrumentId;
 }
 
 export const DEFAULT_HARMONY_TRACK_SETTINGS: HarmonyTrackSettings = Object.freeze({
@@ -23,6 +20,10 @@ export const DEFAULT_HARMONY_TRACK_SETTINGS: HarmonyTrackSettings = Object.freez
   muted: false,
   solo: false,
   volume: 100,
+  pianoEngine: "hq-samples",
+  guitarEngine: "hq-samples",
+  guitarSoundfontInstrument: "gm-025",
+  pianoSoundfontInstrument: "gm-000",
 });
 
 export type HarmonyTrackValidationReason = "invalid-settings";
@@ -89,7 +90,9 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     (muted === true && solo === true) ||
     !Number.isInteger(volume) ||
     (volume as number) < 0 ||
-    (volume as number) > 127
+    (volume as number) > 127 ||
+    (pianoEngine !== "hq-samples" && pianoEngine !== "soundfont") ||
+    (guitarEngine !== "hq-samples" && guitarEngine !== "soundfont")
   ) {
     throw new HarmonyTrackValidationError(
       "Harmony Track settings require a supported instrument, boolean mute/solo flags, and integer volume 0..127",
@@ -97,50 +100,24 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     );
   }
 
-  let validatedPianoEngine: AudioEngineType | undefined;
-  if (pianoEngine !== undefined) {
-    if (pianoEngine !== "hq-samples" && pianoEngine !== "soundfont") {
-      throw new HarmonyTrackValidationError(
-        "Harmony Track pianoEngine must be 'hq-samples' or 'soundfont'",
-        "invalid-settings",
-      );
-    }
-    validatedPianoEngine = pianoEngine;
+  let validatedGuitarSoundfontInstrument: MelodyInstrumentId;
+  try {
+    validatedGuitarSoundfontInstrument = validateMelodyInstrumentId(guitarSoundfontInstrument);
+  } catch {
+    throw new HarmonyTrackValidationError(
+      "Harmony Track guitarSoundfontInstrument must be a valid GM instrument id",
+      "invalid-settings",
+    );
   }
 
-  let validatedGuitarEngine: AudioEngineType | undefined;
-  if (guitarEngine !== undefined) {
-    if (guitarEngine !== "hq-samples" && guitarEngine !== "soundfont") {
-      throw new HarmonyTrackValidationError(
-        "Harmony Track guitarEngine must be 'hq-samples' or 'soundfont'",
-        "invalid-settings",
-      );
-    }
-    validatedGuitarEngine = guitarEngine;
-  }
-
-  let validatedGuitarSoundfontInstrument: MelodyInstrumentId | undefined;
-  if (guitarSoundfontInstrument !== undefined) {
-    try {
-      validatedGuitarSoundfontInstrument = validateMelodyInstrumentId(guitarSoundfontInstrument);
-    } catch {
-      throw new HarmonyTrackValidationError(
-        "Harmony Track guitarSoundfontInstrument must be a valid GM instrument id",
-        "invalid-settings",
-      );
-    }
-  }
-
-  let validatedPianoSoundfontInstrument: MelodyInstrumentId | undefined;
-  if (pianoSoundfontInstrument !== undefined) {
-    try {
-      validatedPianoSoundfontInstrument = validateMelodyInstrumentId(pianoSoundfontInstrument);
-    } catch {
-      throw new HarmonyTrackValidationError(
-        "Harmony Track pianoSoundfontInstrument must be a valid GM instrument id",
-        "invalid-settings",
-      );
-    }
+  let validatedPianoSoundfontInstrument: MelodyInstrumentId;
+  try {
+    validatedPianoSoundfontInstrument = validateMelodyInstrumentId(pianoSoundfontInstrument);
+  } catch {
+    throw new HarmonyTrackValidationError(
+      "Harmony Track pianoSoundfontInstrument must be a valid GM instrument id",
+      "invalid-settings",
+    );
   }
 
   return Object.freeze({
@@ -148,14 +125,10 @@ export function validateHarmonyTrackSettings(value: unknown): HarmonyTrackSettin
     muted: muted as boolean,
     solo: solo as boolean,
     volume: volume as number,
-    ...(validatedPianoEngine ? { pianoEngine: validatedPianoEngine } : {}),
-    ...(validatedGuitarEngine ? { guitarEngine: validatedGuitarEngine } : {}),
-    ...(validatedGuitarSoundfontInstrument
-      ? { guitarSoundfontInstrument: validatedGuitarSoundfontInstrument }
-      : {}),
-    ...(validatedPianoSoundfontInstrument
-      ? { pianoSoundfontInstrument: validatedPianoSoundfontInstrument }
-      : {}),
+    pianoEngine: pianoEngine as AudioEngineType,
+    guitarEngine: guitarEngine as AudioEngineType,
+    guitarSoundfontInstrument: validatedGuitarSoundfontInstrument,
+    pianoSoundfontInstrument: validatedPianoSoundfontInstrument,
   });
 }
 

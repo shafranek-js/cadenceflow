@@ -1,81 +1,33 @@
-# Accepted Developer Assignment — T191 strict harmonic routing
+# Developer Assignment — T196 Guitar Asset Provenance
 
-**Status:** T191 is independently accepted. This file is retained as the completed assignment record. No new
-developer batch is currently authorized; do not start T192 or any later task without an explicit user command.
+**Status:** Accepted by the orchestrator on 2026-09-26 after independent verification. Historical handoff only; T195 has not been assigned.
 
-## Verified baseline
+## Baseline and ownership
 
-- Accepted work exists through T190, including the T188 local GM catalog, Batch 2 documentary convergence,
-  and T190 canonical topology. Start from the committed T190 baseline. Do not reset, clean, push, deploy, or
-  rewrite protected Graphify/QA/source, screenshot, `info source`, or `CHORDFILES_COMPARISON.md` material.
-- Current portable persistence is schema v5. The effective Melody instrument is exactly
-  `step.melodyInstrumentOverride ?? project.melodyTrack.instrument`; inherited values are not serialized.
-- All 128 General MIDI Melody programs are manifest-backed local assets at the pinned FluidR3_GM revision;
-  the six old ids are compatibility identifiers. Runtime loads programs lazily and has no production CDN
-  dependency or export-only catalog entries.
-- Current Progression Views are Harmonic, Piano, Staff, Guitar, and Tablature. `measuresPerSystem` accepts
-  `auto` and manual 1–8; Auto currently targets 2–6 and may reflow for width/density.
-- Guitar fretboard/chord shapes, standard tuning, fingering, in-position Scale Tones, tablature, HQ
-  Samples/SoundFont engines, and bounded strum scheduling are implemented. Scales & Modes Explorer,
-  Blues vocabulary, voice leading, reharmonization, modulation, cadence formulas, and Suzuki colors are
-  implemented current surfaces.
-- `AudioEnginesInspector` is the sole engine/tone settings surface. HarmonyTrackControls and the lower
-  PianoAudioStatus retain only their documented track/provider controls and Retry behavior. Engine/tone
-  fields are not currently portable/autosave round-tripped; T197 owns codec/schema/autosave/export/Undo
-  persistence and must not be inferred from the current UI.
+- Work in the existing Luna 2 isolated worktree. The main checkout at `C:\Projects\cadenceflow` is canonical and has accepted T197+T192, T193, T194, and T211. Your worktree's task/status documents lag; read the current main checkout.
+- Preserve user-owned changes, `pnpm-workspace.yaml`, CodeGraph artifacts, and the running dev server. Do not reset, clean, commit, push, or deploy.
+- Read T196 in main `tasks.md`, the asset risk in `PROJECT_STATUS.md`, FR-182 in `spec.md`, the existing `public/licenses/` notices, T188 Melody manifest/audit, and the asset references in `quickstart.md`. This is an evidence task, not a legal opinion.
 
-## Authorized batch — T191 only
+## Exact audit targets
 
-Implement the strict directed-tension and Modal Corridor contract from T191, FR-026–FR-036, and FR-243.
+- `public/audio/soundfont/acoustic_guitar_nylon-mp3.js` and `public/audio/guitar/acoustic_guitar_nylon-mp3.js` are identical today: 1,837,533 bytes, SHA-256 `623C8109BD17D184C43C6578DFC01170F1E85000EE522F2C580D5FBEEB9298CE`.
+- `public/images/guitar-hand-fretting.png` and `src/ui/guitar/assets/guitar-hand-fretting.png` are identical today: 458,663 bytes, SHA-256 `1A8BAC5E11ACE981D08B12886CEA81BC571768585D8D77938A8B0328ACB784E2`.
+- Git history points to commits `2ef0894` (nylon introduction), `7816ac6` (Guitar hand), and `df8c27f` (local GM catalog), but commit history alone does not establish source ownership or permission. The steel Guitar asset already has T188 manifest evidence; do not reopen it unless an actual inconsistency appears.
 
-- Treat topology `targetId` as the sole Best Match after a directed tension chord such as a secondary
-  dominant or secondary diminished chord. Do not promote another tension chord as an ordinary Alternative.
-- Keep other musically valid visible cards selectable, but clearly distinguish a blocked/requires-confirmation
-  route from a recommendation. Do not mutate or remove legacy project data.
-- Enforce the Progressions Modal Interchange corridor through `I`, `IV`, or `V`: entry into and return from a
-  modal-interchange chord follows the canonical gateway rules. A direct manual route outside the corridor
-  must show a concise warning with explicit `Add anyway`; cancelling must be non-mutating.
-- Keep `Best Match`, `Alternative`, blocked-route rationale, and Beginner/Composer/Expert explanations
-  consistent between Matrix badges, Inspector, keyboard operation, and temporary-branch context.
-- Preserve the accepted T190 geometry: stable semantic columns, visible source/target arrows and highlights,
-  the same-band `Tritone substitution`/contextual slots, and no full-width `Additional` or `Contextual` rows.
-- Add deterministic fixtures covering all 12 tonics, directed tension resolution, tension-to-tension
-  exclusion, allowed corridor transitions, manual violations, cancellation, `Add anyway`, mouse, keyboard,
-  playback highlight, and responsive/layout-pressure routing.
+## Authorized work
 
-### Non-goals
+1. Trace each target to an authoritative upstream source or original creation record. Record exact source URL, repository/file path, pinned revision or version, source-file hash/size where possible, applicable license text, attribution requirement, and how the committed bytes were derived. Distinguish verified facts from inference; do not treat filename similarity or a broad project license as proof for specific bytes.
+2. If provenance and redistribution terms can be verified for the exact target, add repository-local evidence and attribution/license notices in the established `public/licenses/` and documentation pattern. Keep the two-copy inventory and SHA-256/byte-size audit reproducible. Ensure the distributed app includes required notices and stays offline/local.
+3. If exact provenance or permission cannot be established, do not invent a license or silently remove/replace the asset. Report the specific evidence gap and a minimal scoped replacement/removal option with its user-visible impact to the orchestrator; pause that branch for direction. Do not mark T196 accepted on incomplete evidence.
+4. Do not alter the canonical Project/schema, Melody recipe, playback timing, or export semantics. Any necessary asset change must preserve relevant Guitar function and receive focused playback/visual regression checks.
 
-- No schema change; schema v5 remains current.
-- No T192–T197 work, Piano/Melody Target Notes, Explorer apply changes, Focus Mode, Card Flip, print view,
-  audio-asset changes, or release work.
-- Do not redesign T190 topology or move recommendation status back into the Matrix layout.
+## Required evidence
 
-### Required evidence
+- Exact inventory and hash comparison for all four files; verifiable sources and local notices for every retained target; clear separation of source facts, transformations, and remaining uncertainty.
+- If asset bytes or runtime references change: focused tests and Chromium at 1280×720 and 1920×1080 in light/dark, offline asset loading/playback, and no overflow. For documentation-only changes: verify the notice packaging and asset audit with focused checks.
+- Run TypeScript, production build, scoped ESLint/Prettier, and `git diff --check`; report exact commands/results and distinguish pre-existing baseline failures.
+- Report changed files and any legal/provenance uncertainty without claiming legal sufficiency. Do not mark T196 accepted in `tasks.md` or `PROJECT_STATUS.md`; the orchestrator owns acceptance.
 
-- Focused Vitest with `--maxWorkers=1`.
-- Focused Chromium with `--workers=1 --retries=0`, including 1280x720, 1920x1080, dark/light, and 200%
-  equivalent layout pressure.
-- `pnpm build`, scoped ESLint/Prettier, and `git diff --check`.
-- Report the exact changed files and any remaining warnings. Stop for independent acceptance; do not update
-  T191 checkboxes or `PROJECT_STATUS.md` yourself.
+## Out of scope
 
-## Later Batch 5–8 queue (not authorized)
-
-1. Piano Scale Tones, Melody harmonic roles, Target Notes, and the single atomic schema-v5 → v6 migration
-   shared by T192 and T197: `noteColorMode` plus Piano/Guitar engine and SoundFont tone persistence; no v7.
-2. Atomic Scales & Modes Explorer modal apply with undoable key/progression transaction.
-3. Focus Mode and Card Flip presentation workflows.
-4. Printable A4 projection and release gate.
-5. Resolve the remaining nylon Guitar audio and Guitar hand PNG provenance with pinned source, hash,
-   license, and attribution evidence; the reused steel asset is already covered by the T188 manifest.
-6. Resolve portable/autosave/export/Undo round-trip for Piano/Guitar engine and SoundFont tone fields as the
-   T192 prerequisite/joint workstream; do not create a separate schema version.
-
-The dependency-ordered unchecked tasks are appended to `specs/001-cadenceflow-core-studio/tasks.md` as
-T191–T197. T191 is now selected; later tasks still require explicit authorization.
-
-## Verification boundary
-
-For any future implementation, keep schema v5 valid until runtime, codec, migration, fixtures, and the
-JSON Schema switch atomically. Use focused Vitest with one worker, Chromium with one worker/no retries,
-build, scoped formatting/lint, `git diff --check`, and independent acceptance before the next batch.
+T195 print/release gate, Composition UX T198–T210, schema v7/v8, authored Melody, AI, real-time MIDI recording, or literal copying of Hookpad/Signal.

@@ -66,7 +66,7 @@ describe("SC-016 InstrumentProfile boundary", () => {
 
     const encoded = encodePortableProject(project);
     const payload = JSON.parse(encoded) as Record<string, unknown>;
-    expect(payload.schemaVersion).toBe(5);
+    expect(payload.schemaVersion).toBe(6);
     expect(payload).not.toHaveProperty("instrumentProfile");
     expect(decodePortableProject(encoded)).toEqual(project);
   });

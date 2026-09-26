@@ -7,7 +7,7 @@ import {
 import { migrateProjectData } from "../../../src/domain/project/migrations";
 import type { ChordStep } from "../../../src/domain/progression/step";
 
-describe("T188 Melody instrument v5 persistence", () => {
+describe("T188 Melody instrument persistence through schema v6", () => {
   it("round-trips an explicit Step override and leaves inheriting Steps absent", () => {
     const project = createRichProjectFixture();
     const first = project.progression.steps[0] as ChordStep;
@@ -25,7 +25,7 @@ describe("T188 Melody instrument v5 persistence", () => {
     });
     const encoded = encodePortableProject(withOverride);
     const raw = JSON.parse(encoded) as { schemaVersion: number; progression: { steps: unknown[] } };
-    expect(raw.schemaVersion).toBe(5);
+    expect(raw.schemaVersion).toBe(6);
     expect(raw.progression.steps[0]).toHaveProperty("melodyInstrumentOverride", "gm-081");
     expect(raw.progression.steps[1]).not.toHaveProperty("melodyInstrumentOverride");
     expect(decodePortableProject(encoded).progression.steps[0]).toHaveProperty(
@@ -34,12 +34,12 @@ describe("T188 Melody instrument v5 persistence", () => {
     );
   });
 
-  it("migrates v4 to v5 without copying the global track instrument into Steps", () => {
+  it("migrates v4 to v6 without copying the global track instrument into Steps", () => {
     const project = createRichProjectFixture();
     const v4 = JSON.parse(encodePortableProject(project)) as Record<string, unknown>;
     v4.schemaVersion = 4;
     const migrated = migrateProjectData(v4);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     const steps = (migrated.progression as { steps: Record<string, unknown>[] }).steps;
     expect(
       steps.every(

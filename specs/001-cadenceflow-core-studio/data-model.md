@@ -32,11 +32,27 @@ Project
 - customPresets: CustomPreset[]
 ```
 
-The current portable contract is schema v5. v4 projects migrate sequentially to v5; schema v5 adds the
-optional Step-local Melody instrument override while preserving global Melody Track inheritance. This
-documentary convergence does not implement schema v6 or alter the runtime codec. The only planned future
-cutover is one atomic v5-to-v6 migration jointly covering `noteColorMode` and Piano/Guitar engine and
-SoundFont tone persistence; the engine/tone work does not create a separate schema version.
+The current portable contract is schema v6. Schema v5 added the optional Step-local Melody instrument
+override while preserving global Melody Track inheritance. The atomic v5-to-v6 migration adds persisted
+Piano/Guitar engines and SoundFont tones together with `noteColorMode`; it also supplies defaults for
+fields absent from v5 projects. Schema v1–v4 projects migrate sequentially through v5.
+
+### HarmonyTrackSettings
+
+```text
+HarmonyTrackSettings
+- instrument: HarmonyInstrument
+- muted: boolean
+- solo: boolean
+- volume: integer 0..127
+- pianoEngine: hq-samples | soundfont
+- guitarEngine: hq-samples | soundfont
+- pianoSoundfontInstrument: MelodyInstrumentId
+- guitarSoundfontInstrument: MelodyInstrumentId
+```
+
+The v5-to-v6 migration supplies `hq-samples`, `gm-000` for Piano, and `gm-025` for Guitar when those
+settings are absent. `AudioEnginesInspector` is the sole surface for changing engines and SoundFont tones.
 
 ### Invariants
 
@@ -176,12 +192,15 @@ ChordMelodyRecipe
 - connection: retrigger | tie-repeated
 - grid: quarter | eighth | sixteenth | eighth-triplet | sixteenth-triplet
 - octaveOffset: -2 | -1 | 0 | +1 | +2
+- targetNextPitchClass?: integer 0..11
 ```
 
-Generated Melody events are derived and never persisted. Schema v5 keeps this canonical recipe shape and
-stores an optional sibling `melodyInstrumentOverride` only when the Step does not inherit the Melody Track
-default. Schema-v3 `{pattern, grid, octaveOffset}` recipes migrate to the equivalent motion with `even` and
-`retrigger`; schema v4 migrates without adding overrides.
+Generated Melody events are derived and never persisted. `targetNextPitchClass` optionally selects the
+final generated note's pitch class from the next chord; Suggest and Preview keep it in the editor draft,
+and explicit Apply stores it in the recipe. Schema v5 stores an optional sibling `melodyInstrumentOverride`
+only when the Step does not inherit the Melody Track default. Schema-v3 `{pattern, grid, octaveOffset}`
+recipes migrate to the equivalent motion with `even` and `retrigger`; schema v4 migrates without adding
+overrides.
 
 ## MelodyInstrumentCatalogEntry
 
@@ -419,6 +438,7 @@ PresentationState
 - progressionView: harmonic | piano | staff | guitar | tablature
 - measuresPerSystem: auto | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 - showBassInStaff: boolean
+- noteColorMode: standard | suzuki | harmonic-role
 - ...other existing presentation-only settings
 ```
 
@@ -438,14 +458,10 @@ PresentationState
 
 ### Audio engine setting boundary
 
-`HarmonyTrackSettings` currently contains the active-session Piano/Guitar engine and SoundFont tone fields,
-but `encodeHarmonyTrackSettings()` writes only `instrument`, `muted`, `solo`, and `volume`. The current
-schema v5 contract also lacks `pianoSoundfontInstrument`, and the portable/autosave/export/Undo round-trip
-does not claim to preserve any engine or tone field. `AudioEnginesInspector` is the sole settings surface;
-All Steps & Measures retains track controls and provider status/retry, while `PianoAudioStatus` is read-only.
-Atomic codec/schema/migration/autosave/export/Undo coverage is an open roadmap task, not a schema-v5 change.
-It is a prerequisite or joint workstream for the single v5-to-v6 cutover owned by T192/T197; it must not
-create a second engine/tone migration after that cutover.
+All four engine and SoundFont tone values, along with `noteColorMode`, persist through codec,
+autosave/recovery, portable import/export, and Undo/Redo. `AudioEnginesInspector` is the sole engine/tone
+settings surface; All Steps & Measures retains track controls and provider status/retry, while
+`PianoAudioStatus` is read-only.
 
 ## GuitarChordShape and GuitarTabProjection (derived, not persisted)
 
@@ -533,7 +549,60 @@ PlaybackSession
 ScheduledSourceHandles
 PianoAudioEngine: hq-samples | soundfont
 GuitarAudioEngine: hq-samples | soundfont
-GuitarStrumSchedule: bounded per-string onset offsets
+GuitarStrumSchedule: 20–40ms total onset spread across sounding strings
 ```
 
 These are reconstructed after project load.
+
+
+## HarmonicNoteRole (current derived projection; never serialized in MelodyEvent)
+
+```text
+HarmonicNoteRole = {
+  primary: "root" | "chord-tone" | "scale-tone" | "altered";
+  targetNext: boolean
+}
+```
+
+The `primary` role is derived from the current chord and scale context. `targetNext` is an orthogonal
+boolean cue derived from the following harmonic context; show it with a separate non-color marker. Neither
+field is authored note identity or persisted in `MelodyEvent`. Accessible labels/text convey both roles
+independently of color. Piano and Melody views use these cues when `noteColorMode` is `harmonic-role`.
+
+## Composition UX roadmap models (approved, future implementation)
+
+### ChordMelody and authored phrase (schema v7)
+
+```text
+ChordMelody =
+  | { mode: generated, recipe: ChordMelodyRecipe }
+  | { mode: authored, phrase: AuthoredMelodyPhrase, sourceRecipe?: ChordMelodyRecipe }
+
+AuthoredMelodyPhrase
+- notes: AuthoredMelodyNote[]
+
+AuthoredMelodyNote
+- id: stable unique identifier
+- pitch: exact canonical pitch
+- onset: Rational
+- duration: positive Rational
+```
+
+A single `resolveEffectiveMelodyPhrase` resolver serves Melody Lane, Staff, playback, MIDI, MusicXML,
+and audio. Generated note arrays remain derived; authored notes are canonical project data. The schema
+v6→v7 migration materializes no generated list implicitly.
+
+### SongSection (schema v8)
+
+```text
+SongSection
+- id: stable unique identifier
+- name: user-facing section name
+- startStepId: stable ID of the first Step in the section
+```
+
+Sections represent ordered boundaries only. Repeats, alternate arrangement instances, and graph topology are not part of v8.
+
+### CompositionEditorProjection (derived)
+
+The editor projection places Harmony Steps and (when present) Melody events on one musical-time axis. It may contain transient selection, drag preview, and candidate-preview state, but none of these are Project state. Matrix recommendation contexts stay isolated from the temporal editing projection. A gesture completes by emitting one canonical command; cancel emits none.

@@ -1,5 +1,6 @@
 import type {
   MeasuresPerSystem,
+  NoteColorMode,
   PresentationMode,
   ProgressionView,
   Project,
@@ -155,6 +156,37 @@ export function setMeasuresPerSystem(
   };
 }
 
+export interface SetNoteColorModePayload {
+  readonly mode: NoteColorMode;
+  readonly nowIso: string;
+}
+
+export type SetNoteColorModeCommand = ProjectCommand<SetNoteColorModePayload> & {
+  readonly type: "presentation/set-note-color-mode";
+};
+
+export function setNoteColorMode(
+  project: Project,
+  command: SetNoteColorModeCommand,
+): AppliedCommand {
+  const previous = project.presentation.noteColorMode;
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        noteColorMode: command.payload.mode,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-note-color-mode",
+      payload: { mode: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
+/** Compatibility action for existing Suzuki shortcuts; the persisted preference is noteColorMode. */
 export interface SetSuzukiColorsPayload {
   readonly enabled: boolean;
   readonly nowIso: string;
@@ -165,21 +197,13 @@ export type SetSuzukiColorsCommand = ProjectCommand<SetSuzukiColorsPayload> & {
 };
 
 export function setSuzukiColors(project: Project, command: SetSuzukiColorsCommand): AppliedCommand {
-  const previous = project.presentation.suzukiColors ?? false;
-  return {
-    project: Object.freeze({
-      ...project,
-      updatedAt: command.payload.nowIso,
-      presentation: Object.freeze({
-        ...project.presentation,
-        suzukiColors: command.payload.enabled,
-      }),
-    }),
-    inverse: {
-      type: "presentation/set-suzuki-colors",
-      payload: { enabled: previous, nowIso: command.payload.nowIso },
+  return setNoteColorMode(project, {
+    type: "presentation/set-note-color-mode",
+    payload: {
+      mode: command.payload.enabled ? "suzuki" : "standard",
+      nowIso: command.payload.nowIso,
     },
-  };
+  });
 }
 
 export interface SetResolutionArrowsPayload {

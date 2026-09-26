@@ -1,0 +1,15 @@
+Guitar hand fretting illustration
+================================
+
+Author: shafranek-js
+
+The author stated that they drew this illustration in Adobe Photoshop. The
+original PSD is no longer available. This notice records that first-party
+authorship statement; it does not claim an independently preserved source file
+or assign a third-party license.
+
+The two committed PNG copies are byte-identical: 458,663 bytes with SHA-256
+1a8bac5e11ace981d08b12886cea81bc571768585d8d77938a8b0328acb784e2.
+
+- public/images/guitar-hand-fretting.png
+- src/ui/guitar/assets/guitar-hand-fretting.png

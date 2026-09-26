@@ -1,4 +1,5 @@
 import SoundfontPlayer from "soundfont-player";
+import { guitarStrumOffsetSeconds } from "./strumTiming";
 
 import type {
   AudioClock,
@@ -35,7 +36,7 @@ export interface AcousticGuitarProviderOptions {
   readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
   readonly assetUrl?: string | undefined;
   readonly loadInstrument?: GuitarInstrumentLoader | undefined;
-  /** Strum delay in seconds between adjacent strings in a chord (default: 0.016s = 16ms) */
+  /** Optional legacy override for spacing between adjacent strings; default total spread is 30ms. */
   readonly strumDelaySeconds?: number | undefined;
   readonly volume?: number | undefined;
 }
@@ -47,11 +48,15 @@ interface ActiveGuitarPlayback {
 }
 
 const defaultGuitarLoader: GuitarInstrumentLoader = async (context, instrument, url, destination) =>
-  SoundfontPlayer.instrument(context, instrument as any, {
-    format: "mp3",
-    destination,
-    nameToUrl: () => url,
-  });
+  SoundfontPlayer.instrument(
+    context,
+    instrument as Parameters<typeof SoundfontPlayer.instrument>[1],
+    {
+      format: "mp3",
+      destination,
+      nameToUrl: () => url,
+    },
+  );
 
 function clampMidi(value: number): number {
   return Math.max(0, Math.min(127, Math.round(value)));
@@ -65,7 +70,7 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
   private readonly onStateChange?: ((state: AudioProviderState) => void) | undefined;
   private readonly assetUrl: string;
   private readonly loadInstrument: GuitarInstrumentLoader;
-  private readonly strumDelaySeconds: number;
+  private readonly explicitStrumDelaySeconds: number | undefined;
   private volume: number;
 
   private player: GuitarSamplePlayer | null = null;
@@ -78,7 +83,8 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
     this.destinationNode = options.destination;
     this.onStateChange = options.onStateChange;
     this.loadInstrument = options.loadInstrument ?? defaultGuitarLoader;
-    this.strumDelaySeconds = Math.max(0, options.strumDelaySeconds ?? 0.016);
+    this.explicitStrumDelaySeconds =
+      options.strumDelaySeconds === undefined ? undefined : Math.max(0, options.strumDelaySeconds);
     this.volume = clampMidi(options.volume ?? 100);
 
     const baseUrl =
@@ -209,10 +215,11 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
     };
     this.activePlaybacks.add(playback);
 
-    // Group events by approximate start time to detect chord strumming
+    // Group near-simultaneous events to detect chords. Millisecond buckets keep
+    // already-spread events from the progression realizer from being strummed twice.
     const timeGroups = new Map<number, AudioNoteEvent[]>();
     for (const ev of events) {
-      const timeKey = Math.round(ev.startSeconds * 100);
+      const timeKey = Math.round(ev.startSeconds * 1000);
       const existing = timeGroups.get(timeKey);
       if (existing) {
         existing.push(ev);
@@ -228,7 +235,11 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
 
       for (let i = 0; i < sorted.length; i++) {
         const ev = sorted[i]!;
-        const strumOffset = isChord ? i * this.strumDelaySeconds : 0;
+        const strumOffset = isChord
+          ? this.explicitStrumDelaySeconds !== undefined
+            ? i * this.explicitStrumDelaySeconds
+            : guitarStrumOffsetSeconds(i, sorted.length)
+          : 0;
         const when = baseTime + ev.startSeconds + strumOffset;
         const gain = (clampMidi(ev.velocity) / 127) * trackGain;
 

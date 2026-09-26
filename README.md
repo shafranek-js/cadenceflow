@@ -205,6 +205,7 @@ pnpm run validate:musicxml
 
 # Verify offline Melody audio assets
 pnpm run verify:melody-assets
+pnpm run verify:guitar-asset-provenance
 
 # Lint and check code formatting
 pnpm run lint
@@ -231,4 +232,4 @@ pnpm run format:check
 
 This repository does not currently include a `LICENSE` file, and the package metadata does not declare a project-wide license.
 
-Bundled audio assets have their own attribution and license notices: [HQ piano attribution](public/licenses/piano-hq-attribution.txt), [FluidR3_GM attribution](public/licenses/FluidR3_GM-attribution.txt), and the included [FluidR3_GM CC BY 3.0 license](public/licenses/FluidR3_GM-CC-BY-3.0.txt).
+Repository asset notices include [HQ piano attribution](public/licenses/piano-hq-attribution.txt), [FluidR3_GM attribution](public/licenses/FluidR3_GM-attribution.txt), the included [FluidR3_GM CC BY 3.0 license](public/licenses/FluidR3_GM-CC-BY-3.0.txt), and the [guitar hand illustration authorship notice](public/licenses/guitar-hand-fretting-attribution.txt).

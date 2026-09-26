@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/project/project";
 import type { AudioProviderState } from "../../audio/contracts";
-import type { PianoArticulation, StepPerformance } from "../../domain/progression/step";
+import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
@@ -520,7 +520,11 @@ export function ProgressionTrack({
           playing={isPlaying}
           inLoop={isInLoop}
           showBassInStaff={project.presentation.showBassInStaff}
-          suzukiColors={project.presentation.suzukiColors ?? false}
+          noteColorMode={project.presentation.noteColorMode}
+          activeModule={project.activeModule}
+          nextStep={project.progression.steps
+            .slice(index + 1)
+            .find((candidate): candidate is ChordStep => candidate.kind === "chord")}
           guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}

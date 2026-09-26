@@ -6,7 +6,7 @@ import { createDefaultMelodyTrackSettings, validateChordMelodyRecipe } from "../
 import { validateMelodyInstrumentId } from "../melody/instrumentCatalog";
 import { createDefaultHarmonyTrackSettings } from "../harmony/track";
 
-export const CURRENT_PROJECT_SCHEMA_VERSION = 5;
+export const CURRENT_PROJECT_SCHEMA_VERSION = 6;
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(
@@ -52,14 +52,16 @@ export function migrateProjectData(data: unknown): Record<string, unknown> {
   }
 
   if (version === 1) {
-    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(record))));
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(record)))));
   }
 
-  if (version === 2) return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(record)));
+  if (version === 2) return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(record))));
 
-  if (version === 3) return migrateV4ToV5(migrateV3ToV4(record));
+  if (version === 3) return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(record)));
 
-  if (version === 4) return migrateV4ToV5(record);
+  if (version === 4) return migrateV5ToV6(migrateV4ToV5(record));
+
+  if (version === 5) return migrateV5ToV6(record);
 
   // A shallow root copy keeps current decoding pure while preserving every supported
   // current field exactly as supplied. Future migrations can be appended above.
@@ -207,5 +209,42 @@ function migrateV4ToV5(record: Record<string, unknown>): Record<string, unknown>
     ...(record["temporaryBranch"] !== undefined
       ? { temporaryBranch: migrateContainer(record["temporaryBranch"], "temporaryBranch") }
       : {}),
+  };
+}
+
+function migrateV5ToV6(record: Record<string, unknown>): Record<string, unknown> {
+  const harmonyTrack =
+    record["harmonyTrack"] &&
+    typeof record["harmonyTrack"] === "object" &&
+    !Array.isArray(record["harmonyTrack"])
+      ? (record["harmonyTrack"] as Record<string, unknown>)
+      : {};
+  const rawPresentation =
+    record["presentation"] &&
+    typeof record["presentation"] === "object" &&
+    !Array.isArray(record["presentation"])
+      ? (record["presentation"] as Record<string, unknown>)
+      : {};
+  const { suzukiColors, ...presentation } = rawPresentation;
+  const noteColorMode =
+    rawPresentation["noteColorMode"] === "standard" ||
+    rawPresentation["noteColorMode"] === "suzuki" ||
+    rawPresentation["noteColorMode"] === "harmonic-role"
+      ? rawPresentation["noteColorMode"]
+      : suzukiColors === true
+        ? "suzuki"
+        : "standard";
+
+  return {
+    ...record,
+    schemaVersion: 6,
+    harmonyTrack: {
+      ...createDefaultHarmonyTrackSettings(),
+      ...harmonyTrack,
+    },
+    presentation: {
+      ...presentation,
+      noteColorMode,
+    },
   };
 }

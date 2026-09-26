@@ -37,6 +37,7 @@ export interface MelodyProjectionInput {
   readonly upperPitches: readonly ExactPitch[];
   readonly durationBeats: Rational;
   readonly recipe: MelodyRecipeInput;
+  readonly targetPitches?: readonly ExactPitch[];
 }
 
 function validateInput(input: MelodyProjectionInput): void {
@@ -132,5 +133,25 @@ export function realizeChordMelody(input: MelodyProjectionInput): MelodyPhrase {
     sourceIndex += 1;
   }
 
+  const requestedTarget = recipe.targetNextPitchClass;
+  if (requestedTarget !== undefined && input.targetPitches?.length) {
+    const finalEvent = events.at(-1);
+    const matchingTargets = input.targetPitches.filter(
+      (pitch) => ((pitch.midiNumber % 12) + 12) % 12 === requestedTarget,
+    );
+    if (finalEvent && matchingTargets.length > 0) {
+      const target = matchingTargets.reduce((best, candidate) =>
+        Math.abs(candidate.midiNumber - finalEvent.pitch.midiNumber) <
+        Math.abs(best.midiNumber - finalEvent.pitch.midiNumber)
+          ? candidate
+          : best,
+      );
+      events[events.length - 1] = Object.freeze({
+        ...finalEvent,
+        pitch: target,
+        sourcePitchMidi: target.midiNumber,
+      });
+    }
+  }
   return Object.freeze({ events: Object.freeze(events) });
 }

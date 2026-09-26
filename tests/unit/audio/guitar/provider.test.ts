@@ -4,6 +4,10 @@ import {
   type GuitarSampleNode,
   type GuitarSamplePlayer,
 } from "../../../../src/audio/guitar/AcousticGuitarProvider";
+import {
+  guitarStrumOffsetSeconds,
+  GUITAR_STRUM_SPREAD_SECONDS,
+} from "../../../../src/audio/guitar/strumTiming";
 import type { AudioNoteEvent } from "../../../../src/audio/contracts";
 
 function createMockPlayer(): GuitarSamplePlayer & {
@@ -11,7 +15,7 @@ function createMockPlayer(): GuitarSamplePlayer & {
   stop: ReturnType<typeof vi.fn>;
 } {
   return {
-    play: vi.fn(() => ({ stop: vi.fn() } as GuitarSampleNode)),
+    play: vi.fn(() => ({ stop: vi.fn() }) as GuitarSampleNode),
     stop: vi.fn(),
   };
 }
@@ -46,7 +50,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
     expect(loader.mock.calls[0]?.[2]).toBe("/audio/guitar/acoustic_guitar_steel-mp3.js");
   });
 
-  it("schedules chord notes with acoustic guitar downstrum stagger (lowest to highest pitch)", async () => {
+  it("schedules six-string chords across a 30ms total spread from low to high", async () => {
     const player = createMockPlayer();
     const loader = vi.fn(async () => player);
     const mockCtx = createMockContext();
@@ -54,36 +58,100 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
     const provider = new AcousticGuitarProvider({
       audioContext: mockCtx,
       loadInstrument: loader,
-      strumDelaySeconds: 0.016,
       volume: 100,
     });
     await provider.prepare();
 
-    // Simultaneous chord notes passed in non-sorted order (e.g. 52, 40, 47)
+    // Simultaneous chord notes passed in non-sorted order.
     const chordEvents: AudioNoteEvent[] = [
-      { pitch: 52, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
+      { pitch: 64, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
       { pitch: 40, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
       { pitch: 47, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
+      { pitch: 52, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
+      { pitch: 55, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
+      { pitch: 59, startSeconds: 0.5, durationSeconds: 1.5, velocity: 90, channelRole: "upper" },
     ];
 
     const playback = provider.schedule(chordEvents, { now: () => 10 });
     expect(playback.id).toMatch(/^guitar-live-/);
 
-    // Should play 3 notes sorted ascending by pitch (40 -> 47 -> 52)
-    expect(player.play).toHaveBeenCalledTimes(3);
+    // Should play all six strings sorted ascending by pitch.
+    expect(player.play).toHaveBeenCalledTimes(6);
 
     const call1 = player.play.mock.calls[0]!;
     const call2 = player.play.mock.calls[1]!;
     const call3 = player.play.mock.calls[2]!;
+    const call4 = player.play.mock.calls[3]!;
+    const call5 = player.play.mock.calls[4]!;
+    const call6 = player.play.mock.calls[5]!;
 
     expect(call1[0]).toBe(40); // lowest note: string delay 0
     expect(call1[1]).toBeCloseTo(10.5, 4);
+    expect(call2[0]).toBe(47);
+    expect(call3[0]).toBe(52);
+    expect(call4[0]).toBe(55);
+    expect(call5[0]).toBe(59);
+    expect(call6[0]).toBe(64); // highest note
+    expect(call6[1]! - call1[1]!).toBeCloseTo(GUITAR_STRUM_SPREAD_SECONDS, 4);
+    expect(call6[1]! - call5[1]!).toBeCloseTo(GUITAR_STRUM_SPREAD_SECONDS / 5, 4);
+  });
 
-    expect(call2[0]).toBe(47); // second note: string delay 1 * 0.016
-    expect(call2[1]).toBeCloseTo(10.5 + 0.016, 4);
+  it("preserves an explicit adjacent-string delay override", async () => {
+    const player = createMockPlayer();
+    const provider = new AcousticGuitarProvider({
+      audioContext: createMockContext(),
+      loadInstrument: vi.fn(async () => player),
+      strumDelaySeconds: 0.015,
+    });
+    await provider.prepare();
 
-    expect(call3[0]).toBe(52); // highest note: string delay 2 * 0.016
-    expect(call3[1]).toBeCloseTo(10.5 + 0.032, 4);
+    provider.schedule(
+      [40, 47, 52].map((pitch) => ({
+        pitch,
+        startSeconds: 0.5,
+        durationSeconds: 1,
+        velocity: 90,
+        channelRole: "upper" as const,
+      })),
+      { now: () => 10 },
+    );
+
+    expect(player.play.mock.calls[2]![1]! - player.play.mock.calls[0]![1]!).toBeCloseTo(0.03, 4);
+  });
+
+  it("does not add a second spread to already-spread progression events", async () => {
+    const player = createMockPlayer();
+    const provider = new AcousticGuitarProvider({
+      audioContext: createMockContext(),
+      loadInstrument: vi.fn(async () => player),
+    });
+    await provider.prepare();
+
+    const progressionEvents: AudioNoteEvent[] = [40, 45, 50, 55, 59, 64].map((pitch, index) => ({
+      pitch,
+      startSeconds: guitarStrumOffsetSeconds(index, 6),
+      durationSeconds: 1,
+      velocity: 90,
+      channelRole: "upper",
+    }));
+    provider.schedule(progressionEvents, { now: () => 10 });
+
+    expect(player.play).toHaveBeenCalledTimes(6);
+    expect(player.play.mock.calls[5]![1]! - player.play.mock.calls[0]![1]!).toBeCloseTo(
+      GUITAR_STRUM_SPREAD_SECONDS,
+      4,
+    );
+    for (let index = 0; index < progressionEvents.length; index++) {
+      expect(player.play.mock.calls[index]![1]).toBeCloseTo(
+        10 + progressionEvents[index]!.startSeconds,
+        4,
+      );
+    }
+  });
+
+  it("returns zero spread for zero or one string", () => {
+    expect(guitarStrumOffsetSeconds(0, 0)).toBe(0);
+    expect(guitarStrumOffsetSeconds(0, 1)).toBe(0);
   });
 
   it("schedules melodic scale notes at exact start times without strum offset", async () => {

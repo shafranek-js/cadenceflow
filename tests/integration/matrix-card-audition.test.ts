@@ -345,7 +345,7 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     expect(cardBodyButton).not.toBeNull();
     expect(container.querySelector(".add-chord")).toBeNull();
     expect(cardBodyButton.title).toBe(
-      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
+      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add; when selected, press + to add to My Progression; Alt-click to reset card settings",
     );
 
     // Baseline: 0 invocations

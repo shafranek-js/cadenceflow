@@ -58,23 +58,25 @@ Possible decisions:
 - **ACCEPTED WITH FOLLOW-UP** — only if follow-up is non-blocking and receives its own task.
 - **CHANGES REQUIRED** — tasks remain open; return exact correction list.
 
-## Git policy for the next stage
+## Git and worktree policy
 
-The current handoff folder contains no `.git` directory. Before US5 work:
-
-- attach to the intended repository or initialize a repository;
-- create a baseline commit representing this handoff;
-- use small commits mapped to task batches;
-- do not mix toolchain repair, US5 domain realization, and audio assets into one opaque commit.
-
-Recommended commit grouping:
-
-1. `chore: restore reproducible CadenceFlow toolchain`
-2. `test(us5): define piano realization and audio contracts`
-3. `feat(us5): implement canonical piano realization`
-4. `feat(us5): add HQ sample audio providers and scheduler`
-5. `test(us5): verify pitch velocity projection consistency`
+- Use the existing Git repository; do not initialize a replacement repository or create a synthetic
+  baseline commit.
+- Start each assigned batch by checking the current branch/HEAD and `git status`; preserve existing or
+  user-owned changes.
+- Use an isolated worktree for a batch when requested or when concurrent work could overlap. Keep one
+  bounded task batch per worktree and report its full path.
+- Keep commits small and mapped to accepted task batches. Do not commit, push, or open a pull request
+  unless the orchestrator explicitly requests it.
+- Do not begin a later product batch until the current batch has been independently reviewed and
+  separately assigned.
 
 ## Status discipline
 
 `PROJECT_STATUS.md` is the handoff state, not a diary. Keep only information needed to resume development. Replace obsolete limitations once fixed rather than accumulating history.
+
+## CadenceFlow roadmap and transaction rules
+
+T197+T192, T193, T194, T211, and T196 are accepted. T195 is the remaining release batch. Composition UX 1.1 (T198–T205), 1.2 (T206–T208), and 1.3 (T209–T210) are scheduled only after T195 acceptance. Do not infer authorization for the next batch from completion of the previous one; obtain an explicit assignment.
+
+Schema boundaries: v6 is T197 + T192 only, v7 adds Authored Melody (T207), and v8 adds Song Sections (T209). Matrix is for harmonic discovery; My Progression is for temporal editing. Preview/audition cannot mutate Project or history; Apply is one canonical command and one history entry. Any Signal-derived code is limited to adapted MIT interaction gestures behind an adapter, with provenance comments and `THIRD_PARTY_NOTICES.md`. AI, realtime MIDI recording, and literal copying of Hookpad or Signal remain out of scope.

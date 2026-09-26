@@ -630,7 +630,7 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
   changing musical data, playback, MIDI, or MusicXML. Colors MUST NOT be the sole accessibility cue;
   light/dark/print contrast and the exact palette plus preview/export scope MUST be fixed before work starts.
 
-## Phase 19: Documentary convergence roadmap (future Batches 3–8)
+## Phase 19: Release roadmap (Batches 3–8)
 
 The following tasks are intentionally open. They record the remaining roadmap gaps found by the Batch 2
 code/reference/spec convergence and must not be treated as implementation acceptance for the current batch.
@@ -653,39 +653,80 @@ code/reference/spec convergence and must not be treated as implementation accept
   Inspector through desktop and layout-pressure states. Cover mouse, keyboard, playback, responsive
   arrows/highlights, explainable blocked/allowed alternatives, safe legacy-project behavior, and
   deterministic fixtures in all 12 keys against the harmonic reference (partial).
-- [ ] T192 [Batch 5] Add Piano Root/Chord/Scale Tones, Melody harmonic-role metadata, and non-mutating
+- [x] T192 [Batch 5] Add Piano Root/Chord/Scale Tones, Melody harmonic-role metadata, and non-mutating
   Target Notes as one coherent semantic projection: classify chord, scale, altered, and target-next roles;
   keep Target Notes preview-only until explicit application; preserve the full Guitar strum spread at
   20–40 ms; then perform the single shared `schema-v5 -> schema-v6` cutover with T197, adding
   `noteColorMode` values `standard | suzuki | harmonic-role` together with Piano/Guitar engine and
   SoundFont tone persistence. T197 MUST complete first or jointly; there is no separate engine/tone v7
   migration. Cover non-color accessibility cues, codec/migration/fixture coverage, and no schema-v5 or
-  effective-instrument regression (missing).
-- [ ] T193 [Batch 6] Make Scales & Modes Explorer modal formula application atomic per FR-235–FR-236:
+  effective-instrument regression (accepted; full Vitest retains five documented baseline/environment failures).
+- [x] T193 [Batch 6] Make Scales & Modes Explorer modal formula application atomic per FR-235–FR-236:
   keep the Explorer separate without creating a new project harmonic context, apply parent-key plus steps
   through one undoable command, reject an inappropriate old-key apply, and leave cancel/audition non-mutating.
   Keep Blues `I7/IV7/V7` semantics scoped to the Explorer surface and add deterministic Chromium acceptance
-  for the transaction, rollback, keyboard/focus, and responsive behavior (partial).
-- [ ] T194 [Batch 7] Add Focus Mode and Card Flip as presentation-only workflows per FR-056–FR-068: retain
+  for the transaction, rollback, keyboard/focus, and responsive behavior (accepted; focused Vitest 12/12,
+  Chromium 4/4 across both desktop sizes and themes, TypeScript/build/Prettier/diff checks passed).
+- [x] T194 [Batch 7] Add Focus Mode and Card Flip as presentation-only workflows per FR-056–FR-068: retain
   the minimal Matrix/arrows/audition surface in Focus Mode, expose function+tendency on the card front and
   fingering on the back, and guarantee no musical or global-view mutation. Cover keyboard/focus lifecycle,
   reduced-motion behavior, screen readers, responsive containment, persistence boundaries, and Guitar/Melody
-  compatibility (missing).
+  compatibility (accepted: focused Vitest 2/2, Chromium 4/4 across both desktop sizes and themes,
+  TypeScript/build, scoped ESLint/Prettier, and diff checks passed in the main checkout).
+- [x] T211 [Bounded batch after T194] Add `+`/keypad Add for the selected visible Matrix chord
+  per FR-258 and SC-041 in `src/ui/matrix/HarmonicMatrix.tsx` and card shortcut help. Reuse the exact
+  Ctrl+click/Ctrl+Enter guarded add route; ignore editable/dialog focus and key repeats, and leave
+  no-selection/invalid-selection states unchanged. Cover one history entry, Undo/Redo, blocked-route
+  confirmation, temporary-branch behavior, existing add methods, and keyboard accessibility in
+  focused tests plus Chromium at both desktop sizes and themes. Do not fold this into T194
+  (accepted: Matrix and history-focused Vitest passed; Chromium 4/4 at both desktop sizes and
+  themes, TypeScript/build, scoped ESLint/Prettier, and diff checks passed. History dispatcher
+  gained the missing inverse routes for Matrix/branch add and step removal).
 - [ ] T195 [Batch 8] Add Printable A4 projection and the release gate per FR-237–FR-239: print measures,
   chord symbols, arrows, and compact Guitar diagrams through HTML print CSS and the system Save as PDF path;
   cover long progressions, no clipping, accepted desktop/print sizes, Suzuki-color exclusion/legibility,
   license/provenance and offline asset verification, schema/codec compatibility, focused and full regression,
-  and final status/publication evidence. This gate depends on T196 and T197 (missing).
-- [ ] T196 [Release prerequisite] Resolve the remaining Guitar asset provenance/IP audit: the reused steel
+  and final status/publication evidence. This gate remains missing and depends on T196 and accepted T197.
+- [x] T196 [Release prerequisite] Resolve the remaining Guitar asset provenance/IP audit: the reused steel
   Guitar asset is already evidenced by the T188 manifest with source file, size/hash, pinned FluidR3_GM
   revision, and CC-BY-3.0 markers; resolve only the nylon Guitar asset and Guitar hand PNG provenance,
   license, and attribution evidence, or replace/remove assets whose proof cannot be established. Retain the
   exact inventory and SHA-256/byte-size audit and do not claim legal sufficiency without repository proof
-  (partial).
-- [ ] T197 [Release prerequisite / T192 dependency] Resolve the current Piano/Guitar engine and SoundFont
+  (accepted: pinned nylon source/hash and exact checkout derivation, first-party Guitar hand authorship
+  statement, packaged notices, and reproducible four-file audit; no legal sufficiency claim).
+- [x] T197 [Release prerequisite / T192 dependency] Resolve the current Piano/Guitar engine and SoundFont
   tone persistence gap before or jointly with T192: add codec/schema/migration, IndexedDB autosave,
   portable export/import, and session Undo/Redo round-trip tests for `pianoEngine`, `guitarEngine`,
   `pianoSoundfontInstrument`, and `guitarSoundfontInstrument` as part of the single `schema-v5 -> schema-v6`
   cutover that also adds T192's `noteColorMode`. T197 MUST NOT create a separate schema version or a later
   engine/tone v7 migration. Update the ownership acceptance for **FR-240–FR-241** and **SC-029–SC-030**
-  without restoring duplicate UI settings surfaces (missing).
+  without restoring duplicate UI settings surfaces (accepted).
+
+
+## Phase 20: Composition UX Program — after T195 acceptance
+
+T197+T192, T193, T194, T211, and T196 are accepted. T195 is the remaining release gate. Begin UX 1.1 only after T195 has been accepted. T198 is the architecture contract and Signal spike entry gate; any donor reuse is selective MIT gesture code behind an adapter, with per-file provenance comments and `THIRD_PARTY_NOTICES.md` before adapted code lands. Preview/audition remains non-mutating and each Apply is one history entry. Matrix is for harmonic discovery; My Progression is for temporal editing.
+
+### Composition UX 1.1 — T198–T205
+
+- [ ] **T198 UX Architecture Contract** [SC-033–SC-037]: define the shared Harmony/Melody timeline projection, Matrix-versus-Progression ownership, selection/gesture lifecycle, Rational snapping, command/history transaction boundary, preview/apply rules, keyboard/accessibility states, and adapter/provenance contract. No product implementation or schema migration in this contract task. **Dependency:** T195 accepted.
+- [ ] **T199 Signal spike** [FR-257, SC-034, SC-036]: after T198, evaluate only MIT interaction gestures (selection, move/edge resize, coordinate transforms, clipboard as justified) in a disposable spike kept outside the production UI. Use a fixture containing C4 for 1 beat, E4 for 1/2 beat, and G4 for 1 beat; exercise select, move, resize, multi-select, Ctrl-drag duplicate, and Undo/Redo. Demonstrate screen-space float coordinates → exact Rational values → one CadenceFlow command, including cancel with no mutation. No schema changes. Record source/revision/license; if any code is adapted, add per-file provenance comments and `THIRD_PARTY_NOTICES.md`. Do not import Signal domain, stores, audio, or history.
+- [ ] **T200 Label Hierarchy / Compact Quick Edit** [FR-244, FR-248, SC-033]: after T198, provide `Function first`, `Chord first`, and `Inline` label modes. In My Progression, quick edit exposes chord label, duration, inversion, and dynamics; `More` opens the existing Inspector. Matrix remains harmonic discovery.
+- [ ] **T201 Direct Duration Resize** [FR-249, SC-034, SC-036]: after T199, place a resize handle on the final visible fragment of a Step. Snap to existing Rational durations using the one explicit snap policy; preview transiently, then commit exactly one command. Cancel, Undo, and Redo preserve exact timing.
+- [ ] **T202 Range Selection** [FR-250, SC-036]: after T199, support click, Shift+click, marquee, Shift+Arrow, and Escape. Selection is transient and stores a contiguous range of stable Step IDs. Show a batch toolbar for play, loop, copy, duplicate, delete, transpose, performance, and explore; preserve focus and exact Step identity.
+- [ ] **T203 Deterministic Alternatives Tray** [FR-251, SC-034, SC-037]: present reproducible candidates and rationale; arrow keys move among candidates, Space auditions, Enter applies, and Escape closes/restores focus. Preview is non-mutating; applying a candidate uses one history entry.
+- [ ] **T204 Quick Chord / Command Palette** [FR-252, SC-034, SC-037]: add keyboard-first chord and command discovery using canonical commands and the same strict route guard as Matrix card Add, across pointer and keyboard entry points. Preserve accessible focus behavior and one-entry apply semantics.
+- [ ] **T205 Guided Start** [FR-253, SC-033]: provide blank, guided progression, quick starter, and example entry paths; dismiss beginner guidance after successful use without persistent tutorial overlays.
+
+### Composition UX 1.2 — T206–T208
+
+- [ ] **T206 Read-only Inline Melody Lane** [FR-246, FR-254, SC-033, SC-035]: after T205, implement the `createMelodyTimeline` projection and show derived Melody on the shared Harmony timeline with harmonic-role cues and accessible text. Clicking a note selects its owning Step; double-click opens the existing Melody editor. Keep the lane read-only and do not change schema.
+- [ ] **T207 Authored Melody + schema v7** [FR-247, SC-035, SC-038]: after T206, add the generated/authored `ChordMelody` union and authored notes with stable IDs, exact pitch, and Rational onset/duration. Migrate v6→v7. One `resolveEffectiveMelodyPhrase` resolver MUST serve Melody Lane, Staff, playback, MIDI, MusicXML, and audio.
+- [ ] **T208 Keyboard-first Composition** [FR-252, SC-036, SC-038]: support scale-degree entry 1–7, diatonic up/down, Alt+up/down semitone movement, arrows for selection, Shift+arrows to extend, Delete, and Enter insert/edit. Pointer workflows remain available.
+
+### Composition UX 1.3 — T209–T210
+
+- [ ] **T209 Song Sections + schema v8** [FR-255, SC-039]: after T202 and T208, persist section `id`, `name`, and `startStepId`; migrate v7→v8 and validate boundaries/round-trips. When deleting a Step that owns a section boundary, move that boundary to the next Step; if none exists, move it to the previous Step; if the progression is empty, delete the section. Do not add repeats or arrangement instances.
+- [ ] **T210 Web MIDI Step Input** [FR-256, SC-040]: after T207, implement selected-duration quantized step input with browser permission/device errors and accessible fallback. Each Note On inserts one note and advances the cursor by its selected duration; Note Off is ignored. Real-time MIDI recording is explicitly excluded.
+
+Schema ownership: current v6 contains T197 + T192 only; future v7 contains authored Melody (T207); future v8 contains Song Sections (T209).

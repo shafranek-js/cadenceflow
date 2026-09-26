@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadenceflow.local/schema/project-v5.json",
-  "title": "CadenceFlow Project v5",
-  "$comment": "Current schema contract as of the documentary convergence: v5 remains unchanged. Presentation supports harmonic, piano, staff, guitar, and tablature views; Melody catalog entries are manifest-backed local GM programs. This comment does not change validation semantics.",
+  "$id": "https://cadenceflow.local/schema/project-v6.json",
+  "title": "CadenceFlow Project v6",
+  "$comment": "Schema v6 atomically adds noteColorMode and persistent Piano/Guitar engine and SoundFont tone settings. Harmonic roles remain derived projection metadata and are not stored in MelodyEvent.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,6 +15,7 @@
     "tonic",
     "globalTiming",
     "groove",
+    "presentation",
     "harmonyTrack",
     "melodyTrack",
     "defaults",
@@ -23,7 +24,7 @@
     "customPresets"
   ],
   "properties": {
-    "schemaVersion": { "const": 5 },
+    "schemaVersion": { "const": 6 },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -36,7 +37,11 @@
     "melodyTrack": { "$ref": "#/$defs/melodyTrack" },
     "presentation": {
       "type": "object",
-      "$comment": "Presentation-only fields include progressionView harmonic|piano|staff|guitar|tablature and measuresPerSystem auto|1..8; runtime codec remains authoritative for detailed shape."
+      "required": ["noteColorMode"],
+      "properties": {
+        "noteColorMode": { "enum": ["standard", "suzuki", "harmonic-role"] }
+      },
+      "$comment": "Presentation-only note color mode and existing view preferences."
     },
     "defaults": { "type": "object" },
     "moduleTemplateStates": {
@@ -127,9 +132,9 @@
     },
     "harmonyTrack": {
       "type": "object",
-      "$comment": "Schema v5 lists legacy engine fields where present, but the current portable codec encodes only instrument, muted, solo, and volume; engine/tone round-trip is an open roadmap item.",
+      "$comment": "All active Piano/Guitar engine and SoundFont tone selections persist in schema v6.",
       "additionalProperties": false,
-      "required": ["instrument", "muted", "solo", "volume"],
+      "required": ["instrument", "muted", "solo", "volume", "pianoEngine", "guitarEngine", "pianoSoundfontInstrument", "guitarSoundfontInstrument"],
       "properties": {
         "instrument": {
           "anyOf": [
@@ -142,7 +147,8 @@
         "volume": { "type": "integer", "minimum": 0, "maximum": 127 },
         "pianoEngine": { "enum": ["hq-samples", "soundfont"] },
         "guitarEngine": { "enum": ["hq-samples", "soundfont"] },
-        "guitarSoundfontInstrument": { "$ref": "#/$defs/melodyInstrument" }
+        "guitarSoundfontInstrument": { "$ref": "#/$defs/melodyInstrument" },
+        "pianoSoundfontInstrument": { "$ref": "#/$defs/melodyInstrument" }
       },
       "not": {
         "required": ["muted", "solo"],
@@ -380,7 +386,8 @@
         "grid": {
           "enum": ["quarter", "eighth", "sixteenth", "eighth-triplet", "sixteenth-triplet"]
         },
-        "octaveOffset": { "type": "integer", "minimum": -2, "maximum": 2 }
+          "octaveOffset": { "type": "integer", "minimum": -2, "maximum": 2 },
+          "targetNextPitchClass": { "type": "integer", "minimum": 0, "maximum": 11 }
       }
     }
   }

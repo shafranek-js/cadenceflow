@@ -1257,18 +1257,16 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   actions in the current desktop composition shell. Side panels MAY auto-hide/expand, but the active
   surface MUST retain keyboard access, compact measure composition, and no page-level horizontal overflow
   at the accepted desktop sizes.
-- **FR-239**: Schema v5 MUST remain the current portable-project contract. This documentary convergence
-  MUST NOT raise `schemaVersion` or change runtime codec semantics; any future schema-v6 work MUST be a
-  separately accepted migration batch.
+- **FR-239**: The accepted documentary convergence leaves schema v5 unchanged. The separately authorized
+  T197+T192 batch MUST upgrade the portable-project contract atomically from v5 to v6; no partial or
+  separate engine/tone schema migration is permitted.
 - **FR-240**: The Matrix `AudioEnginesInspector` MUST be the sole user-facing surface that changes Piano or
   Guitar engines and SoundFont tones. All Steps & Measures MUST retain only Harmony instrument, volume,
   mute, solo, provider state, and Retry controls. `PianoAudioStatus` MUST remain a read-only status surface
   with Retry available only for error/fallback states and MUST NOT open an engine-settings popover.
-- **FR-241**: Until the dedicated persistence task is implemented, Piano/Guitar engine and SoundFont tone
-  fields MUST be documented as runtime/session settings rather than portable project settings. The current
-  schema-v5 codec, autosave, export round-trip, and Undo/Redo acceptance MUST NOT claim to preserve them.
-  When persistence is implemented, these fields and `noteColorMode` MUST enter one atomic schema-v5-to-v6
-  cutover; engine/tone persistence MUST NOT introduce a separate schema version.
+- **FR-241**: Piano/Guitar engine and SoundFont tone fields MUST persist through the Project codec,
+  autosave/recovery, portable import/export, and Undo/Redo. These fields and `noteColorMode` MUST enter
+  one atomic schema-v5-to-v6 cutover; engine/tone persistence MUST NOT introduce a separate schema version.
 
 #### Canonical Progressions Matrix topology and strict routing
 
@@ -1286,6 +1284,49 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   NOT degrade it into an unrelated independent grid or hide the relationship needed to understand a
   source/target pair. This requirement concerns equivalent spatial structure and relationship clarity,
   not pixel-perfect copying, third-party branding, or verbatim reference text.
+
+- **FR-244**: The Composition UX workspace aligns Harmony Steps and Melody on one shared musical-time
+  axis; Matrix remains the surface for harmonic discovery and My Progression remains the temporal editing
+  surface.
+- **FR-245**: Composition interactions use a projection/adapter boundary over canonical Project
+  semantics. Preview and audition MUST NOT mutate Project or history; Apply MUST commit through one
+  command and create exactly one history entry.
+- **FR-246**: Harmonic note role metadata MUST use the derived shape
+  `{ primary: "root" | "chord-tone" | "scale-tone" | "altered"; targetNext: boolean }` and MUST NOT be
+  serialized in `MelodyEvent`.
+- **FR-247**: Chord-linked Melody supports a generated/authored union. Generated content retains its
+  recipe; authored content stores stable note IDs, exact pitch, and Rational onset and duration.
+- **FR-248**: Composition UX 1.1 provides a label hierarchy and compact quick edit, direct duration
+  resizing, range selection, a deterministic Alternatives tray, a Quick Chord/Command Palette, and a
+  guided start.
+- **FR-249**: Duration resizing uses one explicit Rational snap policy and commits one command
+  transaction; it MUST NOT expose multiple implicit resize modes.
+- **FR-250**: Range selection operates over the shared timeline and supports contiguous selection and
+  the approved keyboard/pointer extension semantics, without changing unrelated Steps.
+- **FR-251**: Alternatives are deterministic and explainable. Candidate preview is non-mutating; Apply
+  creates one undoable transaction.
+- **FR-252**: Quick Chord MUST use the same strict route guard as Matrix card Add. After T207, keyboard-first
+  authored-Melody editing MUST support scale-degree entry `1–7`, arrow-key movement/selection, `Alt`+arrow
+  semitone movement, `Delete`, and `Enter` insert/edit; pointer workflows remain available.
+- **FR-253**: Guided Start offers blank project, guided progression, quick starter, and example entry
+  points, then yields to the normal workspace after successful use without persistent tutorial overlays.
+- **FR-254**: The inline Melody Lane is initially read-only and shares the Harmony timeline; direct
+  authored-note editing is introduced only by the subsequent authored-Melody task.
+- **FR-255**: Song Sections are canonical records with `id`, `name`, and `startStepId`; the initial model
+  represents named boundaries only and excludes repeat graphs and arrangement instances.
+- **FR-256**: Web MIDI input is step input: a selected duration applies to each incoming Note On, which
+  inserts one quantized note and advances the insertion cursor. Note Off is ignored. Real-time MIDI
+  recording is out of scope.
+- **FR-257**: Signal may contribute selectively adapted MIT-licensed interaction gestures through an
+  adapter. Any adapted code MUST carry provenance comments and the repository MUST include
+  `THIRD_PARTY_NOTICES.md`; do not import Signal domain/store/audio/history models. AI, real-time MIDI
+  recording, and literal copying of Hookpad or Signal are out of scope.
+- **FR-258**: When a chord card is selected in the active Harmonic Matrix, pressing `+` (including
+  the numeric keypad Add key) while keyboard focus is in the Matrix MUST add that chord to My
+  Progression through the same guarded action as Ctrl+click/Ctrl+Enter. The shortcut MUST NOT fire
+  from editable controls, dialogs, or an auto-repeated key event; without a selected visible card it
+  MUST do nothing. It MUST NOT change preview-only behavior, route confirmation, or the existing
+  mouse/keyboard add methods. The shortcut MUST be discoverable in the card's accessible help.
 
 ### Scope Boundaries
 
@@ -1513,17 +1554,16 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   surface at accepted desktop sizes without page-level overflow.
 - **SC-027**: Enabling Suzuki colors changes only visible notehead styling; saved semantic notes, playback,
   MIDI, MusicXML, and non-color accessibility labels remain byte/behavior compatible.
-- **SC-028**: The current schema v5 codec and JSON Schema continue to validate v5 projects, and this
-  convergence batch does not change `schemaVersion` or runtime codec semantics.
+- **SC-028**: Schema v6 is the current codec and JSON Schema contract; v5 projects migrate through the
+  single v5-to-v6 cutover, and unsupported future schema versions are rejected.
 - **SC-029**: In the global All Steps & Measures Inspector, engine/tone selectors are absent while
   instrument, volume, mute, solo, provider state, and Retry remain available; `AudioEnginesInspector`
   contains the Piano/Guitar engine and tone selectors; and clicking `PianoAudioStatus` does not open a
   settings surface. Error/fallback status exposes Retry without becoming a settings control.
-- **SC-030**: The current v5 portable round-trip explicitly documents engine/tone settings as runtime-only;
-  no acceptance claim treats `pianoEngine`, `guitarEngine`, `pianoSoundfontInstrument`, or
-  `guitarSoundfontInstrument` as preserved until the dedicated codec/schema/autosave/export/Undo task is
-  implemented. That future persistence work shares the single v5-to-v6 cutover with `noteColorMode` and
-  does not create a separate engine/tone schema version.
+- **SC-030**: Schema v6 migrates v5 fixtures with defaults for absent Piano/Guitar engine and SoundFont
+  tone settings, persists all four fields plus `noteColorMode` through codec, IndexedDB autosave/recovery,
+  portable import/export, and Undo/Redo, and rejects future schema versions. The migration is one atomic
+  v5-to-v6 cutover with no separate engine/tone version.
 - **SC-031**: In a deterministic Progressions Matrix fixture, desktop acceptance shows three horizontal
   zones (`Secondary Dominants`, `Main Chords`, `Modal Interchange`) and six stable primary columns;
   secondary-dominant source cards and their Main Chord targets read as vertically related, while Modal
@@ -1535,6 +1575,18 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   through compression or wrapping without becoming an unrelated independent grid. Acceptance verifies
   this at the supported desktop sizes and a constrained layout-pressure fixture; pixel-perfect reference
   reproduction, third-party branding, and verbatim reference text are not required.
+
+- **SC-033**: Matrix is used for harmonic discovery and My Progression for temporal editing; both expose consistent canonical chord meaning, while edits and playback remain associated with the correct Steps.
+- **SC-034**: Across preview, audition, cancel, and apply flows, preview/cancel produce zero Project/history mutations and each Apply produces exactly one command/history entry with correct Undo/Redo.
+- **SC-035**: Harmonic-role classifications are derived and accessible without color alone; no role is written into serialized `MelodyEvent`, and T197+T192 remains the only schema-v6 scope.
+- **SC-036**: Shared timeline selection and Rational duration resize preserve exact timing, selection boundaries, and Step identity; one completed resize produces one command transaction.
+- **SC-037**: Alternatives and quick-command candidates are deterministic for fixed project inputs, expose rationale, and cannot mutate the Project before Apply.
+- **SC-038**: Generated and authored Melody resolve through one effective-phrase contract; authored note IDs, exact pitch, and Rational onset/duration survive v7 save/load and Undo/Redo, while schema v6 remains compatible.
+- **SC-039**: Song Sections preserve stable IDs, names, and valid start-Step boundaries through v8 migration and round-trip; no repeat graph or arrangement-instance semantics are implied.
+- **SC-040**: Web MIDI step input inserts one quantized note on each Note On using the selected duration and advances the insertion cursor; Note Off is ignored. Device/permission/error states are accessible, and real-time recording is not required.
+- **SC-041**: With one selected visible Matrix chord, one `+` or keypad Add press adds exactly one
+  Step and one history entry, matching Ctrl+click and Undo/Redo; held-key repetition, editable
+  focus, dialogs, and no-selection states add zero Steps. Existing route guards remain effective.
 
 ## Assumptions
 

@@ -3,6 +3,7 @@
   "instrumentId": "fluidr3-gm-midi-js-samples",
   "displayName": "FluidR3 GM sampled melody instruments",
   "format": "MIDI.js MP3 sample maps",
+  "bytePolicy": "Asset size and SHA-256 use canonical LF bytes. Verification also accepts the exact CRLF checkout derivation produced by Git on Windows.",
   "sourceRepository": "https://github.com/gleitz/midi-js-soundfonts/tree/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM",
   "sourceRevision": "044fab8e1456bfafc5776e86dfd6bb8697149aef",
   "sourceDirectory": "FluidR3_GM",
@@ -930,7 +931,11 @@
       "sourceName": "acoustic_guitar_nylon",
       "sourceFile": "acoustic_guitar_nylon-mp3.js",
       "size": 1837439,
-      "sha256": "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64"
+      "sha256": "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64",
+      "sourceSize": 1837439,
+      "sourceSha256": "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64",
+      "sourceUrl": "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/044fab8e1456bfafc5776e86dfd6bb8697149aef/FluidR3_GM/acoustic_guitar_nylon-mp3.js",
+      "derivation": "Pinned upstream LF bytes; Git may convert the 94 LF line endings to CRLF in Windows checkouts. Sample data unchanged."
     },
     "/audio/guitar/acoustic_guitar_steel-mp3.js": {
       "sourceName": "acoustic_guitar_steel",

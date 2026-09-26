@@ -556,7 +556,7 @@ function ScoreSystemCanvas({
   const isTablature = project.presentation.progressionView === "tablature";
   const isNotationView = project.presentation.progressionView === "staff" || isTablature;
   const showBass = isTablature ? false : project.presentation.showBassInStaff;
-  const suzukiColors = project.presentation.suzukiColors ?? false;
+  const suzukiColors = project.presentation.noteColorMode === "suzuki";
 
   const optimizedMelodyTabPositions = useMemo(() => {
     if (!isTablature || !isNotationView) return new Map<string, GuitarTabPosition>();

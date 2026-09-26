@@ -8,6 +8,13 @@ import {
 } from "../domain/melody/instrumentCatalog";
 import { getHarmonicModule } from "../domain/harmony/moduleRegistry";
 import {
+  classifyHarmonicNoteRole,
+  createHarmonicNoteRoleContext,
+  type HarmonicNoteRole,
+  type HarmonicNoteRoleContext,
+} from "../domain/harmony/noteRoles";
+import { realizeChord } from "../domain/harmony/realization";
+import {
   addRational,
   compareRational,
   subtractRational,
@@ -28,6 +35,7 @@ export interface MelodyTimelineEvent extends MelodyEvent {
   readonly startBeats: Rational;
   readonly instrument: MelodyInstrument;
   readonly clef: MelodyStaffClef;
+  readonly harmonicRole: HarmonicNoteRole;
 }
 
 export interface MelodyStaffNoteFragment {
@@ -45,6 +53,7 @@ export interface MelodyStaffNoteFragment {
   readonly continuesToNext: boolean;
   readonly instrument: MelodyInstrument;
   readonly clef: MelodyStaffClef;
+  readonly harmonicRole: HarmonicNoteRole;
 }
 
 export type MelodyRestSourceKind = "no-melody-chord" | "rest-step" | "virtual-gap";
@@ -135,6 +144,7 @@ function createMelodyEvent(
   event: MelodyEvent,
   stepStart: Rational,
   instrument: MelodyInstrument,
+  harmonicRole: HarmonicNoteRole,
 ): MelodyTimelineEvent {
   return Object.freeze({
     ...event,
@@ -142,13 +152,16 @@ function createMelodyEvent(
     startBeats: addRational(stepStart, event.startOffsetBeats),
     instrument,
     clef: melodyClefForInstrument(instrument),
+    harmonicRole,
   });
 }
 
 function addStepSpan(
+  project: Project,
   step: ProgressionStep,
   stepStart: Rational,
   realization: OrderedPianoRealization | null,
+  nextRealization: OrderedPianoRealization | null,
   spans: TimelineSpan[],
   events: MelodyTimelineEvent[],
   restOrdinal: number,
@@ -168,18 +181,41 @@ function addStepSpan(
   }
 
   if (!realization) throw new Error(`missing piano realization for chord step ${step.id}`);
+  const chord = realizeChord(step.harmonicFunction, project.tonic);
+  const currentPitches = [
+    ...realization.upperPitches,
+    ...(realization.bassPitch ? [realization.bassPitch] : []),
+  ];
+  const targetPitches = nextRealization
+    ? [
+        ...nextRealization.upperPitches,
+        ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
+      ]
+    : [];
+  const roleContext = createHarmonicNoteRoleContext({
+    tonic: project.tonic,
+    moduleId: project.activeModule,
+    rootPitchClass: chord.rootPitchClass,
+    chordPitches: currentPitches,
+    nextChordPitches: targetPitches,
+  });
   const phrase = realizeChordMelody({
     sourceStepId: step.id,
     upperPitches: realization.upperPitches,
     durationBeats: step.duration.beats,
     recipe: step.melody,
+    targetPitches,
   });
   const instrument = resolveEffectiveMelodyInstrument(
     step.melodyInstrumentOverride,
     trackInstrument,
   ).id;
   phrase.events.forEach((event) => {
-    const timelineEvent = createMelodyEvent(step.id, event, stepStart, instrument);
+    const harmonicRole = classifyHarmonicNoteRole(
+      ((event.pitch.midiNumber % 12) + 12) % 12,
+      roleContext,
+    );
+    const timelineEvent = createMelodyEvent(step.id, event, stepStart, instrument, harmonicRole);
     events.push(timelineEvent);
     spans.push({
       kind: "note",
@@ -226,6 +262,7 @@ function splitTimelineSpan(
           continuesToNext: compareRational(fragmentEnd, endOfSpan(span)) < 0,
           instrument: event.instrument,
           clef: event.clef,
+          harmonicRole: event.harmonicRole,
         }),
       );
     } else {
@@ -332,9 +369,13 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
   project.progression.steps.forEach((step, stepIndex) => {
     const eventStart = events.length;
     restOrdinal = addStepSpan(
+      project,
       step,
       cursor,
       orderedRealizations[stepIndex] ?? null,
+      orderedRealizations
+        .slice(stepIndex + 1)
+        .find((candidate): candidate is OrderedPianoRealization => candidate !== null) ?? null,
       spans,
       events,
       restOrdinal,
