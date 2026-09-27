@@ -1328,6 +1328,22 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   MUST do nothing. It MUST NOT change preview-only behavior, route confirmation, or the existing
   mouse/keyboard add methods. The shortcut MUST be discoverable in the card's accessible help.
 
+#### Printable score and release gate
+
+- **FR-259**: The studio MUST provide a separate print presentation of My Progression for A4 paper
+  using HTML print CSS and the browser's Save as PDF flow. It MUST include ordered measures, chord
+  symbols, harmonic direction arrows where applicable, and compact Guitar diagrams where a Guitar
+  realization exists. Printing MUST NOT mutate Project, history, selection, or playback state.
+- **FR-260**: The print presentation MUST paginate long progressions without clipping measures,
+  notation, chord labels, or diagrams. Essential harmonic meaning MUST remain legible in grayscale;
+  Suzuki colors MUST NOT be required to understand the printed score. The screen workspace must
+  remain usable at 1280×720 and 1920×1080 in light and dark themes.
+- **FR-261**: Release acceptance MUST verify offline asset availability and notices, current and
+  migrated project round-trips, print layout at A4 and representative long progressions, focused
+  and full regression results, production build, and any unresolved licensing or test failures.
+  A failure may be documented and triaged, but the release gate MUST NOT be marked complete while
+  a required check is failing or its disposition is undecided.
+
 ### Scope Boundaries
 
 #### Explicitly in v1
@@ -1587,6 +1603,11 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - **SC-041**: With one selected visible Matrix chord, one `+` or keypad Add press adds exactly one
   Step and one history entry, matching Ctrl+click and Undo/Redo; held-key repetition, editable
   focus, dialogs, and no-selection states add zero Steps. Existing route guards remain effective.
+- **SC-042**: A4 print preview and Save as PDF preserve ordered measures, chord symbols, direction
+  arrows, and available compact Guitar diagrams across short and long progressions without
+  clipping; grayscale remains understandable, and opening/printing produces zero Project/history
+  mutations. Release evidence records the exact status of offline assets, schema compatibility,
+  regression tests, build, and licensing disposition.
 
 ## Assumptions
 

@@ -530,6 +530,16 @@ Exit gate:
 
 No constitution violations. No exceptions required.
 
+## Printable A4 and release verification (T195)
+
+Render a print-only projection from canonical progression measures and the existing chord,
+notation, and Guitar realization data. Keep it separate from the interactive Studio layout.
+Use A4 `@page` and print CSS with deliberate measure/system page breaks; expose the browser's
+print dialog as the Save as PDF path. Print rendering is read-only and must not create an
+alternate musical model. Verify FR-259–FR-261 and SC-042 with short and long fixtures,
+grayscale, both supported desktop sizes, offline assets/notices, schema round-trips, focused
+and full regression, and the production build. Record any failing release gate explicitly.
+
 
 ## Composition UX Program architecture (future; starts after T195)
 

@@ -682,7 +682,7 @@ code/reference/spec convergence and must not be treated as implementation accept
   (accepted: Matrix and history-focused Vitest passed; Chromium 4/4 at both desktop sizes and
   themes, TypeScript/build, scoped ESLint/Prettier, and diff checks passed. History dispatcher
   gained the missing inverse routes for Matrix/branch add and step removal).
-- [ ] T195 [Batch 8] Add Printable A4 projection and the release gate per FR-237–FR-239: print measures,
+- [ ] T195 [Batch 8] Add Printable A4 projection and the release gate per FR-259–FR-261 and SC-042: print measures,
   chord symbols, arrows, and compact Guitar diagrams through HTML print CSS and the system Save as PDF path;
   cover long progressions, no clipping, accepted desktop/print sizes, Suzuki-color exclusion/legibility,
   license/provenance and offline asset verification, schema/codec compatibility, focused and full regression,
