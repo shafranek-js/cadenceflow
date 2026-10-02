@@ -4,6 +4,7 @@ import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands"
 import {
   batchEditStepPerformance,
   batchPatchSteps,
+  removeProgressionRange,
   removeSteps,
   reorderSteps,
   restoreProgression,
@@ -12,6 +13,7 @@ import {
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import type { ChordStep } from "../../../src/domain/progression/step";
 import type { Project } from "../../../src/domain/project/project";
+import { addRational, rational } from "../../../src/domain/timing/rational";
 import {
   EMPTY_RANGE_SELECTION,
   reduceRangeSelection,
@@ -132,6 +134,64 @@ describe("T202 targeted atomic commands", () => {
       payload: { stepIds: ["step-b", "step-c"], nowIso: T1 },
     });
     expect(result.project.progression.steps.map((step) => step.id)).toEqual(["step-a", "step-d"]);
+  });
+
+  it("clears selected Harmony to exact Rest intervals in one history entry", () => {
+    const base = fixture();
+    const initial: Project = Object.freeze({
+      ...base,
+      progression: Object.freeze({
+        ...base.progression,
+        sections: Object.freeze([
+          Object.freeze({ id: "verse", name: "Verse", startStepId: "step-b" }),
+          Object.freeze({ id: "chorus", name: "Chorus", startStepId: "step-d" }),
+        ]),
+      }),
+    });
+    const originalSteps = initial.progression.steps;
+    const originalStart = (stepId: string) => {
+      let start = rational(0);
+      for (const step of originalSteps) {
+        if (step.id === stepId) return start;
+        start = addRational(start, step.duration.beats);
+      }
+      throw new Error(`Unknown Step ${stepId}`);
+    };
+    const store = new AppStore(initial);
+    const command = {
+      type: "progression/remove-range-harmony" as const,
+      payload: { stepIds: ["step-b", "step-c"], nowIso: T1 },
+    };
+    store.dispatch(command, removeProgressionRange);
+    expect(store.project.progression.steps.map((step) => step.id)).toEqual(
+      originalSteps.map((step) => step.id),
+    );
+    for (const stepId of ["step-b", "step-c"]) {
+      const before = originalSteps.find((step) => step.id === stepId)!;
+      const after = store.project.progression.steps.find((step) => step.id === stepId)!;
+      expect(after.kind).toBe("rest");
+      expect(after.id).toBe(before.id);
+      expect(after.duration).toEqual(before.duration);
+    }
+    let updatedStart = rational(0);
+    for (const step of store.project.progression.steps) {
+      if (step.id === "step-d") break;
+      updatedStart = addRational(updatedStart, step.duration.beats);
+    }
+    expect(updatedStart).toEqual(originalStart("step-d"));
+    expect(store.project.progression.sections).toEqual(initial.progression.sections);
+    expect(store.history.undoDepth).toBe(1);
+    store.dispatch(command, removeProgressionRange);
+    expect(store.history.undoDepth).toBe(1);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(initial.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression.steps.map((step) => step.kind)).toEqual([
+      "chord",
+      "rest",
+      "rest",
+      "chord",
+    ]);
   });
 
   it("accepts a reordered stable-ID sequence without turning selection into indexes", () => {

@@ -2,6 +2,7 @@ import type { Project } from "../../domain/project/project";
 import type { Progression } from "../../domain/progression/progression";
 import { normalizeSongSections } from "../../domain/progression/sections";
 import { deleteStepsAndReanchorSections } from "./sectionCommands";
+import { setSystemRest } from "./systemChordCommands";
 import type {
   CardViewId,
   ChordStep,
@@ -14,7 +15,11 @@ import { musicalDuration, type MusicalDuration } from "../../domain/timing/durat
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
-import { snapshotAuthoredMelodyPhrase, snapshotChordMelody, type ChordMelodyRecipe } from "../../domain/melody/types";
+import {
+  snapshotAuthoredMelodyPhrase,
+  snapshotChordMelody,
+  type ChordMelodyRecipe,
+} from "../../domain/melody/types";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import type { HarmonicVariant } from "../../domain/harmony/chord";
 import type { AppliedCommand, ProjectCommand } from ".";
@@ -47,7 +52,10 @@ function withInverse(project: Project, progression: Progression, nowIso: string)
   const normalizedProgression = normalizeSongSections(progression);
   return {
     project: updateProgression(project, normalizedProgression, nowIso),
-    forward: { type: "progression/restore", payload: { progression: normalizedProgression, nowIso } },
+    forward: {
+      type: "progression/restore",
+      payload: { progression: normalizedProgression, nowIso },
+    },
     inverse: { type: "progression/restore", payload: { progression: project.progression, nowIso } },
   };
 }
@@ -326,9 +334,21 @@ export type RemoveStepCommand = ProjectCommand<RemoveStepPayload> & {
   readonly type: "progression/remove-step";
 };
 export function removeStep(project: Project, command: RemoveStepCommand): AppliedCommand {
-  if (!project.progression.steps.some((step) => step.id === command.payload.stepId))
-    throw new RangeError(`Unknown progression step: ${command.payload.stepId}`);
-  return deleteStepsAndReanchorSections(project, [command.payload.stepId], command.payload.nowIso);
+  const target = project.progression.steps.find((step) => step.id === command.payload.stepId);
+  if (!target) throw new RangeError(`Unknown progression step: ${command.payload.stepId}`);
+  if (target.kind === "rest") {
+    return {
+      project,
+      inverse: {
+        type: "progression/restore",
+        payload: { progression: project.progression, nowIso: command.payload.nowIso },
+      },
+    };
+  }
+  return setSystemRest(project, {
+    type: "piano-roll/set-rest",
+    payload: { stepId: target.id, nowIso: command.payload.nowIso },
+  });
 }
 
 export interface RemoveStepsPayload {
@@ -342,6 +362,41 @@ export type RemoveStepsCommand = ProjectCommand<RemoveStepsPayload> & {
 export function removeSteps(project: Project, command: RemoveStepsCommand): AppliedCommand {
   const idsToRemove = assertTargetStepIds(project, command.payload.stepIds);
   return deleteStepsAndReanchorSections(project, [...idsToRemove], command.payload.nowIso);
+}
+
+export type RemoveProgressionRangeCommand = ProjectCommand<RemoveStepsPayload> & {
+  readonly type: "progression/remove-range-harmony";
+};
+
+/** Clears Harmony over a range while retaining every selected Step and its timeline interval. */
+export function removeProgressionRange(
+  project: Project,
+  command: RemoveProgressionRangeCommand,
+): AppliedCommand {
+  const idsToRemove = assertTargetStepIds(project, command.payload.stepIds);
+  let applied: AppliedCommand = {
+    project,
+    inverse: {
+      type: "progression/restore",
+      payload: { progression: project.progression, nowIso: project.updatedAt },
+    },
+  };
+  for (const stepId of idsToRemove) {
+    if (applied.project.progression.steps.find((step) => step.id === stepId)?.kind === "rest")
+      continue;
+    applied = setSystemRest(applied.project, {
+      type: "piano-roll/set-rest",
+      payload: { stepId, nowIso: command.payload.nowIso },
+    });
+  }
+  if (applied.project === project) return applied;
+  return {
+    ...applied,
+    inverse: {
+      type: "progression/restore",
+      payload: { progression: project.progression, nowIso: project.updatedAt },
+    },
+  };
 }
 
 export interface ReorderStepPayload {
@@ -438,7 +493,9 @@ export function repeatChordStep(project: Project, command: RepeatChordStepComman
   );
 }
 
-function cloneStepMelody(melody: NonNullable<ChordStep["melody"]>): NonNullable<ChordStep["melody"]> {
+function cloneStepMelody(
+  melody: NonNullable<ChordStep["melody"]>,
+): NonNullable<ChordStep["melody"]> {
   if (melody.mode === "generated") return snapshotChordMelody(melody);
   return snapshotChordMelody({
     ...melody,

@@ -48,7 +48,7 @@ import {
   migrateProjectData,
   UnsupportedProjectVersionError,
 } from "../domain/project/migrations";
-import projectSchema from "../../specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json";
+import projectSchema from "../../specs/001-cadenceflow-core-studio/contracts/cadenceflow-project.schema.json" with { type: "json" };
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
@@ -266,7 +266,13 @@ function isProgressionView(value: unknown): value is ProgressionView {
 }
 
 function isCardView(value: unknown): value is CardViewId {
-  return value === "harmonic" || value === "piano" || value === "staff" || value === "guitar" || value === "tablature";
+  return (
+    value === "harmonic" ||
+    value === "piano" ||
+    value === "staff" ||
+    value === "guitar" ||
+    value === "tablature"
+  );
 }
 
 function isMeasuresPerSystem(value: unknown): value is MeasuresPerSystem {
@@ -353,8 +359,12 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
       id: step.id,
       kind: "rest",
       duration: encodeDuration(step.duration),
-      ...(step.authoredMelody !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(step.authoredMelody) } : {}),
-      ...(step.melodyInstrumentOverride !== undefined ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) } : {}),
+      ...(step.authoredMelody !== undefined
+        ? { authoredMelody: snapshotAuthoredMelodyPhrase(step.authoredMelody) }
+        : {}),
+      ...(step.melodyInstrumentOverride !== undefined
+        ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) }
+        : {}),
     };
   }
   return {
@@ -379,8 +389,12 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
       id: String(raw["id"]),
       kind: "rest",
       duration,
-      ...(raw["authoredMelody"] !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) } : {}),
-      ...(raw["melodyInstrumentOverride"] !== undefined ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) } : {}),
+      ...(raw["authoredMelody"] !== undefined
+        ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) }
+        : {}),
+      ...(raw["melodyInstrumentOverride"] !== undefined
+        ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) }
+        : {}),
     });
     return rest;
   }
@@ -393,7 +407,9 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
     performance: raw["performance"] as StepPerformance,
     cardView: (raw["cardView"] as CardViewId | undefined) ?? "harmonic",
     ...(raw["melody"] !== undefined ? { melody: decodeChordMelody(raw["melody"]) } : {}),
-    ...(raw["authoredMelody"] !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) } : {}),
+    ...(raw["authoredMelody"] !== undefined
+      ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) }
+      : {}),
     ...(raw["melodyInstrumentOverride"] !== undefined
       ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) }
       : {}),

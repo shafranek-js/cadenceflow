@@ -143,7 +143,7 @@ describe("T209 Song Sections", () => {
     expect(store.project.progression.sections?.every((s) => s.startStepId === "d")).toBe(true);
   });
 
-  it("uses the previous Step for tail deletion, removes boundaries when empty, and preserves IDs on reorder", () => {
+  it("keeps single-Step removal boundaries on the Rest identity and removes them only for a deleted range", () => {
     const base = fixture();
     const initial = Object.freeze({
       ...base,
@@ -159,9 +159,11 @@ describe("T209 Song Sections", () => {
       type: "progression/remove-step",
       payload: { stepId: "d", nowIso: now },
     });
+    expect(last.project.progression.steps.map((step) => step.id)).toEqual(["a", "b", "c", "d"]);
+    expect(last.project.progression.steps.at(-1)?.kind).toBe("rest");
     expect(
       last.project.progression.sections?.find((section) => section.id === "section-d")?.startStepId,
-    ).toBe("c");
+    ).toBe("d");
     const tailRange = removeSteps(initial, {
       type: "progression/remove-steps",
       payload: { stepIds: ["c", "d"], nowIso: now },
@@ -182,7 +184,14 @@ describe("T209 Song Sections", () => {
       type: "progression/remove-step",
       payload: { stepId: "b", nowIso: now },
     });
-    expect(empty.project.progression.sections).toEqual([]);
+    expect(empty.project.progression.steps).toHaveLength(1);
+    expect(empty.project.progression.steps[0]?.kind).toBe("rest");
+    expect(empty.project.progression.sections?.map((section) => section.startStepId)).toEqual([
+      "b",
+      "b",
+      "c",
+      "d",
+    ]);
     const reordered = reorderSteps(initial, {
       type: "progression/reorder-steps",
       payload: { steps: [...initial.progression.steps].reverse(), nowIso: now },

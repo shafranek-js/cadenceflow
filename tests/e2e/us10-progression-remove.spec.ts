@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("US10 — direct progression-step removal", () => {
-  test("exposes ChordStep and RestStep remove buttons and preserves Undo/Redo order", async ({
+  test("removing a chord preserves its Step as Rest and keeps Rest removal a history no-op", async ({
     page,
   }) => {
     await addChord(page, "I");
@@ -61,21 +61,41 @@ test.describe("US10 — direct progression-step removal", () => {
     }
 
     await steps.nth(1).getByRole("button", { name: "Remove progression step 2: vi" }).click();
-    await expect(steps).toHaveCount(3);
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
+    await expect(steps).toHaveCount(4);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "Rest", "IV"]);
+    await expect(steps.nth(1).locator("[data-progression-step-select]")).toBeFocused();
 
-    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await page.keyboard.press("Control+z");
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "vi", "Rest", "IV"]);
-    await page.getByRole("button", { name: "Redo", exact: true }).click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
+    await page.keyboard.press("Control+y");
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "Rest", "IV"]);
 
-    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: Rest" }).click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
-    await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
+    const noOpRest = steps.nth(1).getByRole("button", { name: "Remove progression step 2: Rest" });
+    await noOpRest.click();
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "Rest", "IV"]);
+    await page.keyboard.press("Control+z");
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "vi", "Rest", "IV"]);
   });
 
-  test("removes an unselected step without changing selected-step or Inspector state", async ({
+  test("Delete changes only the selected chord Harmony", async ({ page }) => {
+    await addChord(page, "I");
+    await addChord(page, "vi");
+    const steps = page.locator('[data-testid="progression-step"]');
+    await expect(steps).toHaveCount(2);
+    const selected = steps.nth(1).locator("[data-progression-step-select]");
+    await selected.click();
+    await selected.focus();
+    await page.keyboard.press("Delete");
+    await expect(steps).toHaveCount(2);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest"]);
+    await expect(steps.nth(1).locator("[data-progression-step-select]")).toBeFocused();
+    await page.keyboard.press("Control+z");
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "vi"]);
+    await page.keyboard.press("Control+y");
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest"]);
+  });
+
+  test("clears Harmony on unselected or selected chords without moving the selected Step", async ({
     page,
   }) => {
     await addChord(page, "I");
@@ -91,26 +111,24 @@ test.describe("US10 — direct progression-step removal", () => {
     ).toBeVisible();
 
     await steps.nth(0).getByRole("button", { name: "Remove progression step 1: I" }).click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["vi", "IV"]);
-    await expect(steps.first()).toHaveAttribute("data-selected", "true");
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["Rest", "vi", "IV"]);
+    await expect(steps.nth(1)).toHaveAttribute("data-selected", "true");
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Performance settings for step vi" }),
     ).toBeVisible();
 
-    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: IV" }).click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["vi"]);
-    await expect(steps.first()).toHaveAttribute("data-selected", "true");
+    await steps.nth(2).getByRole("button", { name: "Remove progression step 3: IV" }).click();
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["Rest", "vi", "Rest"]);
+    await expect(steps.nth(1)).toHaveAttribute("data-selected", "true");
 
-    await steps.first().getByRole("button", { name: "Remove progression step 1: vi" }).click();
-    await expect(steps).toHaveCount(0);
-    await expect(
-      page.getByRole("region", { name: "Performance settings for step vi" }),
-    ).toHaveCount(0);
+    await steps.nth(1).getByRole("button", { name: "Remove progression step 2: vi" }).click();
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["Rest", "Rest", "Rest"]);
+    await expect(steps).toHaveCount(3);
     await expect(page.locator(".step-editor")).toHaveCount(0);
   });
 
-  test("Enter and Space each remove exactly one step through one history entry", async ({
+  test("Enter and Space each clear one chord into Rest through one history entry", async ({
     page,
   }) => {
     await addChord(page, "I");
@@ -125,20 +143,20 @@ test.describe("US10 — direct progression-step removal", () => {
 
     await (await removeVi()).focus();
     await page.keyboard.press("Enter");
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
     await undo.click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "vi", "IV"]);
     await redo.click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
     await undo.click();
 
     await (await removeVi()).focus();
     await page.keyboard.press("Space");
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
     await undo.click();
     await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "vi", "IV"]);
     await redo.click();
-    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "IV"]);
+    await expect(readProgressionIdentity(page)).resolves.toEqual(["I", "Rest", "IV"]);
   });
 });
 

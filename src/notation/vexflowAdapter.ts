@@ -1,6 +1,7 @@
 import {
   Accidental,
   Beam,
+  Dot,
   Formatter,
   Fraction,
   GhostNote,
@@ -18,7 +19,16 @@ import {
 } from "vexflow";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
 import type { Meter } from "../domain/timing/meter";
-import { addRational, rationalToNumber, type Rational } from "../domain/timing/rational";
+import {
+  addRational,
+  compareRational,
+  multiplyRational,
+  rational,
+  rationalToNumber,
+  subtractRational,
+  type Rational,
+  ZERO,
+} from "../domain/timing/rational";
 import type { StaffProjectionDto } from "./staffProjection";
 import { getSuzukiNoteColor, getSuzukiNoteStroke } from "./suzukiColors";
 import {
@@ -103,6 +113,7 @@ function createStaffNote(
     // Keep treble pitch placement without reserving visual space for a clef.
     clef,
   });
+  attachRhythmicDots(note, rhythm.dots);
   projection.notes.forEach((item, index) => {
     const token = accidentalToken(item.alter);
     if (token) {
@@ -151,6 +162,7 @@ function createTabChordNote(
     },
     true,
   );
+  attachRhythmicDots(note, rhythm.dots);
   note.setStave(stave);
   if (ink !== STAFF_INK) {
     note.setStyle({ fillStyle: ink, strokeStyle: ink });
@@ -178,6 +190,7 @@ function createTabSingleNote(
     },
     true,
   );
+  attachRhythmicDots(note, rhythm.dots);
   note.setStave(stave);
   if (ink !== STAFF_INK) {
     note.setStyle({ fillStyle: ink, strokeStyle: ink });
@@ -230,15 +243,21 @@ export type StaffSequenceEntry =
 function staffRhythmForEntry(entry: StaffSequenceEntry): StaffRhythm {
   return entry.writtenRhythm ?? staffRhythmForDuration(entry.duration);
 }
+function attachRhythmicDots(note: StaveNote | TabNote, count: number): void {
+  for (let dot = 0; dot < count; dot += 1) {
+    Dot.buildAndAttach([note], note instanceof TabNote ? undefined : { all: true });
+  }
+}
 function expandStaffSequenceEntries(
   entries: readonly StaffSequenceEntry[],
+  meter: Meter,
 ): readonly StaffSequenceEntry[] {
   return Object.freeze(
     entries.flatMap((entry) => {
       const isWrittenPart = Boolean(entry.writtenRhythm);
       const parts = entry.writtenRhythm
         ? [entry.writtenRhythm]
-        : projectWrittenRhythm(entry.duration.beats);
+        : projectWrittenRhythm(entry.duration.beats, entry.startOffsetBeats, meter);
       return parts.map((part) => ({
         ...entry,
         key: parts.length === 1 ? entry.key : `${entry.key}:written-${part.index}`,
@@ -249,24 +268,27 @@ function expandStaffSequenceEntries(
         writtenRhythm: part,
         ...(entry.kind === "chord" || entry.kind === "note"
           ? {
-              continuesFromPrevious: Boolean(entry.continuesFromPrevious) || part.index > 0,
-              continuesToNext: Boolean(entry.continuesToNext) || part.index < part.count - 1,
+              continuesFromPrevious: Boolean(entry.continuesFromPrevious),
+              continuesToNext: Boolean(entry.continuesToNext),
             }
           : {}),
       }));
     }),
   );
 }
-function expandSystemMeasure(measure: StaffSystemMeasureInput): StaffSystemMeasureInput {
+function expandSystemMeasure(
+  measure: StaffSystemMeasureInput,
+  meter: Meter,
+): StaffSystemMeasureInput {
   const melodyLanes = measure.melodyLanes?.map((lane) => ({
     ...lane,
-    entries: expandStaffSequenceEntries(lane.entries),
+    entries: expandStaffSequenceEntries(lane.entries, meter),
   }));
   return Object.freeze({
     ...measure,
-    harmonyEntries: expandStaffSequenceEntries(measure.harmonyEntries),
+    harmonyEntries: expandStaffSequenceEntries(measure.harmonyEntries, meter),
     ...(measure.melodyEntries
-      ? { melodyEntries: expandStaffSequenceEntries(measure.melodyEntries) }
+      ? { melodyEntries: expandStaffSequenceEntries(measure.melodyEntries, meter) }
       : {}),
     ...(melodyLanes ? { melodyLanes: Object.freeze(melodyLanes) } : {}),
   });
@@ -406,7 +428,23 @@ function createSystemVoices(rendered: readonly RenderedSequenceTickable[], meter
     const voice = new Voice({ numBeats: meter.numerator, beatValue: meter.denominator }).setMode(
       Voice.Mode.SOFT,
     );
-    voice.addTickables(items.map(({ note }) => note));
+    const orderedItems = [...items].sort((left, right) =>
+      compareRational(left.entry.startOffsetBeats, right.entry.startOffsetBeats),
+    );
+    const tickables: (StaveNote | TabNote | GhostNote)[] = [];
+    let cursor = ZERO;
+    orderedItems.forEach((item) => {
+      const onset = item.entry.startOffsetBeats;
+      if (compareRational(onset, cursor) > 0) {
+        const stave = item.note.getStave();
+        if (!stave) throw new Error(`Missing stave for rhythmic entry ${item.entry.key}`);
+        tickables.push(createGapNote(stave, musicalDuration(subtractRational(onset, cursor))));
+      }
+      tickables.push(item.note);
+      const end = addRational(onset, item.entry.duration.beats);
+      if (compareRational(end, cursor) > 0) cursor = end;
+    });
+    voice.addTickables(tickables);
     return voice;
   });
 }
@@ -431,6 +469,7 @@ function createRestNote(
     durationOverride: vexDurationOverride(duration, rhythm),
     clef,
   });
+  attachRhythmicDots(note, rhythm.dots);
   note.setStave(stave);
   note.setStyle({ fillStyle: STAFF_INK, strokeStyle: STAFF_INK });
   note.preFormat();
@@ -617,6 +656,7 @@ export function renderStaffProjection(
   options: StaffSequenceRenderOptions = {},
 ): () => void {
   container.replaceChildren();
+  entries = expandStaffSequenceEntries(entries, meter);
   if (entries.length === 0) return () => container.replaceChildren();
   const clef = options.clef ?? "treble";
   const layout = getSequenceLayout(container, entries, meter, clef);
@@ -775,30 +815,17 @@ export function renderStaffProjection(
         ],
   );
   onLayout?.(Object.freeze(positions));
-  notes.forEach(({ entry, note }) => {
-    if (entry.kind !== "chord" && entry.kind !== "note") return;
-    const indexes = entry.projection.notes.map((_, index) => index);
-    if (entry.continuesFromPrevious) {
-      indexes.forEach((index) => {
-        new StaveTie({ lastNote: note, lastIndexes: [index] }).setContext(context).draw();
-      });
-    }
-    if (entry.continuesToNext) {
-      indexes.forEach((index) => {
-        new StaveTie({ firstNote: note, firstIndexes: [index] }).setContext(context).draw();
-      });
-    }
-  });
-  bassNotes.forEach(({ entry, note }) => {
-    if (entry.kind !== "chord" || !entry.bassProjection) return;
-    const indexes = entry.bassProjection.notes.map((_, index) => index);
-    if (entry.continuesFromPrevious) {
-      new StaveTie({ lastNote: note, lastIndexes: indexes }).setContext(context).draw();
-    }
-    if (entry.continuesToNext) {
-      new StaveTie({ firstNote: note, firstIndexes: indexes }).setContext(context).draw();
-    }
-  });
+  drawConnectedTies(
+    container,
+    context,
+    [
+      ...notes.map((item) => ({ ...item, staff: "staff", measureIndex: 0 })),
+      ...bassNotes.map((item) => ({ ...item, staff: "bass", measureIndex: 0 })),
+    ],
+    meter,
+    0,
+    1,
+  );
   tuplets.forEach((tuplet) => tuplet.setContext(context).draw());
   bassTuplets.forEach((tuplet) => tuplet.setContext(context).draw());
   const svg = container.querySelector("svg");
@@ -878,6 +905,189 @@ interface RenderedSystemTickable extends RenderedSequenceTickable {
   readonly staff: StaffSystemStaff;
   readonly measureIndex: number;
   readonly stave: Stave;
+}
+interface RenderedTieItem {
+  readonly entry: StaffSequenceEntry;
+  readonly note: StaveNote | TabNote | GhostNote;
+  readonly staff: string;
+  readonly measureIndex: number;
+}
+
+function tieMembers(
+  item: RenderedTieItem,
+): readonly { readonly index: number; readonly key: string }[] {
+  if (item.entry.kind !== "chord" && item.entry.kind !== "note") return [];
+  const sourceKeys = item.entry.sourceEventKeys;
+  if (!sourceKeys?.length) return [];
+  const isTab = item.note instanceof TabNote;
+  const projectionNotes =
+    item.entry.kind === "chord" || item.entry.kind === "note" ? item.entry.projection.notes : [];
+  const count = isTab ? item.note.getPositions().length : projectionNotes.length;
+  return Array.from({ length: count }, (_, index) => {
+    const sourceKey = sourceKeys[index] ?? sourceKeys[0]!;
+    if (isTab) {
+      const position = item.note.getPositions()[index];
+      return {
+        index,
+        key: `${sourceKey}|${item.entry.rhythmicVoice ?? "default"}|tab:${position?.str}:${position?.fret}`,
+      };
+    }
+    return {
+      index,
+      key: `${sourceKey}|${item.entry.rhythmicVoice ?? "default"}|pitch:${projectionNotes[index]?.vexKey ?? index}`,
+    };
+  });
+}
+
+function continuesInto(item: RenderedTieItem): boolean {
+  const rhythm = item.entry.writtenRhythm;
+  return (
+    Boolean(
+      item.entry.kind !== "rest" && item.entry.kind !== "gap" && item.entry.continuesToNext,
+    ) || Boolean(rhythm && rhythm.index < rhythm.count - 1)
+  );
+}
+
+function continuesFrom(item: RenderedTieItem): boolean {
+  const rhythm = item.entry.writtenRhythm;
+  return (
+    Boolean(
+      item.entry.kind !== "rest" && item.entry.kind !== "gap" && item.entry.continuesFromPrevious,
+    ) || Boolean(rhythm && rhythm.index > 0)
+  );
+}
+
+function drawOwnedTie(
+  container: HTMLDivElement,
+  context: ReturnType<Renderer["getContext"]>,
+  first: RenderedTieItem | undefined,
+  last: RenderedTieItem | undefined,
+  firstIndex: number | undefined,
+  lastIndex: number | undefined,
+  ownerKey: string,
+  memberKey: string,
+  staff: string,
+  kind: "complete" | "system-edge-left" | "system-edge-right",
+): void {
+  const firstNote =
+    first?.note instanceof StaveNote || first?.note instanceof TabNote ? first.note : undefined;
+  const lastNote =
+    last?.note instanceof StaveNote || last?.note instanceof TabNote ? last.note : undefined;
+  const useTabTie = firstNote instanceof TabNote || lastNote instanceof TabNote;
+  const tie = useTabTie
+    ? new TabTie({
+        ...(firstNote ? { firstNote } : {}),
+        ...(lastNote ? { lastNote } : {}),
+        ...(firstIndex !== undefined ? { firstIndexes: [firstIndex] } : {}),
+        ...(lastIndex !== undefined ? { lastIndexes: [lastIndex] } : {}),
+      })
+    : new StaveTie({
+        ...(firstNote ? { firstNote } : {}),
+        ...(lastNote ? { lastNote } : {}),
+        ...(firstIndex !== undefined ? { firstIndexes: [firstIndex] } : {}),
+        ...(lastIndex !== undefined ? { lastIndexes: [lastIndex] } : {}),
+      });
+  tie.setContext(context).draw();
+  const group = Array.from(container.querySelectorAll<SVGGElement>("g.vf-stavetie")).at(-1);
+  group?.setAttribute("data-tie-kind", kind);
+  group?.setAttribute("data-tie-staff", staff);
+  group?.setAttribute("data-tie-owner-key", ownerKey);
+  group?.setAttribute("data-tie-member-key", memberKey);
+  if (first) group?.setAttribute("data-tie-first-entry", first.entry.key);
+  if (last) group?.setAttribute("data-tie-last-entry", last.entry.key);
+}
+
+function drawConnectedTies(
+  container: HTMLDivElement,
+  context: ReturnType<Renderer["getContext"]>,
+  rendered: readonly RenderedTieItem[],
+  meter: Meter,
+  systemStartMeasure: number,
+  systemEndMeasure: number,
+): void {
+  const barLength = rational(meter.numerator * 4, meter.denominator);
+  const timeline = rendered.flatMap((item) =>
+    tieMembers(item).map((member) => {
+      const start = addRational(
+        multiplyRational(barLength, rational(item.measureIndex)),
+        item.entry.startOffsetBeats,
+      );
+      return {
+        item,
+        member,
+        start,
+        end: addRational(start, item.entry.duration.beats),
+      };
+    }),
+  );
+  const matchedIncoming = new Set<string>();
+  const matchedOutgoing = new Set<string>();
+  timeline.forEach((left) => {
+    if (!continuesInto(left.item)) return;
+    const right = timeline.find(
+      (candidate) =>
+        candidate.item.staff === left.item.staff &&
+        candidate.member.key === left.member.key &&
+        compareRational(candidate.start, left.end) === 0 &&
+        continuesFrom(candidate.item),
+    );
+    if (!right) return;
+    matchedOutgoing.add(`${left.item.staff}|${left.member.key}|${left.item.entry.key}`);
+    matchedIncoming.add(`${right.item.staff}|${right.member.key}|${right.item.entry.key}`);
+    drawOwnedTie(
+      container,
+      context,
+      left.item,
+      right.item,
+      left.member.index,
+      right.member.index,
+      left.member.key.split("|")[0]!,
+      left.member.key,
+      left.item.staff,
+      "complete",
+    );
+  });
+  const systemStart = multiplyRational(barLength, rational(systemStartMeasure));
+  const systemEnd = multiplyRational(barLength, rational(systemEndMeasure));
+  timeline.forEach((node) => {
+    const identity = `${node.item.staff}|${node.member.key}|${node.item.entry.key}`;
+    if (
+      continuesFrom(node.item) &&
+      compareRational(node.start, systemStart) === 0 &&
+      !matchedIncoming.has(identity)
+    ) {
+      drawOwnedTie(
+        container,
+        context,
+        undefined,
+        node.item,
+        undefined,
+        node.member.index,
+        node.member.key.split("|")[0]!,
+        node.member.key,
+        node.item.staff,
+        "system-edge-left",
+      );
+    }
+    if (
+      continuesInto(node.item) &&
+      compareRational(node.end, systemEnd) === 0 &&
+      !matchedOutgoing.has(identity)
+    ) {
+      drawOwnedTie(
+        container,
+        context,
+        node.item,
+        undefined,
+        node.member.index,
+        undefined,
+        node.member.key.split("|")[0]!,
+        node.member.key,
+        node.item.staff,
+        "system-edge-right",
+      );
+    }
+  });
 }
 function entriesForBassStaff(
   entries: readonly StaffSequenceEntry[],
@@ -1007,7 +1217,7 @@ function systemStaveOptions(hasBassStaff: boolean) {
 ): () => void {
   container.replaceChildren();
   if (measures.length === 0) return () => container.replaceChildren();
-  measures = measures.map(expandSystemMeasure);
+  measures = measures.map((measure) => expandSystemMeasure(measure, meter));
   const showBass =
     options.showBass ??
     measures.some((measure) =>
@@ -1290,33 +1500,6 @@ function systemStaveOptions(hasBassStaff: boolean) {
         [...melodyTuplets, ...harmonyTuplets].forEach((tuplet) =>
           tuplet.setContext(context).draw(),
         );
-        [...renderedMelody, ...renderedHarmony].forEach((item) => {
-          if (item.entry.kind !== "note" && item.entry.kind !== "chord") return;
-          if (!(item.note instanceof StaveNote) && !(item.note instanceof TabNote)) return;
-          const indexCount =
-            item.note instanceof TabNote
-              ? item.note.getPositions().length
-              : item.entry.projection.notes.length;
-          const indexes = Array.from({ length: indexCount }, (_, index) => index);
-          const continuesFromPrevious = item.entry.continuesFromPrevious;
-          const continuesToNext = item.entry.continuesToNext;
-          indexes.forEach((index) => {
-            if (continuesFromPrevious) {
-              const tie =
-                item.note instanceof TabNote
-                  ? new TabTie({ lastNote: item.note, lastIndexes: [index] })
-                  : new StaveTie({ lastNote: item.note, lastIndexes: [index] });
-              tie.setContext(context).draw();
-            }
-            if (continuesToNext) {
-              const tie =
-                item.note instanceof TabNote
-                  ? new TabTie({ firstNote: item.note, firstIndexes: [index] })
-                  : new StaveTie({ firstNote: item.note, firstIndexes: [index] });
-              tie.setContext(context).draw();
-            }
-          });
-        });
         renderedMelody.forEach((item) => allRendered.push(item));
         renderedHarmony.forEach((item) => allRendered.push(item));
         [...renderedMelody, ...renderedHarmony].forEach((item) => {
@@ -1420,35 +1603,16 @@ function systemStaveOptions(hasBassStaff: boolean) {
           }),
         );
       });
-      rendered.forEach((item) => {
-        if (item.entry.kind !== "chord" && item.entry.kind !== "note") return;
-        if (!(item.note instanceof StaveNote) && !(item.note instanceof TabNote)) return;
-        const indexCount =
-          item.note instanceof TabNote
-            ? item.note.getPositions().length
-            : item.entry.projection.notes.length;
-        const indexes = Array.from({ length: indexCount }, (_, index) => index);
-        if (item.entry.continuesFromPrevious) {
-          indexes.forEach((index) => {
-            const tie =
-              item.note instanceof TabNote
-                ? new TabTie({ lastNote: item.note, lastIndexes: [index] })
-                : new StaveTie({ lastNote: item.note, lastIndexes: [index] });
-            tie.setContext(context).draw();
-          });
-        }
-        if (item.entry.continuesToNext) {
-          indexes.forEach((index) => {
-            const tie =
-              item.note instanceof TabNote
-                ? new TabTie({ firstNote: item.note, firstIndexes: [index] })
-                : new StaveTie({ firstNote: item.note, firstIndexes: [index] });
-            tie.setContext(context).draw();
-          });
-        }
-      });
     });
   });
+  drawConnectedTies(
+    container,
+    context,
+    allRendered,
+    meter,
+    measures[0]!.measureIndex,
+    measures.at(-1)!.measureIndex + 1,
+  );
   const svg = container.querySelector("svg");
   if (!svg) throw new Error("VexFlow did not create a score system surface");
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);

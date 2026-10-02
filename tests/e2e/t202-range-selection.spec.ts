@@ -73,6 +73,48 @@ test.describe("T202 range selection", () => {
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
   });
 
+  test("range Delete preserves Step IDs and exact timeline by clearing Harmony to Rest", async ({
+    page,
+  }) => {
+    await createFourStepProgression(page);
+    await ensureHistoryControlsVisible(page);
+    const idsBefore = await page
+      .locator("[data-progression-step-select]")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+    const startsBefore = await page
+      .locator("[data-progression-step-select]")
+      .evaluateAll((buttons) =>
+        buttons.map(
+          (button) => button.closest<HTMLElement>("[data-start-beats]")?.dataset.startBeats,
+        ),
+      );
+
+    await stepButton(page, 1).click();
+    await stepButton(page, 2).click({ modifiers: ["Shift"] });
+    await expect(page.getByTestId("range-selection-toolbar")).toContainText("2 selected");
+    await page.getByTestId("range-toolbar-delete").click();
+
+    await expect(page.getByTestId("progression-step")).toHaveCount(4);
+    await expect(page.locator(".progression-rest-card")).toHaveCount(2);
+    const idsAfter = await page
+      .locator("[data-progression-step-select]")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+    const startsAfter = await page
+      .locator("[data-progression-step-select]")
+      .evaluateAll((buttons) =>
+        buttons.map(
+          (button) => button.closest<HTMLElement>("[data-start-beats]")?.dataset.startBeats,
+        ),
+      );
+    expect(idsAfter).toEqual(idsBefore);
+    expect(startsAfter).toEqual(startsBefore);
+    await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
+    await page.keyboard.press("Control+z");
+    await expect(page.locator(".progression-rest-card")).toHaveCount(0);
+    await page.keyboard.press("Control+y");
+    await expect(page.locator(".progression-rest-card")).toHaveCount(2);
+  });
+
   test("clears transient range after Duplicate and keeps one selection through Undo/Redo", async ({
     page,
   }) => {
@@ -168,7 +210,8 @@ test.describe("T202 range selection", () => {
     await addRestToProgression(page);
     await expect(page.getByTestId("progression-step")).toHaveCount(5);
     await page.getByRole("button", { name: "Remove progression step 5: Rest" }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(4);
+    await expect(page.getByTestId("progression-step")).toHaveCount(5);
+    await expect(page.locator(".progression-rest-card")).toHaveCount(1);
   });
 
   test("Shift+Arrow extends Staff and Tablature ranges without reordering chords", async ({

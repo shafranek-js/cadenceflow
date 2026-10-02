@@ -625,6 +625,7 @@ playback, MIDI/MusicXML, accessibility, performance, and the complete SC-001..SC
 
 ## Product Backlog (not scheduled)
 
+- [ ] **T214 [Backlog] Persistent window-bottom status bar**: Anchor the existing page status bar to the bottom edge of the browser window so its useful information remains visible during scrolling, like a conventional application status bar. Preserve its current content and updates. Reserve layout space so the bar does not cover music, controls or focused elements; support narrow viewports, light/dark themes and browser zoom. Verify visibility while scrolling and keyboard access at 640×360, 1280×720 and 1920×1080. This is a separate unscheduled presentation task; no implementation is authorized by this backlog entry.
 - [ ] **T213 [Backlog] Guitar chord-diagram marker colors**: Add a global `View → Guitar view`
   radio choice between the current `Chord roles` mode (root red, other notes blue) and
   `Fingering colors` mode. In fingering mode, fretted dots use the existing Tablature/hand-legend

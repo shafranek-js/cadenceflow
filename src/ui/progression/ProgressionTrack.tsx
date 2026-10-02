@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
   useEffect,
+  useLayoutEffect,
   type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
@@ -69,7 +70,10 @@ import {
 } from "../melody/PianoRollView";
 import { PianoRollSystemNotePanel } from "../melody/PianoRollSystemNotePanel";
 import { PianoRollSystemChordPanel } from "../melody/PianoRollSystemChordPanel";
-import { systemTieDisabledReason } from "../../app/commands/systemChordCommands";
+import {
+  sameSystemChordIdentity,
+  systemTieDisabledReason,
+} from "../../app/commands/systemChordCommands";
 import {
   readPianoRollPreferences,
   writePianoRollPreferences,
@@ -139,6 +143,7 @@ const NOOP_DURATION_RESIZE_STATUS_CHANGE = () => undefined;
 interface PianoRollBoundaryResizeDraft {
   readonly selectedStepId: string;
   readonly edge: "left" | "right";
+  readonly resizeMode: "boundary" | "isolated";
   readonly leftStepId: string;
   readonly rightStepId: string;
   readonly baseline: string;
@@ -148,6 +153,7 @@ interface PianoRollBoundaryResizeDraft {
   readonly pairEnd: Rational;
   readonly candidates: readonly Rational[];
   readonly snapQuantum: Rational;
+  readonly draggedEdge: "left" | "right";
   readonly pointerId?: number;
   readonly grabOffset?: Rational;
   readonly pointerClientX?: number;
@@ -166,22 +172,27 @@ function stepTimelineStarts(
   return starts;
 }
 
+function measureIndexAtBeat(beat: Rational, barLengthBeats: Rational): number {
+  return Math.floor(
+    (beat.numerator * barLengthBeats.denominator) / (beat.denominator * barLengthBeats.numerator),
+  );
+}
+
 function boundarySnapCandidates(
-  pairStart: Rational,
-  pairEnd: Rational,
+  minimum: Rational,
+  maximum: Rational,
   quantum: Rational,
 ): readonly Rational[] {
-  const minBoundary = addRational(pairStart, quantum);
-  const maxBoundary = subtractRational(pairEnd, quantum);
-  if (compareRational(minBoundary, maxBoundary) > 0) return [];
-  const ratioNumerator = pairStart.numerator * quantum.denominator;
-  const ratioDenominator = pairStart.denominator * quantum.numerator;
-  let index = Math.floor(ratioNumerator / ratioDenominator) + 1;
+  if (compareRational(minimum, maximum) > 0 || compareRational(quantum, rational(0)) <= 0)
+    return [];
+  const minNumerator = minimum.numerator * quantum.denominator;
+  const minDenominator = minimum.denominator * quantum.numerator;
+  let index = Math.ceil(minNumerator / minDenominator);
   const candidates: Rational[] = [];
   for (let count = 0; count < 500_000; count += 1, index += 1) {
     const candidate = multiplyRational(quantum, rational(index));
-    if (compareRational(candidate, maxBoundary) > 0) break;
-    if (compareRational(candidate, minBoundary) >= 0) candidates.push(candidate);
+    if (compareRational(candidate, maximum) > 0) break;
+    if (compareRational(candidate, minimum) >= 0) candidates.push(candidate);
   }
   return Object.freeze(candidates);
 }
@@ -342,6 +353,9 @@ export function ProgressionTrack({
     leftStepId: string,
     boundary: Rational,
     snapQuantum: Rational,
+    draggedStepId?: string,
+    draggedEdge?: "left" | "right",
+    resizeMode?: "boundary" | "isolated",
   ) => void;
   readonly onAuditionPianoRollNote?: (stepId: string, eventKey: string) => void;
   readonly onAuditionPianoRollSystem?: (system: ScoreSystem) => void;
@@ -506,6 +520,7 @@ export function ProgressionTrack({
   } | null>(null);
   const [melodyEditorStepId, setMelodyEditorStepId] = useState<string | null>(null);
   const [rangeSelection, setRangeSelection] = useState<RangeSelectionState>(EMPTY_RANGE_SELECTION);
+  const pendingFocusStepIdRef = useRef<string | null>(null);
   const [marquee, setMarquee] = useState<{
     readonly pointerId: number;
     readonly startX: number;
@@ -586,27 +601,56 @@ export function ProgressionTrack({
     );
   }, [orderedStepIds]);
 
-  const focusStepTarget = (stepId: string | undefined) => {
+  const focusStepTarget = useCallback((stepId: string | undefined) => {
     if (!stepId) return;
     const focus = () => {
+      const pianoRollTarget = Array.from(
+        trackRef.current?.querySelectorAll<HTMLButtonElement>(
+          ".piano-roll-chord[data-source-step-id]",
+        ) ?? [],
+      ).find((candidate) => candidate.dataset.sourceStepId === stepId);
       const target = Array.from(
         trackRef.current?.querySelectorAll<HTMLElement>("[data-progression-step-select]") ?? [],
       ).find((candidate) => candidate.dataset.stepId === stepId);
-      target?.focus();
+      (pianoRollTarget ?? target)?.focus();
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
     else focus();
+  }, []);
+
+  useLayoutEffect(() => {
+    const stepId = pendingFocusStepIdRef.current;
+    if (!stepId || !project.progression.steps.some((step) => step.id === stepId)) return;
+    pendingFocusStepIdRef.current = null;
+    const pianoRollTarget = Array.from(
+      trackRef.current?.querySelectorAll<HTMLButtonElement>(
+        ".piano-roll-chord[data-source-step-id]",
+      ) ?? [],
+    ).find((candidate) => candidate.dataset.sourceStepId === stepId);
+    const progressionTarget = Array.from(
+      trackRef.current?.querySelectorAll<HTMLElement>("[data-progression-step-select]") ?? [],
+    ).find((candidate) => candidate.dataset.stepId === stepId);
+    (pianoRollTarget ?? progressionTarget)?.focus({ preventScroll: true });
+  }, [project.progression.steps]);
+
+  const removeStepAndRestoreFocus = (stepId: string) => {
+    const step = project.progression.steps.find((candidate) => candidate.id === stepId);
+    if (!step || step.kind === "rest") return;
+    pendingFocusStepIdRef.current = stepId;
+    onRemove(stepId);
   };
 
   const applyPianoRollChordTie = (stepIds: readonly string[]): void => {
+    const retainedStepId = stepIds.find(
+      (id) => project.progression.steps.find((step) => step.id === id)?.kind === "chord",
+    );
     onTiePianoRollSteps?.(stepIds);
-    const first = stepIds[0];
-    if (!first) return;
-    onSelectedPianoChordChange?.(first);
+    if (!retainedStepId) return;
+    onSelectedPianoChordChange?.(retainedStepId);
     setPianoRollChordSelection((current) => ({
-      stepIds: [first],
-      anchorStepId: first,
-      activeStepId: first,
+      stepIds: [retainedStepId],
+      anchorStepId: retainedStepId,
+      activeStepId: retainedStepId,
       systemIndex: current?.systemIndex ?? 0,
     }));
   };
@@ -663,6 +707,20 @@ export function ProgressionTrack({
 
   const handleRangeKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
     if (isAppShortcutProtectedTarget(event.target)) return;
+    if (event.key === "Delete" && !event.repeat && rangeStepIds.length <= 1) {
+      const target = event.target instanceof Element ? event.target : null;
+      // Melody notes own Delete/Backspace on their grid. A selected harmony
+      // chord can be cleared from the surrounding progression surface.
+      if (target?.closest(".piano-roll-grid, button.piano-roll-note")) return;
+      const selected = project.progression.steps.find((step) => step.id === selectedStepId);
+      if (selected?.kind === "chord" && onRemove) {
+        event.preventDefault();
+        event.stopPropagation();
+        pendingFocusStepIdRef.current = selected.id;
+        onRemove(selected.id);
+        return;
+      }
+    }
     // Piano Roll notes own Shift+Arrow as onset editing; do not consume it as
     // progression range navigation before the note button can handle it.
     if (event.target instanceof Element && event.target.closest("button.piano-roll-note")) {
@@ -953,25 +1011,146 @@ export function ProgressionTrack({
   const createPianoRollBoundarySnapshot = (
     selectedStepId: string,
     edge: "left" | "right",
+    resizeMode: "boundary" | "isolated" = "boundary",
   ): PianoRollBoundaryResizeDraft => {
     const selectedIndex = project.progression.steps.findIndex((step) => step.id === selectedStepId);
+    if (selectedIndex < 0) throw new RangeError("The selected Step no longer exists.");
+    const selected = project.progression.steps[selectedIndex]!;
+    const starts = stepTimelineStarts(project.progression.steps);
+    const snapQuantum = pianoRollSnapBeats(pianoRollSnap);
+    const minimumDuration = rational(1, 24);
+    if (edge === "left" && selectedIndex === 0) {
+      if (selected.kind !== "chord")
+        throw new RangeError("Only a chord has a resizable left edge.");
+      const pairStart = starts.get(selected.id)!;
+      const pairEnd = addRational(pairStart, selected.duration.beats);
+      const candidates = boundarySnapCandidates(
+        pairStart,
+        subtractRational(pairEnd, minimumDuration),
+        snapQuantum,
+      );
+      if (!candidates.length)
+        throw new RangeError("This chord has no valid left-edge Snap positions.");
+      return {
+        selectedStepId,
+        edge,
+        resizeMode,
+        leftStepId: selected.id,
+        rightStepId: selected.id,
+        baseline: project.updatedAt,
+        originalBoundary: pairStart,
+        previewBoundary: pairStart,
+        pairStart,
+        pairEnd,
+        candidates,
+        snapQuantum,
+        draggedEdge: edge,
+      };
+    }
+    if (edge === "right" && selectedIndex === project.progression.steps.length - 1) {
+      if (selected.kind !== "chord")
+        throw new RangeError("Only a chord has a resizable right edge.");
+      const pairStart = starts.get(selected.id)!;
+      const pairEnd = addRational(pairStart, selected.duration.beats);
+      const candidates = boundarySnapCandidates(
+        addRational(pairStart, minimumDuration),
+        pairEnd,
+        snapQuantum,
+      );
+      if (!candidates.length)
+        throw new RangeError("This chord has no valid right-edge Snap positions.");
+      return {
+        selectedStepId,
+        edge,
+        resizeMode,
+        leftStepId: selected.id,
+        rightStepId: selected.id,
+        baseline: project.updatedAt,
+        originalBoundary: pairEnd,
+        previewBoundary: pairEnd,
+        pairStart,
+        pairEnd,
+        candidates,
+        snapQuantum,
+        draggedEdge: edge,
+      };
+    }
     const leftIndex = edge === "left" ? selectedIndex - 1 : selectedIndex;
     const rightIndex = leftIndex + 1;
     const left = project.progression.steps[leftIndex];
     const right = project.progression.steps[rightIndex];
-    if (selectedIndex < 0 || !left || !right)
-      throw new RangeError("There is no adjacent Step boundary to resize.");
-    const starts = stepTimelineStarts(project.progression.steps);
+    if (!left || !right) throw new RangeError("There is no adjacent Step boundary to resize.");
     const pairStart = starts.get(left.id)!;
     const originalBoundary = starts.get(right.id)!;
     const pairEnd = addRational(originalBoundary, right.duration.beats);
-    const snapQuantum = pianoRollSnapBeats(pianoRollSnap);
-    const candidates = boundarySnapCandidates(pairStart, pairEnd, snapQuantum);
+    const measureIndex = measureIndexAtBeat(pairStart, layout.barLengthBeats);
+    const measureEnd = multiplyRational(layout.barLengthBeats, rational(measureIndex + 1));
+    const boundaryMeasureStart = multiplyRational(
+      layout.barLengthBeats,
+      rational(measureIndexAtBeat(originalBoundary, layout.barLengthBeats)),
+    );
+    const boundaryMeasureEnd = addRational(boundaryMeasureStart, layout.barLengthBeats);
+    const sameMeasurePair =
+      measureIndexAtBeat(pairStart, layout.barLengthBeats) ===
+        measureIndexAtBeat(originalBoundary, layout.barLengthBeats) &&
+      compareRational(pairEnd, measureEnd) <= 0;
+    const sameMeasureChordPair = left.kind === "chord" && right.kind === "chord" && sameMeasurePair;
+    const identicalChordPair =
+      sameMeasureChordPair && left.kind === "chord" && right.kind === "chord"
+        ? sameSystemChordIdentity(left, right)
+        : false;
+    const transferMinimumDuration =
+      compareRational(snapQuantum, minimumDuration) > 0 ? snapQuantum : minimumDuration;
+    let minimumBoundary = addRational(
+      pairStart,
+      left.kind === "chord" ? minimumDuration : rational(0),
+    );
+    let maximumBoundary = subtractRational(
+      pairEnd,
+      right.kind === "chord" ? minimumDuration : rational(0),
+    );
+    const leftRestExtensionStart =
+      compareRational(pairStart, boundaryMeasureStart) > 0 ? pairStart : boundaryMeasureStart;
+    const rightRestExtensionEnd =
+      compareRational(pairEnd, boundaryMeasureEnd) < 0 ? pairEnd : boundaryMeasureEnd;
+    const leftRestCanExtend =
+      left.kind === "rest" && compareRational(originalBoundary, leftRestExtensionStart) > 0;
+    const rightRestCanExtend =
+      right.kind === "rest" && compareRational(rightRestExtensionEnd, originalBoundary) > 0;
+    const canExtendLeft =
+      leftRestCanExtend ||
+      (sameMeasureChordPair && (resizeMode === "boundary" || identicalChordPair));
+    const canExtendRight =
+      rightRestCanExtend ||
+      (sameMeasureChordPair && (resizeMode === "boundary" || identicalChordPair));
+    if (edge === "left") {
+      minimumBoundary = canExtendLeft
+        ? left.kind === "rest"
+          ? leftRestExtensionStart
+          : sameMeasureChordPair
+            ? pairStart
+            : addRational(pairStart, transferMinimumDuration)
+        : originalBoundary;
+      maximumBoundary = subtractRational(pairEnd, minimumDuration);
+    } else if (sameMeasureChordPair && left.kind === "chord" && right.kind === "chord") {
+      maximumBoundary =
+        canExtendRight && selectedStepId === left.id && edge === "right"
+          ? sameMeasureChordPair
+            ? pairEnd
+            : subtractRational(pairEnd, transferMinimumDuration)
+          : originalBoundary;
+    } else if (right.kind === "rest") {
+      maximumBoundary = canExtendRight ? rightRestExtensionEnd : originalBoundary;
+    } else if (left.kind === "chord" && right.kind === "chord") {
+      maximumBoundary = originalBoundary;
+    }
+    const candidates = boundarySnapCandidates(minimumBoundary, maximumBoundary, snapQuantum);
     if (!candidates.length)
       throw new RangeError("Both neighboring Steps must fit at least one current Snap unit.");
     return {
       selectedStepId,
       edge,
+      resizeMode,
       leftStepId: left.id,
       rightStepId: right.id,
       baseline: project.updatedAt,
@@ -981,6 +1160,7 @@ export function ProgressionTrack({
       pairEnd,
       candidates,
       snapQuantum,
+      draggedEdge: edge,
     };
   };
 
@@ -989,9 +1169,11 @@ export function ProgressionTrack({
     clientY: number,
     fallbackMeasure: (typeof layout.measures)[number],
   ): Rational => {
-    const targetMeasureElement = document
-      .elementFromPoint(clientX, clientY)
-      ?.closest<HTMLElement>(".piano-roll-measure");
+    const targetMeasureElement =
+      document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>(".piano-roll-measure") ??
+      trackRef.current?.querySelector<HTMLElement>(
+        `.piano-roll-measure[data-measure-index="${fallbackMeasure.measureIndex}"]`,
+      );
     const measureIndex = Number(targetMeasureElement?.dataset.measureIndex);
     const targetMeasure = Number.isInteger(measureIndex)
       ? (layout.measures[measureIndex] ?? fallbackMeasure)
@@ -1048,7 +1230,14 @@ export function ProgressionTrack({
     onDurationResizeStatusChange(null);
     if (compareRational(draft.previewBoundary, draft.originalBoundary) !== 0) {
       try {
-        onTransferPianoRollBoundary?.(draft.leftStepId, draft.previewBoundary, draft.snapQuantum);
+        onTransferPianoRollBoundary?.(
+          draft.leftStepId,
+          draft.previewBoundary,
+          draft.snapQuantum,
+          draft.selectedStepId,
+          draft.draggedEdge,
+          draft.resizeMode,
+        );
       } catch (error) {
         onDurationResizeStatusChange(
           error instanceof Error ? error.message : "Boundary transfer could not be applied.",
@@ -1067,7 +1256,11 @@ export function ProgressionTrack({
     event.preventDefault();
     event.stopPropagation();
     try {
-      const snapshot = createPianoRollBoundarySnapshot(fragment.stepId, edge);
+      const snapshot = createPianoRollBoundarySnapshot(
+        fragment.stepId,
+        edge,
+        event.altKey ? "isolated" : "boundary",
+      );
       const pointerBeat = pianoRollBeatAtPointer(event.clientX, event.clientY, measure);
       const handle = event.currentTarget;
       handle.focus();
@@ -1172,10 +1365,16 @@ export function ProgressionTrack({
     event.stopPropagation();
     try {
       const current = pianoRollBoundaryResizeDraftRef.current;
+      const resizeMode =
+        current?.selectedStepId === fragment.stepId && current.edge === edge
+          ? current.resizeMode
+          : event.altKey
+            ? "isolated"
+            : "boundary";
       const snapshot =
         current?.selectedStepId === fragment.stepId && current.edge === edge
           ? current
-          : createPianoRollBoundarySnapshot(fragment.stepId, edge);
+          : createPianoRollBoundarySnapshot(fragment.stepId, edge, resizeMode);
       const next =
         event.key === "ArrowRight"
           ? snapshot.candidates.find(
@@ -1197,17 +1396,21 @@ export function ProgressionTrack({
     edge: "left" | "right",
     measure: (typeof layout.measures)[number],
   ) => {
-    let snapshot: PianoRollBoundaryResizeDraft;
-    try {
-      snapshot = createPianoRollBoundarySnapshot(fragment.stepId, edge);
-    } catch {
-      return null;
-    }
     const current =
       pianoRollBoundaryResizeDraft?.selectedStepId === fragment.stepId &&
       pianoRollBoundaryResizeDraft.edge === edge
         ? pianoRollBoundaryResizeDraft
         : null;
+    let snapshot: PianoRollBoundaryResizeDraft;
+    try {
+      snapshot = createPianoRollBoundarySnapshot(
+        fragment.stepId,
+        edge,
+        current?.resizeMode ?? "boundary",
+      );
+    } catch {
+      return null;
+    }
     const value = current?.previewBoundary ?? snapshot.originalBoundary;
     const isLeft = edge === "left";
     return (
@@ -1218,12 +1421,12 @@ export function ProgressionTrack({
         data-piano-roll-boundary-handle="true"
         data-boundary-step-id={fragment.stepId}
         data-boundary-edge={edge}
-        aria-label={`${isLeft ? "Resize left" : "Resize right"} boundary of Step ${fragment.stepIndex + 1}; transfer duration with its neighbor`}
+        aria-label={`${isLeft ? "Resize left" : "Resize right"} edge of Step ${fragment.stepIndex + 1}; normal resize transfers a same-measure chord boundary, Alt resize leaves a Rest when shrinking`}
         aria-valuemin={rationalToNumber(snapshot.candidates[0]!)}
         aria-valuemax={rationalToNumber(snapshot.candidates.at(-1)!)}
         aria-valuenow={rationalToNumber(value)}
-        aria-valuetext={`${value.numerator}/${value.denominator} beats; neighboring Steps transfer duration`}
-        title={`${current ? "Preview" : "Resize"} shared Step boundary. Drag or use Arrow Left/Right; Enter applies; Escape cancels.`}
+        aria-valuetext={`${value.numerator}/${value.denominator} beats; ${current?.resizeMode === "isolated" ? "Alt isolated" : "shared-boundary"} mode; hold Alt while dragging or press Alt+Arrow to shrink into a Rest`}
+        title={`${current ? "Preview" : "Resize"} edge. Drag normally to transfer the shared boundary between same-measure chords. Hold Alt while dragging to shrink only this chord and leave a Rest. Keyboard: Arrow Left/Right resizes; Alt+Arrow shrinks into a Rest; Enter applies; Escape cancels.`}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1265,7 +1468,7 @@ export function ProgressionTrack({
     if (pianoRollBoundaryResizeDraft) {
       const boundary = pianoRollBoundaryResizeDraft.previewBoundary;
       onDurationResizeStatusChange(
-        `Preview boundary ${boundary.numerator}/${boundary.denominator} beats; adjacent durations remain at least one Snap unit.`,
+        `Preview boundary ${boundary.numerator}/${boundary.denominator} beats; adjacent durations remain at least 1/24 beat.`,
       );
     } else onDurationResizeStatusChange(null);
   }, [onDurationResizeStatusChange, pianoRollBoundaryResizeDraft]);
@@ -1635,13 +1838,8 @@ export function ProgressionTrack({
     else focus();
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      isAppShortcutProtectedTarget(event.target) ||
-      event.key !== "Escape" ||
-      !selectedStepId ||
-      !onClearSelection
-    )
-      return;
+    if (isAppShortcutProtectedTarget(event.target) || event.key !== "Escape") return;
+    if (!selectedStepId || !onClearSelection) return;
     event.preventDefault();
     event.stopPropagation();
     onClearSelection();
@@ -1723,7 +1921,7 @@ export function ProgressionTrack({
           </span>
           <ProgressionStepRemoveButton
             accessibleName={`Remove progression step ${index + 1}: Rest`}
-            onRemove={() => onRemove(step.id)}
+            onRemove={() => removeStepAndRestoreFocus(step.id)}
           />
           <button
             type="button"
@@ -1839,7 +2037,7 @@ export function ProgressionTrack({
           guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
-          onRemove={() => onRemove(step.id)}
+          onRemove={() => removeStepAndRestoreFocus(step.id)}
           {...(onSetMelodyRecipe
             ? {
                 onOpenMelodyMenu: (anchor: HTMLElement, position?: MelodyMenuPosition) =>

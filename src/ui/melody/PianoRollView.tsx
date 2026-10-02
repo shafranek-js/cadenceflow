@@ -529,6 +529,10 @@ export function PianoRollMeasure({
   readonly emptyCursor?: { readonly startBeats: Rational; readonly pitch: ExactPitch } | null;
 }) {
   const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
+  const gridOffsets = useMemo(
+    () => pianoRollSnapOffsets(layout.barLengthBeats, snap, measure.startBeats),
+    [layout.barLengthBeats, measure.startBeats, snap],
+  );
   const noteGesture = useSyncExternalStore(
     subscribePianoRollSession,
     getPianoRollGesture,
@@ -1599,21 +1603,20 @@ export function PianoRollMeasure({
               y2={(i / rowCount) * 100}
             />
           ))}
-          {pianoRollSnapOffsets(layout.barLengthBeats, snap, measure.startBeats).map(
-            (offset, i) => {
-              const x = (rationalToNumber(offset) / rationalToNumber(layout.barLengthBeats)) * 100;
-              return (
-                <line
-                  className={`piano-roll-snap-line ${compareRational(offset, rational(0)) === 0 ? "is-bar-line" : offset.denominator === 1 ? "is-beat-line" : "is-subdivision-line"}`}
-                  key={`snap-${i}`}
-                  x1={x}
-                  x2={x}
-                  y1="0"
-                  y2="100"
-                />
-              );
-            },
-          )}
+          {gridOffsets.map((offset, i) => {
+            const x = (rationalToNumber(offset) / rationalToNumber(layout.barLengthBeats)) * 100;
+            return (
+              <line
+                className={`piano-roll-snap-line ${compareRational(offset, rational(0)) === 0 ? "is-bar-line" : offset.denominator === 1 ? "is-beat-line" : "is-subdivision-line"}`}
+                data-grid-offset={`${offset.numerator}/${offset.denominator}`}
+                key={`snap-${i}`}
+                x1={x}
+                x2={x}
+                y1="0"
+                y2="100"
+              />
+            );
+          })}
         </svg>
         {pitchRows.map((midi) => {
           const rowStart = pitchGeometry.rowStart(midi);
@@ -1642,42 +1645,48 @@ export function PianoRollMeasure({
             >
               {guidesEnabled ? (
                 <span className="piano-roll-guide-layer" aria-hidden="true">
-                  {guideItems.map(({ item, tones }, index) => (
-                    <span
-                      key={`${item.kind}-${index}`}
-                      className="piano-roll-guide-step"
-                      style={{ flex: `${rationalToNumber(item.durationBeats)} 1 0` }}
-                    >
-                      <i
-                        className="piano-roll-guide-segment is-neutral"
-                        data-testid="piano-roll-guide-neutral"
-                        {...(item.kind === "step" ? { "data-source-step-id": item.stepId } : {})}
-                        data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
-                        data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
-                        data-pitch-class={((midi % 12) + 12) % 12}
-                      />
-                      {tones.map((tone, toneIndex) => (
+                  {guideItems.map(({ item, tones }, index) => {
+                    const hasHarmony = item.kind === "step" && item.step.kind === "chord";
+                    return (
+                      <span
+                        key={`${item.kind}-${index}`}
+                        className="piano-roll-guide-step"
+                        style={{ flex: `${rationalToNumber(item.durationBeats)} 1 0` }}
+                      >
                         <i
-                          key={`${tone.pitchClass}-${tone.half ?? "full"}-${toneIndex}`}
-                          className={`piano-roll-guide-segment is-chord-tone${tone.half ? ` is-${tone.half}-half` : ""}`}
-                          data-testid="piano-roll-guide-tone"
+                          className={`piano-roll-guide-segment is-neutral ${hasHarmony ? "" : "is-no-harmony"}`.trim()}
+                          data-testid="piano-roll-guide-neutral"
                           {...(item.kind === "step" ? { "data-source-step-id": item.stepId } : {})}
                           data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
                           data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
-                          data-pitch-class={tone.pitchClass}
-                          data-guide-half={tone.half ?? "full"}
-                          data-palette-degrees={pianoRollPaletteDegrees(
-                            tone.pitchClass,
-                            tonic,
-                            project.activeModule,
-                          ).join("-")}
-                          style={paletteStyle(
-                            pianoRollPaletteDegrees(tone.pitchClass, tonic, project.activeModule),
-                          )}
+                          data-pitch-class={((midi % 12) + 12) % 12}
+                          data-palette-degrees={paletteDegrees.join("-")}
                         />
-                      ))}
-                    </span>
-                  ))}
+                        {tones.map((tone, toneIndex) => (
+                          <i
+                            key={`${tone.pitchClass}-${tone.half ?? "full"}-${toneIndex}`}
+                            className={`piano-roll-guide-segment is-chord-tone${tone.half ? ` is-${tone.half}-half` : ""}`}
+                            data-testid="piano-roll-guide-tone"
+                            {...(item.kind === "step"
+                              ? { "data-source-step-id": item.stepId }
+                              : {})}
+                            data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
+                            data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
+                            data-pitch-class={tone.pitchClass}
+                            data-guide-half={tone.half ?? "full"}
+                            data-palette-degrees={pianoRollPaletteDegrees(
+                              tone.pitchClass,
+                              tonic,
+                              project.activeModule,
+                            ).join("-")}
+                            style={paletteStyle(
+                              pianoRollPaletteDegrees(tone.pitchClass, tonic, project.activeModule),
+                            )}
+                          />
+                        ))}
+                      </span>
+                    );
+                  })}
                 </span>
               ) : null}
             </div>
@@ -1959,6 +1968,56 @@ export function PianoRollMeasure({
         role="group"
         aria-label={`Harmony, measure ${measure.number}`}
       >
+        <svg
+          className="piano-roll-harmony-grid-lines"
+          data-testid="piano-roll-harmony-grid-lines"
+          aria-hidden="true"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          {gridOffsets.map((offset, index) => {
+            const x = (rationalToNumber(offset) / rationalToNumber(layout.barLengthBeats)) * 100;
+            const kind =
+              compareRational(offset, rational(0)) === 0
+                ? "bar"
+                : offset.denominator === 1
+                  ? "beat"
+                  : "subdivision";
+            return (
+              <line
+                key={`harmony-grid-${index}`}
+                className={`piano-roll-harmony-grid-line is-${kind}`}
+                data-grid-kind={kind}
+                data-grid-offset={`${offset.numerator}/${offset.denominator}`}
+                x1={x}
+                x2={x}
+                y1="0"
+                y2="22"
+              />
+            );
+          })}
+          {gridOffsets.map((offset, index) => {
+            const x = (rationalToNumber(offset) / rationalToNumber(layout.barLengthBeats)) * 100;
+            const kind =
+              compareRational(offset, rational(0)) === 0
+                ? "bar"
+                : offset.denominator === 1
+                  ? "beat"
+                  : "subdivision";
+            return (
+              <line
+                key={`harmony-grid-lower-${index}`}
+                className={`piano-roll-harmony-grid-line is-${kind}`}
+                data-grid-kind={kind}
+                data-grid-offset={`${offset.numerator}/${offset.denominator}`}
+                x1={x}
+                x2={x}
+                y1="78"
+                y2="100"
+              />
+            );
+          })}
+        </svg>
         {measure.items.map((item, index) => {
           if (item.kind === "gap")
             return (
@@ -1992,13 +2051,9 @@ export function PianoRollMeasure({
               : "Rest";
           const functionName = step.kind === "chord" ? step.harmonicFunction.functionId : "";
           const isSelectedChord = !selectedNoteKey && selectedStepId === step.id;
-          const hasLeftBoundary =
-            isSelectedChord && step.kind === "chord" && item.startsHere && item.stepIndex > 0;
+          const hasLeftBoundary = isSelectedChord && step.kind === "chord" && item.startsHere;
           const hasRightBoundary =
-            isSelectedChord &&
-            step.kind === "chord" &&
-            !item.continuesToNext &&
-            item.stepIndex < project.progression.steps.length - 1;
+            isSelectedChord && step.kind === "chord" && !item.continuesToNext;
           return (
             <div
               className="piano-roll-harmony-fragment"

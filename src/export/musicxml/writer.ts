@@ -9,6 +9,7 @@ import type {
   MusicXmlNoteEvent,
   MusicXmlProjection,
   MusicXmlRestEvent,
+  MusicXmlWrittenNoteType,
 } from "./projection";
 import { getMelodyInstrument } from "../../domain/melody/instrumentCatalog";
 
@@ -68,6 +69,79 @@ function xmlAttribute(name: string, value: string | number): string {
 function assertInteger(value: number, label: string, minimum = 0): void {
   if (!Number.isSafeInteger(value) || value < minimum) {
     throw new MusicXmlWriterError(`${label} must be a safe integer >= ${minimum}.`);
+  }
+}
+
+function noteTypeBeats(type: MusicXmlWrittenNoteType): readonly [bigint, bigint] {
+  switch (type) {
+    case "whole":
+      return [4n, 1n];
+    case "half":
+      return [2n, 1n];
+    case "quarter":
+      return [1n, 1n];
+    case "eighth":
+      return [1n, 2n];
+    case "16th":
+      return [1n, 4n];
+    case "32nd":
+      return [1n, 8n];
+    case "64th":
+      return [1n, 16n];
+  }
+}
+
+function validateExactWrittenDuration(event: MusicXmlMelodyMeasureEvent): void {
+  if (!event || (event.kind !== "note" && event.kind !== "rest")) return;
+  if (!["whole", "half", "quarter", "eighth", "16th", "32nd", "64th"].includes(event.type)) {
+    throw new MusicXmlWriterError(`Melody event ${event.stepId} has an invalid written type.`);
+  }
+  if (event.dots !== undefined && event.dots !== 1) {
+    throw new MusicXmlWriterError(`Melody event ${event.stepId} has an invalid dot count.`);
+  }
+  let [typeNumerator, typeDenominator] = noteTypeBeats(event.type);
+  if (event.dots) {
+    typeNumerator *= 3n;
+    typeDenominator *= 2n;
+  }
+  let actualNotes = 1n;
+  let normalNotes = 1n;
+  if (event.timeModification) {
+    const timeModification = event.timeModification;
+    assertInteger(timeModification.actualNotes, `actual-notes for ${event.stepId}`, 1);
+    assertInteger(timeModification.normalNotes, `normal-notes for ${event.stepId}`, 1);
+    if (
+      !["whole", "half", "quarter", "eighth", "16th", "32nd", "64th"].includes(
+        timeModification.normalType,
+      ) ||
+      timeModification.normalType !== event.type
+    ) {
+      throw new MusicXmlWriterError(
+        `Melody event ${event.stepId} written type disagrees with its time modification.`,
+      );
+    }
+    actualNotes = BigInt(timeModification.actualNotes);
+    normalNotes = BigInt(timeModification.normalNotes);
+  }
+  const left = typeNumerator * normalNotes * BigInt(event.durationBeats.denominator);
+  const right = BigInt(event.durationBeats.numerator) * typeDenominator * actualNotes;
+  if (left !== right) {
+    throw new MusicXmlWriterError(
+      `Melody event ${event.stepId} written notation does not equal its exact ${event.durationBeats.numerator}/${event.durationBeats.denominator} beat duration.`,
+    );
+  }
+}
+
+function validateExactDurationUnits(event: MusicXmlMelodyMeasureEvent, divisions: number): void {
+  const scaledNumerator = BigInt(event.durationBeats.numerator) * BigInt(divisions);
+  const denominator = BigInt(event.durationBeats.denominator);
+  if (
+    scaledNumerator % denominator !== 0n ||
+    scaledNumerator / denominator !== BigInt(event.duration)
+  ) {
+    throw new MusicXmlWriterError(
+      `Melody event ${event.stepId} MusicXML duration does not equal its exact beat duration.`,
+    );
   }
 }
 
@@ -148,7 +222,7 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
       `Melody note ${event.stepId} must use a positive voice, staff 1, and no chord.`,
     );
   }
-  if (!["whole", "half", "quarter", "eighth", "16th"].includes(event.type)) {
+  if (!["whole", "half", "quarter", "eighth", "16th", "32nd", "64th"].includes(event.type)) {
     throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid written type.`);
   }
   if (event.dots !== undefined && event.dots !== 1) {
@@ -167,33 +241,9 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
       throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid tuplet mark.`);
     }
   }
-  if (event.timeModification) {
-    if (typeof event.timeModification !== "object") {
-      throw new MusicXmlWriterError(
-        `Melody note ${event.stepId} has an invalid time modification.`,
-      );
-    }
-    if (
-      event.timeModification.actualNotes !== 3 ||
-      event.timeModification.normalNotes !== 2 ||
-      !["quarter", "eighth", "16th"].includes(event.timeModification.normalType)
-    ) {
-      throw new MusicXmlWriterError(
-        `Melody note ${event.stepId} has an invalid time modification.`,
-      );
-    }
-    const expectedType =
-      event.timeModification.normalType === "quarter"
-        ? "quarter"
-        : event.timeModification.normalType === "16th"
-          ? "16th"
-          : "eighth";
-    if (event.type !== expectedType) {
-      throw new MusicXmlWriterError(
-        `Melody note ${event.stepId} written type disagrees with its time modification.`,
-      );
-    }
-  }
+  if (event.timeModification && typeof event.timeModification !== "object")
+    throw new MusicXmlWriterError(`Melody note ${event.stepId} has an invalid time modification.`);
+  validateExactWrittenDuration(event);
 }
 
 function validateMelodyRest(event: MusicXmlMelodyMeasureEvent & { readonly kind: "rest" }): void {
@@ -206,6 +256,9 @@ function validateMelodyRest(event: MusicXmlMelodyMeasureEvent & { readonly kind:
       `Melody rest ${event.stepId} must use a positive voice and staff 1.`,
     );
   }
+  if (event.timeModification && typeof event.timeModification !== "object")
+    throw new MusicXmlWriterError(`Melody rest ${event.stepId} has an invalid time modification.`);
+  validateExactWrittenDuration(event);
 }
 
 function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelodyPart): void {
@@ -321,6 +374,7 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
         }
       } else if (event?.kind === "rest") validateMelodyRest(event);
       else throw new MusicXmlWriterError("MusicXML Melody measure contains an invalid event.");
+      validateExactDurationUnits(event, projection.attributes.divisions);
       const start =
         (event.onsetBeats.numerator * projection.attributes.divisions) /
         event.onsetBeats.denominator;
@@ -546,6 +600,15 @@ function writeMelodyRest(
   lines.push(selfClosingElement("rest", level + 1));
   lines.push(element("duration", event.duration, level + 1));
   lines.push(element("voice", event.voice, level + 1));
+  lines.push(element("type", event.type, level + 1));
+  if (event.dots) lines.push(selfClosingElement("dot", level + 1));
+  if (event.timeModification) {
+    lines.push(emptyElement("time-modification", level + 1));
+    lines.push(element("actual-notes", event.timeModification.actualNotes, level + 2));
+    lines.push(element("normal-notes", event.timeModification.normalNotes, level + 2));
+    lines.push(element("normal-type", event.timeModification.normalType, level + 2));
+    lines.push(closeElement("time-modification", level + 1));
+  }
   lines.push(element("staff", event.staff, level + 1));
   lines.push(closeElement("note", level));
   return lines;

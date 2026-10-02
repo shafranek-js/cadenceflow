@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
+import { Glyphs } from "vexflow";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { musicalDuration, type MusicalDuration } from "../../../src/domain/timing/duration";
 import { meter } from "../../../src/domain/timing/meter";
@@ -142,6 +143,9 @@ describe("renderStaffProjection", () => {
     expect(dottedQuarter.dataset.staffDuration).toBe("3/2");
     expect(dottedQuarter.dataset.staffRhythm).toBe("dotted-quarter");
     expect(staffRhythmForDuration(musicalDuration(rational(3, 2))).dots).toBe(1);
+    expect(dottedQuarter.querySelectorAll(".vf-stavenote text").length).toBeGreaterThan(
+      quarter.querySelectorAll(".vf-stavenote text").length,
+    );
     expect(quarterTriplet.dataset.staffDuration).toBe("2/3");
     expect(quarterTriplet.dataset.staffRhythm).toBe("quarter-triplet");
     expect(staffRhythmForDuration(musicalDuration(rational(2, 3))).tuplet).toEqual({
@@ -197,6 +201,12 @@ describe("renderStaffProjection", () => {
         }, []),
       );
     }
+
+    expect(
+      projectWrittenRhythm(rational(5, 2), rational(0), meter(5, 8, [3, 2])).map(
+        (part) => part.beats,
+      ),
+    ).toEqual([rational(3, 2), rational(1)]);
 
     expect(projectWrittenRhythm(rational(5, 2)).map((part) => part.notation)).toEqual([
       "half",
@@ -378,6 +388,7 @@ describe("renderStaffSequence", () => {
         key: "continued",
         kind: "chord",
         projection: lowProjection,
+        sourceEventKeys: ["continued-event"],
         startOffsetBeats: rational(0),
         duration: musicalDuration(rational(4)),
         continuesFromPrevious: true,
@@ -387,7 +398,12 @@ describe("renderStaffSequence", () => {
     const { svg } = renderSequence(entries);
     const [, , width, height] = viewBox(svg);
 
-    expect(svg.querySelectorAll(".vf-stavetie").length).toBeGreaterThan(0);
+    const ties = Array.from(svg.querySelectorAll<SVGGElement>(".vf-stavetie"));
+    expect(ties).toHaveLength(2);
+    expect(ties.map((tie) => tie.getAttribute("data-tie-kind")).sort()).toEqual([
+      "system-edge-left",
+      "system-edge-right",
+    ]);
     for (const [x, y] of pathPoints(svg)) {
       expect(x).toBeGreaterThanOrEqual(0);
       expect(x).toBeLessThanOrEqual(width);
@@ -432,7 +448,7 @@ describe("renderStaffSequence", () => {
         positions = next;
       }),
     ).not.toThrow();
-    expect(positions).toHaveLength(2);
+    expect(positions).toHaveLength(6);
     expect(positions[1]!.x).toBeGreaterThan(positions[0]!.x);
   });
 
@@ -488,6 +504,7 @@ describe("renderStaffSystem", () => {
         key: "resized-short",
         kind: "chord",
         projection: cMajor,
+        sourceEventKeys: ["tie-event"],
         startOffsetBeats: rational(0),
         duration: musicalDuration(rational(1, 24)),
       },
@@ -670,6 +687,66 @@ describe("renderStaffSystem", () => {
     expect(svg.dataset.staffBassEntries).toBe("harmony-1,harmony-2");
   });
 
+  it("keeps a tied note at the barline ahead of a later Rest in another rhythmic voice", () => {
+    const g4 = projectionFor([exactPitch(67, { step: "G", alter: 0 })]);
+    const container = document.createElement("div");
+    let positions: readonly StaffSystemPosition[] = [];
+    const tieStart: StaffSequenceEntry = {
+      key: "long-g4-start",
+      kind: "note",
+      projection: g4,
+      sourceEventKeys: ["long-g4"],
+      rhythmicVoice: "melody:voice0",
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(4)),
+      continuesToNext: true,
+    };
+    const continuation: StaffSequenceEntry = {
+      key: "long-g4-continuation",
+      kind: "note",
+      projection: g4,
+      sourceEventKeys: ["long-g4"],
+      rhythmicVoice: "melody:voice0",
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(2)),
+      continuesFromPrevious: true,
+    };
+    const laterRest: StaffSequenceEntry = {
+      key: "later-rest",
+      kind: "rest",
+      rhythmicVoice: "rest:voice0",
+      startOffsetBeats: rational(2),
+      duration: musicalDuration(rational(2)),
+    };
+
+    renderStaffSystem(
+      container,
+      [systemMeasure(6, [], [tieStart]), systemMeasure(7, [], [continuation, laterRest])],
+      meter(4, 4),
+      (next) => {
+        positions = next;
+      },
+      { showTimeSignature: false },
+    );
+
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    const notePosition = positions.find(
+      (position) => position.key === "long-g4-continuation" && position.measureIndex === 7,
+    );
+    const restPosition = positions.find(
+      (position) => position.key === "later-rest" && position.measureIndex === 7,
+    );
+    expect(notePosition).toBeDefined();
+    expect(restPosition).toBeDefined();
+    expect(restPosition!.x - notePosition!.x).toBeGreaterThan(40);
+    expect(
+      svg.querySelector(
+        '.vf-stavetie[data-tie-owner-key="long-g4"][data-tie-last-entry="long-g4-continuation"]',
+      ),
+    ).not.toBeNull();
+  });
+
   it("renders one aligned staff row for each active Melody lane", () => {
     const note = (key: string, pitch: number): StaffSequenceEntry => ({
       key,
@@ -809,6 +886,7 @@ describe("renderStaffSystem", () => {
         key: "tie-start",
         kind: "chord",
         projection: cMajor,
+        sourceEventKeys: ["tie-event"],
         startOffsetBeats: rational(0),
         duration: musicalDuration(rational(4)),
         continuesToNext: true,
@@ -819,6 +897,7 @@ describe("renderStaffSystem", () => {
         key: "tie-end",
         kind: "chord",
         projection: cMajor,
+        sourceEventKeys: ["tie-event"],
         startOffsetBeats: rational(0),
         duration: musicalDuration(rational(4)),
         continuesFromPrevious: true,
@@ -872,9 +951,237 @@ describe("renderStaffSystem", () => {
     const tupletSvg = tupletsContainer.querySelector("svg");
     if (!tieSvg || !tupletSvg) throw new Error("Score system SVG was not rendered");
     expect(tieSvg.dataset.staffTimeSignature).toBe("false");
-    expect(tieSvg.querySelectorAll(".vf-stavetie").length).toBeGreaterThan(0);
+    const tieGroups = Array.from(tieSvg.querySelectorAll<SVGGElement>(".vf-stavetie"));
+    expect(tieGroups).toHaveLength(3);
+    tieGroups.forEach((group) => {
+      expect(group.getAttribute("data-tie-kind")).toBe("complete");
+      expect(group.getAttribute("data-tie-owner-key")).toBe("tie-event");
+      expect(group.getAttribute("data-tie-first-entry")).toBe("tie-start");
+      expect(group.getAttribute("data-tie-last-entry")).toBe("tie-end");
+      expect(group.querySelector("path")?.getAttribute("d")).toMatch(/^M/);
+    });
     expect(tupletSvg.dataset.staffTupletGroups).toBe("1");
     expect(tupletSvg.querySelectorAll(".vf-tuplet")).toHaveLength(1);
+  });
+
+  it("draws real augmentation dots for Staff, rests, and rhythmic TAB", () => {
+    const restContainer = document.createElement("div");
+    renderStaffSequence(
+      restContainer,
+      [
+        {
+          key: "dotted-rest",
+          kind: "rest",
+          startOffsetBeats: rational(0),
+          duration: musicalDuration(rational(3, 2)),
+        },
+      ],
+      meter(4, 4),
+    );
+    const restSvg = restContainer.querySelector("svg");
+    const plainRestContainer = document.createElement("div");
+    renderStaffSequence(
+      plainRestContainer,
+      [
+        {
+          key: "plain-rest",
+          kind: "rest",
+          startOffsetBeats: rational(0),
+          duration: musicalDuration(rational(1)),
+        },
+      ],
+      meter(4, 4),
+    );
+    const plainRestSvg = plainRestContainer.querySelector("svg");
+
+    const tabContainer = document.createElement("div");
+    renderStaffSystem(
+      tabContainer,
+      [
+        systemMeasure(0, [
+          {
+            key: "dotted-tab-chord",
+            kind: "chord",
+            projection: cMajor,
+            tabPositions: [
+              { str: 5, fret: 3 },
+              { str: 4, fret: 2 },
+              { str: 3, fret: 0 },
+            ],
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(3, 2)),
+          },
+          {
+            key: "tab-rest",
+            kind: "rest",
+            startOffsetBeats: rational(3, 2),
+            duration: musicalDuration(rational(5, 2)),
+          },
+        ]),
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showTimeSignature: false },
+    );
+    const tabSvg = tabContainer.querySelector("svg");
+    const plainTabContainer = document.createElement("div");
+    renderStaffSystem(
+      plainTabContainer,
+      [
+        systemMeasure(0, [
+          {
+            key: "plain-tab-chord",
+            kind: "chord",
+            projection: cMajor,
+            tabPositions: [
+              { str: 5, fret: 3 },
+              { str: 4, fret: 2 },
+              { str: 3, fret: 0 },
+            ],
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(1)),
+          },
+          {
+            key: "plain-tab-rest",
+            kind: "rest",
+            startOffsetBeats: rational(1),
+            duration: musicalDuration(rational(3)),
+          },
+        ]),
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showTimeSignature: false },
+    );
+    const plainTabSvg = plainTabContainer.querySelector("svg");
+
+    expect(
+      restSvg?.querySelector('.vf-stavenote[data-staff-entry="dotted-rest"]')?.textContent,
+    ).toContain(Glyphs.augmentationDot);
+    expect(
+      plainRestSvg?.querySelector('.vf-stavenote[data-staff-entry="plain-rest"]')?.textContent,
+    ).not.toContain(Glyphs.augmentationDot);
+    expect(
+      tabSvg?.querySelector('.vf-tabnote[data-staff-entry="dotted-tab-chord"]')?.textContent,
+    ).toContain(Glyphs.augmentationDot);
+    expect(
+      plainTabSvg?.querySelector('.vf-tabnote[data-staff-entry="plain-tab-chord"]')?.textContent,
+    ).not.toContain(Glyphs.augmentationDot);
+  });
+
+  it("ties adjacent written fragments by source owner and never through a Rest", () => {
+    const container = document.createElement("div");
+    renderStaffSystem(
+      container,
+      [
+        systemMeasure(0, [
+          {
+            key: "long-event",
+            kind: "chord",
+            projection: cMajor,
+            sourceEventKeys: ["same-source"],
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(5, 2)),
+          },
+          {
+            key: "intervening-rest",
+            kind: "rest",
+            startOffsetBeats: rational(5, 2),
+            duration: musicalDuration(rational(3, 2)),
+          },
+        ]),
+        systemMeasure(1, [
+          {
+            key: "same-pitch-after-rest",
+            kind: "chord",
+            projection: cMajor,
+            sourceEventKeys: ["same-source"],
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(1)),
+            continuesFromPrevious: true,
+          },
+          {
+            key: "different-owner-repeat",
+            kind: "chord",
+            projection: cMajor,
+            sourceEventKeys: ["new-attack"],
+            startOffsetBeats: rational(1),
+            duration: musicalDuration(rational(1)),
+            continuesFromPrevious: true,
+          },
+        ]),
+      ],
+      meter(4, 4),
+      undefined,
+      { showTimeSignature: false },
+    );
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("Score system SVG was not rendered");
+    const completeTies = Array.from(
+      svg.querySelectorAll<SVGGElement>(".vf-stavetie[data-tie-kind='complete']"),
+    );
+
+    expect(completeTies).toHaveLength(3);
+    expect(svg.querySelectorAll(".vf-stavetie")).toHaveLength(3);
+    expect(
+      completeTies.every((tie) => tie.getAttribute("data-tie-owner-key") === "same-source"),
+    ).toBe(true);
+    expect(
+      completeTies.every(
+        (tie) => tie.getAttribute("data-tie-first-entry") === "long-event:written-0",
+      ),
+    ).toBe(true);
+    expect(
+      completeTies.every(
+        (tie) => tie.getAttribute("data-tie-last-entry") === "long-event:written-1",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps rhythmic TAB ties between matching source, string, and fret positions", () => {
+    const tabPosition = [{ str: 6, fret: 3 }];
+    const container = document.createElement("div");
+    renderStaffSystem(
+      container,
+      [
+        systemMeasure(0, [
+          {
+            key: "tab-tie-start",
+            kind: "note",
+            projection: projectionFor([exactPitch(55, { step: "G", alter: 0 })]),
+            sourceEventKeys: ["tab-event"],
+            tabPositions: tabPosition,
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(4)),
+            continuesToNext: true,
+          },
+        ]),
+        systemMeasure(1, [
+          {
+            key: "tab-tie-end",
+            kind: "note",
+            projection: projectionFor([exactPitch(55, { step: "G", alter: 0 })]),
+            sourceEventKeys: ["tab-event"],
+            tabPositions: tabPosition,
+            startOffsetBeats: rational(0),
+            duration: musicalDuration(rational(4)),
+            continuesFromPrevious: true,
+          },
+        ]),
+      ],
+      meter(4, 4),
+      undefined,
+      { isTablature: true, showTimeSignature: false },
+    );
+    const svg = container.querySelector("svg");
+    if (!svg) throw new Error("TAB system SVG was not rendered");
+    const tie = svg.querySelector<SVGGElement>(".vf-stavetie");
+
+    expect(tie?.getAttribute("data-tie-kind")).toBe("complete");
+    expect(tie?.getAttribute("data-tie-staff")).toBe("harmony");
+    expect(tie?.getAttribute("data-tie-owner-key")).toBe("tab-event");
+    expect(tie?.getAttribute("data-tie-member-key")).toContain("tab:6:3");
+    expect(tie?.querySelector("path")?.getAttribute("d")).toMatch(/^M/);
   });
 
   it("renders multi-measure tablature systems with TabStave and TabNotes", () => {

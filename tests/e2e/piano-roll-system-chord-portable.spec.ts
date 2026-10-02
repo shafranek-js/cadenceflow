@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import type { LookAheadScheduler } from "../../src/audio/scheduler";
+import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
 import { createEffectiveMelodyTimeline } from "../../src/domain/melody/effectiveTimeline";
 import type { HarmonicVariant } from "../../src/domain/harmony/chord";
 import type { Project } from "../../src/domain/project/project";
@@ -28,7 +30,11 @@ async function installControlledAudioClock(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const NativeAudioContext = window.AudioContext;
     if (!NativeAudioContext) throw new Error("This browser has no AudioContext implementation");
-    const testWindow = window as Window & { __pianoRollTestAudioTime?: number };
+    const testWindow = window as Window & {
+      __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean;
+      __pianoRollTestAudioTime?: number;
+    };
+    testWindow.__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
     testWindow.__pianoRollTestAudioTime = 0;
     class ControlledAudioContext extends NativeAudioContext {
       override get currentTime(): number {
@@ -136,6 +142,213 @@ function withMatrixVariant(
   });
 }
 
+function withSameMeasureChordPair(project: Project): Project {
+  const [first, second, ...tail] = project.progression.steps;
+  if (!first || !second) throw new Error("The fixture needs two leading chords");
+  const spacer = Object.freeze({
+    id: "boundary-spacer-rest",
+    kind: "rest" as const,
+    duration: musicalDuration(rational(4)),
+  });
+  return Object.freeze({
+    ...project,
+    progression: Object.freeze({
+      ...project.progression,
+      steps: Object.freeze([
+        Object.freeze({ ...first, duration: musicalDuration(rational(2)) }),
+        Object.freeze({ ...second, duration: musicalDuration(rational(2)) }),
+        spacer,
+        ...tail,
+      ]),
+    }),
+  });
+}
+
+function withDifferentSameMeasureChordPair(project: Project): Project {
+  const paired = withSameMeasureChordPair(project);
+  const left = paired.progression.steps.find((candidate) => candidate.id === "chord-a");
+  const right = paired.progression.steps.find((candidate) => candidate.id === "chord-b");
+  if (!left || left.kind !== "chord" || !right || right.kind !== "chord")
+    throw new Error("The fixture needs two leading chords");
+  const replacement = createMatrixChordStep(paired, "V", right.id);
+  const differentRight = Object.freeze({
+    ...right,
+    harmonicFunction: replacement.harmonicFunction,
+    harmonicVariant: replacement.harmonicVariant,
+  });
+  return Object.freeze({
+    ...paired,
+    progression: Object.freeze({
+      ...paired.progression,
+      steps: Object.freeze(
+        paired.progression.steps.map((candidate) =>
+          candidate.id === differentRight.id ? differentRight : candidate,
+        ),
+      ),
+    }),
+  });
+}
+
+function withDistinctChordResizeParameters(project: Project): Project {
+  const steps = project.progression.steps.map((candidate) => {
+    if (candidate.kind !== "chord") return candidate;
+    if (candidate.id === "chord-a")
+      return Object.freeze({
+        ...candidate,
+        performance: Object.freeze({
+          ...candidate.performance,
+          articulation: "block" as const,
+          register: 1 as const,
+          masterVelocity: 91,
+        }),
+        melodyInstrumentOverride: "violin" as const,
+      });
+    if (candidate.id === "chord-b")
+      return Object.freeze({
+        ...candidate,
+        performance: Object.freeze({
+          ...candidate.performance,
+          articulation: "arp-up" as const,
+          register: -1 as const,
+          masterVelocity: 57,
+        }),
+        melodyInstrumentOverride: "oboe" as const,
+      });
+    return candidate;
+  });
+  return Object.freeze({
+    ...project,
+    progression: Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+  });
+}
+
+function withSameMeasureChordRestPair(project: Project, restFirst = false): Project {
+  const chordStep = project.progression.steps.find((candidate) => candidate.id === "chord-a");
+  const gap = project.progression.steps.find((candidate) => candidate.id === "rest-d");
+  if (!chordStep || chordStep.kind !== "chord" || !gap || gap.kind !== "rest")
+    throw new Error("The portable fixture needs chord-a and rest-d");
+  const pairChord = Object.freeze({ ...chordStep, duration: musicalDuration(rational(2)) });
+  const pairRest = Object.freeze({ ...gap, duration: musicalDuration(rational(2)) });
+  const tail = project.progression.steps.filter(
+    (candidate) => candidate.id !== chordStep.id && candidate.id !== gap.id,
+  );
+  const sections = project.progression.sections?.map((section) =>
+    restFirst && section.startStepId === chordStep.id
+      ? Object.freeze({ ...section, startStepId: gap.id })
+      : section,
+  );
+  return Object.freeze({
+    ...project,
+    progression: Object.freeze({
+      ...project.progression,
+      steps: Object.freeze(
+        restFirst ? [pairRest, pairChord, ...tail] : [pairChord, pairRest, ...tail],
+      ),
+      ...(sections ? { sections: Object.freeze(sections) } : {}),
+    }),
+  });
+}
+
+function withFirstMeasureRest(project: Project): Project {
+  const chordStep = project.progression.steps.find((candidate) => candidate.id === "chord-a");
+  const gap = project.progression.steps.find((candidate) => candidate.id === "rest-d");
+  if (!chordStep || chordStep.kind !== "chord" || !gap || gap.kind !== "rest")
+    throw new Error("The portable fixture needs chord-a and rest-d");
+  const firstMeasureRest = Object.freeze({ ...gap, duration: musicalDuration(rational(4)) });
+  const secondMeasureChord = Object.freeze({
+    ...chordStep,
+    duration: musicalDuration(rational(4)),
+  });
+  const tail = project.progression.steps.filter(
+    (candidate) => candidate.id !== chordStep.id && candidate.id !== gap.id,
+  );
+  return Object.freeze({
+    ...project,
+    progression: Object.freeze({
+      ...project.progression,
+      steps: Object.freeze([firstMeasureRest, secondMeasureChord, ...tail]),
+    }),
+  });
+}
+
+async function installAudioScheduleCapture(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type SchedulerStartArgs = Parameters<LookAheadScheduler["start"]>;
+    const target = window as Window & {
+      __cadenceflow_audio__?: {
+        readonly LookAheadScheduler?: { prototype: Pick<LookAheadScheduler, "start"> };
+      };
+      __capturedCadenceflowAudioEvents__?: readonly {
+        readonly startSeconds: number;
+        readonly channelRole: string;
+        readonly stepIndex?: number;
+      }[];
+    };
+    const scheduler = target.__cadenceflow_audio__?.LookAheadScheduler;
+    if (!scheduler) throw new Error("The development audio scheduler hook is unavailable");
+    const originalStart = scheduler.prototype.start;
+    scheduler.prototype.start = function (this: LookAheadScheduler, ...args: SchedulerStartArgs) {
+      const [events] = args;
+      target.__capturedCadenceflowAudioEvents__ = events.map((event) => ({
+        startSeconds: event.startSeconds,
+        channelRole: event.channelRole,
+        ...(event.stepIndex !== undefined ? { stepIndex: event.stepIndex } : {}),
+      }));
+      return originalStart.call(this, ...args);
+    };
+  });
+}
+
+async function capturedAudioEvents(page: Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __capturedCadenceflowAudioEvents__?: readonly {
+            readonly startSeconds: number;
+            readonly channelRole: string;
+            readonly stepIndex?: number;
+          }[];
+        }
+      ).__capturedCadenceflowAudioEvents__ ?? [],
+  );
+}
+
+async function clearCapturedAudioEvents(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as Window & { __capturedCadenceflowAudioEvents__?: readonly unknown[] })[
+      "__capturedCadenceflowAudioEvents__"
+    ] = [];
+  });
+}
+
+async function playAndCaptureAudioEvents(page: Page) {
+  await installAudioScheduleCapture(page);
+  const controls = page.getByRole("group", { name: "Progression playback controls" });
+  await setControlledAudioTime(page, 20);
+  await controls.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(controls.getByRole("button", { name: "Pause" })).toBeEnabled();
+  return capturedAudioEvents(page);
+}
+
+function withEmAtFourAndFAtEight(project: Project): Project {
+  const steps = project.progression.steps.map((step) => {
+    const functionId = step.id === "chord-b" ? "iii" : step.id === "chord-c" ? "IV" : null;
+    if (step.kind !== "chord" || !functionId) return step;
+    const replacement = createMatrixChordStep(project, functionId, step.id);
+    const { explicitSpellingOverrides: _discarded, ...withoutSpelling } = step;
+    return Object.freeze({
+      ...withoutSpelling,
+      harmonicFunction: replacement.harmonicFunction,
+      harmonicVariant: replacement.harmonicVariant,
+    });
+  });
+  return Object.freeze({
+    ...project,
+    progression: Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+  });
+}
+
 function stepStart(project: Project, id: string) {
   let cursor = rational(0);
   for (const candidate of project.progression.steps) {
@@ -150,6 +363,7 @@ async function dragBoundaryToBeat(
   boundary: import("@playwright/test").Locator,
   targetMeasureNumber: number,
   targetBeat: number,
+  altModifier = false,
 ): Promise<number> {
   const handleBox = await boundary.boundingBox();
   const targetMeasure = page.getByRole("region", { name: `Measure ${targetMeasureNumber}` });
@@ -160,14 +374,48 @@ async function dragBoundaryToBeat(
     x: gridBox.x + ((targetBeat - measureStartBeat) / 4) * gridBox.width,
     y: handleBox.y + handleBox.height / 2,
   };
-  await page.mouse.move(handleBox.x + handleBox.width / 2, target.y);
-  await page.mouse.down();
-  await page.mouse.move(target.x, target.y, { steps: 8 });
-  await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
-  const preview = Number(await boundary.getAttribute("aria-valuenow"));
-  await page.mouse.up();
-  await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-  return preview;
+  if (altModifier) await page.keyboard.down("Alt");
+  try {
+    await page.mouse.move(handleBox.x + handleBox.width / 2, target.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x, target.y, { steps: 8 });
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    const preview = Number(await boundary.getAttribute("aria-valuenow"));
+    await page.mouse.up();
+    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+    return preview;
+  } finally {
+    if (altModifier) await page.keyboard.up("Alt");
+  }
+}
+
+async function cancelBoundaryDragToBeat(
+  page: Page,
+  boundary: import("@playwright/test").Locator,
+  targetMeasureNumber: number,
+  targetBeat: number,
+  altModifier = false,
+): Promise<void> {
+  const handleBox = await boundary.boundingBox();
+  const targetMeasure = page.getByRole("region", { name: `Measure ${targetMeasureNumber}` });
+  const gridBox = await targetMeasure.locator(".piano-roll-grid").boundingBox();
+  if (!handleBox || !gridBox) throw new Error("Left-edge cancellation geometry is unavailable");
+  const target = {
+    x: gridBox.x + (targetBeat / 4) * gridBox.width,
+    y: handleBox.y + handleBox.height / 2,
+  };
+  if (altModifier) await page.keyboard.down("Alt");
+  try {
+    await page.mouse.move(handleBox.x + handleBox.width / 2, target.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x, target.y, { steps: 8 });
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+  } finally {
+    if (altModifier) await page.keyboard.up("Alt");
+  }
 }
 
 function melodySignature(project: Project, sourceStepIds: ReadonlySet<string>) {
@@ -295,6 +543,125 @@ test("real portable import preserves replacement, generated Rest, and exact Undo
   );
   expect(sumDuration(afterAuthoredRestProject)).toEqual(sumDuration(beforeAuthoredRestProject));
   await expectUndoRedoBytes(page, beforeAuthoredRest, afterAuthoredRest);
+});
+
+test("Delete on a selected chord preserves its Rest interval, Melody and portable Ctrl+Z/Redo", async ({
+  page,
+}) => {
+  await openStudio(page);
+  const fixture = createPianoRollSystemChordFixture();
+  await importProject(page, fixture);
+  const guidesButton = page.getByRole("button", { name: "Guides" });
+  if ((await guidesButton.getAttribute("aria-pressed")) !== "true") await guidesButton.click();
+  await expect(guidesButton).toHaveAttribute("aria-pressed", "true");
+  const before = await exportProjectText(page);
+  const beforeProject = decodePortableProject(before);
+  const chord = page.locator('.piano-roll-chord[data-source-step-id="generated-e"]').first();
+  await chord.scrollIntoViewIfNeeded();
+  const exactChordGuides = page.locator(
+    '.piano-roll-grid.is-guides-on .piano-roll-guide-segment.is-chord-tone[data-source-step-id="generated-e"]',
+  );
+  await expect(exactChordGuides.first()).toBeVisible();
+  await chord.click({ modifiers: ["Shift"] });
+  await expect(chord).toHaveAttribute("aria-pressed", "true");
+  await expect(chord).toBeFocused();
+  await page.keyboard.press("Delete");
+  await expect(chord).toBeFocused();
+
+  const after = await exportProjectText(page);
+  const afterProject = decodePortableProject(after);
+  const rest = step(afterProject, "generated-e");
+  expect(rest.kind).toBe("rest");
+  if (rest.kind !== "rest") throw new Error("Delete removed the Step instead of making a Rest.");
+  expect(rest.id).toBe(step(beforeProject, "generated-e").id);
+  expect(rest.duration).toEqual(step(beforeProject, "generated-e").duration);
+  expect(rest.melodyInstrumentOverride).toBe("flute");
+  expect(rest.authoredMelody?.sourceRecipe).toEqual(
+    step(beforeProject, "generated-e").kind === "chord" &&
+      step(beforeProject, "generated-e").melody?.mode === "generated"
+      ? step(beforeProject, "generated-e").melody.recipe
+      : undefined,
+  );
+  expect(fullMelodySignature(afterProject)).toEqual(fullMelodySignature(beforeProject));
+  expect(stepStart(afterProject, "chord-f")).toEqual(stepStart(beforeProject, "chord-f"));
+  expect(afterProject.progression.sections).toEqual(beforeProject.progression.sections);
+  expect(afterProject.temporaryBranch).toEqual(beforeProject.temporaryBranch);
+  const expectMutedRestGuides = async () => {
+    const restGuides = page.locator(
+      '.piano-roll-grid.is-guides-on .piano-roll-guide-segment.is-neutral.is-no-harmony[data-source-step-id="generated-e"]',
+    );
+    await expect(restGuides.first()).toBeVisible();
+    await expect(
+      page.locator(
+        '.piano-roll-grid.is-guides-on .piano-roll-guide-segment.is-chord-tone[data-source-step-id="generated-e"]',
+      ),
+    ).toHaveCount(0);
+    const palette = await restGuides.first().evaluate((element) => {
+      const row = element.closest<HTMLElement>(".piano-roll-row");
+      if (!row) throw new Error("Rest guide has no pitch row");
+      const probe = document.createElement("span");
+      probe.style.background = "var(--piano-roll-palette-surface)";
+      row.append(probe);
+      const surface = getComputedStyle(probe).backgroundColor;
+      const restColor = getComputedStyle(element).backgroundColor;
+      probe.remove();
+      return {
+        degrees: element.getAttribute("data-palette-degrees") ?? "",
+        restColor,
+        surface,
+      };
+    });
+    expect(palette.degrees).not.toBe("");
+    expect(palette.restColor).not.toBe(palette.surface);
+    await expect(
+      page.locator('.piano-roll-chord.is-rest[data-source-step-id="generated-e"]'),
+    ).toContainText("Rest · no harmony");
+  };
+  await expectMutedRestGuides();
+
+  await chord.focus();
+  await page.keyboard.press("Control+z");
+  await expect(
+    page.locator('.piano-roll-chord[data-source-step-id="generated-e"]').first(),
+  ).toBeFocused();
+  await expect(exactChordGuides.first()).toBeVisible();
+  expect(await exportProjectText(page)).toBe(before);
+  await chord.focus();
+  await page.keyboard.press("Control+y");
+  await expect(
+    page.locator('.piano-roll-chord[data-source-step-id="generated-e"]').first(),
+  ).toBeFocused();
+  await expectMutedRestGuides();
+  expect(await exportProjectText(page)).toBe(after);
+
+  for (const gridMode of ["Degrees", "Chromatic"] as const) {
+    await page
+      .getByRole("group", { name: "Pitch grid" })
+      .getByRole("button", { name: gridMode, exact: true })
+      .click();
+    await expectMutedRestGuides();
+    await page.setViewportSize({ width: 640, height: 360 });
+    await page.locator(".piano-roll-measure").first().scrollIntoViewIfNeeded();
+    for (const themeName of ["Dark", "Light"] as const) {
+      await page
+        .getByRole("group", { name: "Theme" })
+        .getByRole("button", { name: `${themeName} theme` })
+        .click();
+      await page.screenshot({
+        path: `test-results/chord-guides-rest-640x360-${gridMode.toLowerCase()}-${themeName.toLowerCase()}.png`,
+      });
+    }
+  }
+
+  const restProject = decodePortableProject(after);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible({
+    timeout: 30_000,
+  });
+  await importProject(page, restProject);
+  const reloadedGuides = page.getByRole("button", { name: "Guides" });
+  if ((await reloadedGuides.getAttribute("aria-pressed")) !== "true") await reloadedGuides.click();
+  await expectMutedRestGuides();
 });
 
 test("Matrix replacement transfers its selected nonstandard variant onto an authored Rest", async ({
@@ -503,7 +870,7 @@ test("pointer boundary transfer snaps to every triplet grid and stays in the Sys
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openStudio(page);
-  const fixture = createPianoRollSystemChordFixture();
+  const fixture = withSameMeasureChordPair(createPianoRollSystemChordFixture());
   await importProject(page, fixture);
   const sourceChord = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
   await sourceChord.click();
@@ -512,28 +879,24 @@ test("pointer boundary transfer snaps to every triplet grid and stays in the Sys
   );
   await expect(boundary).toBeVisible();
   const tripletTargets = [
-    { snap: "1/1 triplet", expectedBoundary: rational(16, 3) },
-    { snap: "1/2 triplet", expectedBoundary: rational(16, 3) },
-    { snap: "1/4 triplet", expectedBoundary: rational(14, 3) },
-    { snap: "1/8 triplet", expectedBoundary: rational(13, 3) },
-    { snap: "1/16 triplet", expectedBoundary: rational(25, 6) },
+    { snap: "1/1 triplet", expectedBoundary: rational(8, 3) },
+    { snap: "1/2 triplet", expectedBoundary: rational(8, 3) },
+    { snap: "1/4 triplet", expectedBoundary: rational(8, 3) },
+    { snap: "1/8 triplet", expectedBoundary: rational(7, 3) },
+    { snap: "1/16 triplet", expectedBoundary: rational(13, 6) },
   ] as const;
 
   for (const target of tripletTargets) {
     const before = await exportProjectText(page);
     await page.getByLabel("Snap resolution").selectOption(target.snap);
     const expectedBoundary = rationalToNumber(target.expectedBoundary);
-    const preview = await dragBoundaryToBeat(page, boundary, 2, expectedBoundary);
+    const preview = await dragBoundaryToBeat(page, boundary, 1, expectedBoundary);
     expect(preview).toBeCloseTo(expectedBoundary, 6);
     const after = await exportProjectText(page);
     const updated = decodePortableProject(after);
-    const exactBeatFourNote = createEffectiveMelodyTimeline(updated).find(
-      (note) => note.pitch.midiNumber === 69 && compareRational(note.startBeats, rational(4)) === 0,
-    );
-    expect(exactBeatFourNote?.sourceStepId).toBe("chord-a");
     expect(step(updated, "chord-a").duration.beats).toEqual(target.expectedBoundary);
     expect(step(updated, "chord-b").duration.beats).toEqual(
-      subtractRational(rational(8), target.expectedBoundary),
+      subtractRational(rational(4), target.expectedBoundary),
     );
     expect(
       melodySignature(updated, new Set(updated.progression.steps.map((candidate) => candidate.id))),
@@ -548,12 +911,12 @@ test("pointer boundary transfer snaps to every triplet grid and stays in the Sys
   }
 });
 
-test("pointer boundary transfer works in both directions with exact portable pair durations", async ({
+test("pointer resize transfers a shared boundary both ways between identical chords", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openStudio(page);
-  const fixture = createPianoRollSystemChordFixture();
+  const fixture = withSameMeasureChordPair(createPianoRollSystemChordFixture());
   await importProject(page, fixture);
   const beforeExpansion = await exportProjectText(page);
   const sourceChord = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
@@ -562,23 +925,22 @@ test("pointer boundary transfer works in both directions with exact portable pai
   const boundary = page.locator(
     '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
   );
-  const forwardPreview = await dragBoundaryToBeat(page, boundary, 2, 13 / 3);
-  expect(forwardPreview).toBeCloseTo(13 / 3, 6);
+  const forwardPreview = await dragBoundaryToBeat(page, boundary, 1, 8 / 3);
+  expect(forwardPreview).toBeCloseTo(8 / 3, 6);
   const afterExpansion = await exportProjectText(page);
   await expectUndoRedoBytes(page, beforeExpansion, afterExpansion);
 
   const beforeReverse = await exportProjectText(page);
-  const reversePreview = await dragBoundaryToBeat(page, boundary, 1, 11 / 3);
-  expect(reversePreview).toBeCloseTo(11 / 3, 6);
+  const reversePreview = await dragBoundaryToBeat(page, boundary, 1, 4 / 3);
+  expect(reversePreview).toBeCloseTo(4 / 3, 6);
   const afterReverse = await exportProjectText(page);
   const beforeProject = decodePortableProject(beforeExpansion);
   const afterProject = decodePortableProject(afterReverse);
-  const exactBeatFourNote = createEffectiveMelodyTimeline(afterProject).find(
-    (note) => note.pitch.midiNumber === 69 && compareRational(note.startBeats, rational(4)) === 0,
+  expect(step(afterProject, "chord-a").duration.beats).toEqual(rational(4, 3));
+  expect(step(afterProject, "chord-b").duration.beats).toEqual(rational(8, 3));
+  expect(afterProject.progression.steps.map((candidate) => candidate.id)).not.toContain(
+    "resize-gap:chord-a:chord-b",
   );
-  expect(exactBeatFourNote?.sourceStepId).toBe("chord-b");
-  expect(step(afterProject, "chord-a").duration.beats).toEqual(rational(11, 3));
-  expect(step(afterProject, "chord-b").duration.beats).toEqual(rational(13, 3));
   expect(
     compareRational(stepStart(afterProject, "chord-c"), stepStart(beforeProject, "chord-c")),
   ).toBe(0);
@@ -599,6 +961,760 @@ test("pointer boundary transfer works in both directions with exact portable pai
   expect(afterProject.temporaryBranch).toEqual(beforeProject.temporaryBranch);
   expect(sumDuration(afterProject)).toEqual(sumDuration(beforeProject));
   await expectUndoRedoBytes(page, beforeReverse, afterReverse);
+});
+
+test("normal pointer resize transfers exact time between different same-measure chords on both edges", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+
+  const cases = [
+    { selectedId: "chord-a", edge: "right" as const, boundary: 3, leftDuration: rational(3) },
+    { selectedId: "chord-a", edge: "right" as const, boundary: 1, leftDuration: rational(1) },
+    { selectedId: "chord-b", edge: "left" as const, boundary: 1, leftDuration: rational(1) },
+    { selectedId: "chord-b", edge: "left" as const, boundary: 3, leftDuration: rational(3) },
+  ];
+  for (const [index, scenario] of cases.entries()) {
+    const fixture = withDifferentSameMeasureChordPair(
+      createPianoRollSystemChordFixture(`different-harmony-boundary-${index}`),
+    );
+    await importProject(page, fixture);
+    await page.getByLabel("Snap resolution").selectOption("1/16");
+    const before = await exportProjectText(page);
+    const selected = page
+      .locator(`.piano-roll-chord[data-source-step-id="${scenario.selectedId}"]`)
+      .first();
+    await selected.click();
+    const handle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="${scenario.selectedId}"][data-boundary-edge="${scenario.edge}"]`,
+    );
+    if (index === 0) {
+      await cancelBoundaryDragToBeat(page, handle, 1, scenario.boundary);
+      expect(await exportProjectText(page)).toBe(before);
+    }
+    if (index === 0) await installAudioScheduleCapture(page);
+    expect(await dragBoundaryToBeat(page, handle, 1, scenario.boundary)).toBeCloseTo(
+      scenario.boundary,
+      6,
+    );
+    const afterText = await exportProjectText(page);
+    const updated = decodePortableProject(afterText);
+    expect(step(updated, "chord-a").duration.beats).toEqual(scenario.leftDuration);
+    expect(step(updated, "chord-b").duration.beats).toEqual(
+      subtractRational(rational(4), scenario.leftDuration),
+    );
+    expect(stepStart(updated, "chord-b")).toEqual(scenario.leftDuration);
+    expect(stepStart(updated, "chord-c")).toEqual(rational(8));
+    expect(sumDuration(updated)).toEqual(sumDuration(fixture));
+    for (const id of ["chord-a", "chord-b"] as const) {
+      expect(step(updated, id).harmonicFunction).toEqual(step(fixture, id).harmonicFunction);
+      expect(step(updated, id).harmonicVariant).toEqual(step(fixture, id).harmonicVariant);
+      expect(step(updated, id).id).toBe(step(fixture, id).id);
+    }
+    expect(
+      melodySignature(updated, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    ).toEqual(
+      melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    );
+    expect(updated.progression.sections).toEqual(fixture.progression.sections);
+    expect(updated.progression.loopRegion).toEqual(fixture.progression.loopRegion);
+    expect(updated.temporaryBranch).toEqual(fixture.temporaryBranch);
+    await expectUndoRedoBytes(page, before, afterText);
+    if (index === 0) {
+      const events = await playAndCaptureAudioEvents(page);
+      const harmony = events.filter(
+        (event) => event.channelRole === "upper" || event.channelRole === "bass",
+      );
+      const firstAttack = Math.min(
+        ...harmony.filter((event) => event.stepIndex === 0).map((event) => event.startSeconds),
+      );
+      const expectedNeighborAttack =
+        firstAttack +
+        rationalToNumber(scenario.leftDuration) * (60 / fixture.globalTiming.tempoBpm);
+      expect(
+        harmony.some(
+          (event) =>
+            event.stepIndex === 1 && Math.abs(event.startSeconds - expectedNeighborAttack) < 1e-6,
+        ),
+      ).toBe(true);
+      await page
+        .getByRole("group", { name: "Progression playback controls" })
+        .getByRole("button", { name: "Stop" })
+        .click();
+    }
+  }
+});
+
+test("normal resize fully consumes a different same-measure chord from either edge", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+
+  const scenarios = [
+    {
+      draggedId: "chord-a",
+      edge: "right" as const,
+      boundary: 4,
+      retainedId: "chord-a",
+      removedId: "chord-b",
+    },
+    {
+      draggedId: "chord-b",
+      edge: "left" as const,
+      boundary: 0,
+      retainedId: "chord-b",
+      removedId: "chord-a",
+    },
+  ];
+  for (const [index, scenario] of scenarios.entries()) {
+    const fixture = withDistinctChordResizeParameters(
+      withDifferentSameMeasureChordPair(
+        createPianoRollSystemChordFixture(`different-harmony-full-consumption-${index}`),
+      ),
+    );
+    await importProject(page, fixture);
+    await page.getByLabel("Snap resolution").selectOption("1/16");
+    const before = await exportProjectText(page);
+    const dragged = step(fixture, scenario.draggedId);
+    if (dragged.kind !== "chord") throw new Error("The dragged fixture Step must be a chord");
+    const selected = page
+      .locator(`.piano-roll-chord[data-source-step-id="${scenario.draggedId}"]`)
+      .first();
+    await installAudioScheduleCapture(page);
+    await selected.click();
+    const handle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="${scenario.draggedId}"][data-boundary-edge="${scenario.edge}"]`,
+    );
+    if (scenario.edge === "right") await expect(handle).toHaveAttribute("aria-valuemax", "4");
+    else await expect(handle).toHaveAttribute("aria-valuemin", "0");
+    await cancelBoundaryDragToBeat(page, handle, 1, scenario.boundary);
+    expect(await exportProjectText(page)).toBe(before);
+    await clearCapturedAudioEvents(page);
+    expect(await dragBoundaryToBeat(page, handle, 1, scenario.boundary)).toBeCloseTo(
+      scenario.boundary,
+      6,
+    );
+    expect(await capturedAudioEvents(page)).toEqual([]);
+    const after = await exportProjectText(page);
+    const merged = decodePortableProject(after);
+    expect(merged.progression.steps.map((candidate) => candidate.id)).not.toContain(
+      scenario.removedId,
+    );
+    const retained = step(merged, scenario.retainedId);
+    expect(retained.kind).toBe("chord");
+    if (retained.kind !== "chord") throw new Error("The retained Step must remain a chord");
+    expect(retained.duration.beats).toEqual(rational(4));
+    expect(retained.harmonicFunction).toEqual(dragged.harmonicFunction);
+    expect(retained.harmonicVariant).toEqual(dragged.harmonicVariant);
+    expect(retained.performance).toEqual(dragged.performance);
+    expect(retained.melodyInstrumentOverride).toBe(dragged.melodyInstrumentOverride);
+    expect(retained.cardView).toBe(dragged.cardView);
+    expect(stepStart(merged, scenario.retainedId)).toEqual(rational(0));
+    expect(stepStart(merged, "chord-c")).toEqual(rational(8));
+    expect(sumDuration(merged)).toEqual(sumDuration(fixture));
+    expect(fullMelodySignature(merged)).toEqual(fullMelodySignature(fixture));
+    expect(merged.progression.sections).toEqual(
+      fixture.progression.sections?.map((section) =>
+        section.startStepId === scenario.removedId
+          ? { ...section, startStepId: scenario.retainedId }
+          : section,
+      ),
+    );
+    expect(merged.temporaryBranch?.originStepId).toBe(
+      scenario.draggedId === "chord-a" ? "chord-a" : "chord-b",
+    );
+    await page.screenshot({
+      path: `test-results/chord-different-full-consumption-${scenario.edge}-1280x900.png`,
+    });
+    await expectUndoRedoBytes(page, before, after);
+
+    const audio = await playAndCaptureAudioEvents(page);
+    const harmony = audio.filter(
+      (event) => event.channelRole === "upper" || event.channelRole === "bass",
+    );
+    expect(harmony.some((event) => event.stepIndex === 1)).toBe(false);
+    await page
+      .getByRole("group", { name: "Progression playback controls" })
+      .getByRole("button", { name: "Stop" })
+      .click();
+  }
+});
+
+test("Alt pointer shrink isolates the selected chord and Alt+Arrow offers the keyboard path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+
+  for (const leftEdge of [false, true]) {
+    const fixture = withDifferentSameMeasureChordPair(
+      createPianoRollSystemChordFixture(`isolated-alt-shrink-${leftEdge ? "left" : "right"}`),
+    );
+    await importProject(page, fixture);
+    await page.getByLabel("Snap resolution").selectOption("1/16");
+    const before = await exportProjectText(page);
+    const selectedId = leftEdge ? "chord-b" : "chord-a";
+    const edge = leftEdge ? "left" : "right";
+    const selected = page.locator(`.piano-roll-chord[data-source-step-id="${selectedId}"]`).first();
+    await selected.click();
+    const handle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="${selectedId}"][data-boundary-edge="${edge}"]`,
+    );
+    await expect(handle).toHaveAttribute("title", /Hold Alt while dragging/);
+    if (!leftEdge) {
+      await cancelBoundaryDragToBeat(page, handle, 1, 1.5, true);
+      expect(await exportProjectText(page)).toBe(before);
+      await installAudioScheduleCapture(page);
+    }
+    const target = leftEdge ? 3 : 1.5;
+    expect(await dragBoundaryToBeat(page, handle, 1, target, true)).toBeCloseTo(target, 6);
+    const afterText = await exportProjectText(page);
+    const updated = decodePortableProject(afterText);
+    const gap = step(updated, `resize-gap:chord-a:chord-b`);
+    expect(gap.kind).toBe("rest");
+    expect(gap.duration.beats).toEqual(leftEdge ? rational(1) : rational(1, 2));
+    expect(step(updated, "chord-a").duration.beats).toEqual(
+      leftEdge ? rational(2) : rational(3, 2),
+    );
+    expect(step(updated, "chord-b").duration.beats).toEqual(leftEdge ? rational(1) : rational(2));
+    expect(stepStart(updated, "chord-b")).toEqual(leftEdge ? rational(3) : rational(2));
+    expect(stepStart(updated, "chord-c")).toEqual(rational(8));
+    expect(sumDuration(updated)).toEqual(sumDuration(fixture));
+    expect(fullMelodySignature(updated)).toEqual(fullMelodySignature(fixture));
+    expect(step(updated, "chord-a").harmonicFunction).toEqual(
+      step(fixture, "chord-a").harmonicFunction,
+    );
+    expect(step(updated, "chord-b").harmonicFunction).toEqual(
+      step(fixture, "chord-b").harmonicFunction,
+    );
+    if (!leftEdge) expect(await capturedAudioEvents(page)).toEqual([]);
+    await page.screenshot({
+      path: `test-results/chord-alt-${edge}-shrink-rest-1280x900.png`,
+    });
+    await expectUndoRedoBytes(page, before, afterText);
+  }
+
+  const keyboardFixture = withDifferentSameMeasureChordPair(
+    createPianoRollSystemChordFixture("isolated-alt-keyboard-shrink"),
+  );
+  await importProject(page, keyboardFixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+  const beforeKeyboard = await exportProjectText(page);
+  const chordB = page.locator('.piano-roll-chord[data-source-step-id="chord-b"]').first();
+  await chordB.click();
+  const leftHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-b"][data-boundary-edge="left"]',
+  );
+  await leftHandle.focus();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(leftHandle).toHaveAttribute("aria-valuenow", "2.25");
+  await expect(leftHandle).toHaveAttribute("aria-valuetext", /Alt isolated mode/);
+  await page.keyboard.press("Escape");
+  expect(await exportProjectText(page)).toBe(beforeKeyboard);
+
+  await leftHandle.focus();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(leftHandle).toHaveAttribute("aria-valuenow", "2.25");
+  await page.keyboard.press("Enter");
+  const afterKeyboardText = await exportProjectText(page);
+  const keyboardUpdated = decodePortableProject(afterKeyboardText);
+  expect(step(keyboardUpdated, "resize-gap:chord-a:chord-b").duration.beats).toEqual(
+    rational(1, 4),
+  );
+  expect(step(keyboardUpdated, "chord-a").duration.beats).toEqual(rational(2));
+  expect(step(keyboardUpdated, "chord-b").duration.beats).toEqual(rational(7, 4));
+  expect(stepStart(keyboardUpdated, "chord-b")).toEqual(rational(9, 4));
+  await expectUndoRedoBytes(page, beforeKeyboard, afterKeyboardText);
+});
+
+test("pointer shrink on either edge leaves a Rest and keeps absolute chord onsets", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+
+  const rightFixture = withSameMeasureChordRestPair(
+    createPianoRollSystemChordFixture("right-edge-rest-shrink"),
+  );
+  await importProject(page, rightFixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+  const rightBefore = await exportProjectText(page);
+  const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await chordA.click();
+  const rightHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
+  );
+  await cancelBoundaryDragToBeat(page, rightHandle, 1, 1.5);
+  expect(await exportProjectText(page)).toBe(rightBefore);
+  expect(await dragBoundaryToBeat(page, rightHandle, 1, 1.5)).toBeCloseTo(1.5, 6);
+  const rightAfterText = await exportProjectText(page);
+  const rightAfter = decodePortableProject(rightAfterText);
+  expect(step(rightAfter, "chord-a").duration.beats).toEqual(rational(3, 2));
+  expect(step(rightAfter, "rest-d").duration.beats).toEqual(rational(5, 2));
+  expect(stepStart(rightAfter, "chord-b")).toEqual(rational(4));
+  expect(sumDuration(rightAfter)).toEqual(sumDuration(rightFixture));
+  expect(
+    melodySignature(
+      rightAfter,
+      new Set(rightFixture.progression.steps.map((candidate) => candidate.id)),
+    ),
+  ).toEqual(
+    melodySignature(
+      rightFixture,
+      new Set(rightFixture.progression.steps.map((candidate) => candidate.id)),
+    ),
+  );
+  await page.screenshot({ path: "test-results/chord-right-edge-shrink-rest-1280x900.png" });
+  await expectUndoRedoBytes(page, rightBefore, rightAfterText);
+  const rightEvents = await playAndCaptureAudioEvents(page);
+  const rightHarmony = rightEvents.filter(
+    (event) => event.channelRole === "upper" || event.channelRole === "bass",
+  );
+  const rightChordStart = Math.min(
+    ...rightHarmony.filter((event) => event.stepIndex === 2).map((event) => event.startSeconds),
+  );
+  const restGapOnset = rightChordStart - (2.5 * 60) / rightFixture.globalTiming.tempoBpm;
+  expect(rightHarmony.some((event) => Math.abs(event.startSeconds - restGapOnset) < 1e-6)).toBe(
+    false,
+  );
+  await page
+    .getByRole("group", { name: "Progression playback controls" })
+    .getByRole("button", { name: "Stop" })
+    .click();
+
+  const leftFixture = withSameMeasureChordRestPair(
+    createPianoRollSystemChordFixture("left-edge-rest-shrink"),
+    true,
+  );
+  await importProject(page, leftFixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+  const leftBefore = await exportProjectText(page);
+  const leftChordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await leftChordA.click();
+  const leftHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="left"]',
+  );
+  await cancelBoundaryDragToBeat(page, leftHandle, 1, 3);
+  expect(await exportProjectText(page)).toBe(leftBefore);
+  expect(await dragBoundaryToBeat(page, leftHandle, 1, 3)).toBeCloseTo(3, 6);
+  const leftAfterText = await exportProjectText(page);
+  const leftAfter = decodePortableProject(leftAfterText);
+  expect(step(leftAfter, "rest-d").duration.beats).toEqual(rational(3));
+  expect(step(leftAfter, "chord-a").duration.beats).toEqual(rational(1));
+  expect(stepStart(leftAfter, "chord-a")).toEqual(rational(3));
+  expect(stepStart(leftAfter, "chord-b")).toEqual(rational(4));
+  expect(sumDuration(leftAfter)).toEqual(sumDuration(leftFixture));
+  expect(
+    melodySignature(
+      leftAfter,
+      new Set(leftFixture.progression.steps.map((candidate) => candidate.id)),
+    ),
+  ).toEqual(
+    melodySignature(
+      leftFixture,
+      new Set(leftFixture.progression.steps.map((candidate) => candidate.id)),
+    ),
+  );
+  await page.screenshot({ path: "test-results/chord-left-edge-shrink-rest-1280x900.png" });
+  await expectUndoRedoBytes(page, leftBefore, leftAfterText);
+  const leftEvents = await playAndCaptureAudioEvents(page);
+  const leftHarmony = leftEvents.filter(
+    (event) => event.channelRole === "upper" || event.channelRole === "bass",
+  );
+  const selectedChordStart = Math.min(
+    ...leftHarmony.filter((event) => event.stepIndex === 1).map((event) => event.startSeconds),
+  );
+  const followingChordStart = Math.min(
+    ...leftHarmony.filter((event) => event.stepIndex === 2).map((event) => event.startSeconds),
+  );
+  expect(followingChordStart - selectedChordStart).toBeCloseTo(
+    60 / leftFixture.globalTiming.tempoBpm,
+    6,
+  );
+  await page
+    .getByRole("group", { name: "Progression playback controls" })
+    .getByRole("button", { name: "Stop" })
+    .click();
+});
+
+test("pointer extension consumes only a same-measure Rest from either edge", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+
+  for (const restFirst of [false, true]) {
+    const fixture = withSameMeasureChordRestPair(
+      createPianoRollSystemChordFixture(`edge-rest-extension-${restFirst ? "left" : "right"}`),
+      restFirst,
+    );
+    await importProject(page, fixture);
+    await page.getByLabel("Snap resolution").selectOption("1/16");
+    const before = await exportProjectText(page);
+    const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+    await chordA.click();
+    const edge = restFirst ? "left" : "right";
+    const handle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="${edge}"]`,
+    );
+    const partialTarget = restFirst ? 1 : 3;
+    expect(await dragBoundaryToBeat(page, handle, 1, partialTarget)).toBeCloseTo(partialTarget, 6);
+    const partialText = await exportProjectText(page);
+    const partial = decodePortableProject(partialText);
+    expect(step(partial, "rest-d").duration.beats).toEqual(rational(1));
+    expect(step(partial, "chord-a").duration.beats).toEqual(rational(3));
+    expect(stepStart(partial, "chord-a")).toEqual(restFirst ? rational(1) : rational(0));
+    expect(stepStart(partial, "chord-b")).toEqual(rational(4));
+    expect(sumDuration(partial)).toEqual(sumDuration(fixture));
+    expect(
+      melodySignature(partial, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    ).toEqual(
+      melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    );
+    await expectUndoRedoBytes(page, before, partialText);
+
+    await historyAction(page, "Undo");
+    expect(await exportProjectText(page)).toBe(before);
+    const fullTarget = restFirst ? 0 : 4;
+    expect(await dragBoundaryToBeat(page, handle, 1, fullTarget)).toBeCloseTo(fullTarget, 6);
+    const fullText = await exportProjectText(page);
+    const full = decodePortableProject(fullText);
+    expect(full.progression.steps.map((candidate) => candidate.id)).not.toContain("rest-d");
+    expect(step(full, "chord-a").duration.beats).toEqual(rational(4));
+    expect(stepStart(full, "chord-a")).toEqual(rational(0));
+    expect(stepStart(full, "chord-b")).toEqual(rational(4));
+    expect(sumDuration(full)).toEqual(sumDuration(fixture));
+    expect(
+      melodySignature(full, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    ).toEqual(
+      melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+    );
+    expect(full.progression.sections?.map((section) => section.id)).toEqual(
+      fixture.progression.sections?.map((section) => section.id),
+    );
+    expect(full.progression.sections?.[0]?.startStepId).toBe("chord-a");
+    expect(full.progression.loopRegion?.startStepId).toBe(
+      fixture.progression.loopRegion?.startStepId,
+    );
+    expect(full.temporaryBranch?.originStepId).toBe(fixture.temporaryBranch?.originStepId);
+    await page.screenshot({
+      path: `test-results/chord-${edge}-edge-rest-full-extension-1280x900.png`,
+    });
+    await expectUndoRedoBytes(page, before, fullText);
+
+    const events = await playAndCaptureAudioEvents(page);
+    const harmony = events.filter(
+      (event) => event.channelRole === "upper" || event.channelRole === "bass",
+    );
+    const start = Math.min(
+      ...harmony.filter((event) => event.stepIndex === 0).map((event) => event.startSeconds),
+    );
+    expect(harmony.some((event) => Math.abs(event.startSeconds - (start + 1)) < 1e-6)).toBe(false);
+    await page
+      .getByRole("group", { name: "Progression playback controls" })
+      .getByRole("button", { name: "Stop" })
+      .click();
+  }
+});
+
+test("left edge can shrink into a leading-measure Rest and expand back to the barline", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openStudio(page);
+  const fixture = withFirstMeasureRest(
+    createPianoRollSystemChordFixture("cross-measure-left-rest"),
+  );
+  await importProject(page, fixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+  const before = await exportProjectText(page);
+  const initial = decodePortableProject(before);
+  expect(initial.progression.steps[0]).toMatchObject({
+    kind: "rest",
+    duration: { beats: rational(4) },
+  });
+  expect(stepStart(initial, "chord-a")).toEqual(rational(4));
+  expect(step(initial, "chord-a").duration.beats).toEqual(rational(4));
+  const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await chordA.scrollIntoViewIfNeeded();
+  await chordA.click();
+  const leftHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="left"]',
+  );
+  await expect(leftHandle).toBeVisible();
+  expect(Number(await leftHandle.getAttribute("aria-valuemin"))).toBeCloseTo(4, 6);
+  expect(await dragBoundaryToBeat(page, leftHandle, 2, 6)).toBeCloseTo(6, 6);
+  const shrunkText = await exportProjectText(page);
+  const shrunk = decodePortableProject(shrunkText);
+  expect(step(shrunk, "rest-d").duration.beats).toEqual(rational(6));
+  expect(step(shrunk, "chord-a").duration.beats).toEqual(rational(2));
+  expect(stepStart(shrunk, "chord-a")).toEqual(rational(6));
+  expect(stepStart(shrunk, "chord-b")).toEqual(rational(8));
+  expect(sumDuration(shrunk)).toEqual(sumDuration(fixture));
+  expect(
+    melodySignature(shrunk, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+  ).toEqual(
+    melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+  );
+  expect(shrunk.progression.sections).toEqual(fixture.progression.sections);
+  expect(shrunk.progression.loopRegion).toEqual(fixture.progression.loopRegion);
+  expect(shrunk.temporaryBranch).toEqual(fixture.temporaryBranch);
+  await page.screenshot({ path: "test-results/chord-left-shrink-leading-rest-1280x900.png" });
+  await expectUndoRedoBytes(page, before, shrunkText);
+
+  await expect(leftHandle).toBeVisible();
+  expect(await leftHandle.evaluate((element) => getComputedStyle(element).cursor)).toBe(
+    "ew-resize",
+  );
+  const beforeReExpansion = await exportProjectText(page);
+  expect(Number(await leftHandle.getAttribute("aria-valuemin"))).toBeCloseTo(4, 6);
+  expect(await dragBoundaryToBeat(page, leftHandle, 2, 4)).toBeCloseTo(4, 6);
+  const restoredText = await exportProjectText(page);
+  const restored = decodePortableProject(restoredText);
+  expect(step(restored, "rest-d").duration.beats).toEqual(rational(4));
+  expect(step(restored, "chord-a").duration.beats).toEqual(rational(4));
+  expect(stepStart(restored, "chord-a")).toEqual(rational(4));
+  expect(stepStart(restored, "chord-b")).toEqual(rational(8));
+  expect(sumDuration(restored)).toEqual(sumDuration(fixture));
+  expect(
+    melodySignature(restored, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+  ).toEqual(
+    melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+  );
+  expect(restored.progression.sections).toEqual(fixture.progression.sections);
+  expect(restored.progression.loopRegion).toEqual(fixture.progression.loopRegion);
+  expect(restored.temporaryBranch).toEqual(fixture.temporaryBranch);
+  await page.screenshot({ path: "test-results/chord-left-reexpanded-to-barline-1280x900.png" });
+  await expectUndoRedoBytes(page, beforeReExpansion, restoredText);
+});
+
+test("first and final chord edges create leading and trailing Rest gaps", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openStudio(page);
+  const fixture = createPianoRollSystemChordFixture("edge-project-bounds");
+  await importProject(page, fixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+
+  const beforeLeading = await exportProjectText(page);
+  const first = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await first.click();
+  const leadingHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="left"]',
+  );
+  expect(await dragBoundaryToBeat(page, leadingHandle, 1, 1)).toBeCloseTo(1, 6);
+  const leadingText = await exportProjectText(page);
+  const leading = decodePortableProject(leadingText);
+  expect(leading.progression.steps[0]?.kind).toBe("rest");
+  expect(leading.progression.steps[0]?.duration.beats).toEqual(rational(1));
+  expect(step(leading, "chord-a").duration.beats).toEqual(rational(3));
+  expect(stepStart(leading, "chord-b")).toEqual(rational(4));
+  expect(sumDuration(leading)).toEqual(sumDuration(fixture));
+  await expectUndoRedoBytes(page, beforeLeading, leadingText);
+
+  await historyAction(page, "Undo");
+  expect(await exportProjectText(page)).toBe(beforeLeading);
+  const last = page.locator('.piano-roll-chord[data-source-step-id="chord-f"]').last();
+  await last.scrollIntoViewIfNeeded();
+  await last.click();
+  const trailingHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-f"][data-boundary-edge="right"]',
+  );
+  expect(await dragBoundaryToBeat(page, trailingHandle, 6, 23)).toBeCloseTo(23, 6);
+  const trailingText = await exportProjectText(page);
+  const trailing = decodePortableProject(trailingText);
+  expect(step(trailing, "chord-f").duration.beats).toEqual(rational(3));
+  expect(trailing.progression.steps.at(-1)?.kind).toBe("rest");
+  expect(trailing.progression.steps.at(-1)?.duration.beats).toEqual(rational(1));
+  expect(sumDuration(trailing)).toEqual(sumDuration(fixture));
+  await page.screenshot({ path: "test-results/chord-final-right-edge-trailing-rest-1280x900.png" });
+  await expectUndoRedoBytes(page, beforeLeading, trailingText);
+});
+
+test("pointer resize consumes a same-measure Rest or identical chord without shifting the timeline", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+  const fixture = withSameMeasureChordPair(createPianoRollSystemChordFixture());
+  await importProject(page, fixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16");
+  const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await chordA.click();
+  const beforePartial = await exportProjectText(page);
+  const rightHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
+  );
+  expect(await dragBoundaryToBeat(page, rightHandle, 1, 3)).toBeCloseTo(3, 6);
+  const partial = decodePortableProject(await exportProjectText(page));
+  expect(step(partial, "chord-a").duration.beats).toEqual(rational(3));
+  expect(step(partial, "chord-b").duration.beats).toEqual(rational(1));
+  expect(stepStart(partial, "chord-c")).toEqual(rational(8));
+  expect(sumDuration(partial)).toEqual(sumDuration(fixture));
+
+  const partialEvents = await playAndCaptureAudioEvents(page);
+  const partialHarmony = partialEvents.filter(
+    (event) => event.channelRole === "upper" || event.channelRole === "bass",
+  );
+  const firstChordAttack = Math.min(
+    ...partialHarmony.filter((event) => event.stepIndex === 0).map((event) => event.startSeconds),
+  );
+  const expectedBoundaryAttack = firstChordAttack + (3 * 60) / fixture.globalTiming.tempoBpm;
+  expect(
+    partialHarmony.some(
+      (event) =>
+        event.stepIndex === 1 && Math.abs(event.startSeconds - expectedBoundaryAttack) < 1e-6,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("group", { name: "Progression playback controls" })
+    .getByRole("button", { name: "Stop" })
+    .click();
+  await expectUndoRedoBytes(page, beforePartial, await exportProjectText(page));
+  await historyAction(page, "Undo");
+  expect(await exportProjectText(page)).toBe(beforePartial);
+
+  const beforeLeftRetainedMerge = await exportProjectText(page);
+  await chordA.click();
+  expect(await dragBoundaryToBeat(page, rightHandle, 1, 3.9)).toBeCloseTo(4, 6);
+  const mergedLeftText = await exportProjectText(page);
+  const mergedLeft = decodePortableProject(mergedLeftText);
+  expect(mergedLeft.progression.steps.map((candidate) => candidate.id)).not.toContain("chord-b");
+  expect(step(mergedLeft, "chord-a").duration.beats).toEqual(rational(4));
+  expect(stepStart(mergedLeft, "chord-c")).toEqual(rational(8));
+  expect(sumDuration(mergedLeft)).toEqual(sumDuration(fixture));
+  expect(
+    melodySignature(
+      mergedLeft,
+      new Set(fixture.progression.steps.map((candidate) => candidate.id)),
+    ),
+  ).toEqual(
+    melodySignature(fixture, new Set(fixture.progression.steps.map((candidate) => candidate.id))),
+  );
+  await page.screenshot({
+    path: "test-results/chord-identical-full-merge-retained-left-1280x900.png",
+  });
+  await expectUndoRedoBytes(page, beforeLeftRetainedMerge, mergedLeftText);
+  const leftEvents = await playAndCaptureAudioEvents(page);
+  const leftHarmony = leftEvents.filter(
+    (event) => event.channelRole === "upper" || event.channelRole === "bass",
+  );
+  const mergedStart = Math.min(
+    ...leftHarmony.filter((event) => event.stepIndex === 0).map((event) => event.startSeconds),
+  );
+  expect(leftHarmony.some((event) => Math.abs(event.startSeconds - (mergedStart + 2)) < 1e-6)).toBe(
+    false,
+  );
+  const chordCAudioIndex = mergedLeft.progression.steps.findIndex(
+    (candidate) => candidate.id === "chord-c",
+  );
+  expect(chordCAudioIndex).toBeGreaterThanOrEqual(0);
+  expect(
+    leftHarmony.some(
+      (event) =>
+        event.stepIndex === chordCAudioIndex &&
+        event.startSeconds >= mergedStart + (4 * 60) / fixture.globalTiming.tempoBpm,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("group", { name: "Progression playback controls" })
+    .getByRole("button", { name: "Stop" })
+    .click();
+  await historyAction(page, "Undo");
+  expect(await exportProjectText(page)).toBe(beforeLeftRetainedMerge);
+
+  const chordB = page.locator('.piano-roll-chord[data-source-step-id="chord-b"]').first();
+  await chordB.click();
+  const leftHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-b"][data-boundary-edge="left"]',
+  );
+  expect(await dragBoundaryToBeat(page, leftHandle, 1, 0.1)).toBeCloseTo(0, 6);
+  const mergedRightText = await exportProjectText(page);
+  const mergedRight = decodePortableProject(mergedRightText);
+  expect(mergedRight.progression.steps.map((candidate) => candidate.id)).not.toContain("chord-a");
+  expect(step(mergedRight, "chord-b").duration.beats).toEqual(rational(4));
+  expect(stepStart(mergedRight, "chord-c")).toEqual(rational(8));
+  expect(sumDuration(mergedRight)).toEqual(sumDuration(fixture));
+  await page.screenshot({
+    path: "test-results/chord-identical-full-merge-retained-right-1280x900.png",
+  });
+  await expectUndoRedoBytes(page, beforeLeftRetainedMerge, mergedRightText);
+});
+
+test("Tie fills a same-measure Rest with the chord, preserving notes, sections, audio and history", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installControlledAudioClock(page);
+  await openStudio(page);
+  for (const restFirst of [false, true]) {
+    const fixture = withSameMeasureChordRestPair(
+      createPianoRollSystemChordFixture(
+        `tie-chord-rest-${restFirst ? "rest-first" : "chord-first"}`,
+      ),
+      restFirst,
+    );
+    await importProject(page, fixture);
+    const before = await exportProjectText(page);
+    const original = decodePortableProject(before);
+    const originalMelody = melodySignature(
+      original,
+      new Set(original.progression.steps.map((candidate) => candidate.id)),
+    );
+    const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+    const rest = page.locator('.piano-roll-chord[data-source-step-id="rest-d"]').first();
+    await chordA.click();
+    await rest.click({ modifiers: ["Shift"] });
+    const panel = page.getByTestId("piano-roll-system-chord-panel-0");
+    const tieButton = panel.getByRole("button", { name: "Tie", exact: true });
+    await expect(tieButton).toBeEnabled();
+    expect(await exportProjectText(page)).toBe(before);
+    await tieButton.click();
+    const afterTie = await exportProjectText(page);
+    const tiedProject = decodePortableProject(afterTie);
+    expect(tiedProject.progression.steps.map((candidate) => candidate.id)).not.toContain("rest-d");
+    expect(step(tiedProject, "chord-a").duration.beats).toEqual(rational(4));
+    expect(stepStart(tiedProject, "chord-b")).toEqual(rational(4));
+    expect(sumDuration(tiedProject)).toEqual(sumDuration(original));
+    expect(tiedProject.progression.sections?.[0]?.startStepId).toBe("chord-a");
+    expect(tiedProject.progression.loopRegion?.startStepId).toBe("chord-a");
+    expect(tiedProject.temporaryBranch?.originStepId).toBe("chord-a");
+    expect(
+      melodySignature(
+        tiedProject,
+        new Set(original.progression.steps.map((candidate) => candidate.id)),
+      ),
+    ).toEqual(originalMelody);
+    const tiedChord = step(tiedProject, "chord-a");
+    expect(tiedChord.kind).toBe("chord");
+    if (tiedChord.kind !== "chord" || tiedChord.melody?.mode !== "authored")
+      throw new Error("Tie did not materialize the chord and Rest Melody on the retained chord");
+    const tiedNoteIds = tiedChord.melody.phrase.notes.map((note) => note.id);
+    expect(new Set(tiedNoteIds).size).toBe(tiedNoteIds.length);
+    if (restFirst)
+      await page.screenshot({ path: "test-results/tie-rest-first-fills-chord-1280x900.png" });
+    await expectUndoRedoBytes(page, before, afterTie);
+
+    const audioEvents = await playAndCaptureAudioEvents(page);
+    const harmonyEvents = audioEvents.filter(
+      (event) => event.channelRole === "upper" || event.channelRole === "bass",
+    );
+    const chordStart = Math.min(
+      ...harmonyEvents.filter((event) => event.stepIndex === 0).map((event) => event.startSeconds),
+    );
+    expect(
+      harmonyEvents.some((event) => Math.abs(event.startSeconds - (chordStart + 1)) < 1e-6),
+    ).toBe(false);
+    await page
+      .getByRole("group", { name: "Progression playback controls" })
+      .getByRole("button", { name: "Stop" })
+      .click();
+  }
 });
 
 test("only real Step boundaries get handles across measure and System cuts", async ({ page }) => {
@@ -646,12 +1762,183 @@ test("only real Step boundaries get handles across measure and System cuts", asy
   ).toHaveCount(1);
 });
 
+test("Piano Roll Harmony strip grid lines stay aligned with the Melody grid while zoomed and scrolled", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openStudio(page);
+  const source = createPianoRollSystemChordFixture();
+  const first = source.progression.steps[0];
+  if (!first) throw new Error("Fixture is missing its first chord");
+  const fixture: Project = Object.freeze({
+    ...source,
+    progression: Object.freeze({
+      ...source.progression,
+      steps: Object.freeze([
+        Object.freeze({ ...first, duration: musicalDuration(rational(6)) }),
+        ...source.progression.steps.slice(1),
+      ]),
+    }),
+  });
+  await importProject(page, fixture);
+  const zoom = page.getByRole("slider", { name: "Horizontal zoom" });
+
+  for (const value of [70, 120, 180]) {
+    await zoom.evaluate((input, zoomValue) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, String(zoomValue));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+    await expect(zoom).toHaveValue(String(value));
+    await page.locator(".score-system-scroll").evaluateAll((scrollers) => {
+      for (const scroller of scrollers) {
+        const element = scroller as HTMLElement;
+        element.scrollLeft = element.scrollWidth - element.clientWidth;
+      }
+    });
+    const measures = await page.locator(".piano-roll-measure").evaluateAll((elements) =>
+      elements.map((measure) => {
+        const grid = measure.querySelector<HTMLElement>(".piano-roll-grid");
+        const harmony = measure.querySelector<HTMLElement>(".piano-roll-harmony");
+        const harmonySvg = harmony?.querySelector<SVGSVGElement>(".piano-roll-harmony-grid-lines");
+        if (!grid || !harmony || !harmonySvg)
+          throw new Error("Piano Roll grid geometry is missing");
+        const noteLines = Array.from(
+          grid.querySelectorAll<SVGLineElement>(".piano-roll-snap-line"),
+        ).map((line) => ({
+          offset: line.dataset.gridOffset,
+          x: line.getBoundingClientRect().left,
+          kind: line.classList.contains("is-bar-line")
+            ? "bar"
+            : line.classList.contains("is-beat-line")
+              ? "beat"
+              : "subdivision",
+        }));
+        const harmonyLines = Array.from(
+          harmonySvg.querySelectorAll<SVGLineElement>('.piano-roll-harmony-grid-line[y1="0"]'),
+        ).map((line) => ({
+          offset: line.dataset.gridOffset,
+          x: line.getBoundingClientRect().left,
+          kind: line.dataset.gridKind,
+        }));
+        return {
+          pointerEvents: getComputedStyle(harmonySvg).pointerEvents,
+          noteLines,
+          harmonyLines,
+          hasRest: Boolean(harmony.querySelector(".piano-roll-chord.is-rest")),
+          hasContinuation: Boolean(
+            harmony.querySelector('.piano-roll-chord[aria-label*="continuation"]'),
+          ),
+        };
+      }),
+    );
+    expect(measures.length).toBeGreaterThan(3);
+    expect(measures.some((measure) => measure.hasRest)).toBe(true);
+    expect(measures.some((measure) => measure.hasContinuation)).toBe(true);
+    for (const measure of measures) {
+      expect(measure.pointerEvents).toBe("none");
+      expect(measure.noteLines.map((line) => line.offset)).toEqual(
+        measure.harmonyLines.map((line) => line.offset),
+      );
+      expect(measure.noteLines.map((line) => line.kind)).toEqual(
+        measure.harmonyLines.map((line) => line.kind),
+      );
+      expect(
+        measure.noteLines.every(
+          (line, index) => Math.abs(line.x - measure.harmonyLines[index]!.x) < 1,
+        ),
+      ).toBe(true);
+    }
+  }
+});
+
+test("editable Piano Roll chord edges expose an ew-resize cursor and keep short chord bodies usable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openStudio(page);
+  const paired = withSameMeasureChordPair(createPianoRollSystemChordFixture());
+  const [first, second, spacer, ...tail] = paired.progression.steps;
+  if (!first || !second || !spacer || spacer.kind !== "rest")
+    throw new Error("The editable-edge fixture is incomplete");
+  const fixture: Project = Object.freeze({
+    ...paired,
+    progression: Object.freeze({
+      ...paired.progression,
+      steps: Object.freeze([
+        Object.freeze({ ...first, duration: musicalDuration(rational(1, 6)) }),
+        Object.freeze({ ...second, duration: musicalDuration(rational(23, 6)) }),
+        spacer,
+        ...tail,
+      ]),
+    }),
+  });
+  await importProject(page, fixture);
+  await page.getByLabel("Snap resolution").selectOption("1/16 triplet");
+
+  const shortChord = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  await shortChord.click();
+  const rightHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
+  );
+  await expect(rightHandle).toBeVisible();
+  const handleBox = await rightHandle.boundingBox();
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  const hoverState = await rightHandle.evaluate((element) => ({
+    cursor: getComputedStyle(element).cursor,
+    marker: getComputedStyle(element, "::after").backgroundColor,
+  }));
+  expect(hoverState.cursor).toBe("ew-resize");
+  expect(hoverState.marker).not.toBe("rgba(0, 0, 0, 0)");
+
+  await page.mouse.down();
+  await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+  await expect(rightHandle).toHaveClass(/is-previewing/);
+  await page.mouse.up();
+  await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+  await expect(rightHandle).not.toHaveClass(/is-previewing/);
+
+  const shortChordBox = await shortChord.boundingBox();
+  expect(shortChordBox).not.toBeNull();
+  const bodyTarget = await page.evaluate(
+    ({ x, y }) =>
+      document.elementFromPoint(x, y)?.closest(".piano-roll-chord")?.dataset.sourceStepId,
+    {
+      x: shortChordBox!.x + shortChordBox!.width / 2,
+      y: shortChordBox!.y + shortChordBox!.height / 2,
+    },
+  );
+  expect(bodyTarget).toBe("chord-a");
+  await shortChord.click({
+    position: { x: shortChordBox!.width / 2, y: shortChordBox!.height / 2 },
+  });
+  await expect(shortChord).toHaveAttribute("aria-pressed", "true");
+
+  const nextChord = page.locator('.piano-roll-chord[data-source-step-id="chord-b"]').first();
+  await nextChord.click();
+  const leftHandle = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-b"][data-boundary-edge="left"]',
+  );
+  await expect(leftHandle).toBeVisible();
+  const leftBox = await leftHandle.boundingBox();
+  expect(leftBox).not.toBeNull();
+  await page.mouse.move(leftBox!.x + leftBox!.width / 2, leftBox!.y + leftBox!.height / 2);
+  const leftHoverState = await leftHandle.evaluate((element) => ({
+    cursor: getComputedStyle(element).cursor,
+    marker: getComputedStyle(element, "::after").backgroundColor,
+  }));
+  expect(leftHoverState.cursor).toBe("ew-resize");
+  expect(leftHoverState.marker).not.toBe("rgba(0, 0, 0, 0)");
+});
+
 test("boundary drag autoscrolls across Systems and pointer cancellation preserves the snapshot", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 360 });
   await openStudio(page);
-  const fixture = createPianoRollSystemChordFixture();
+  const fixture = withSameMeasureChordPair(createPianoRollSystemChordFixture());
   await importProject(page, fixture);
   const before = await exportProjectText(page);
   await page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first().click();
@@ -680,19 +1967,19 @@ test("boundary drag autoscrolls across Systems and pointer cancellation preserve
   expect(await exportProjectText(page)).toBe(before);
 });
 
-test("cross-System boundary autoscroll commits exact pair data and one Undo/Redo", async ({
+test("cross-System resize creates Rest1 and keeps the following F fixed at beat 8", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 360 });
   await openStudio(page);
-  const fixture = createPianoRollSystemChordFixture();
+  const fixture = withEmAtFourAndFAtEight(createPianoRollSystemChordFixture());
   const project: Project = Object.freeze({
     ...fixture,
     presentation: Object.freeze({ ...fixture.presentation, measuresPerSystem: 1 }),
   });
   await importProject(page, project);
 
-  const sourceChord = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
+  const sourceChord = page.locator('.piano-roll-chord[data-source-step-id="chord-b"]').first();
   await sourceChord.click();
   const audition = page.getByTestId("piano-roll-playhead");
   if (await audition.count()) await expect(audition).toHaveCount(0, { timeout: 8_000 });
@@ -700,7 +1987,7 @@ test("cross-System boundary autoscroll commits exact pair data and one Undo/Redo
   const before = await exportProjectText(page);
   const beforeProject = decodePortableProject(before);
   const boundary = page.locator(
-    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-b"][data-boundary-edge="right"]',
   );
   await boundary.scrollIntoViewIfNeeded();
   const handleBox = await boundary.boundingBox();
@@ -709,66 +1996,48 @@ test("cross-System boundary autoscroll commits exact pair data and one Undo/Redo
     x: handleBox.x + handleBox.width / 2,
     y: handleBox.y + handleBox.height / 2,
   };
-  const startingScroll = await page.evaluate(() => window.scrollY);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
+  await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
 
   const targetGrid = page.getByRole("region", { name: "Measure 2" }).locator(".piano-roll-grid");
-  let targetBox = await targetGrid.boundingBox();
-  for (let index = 0; index < 32; index += 1) {
-    if (
-      targetBox &&
-      targetBox.y < (page.viewportSize()?.height ?? 360) - 44 &&
-      targetBox.y + targetBox.height > 36
-    )
-      break;
-    await page.mouse.move(start.x, (page.viewportSize()?.height ?? 360) - 8);
-    await page.waitForTimeout(24);
-    targetBox = await targetGrid.boundingBox();
-  }
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(startingScroll);
-  targetBox = await targetGrid.boundingBox();
+  const targetBox = await targetGrid.boundingBox();
   if (!targetBox || targetBox.y >= 352 || targetBox.y + targetBox.height <= 36)
-    throw new Error("Measure 2 did not enter the viewport during boundary autoscroll");
+    throw new Error("Measure 2 is not visible for the cross-System boundary drag");
+  const visibleTop = Math.max(targetBox.y + 1, 28);
+  const visibleBottom = Math.min(targetBox.y + targetBox.height - 1, 332);
+  if (visibleBottom <= visibleTop)
+    throw new Error("Measure 2 has no usable visible Piano Roll area for the drag");
   const target = {
-    x: targetBox.x + targetBox.width / 4,
-    y: Math.max(36, Math.min(320, targetBox.y + targetBox.height / 2)),
+    x: targetBox.x + (targetBox.width * 3) / 4,
+    y: (visibleTop + visibleBottom) / 2,
   };
   await page.mouse.move(target.x, target.y, { steps: 8 });
   await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
-  expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeCloseTo(5, 6);
+  expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeCloseTo(7, 6);
   await page.mouse.up();
   await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
   await expect(page.getByTestId("piano-roll-playhead")).toHaveCount(0);
 
   const after = await exportProjectText(page);
   const afterProject = decodePortableProject(after);
-  expect(step(afterProject, "chord-a").duration.beats).toEqual(rational(5));
   expect(step(afterProject, "chord-b").duration.beats).toEqual(rational(3));
-  expect(stepStart(afterProject, "chord-a")).toEqual(rational(0));
+  expect(stepStart(afterProject, "chord-b")).toEqual(rational(4));
+  const gap =
+    afterProject.progression.steps[
+      afterProject.progression.steps.findIndex((candidate) => candidate.id === "chord-b") + 1
+    ];
+  expect(gap?.kind).toBe("rest");
+  expect(gap?.duration.beats).toEqual(rational(1));
+  expect(step(afterProject, "chord-c").kind).toBe("chord");
+  expect(stepStart(afterProject, "chord-c")).toEqual(rational(8));
   expect(sumDuration(afterProject)).toEqual(sumDuration(beforeProject));
-  expect(afterProject.progression.steps.map((candidate) => candidate.id)).toEqual(
-    beforeProject.progression.steps.map((candidate) => candidate.id),
-  );
   for (const stepId of ["chord-c", "rest-d", "generated-e", "chord-f"]) {
     expect(step(afterProject, stepId)).toEqual(step(beforeProject, stepId));
     expect(stepStart(afterProject, stepId)).toEqual(stepStart(beforeProject, stepId));
   }
   expect(fullMelodySignature(afterProject)).toEqual(fullMelodySignature(beforeProject));
 
-  const beforeMelody = createEffectiveMelodyTimeline(beforeProject);
-  const afterMelody = createEffectiveMelodyTimeline(afterProject);
-  expect(afterMelody.map((note) => note.sourceStepId)).toEqual(
-    beforeMelody.map((note) => {
-      if (note.sourceStepId !== "chord-a" && note.sourceStepId !== "chord-b")
-        return note.sourceStepId;
-      return compareRational(note.startBeats, rational(5)) < 0 ? "chord-a" : "chord-b";
-    }),
-  );
-  const movedBNote = afterMelody.find(
-    (note) => note.pitch.midiNumber === 67 && compareRational(note.startBeats, rational(4)) === 0,
-  );
-  expect(movedBNote?.sourceStepId).toBe("chord-a");
   const chordAAfter = step(afterProject, "chord-a");
   expect(chordAAfter.kind).toBe("chord");
   if (chordAAfter.kind !== "chord" || chordAAfter.melody?.mode !== "authored")
@@ -779,12 +2048,12 @@ test("cross-System boundary autoscroll commits exact pair data and one Undo/Redo
   await expectUndoRedoBytes(page, before, after);
 });
 
-test("keyboard boundary resize clamps both short neighbors and keeps project edges fixed", async ({
+test("keyboard boundary resize supports full chord merge and keeps project edges fixed", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openStudio(page);
-  const fixture = createPianoRollSystemChordFixture();
+  const fixture = withSameMeasureChordPair(createPianoRollSystemChordFixture());
   await importProject(page, fixture);
   const chordA = page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first();
   await chordA.click();
@@ -796,7 +2065,18 @@ test("keyboard boundary resize clamps both short neighbors and keeps project edg
   const startHandle = page.locator(
     '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="left"]',
   );
-  await expect(startHandle).toHaveCount(0);
+  await expect(startHandle).toHaveAttribute("aria-valuemin", "0");
+  await expect(startHandle).toHaveAttribute("aria-valuenow", "0");
+  const beforeProjectEdge = await exportProjectText(page);
+  await startHandle.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+  expect(Number(await startHandle.getAttribute("aria-valuenow"))).toBeCloseTo(0, 6);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+  expect(Number(await startHandle.getAttribute("aria-valuenow"))).toBeCloseTo(0.5, 6);
+  await page.keyboard.press("Escape");
+  expect(await exportProjectText(page)).toBe(beforeProjectEdge);
   const boundary = page.locator(
     '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
   );
@@ -804,18 +2084,24 @@ test("keyboard boundary resize clamps both short neighbors and keeps project edg
   await boundary.focus();
   for (let index = 0; index < 32; index += 1) await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
-  expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeCloseTo(7.5, 6);
+  expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeCloseTo(4, 6);
   await page.keyboard.press("Enter");
   const afterMaximum = await exportProjectText(page);
   const maximumProject = decodePortableProject(afterMaximum);
-  expect(step(maximumProject, "chord-a").duration.beats).toEqual(rational(15, 2));
-  expect(step(maximumProject, "chord-b").duration.beats).toEqual(rational(1, 2));
+  expect(maximumProject.progression.steps.map((candidate) => candidate.id)).not.toContain(
+    "chord-b",
+  );
+  expect(step(maximumProject, "chord-a").duration.beats).toEqual(rational(4));
   expect(stepStart(maximumProject, "chord-c")).toEqual(rational(8));
   expect(sumDuration(maximumProject)).toEqual(sumDuration(fixture));
   await page.waitForTimeout(100);
   await expect(playhead).toHaveCount(0);
   await expectUndoRedoBytes(page, beforeMaximum, afterMaximum);
 
+  await importProject(page, fixture);
+  await page.getByLabel("Snap resolution").selectOption("1/8");
+  await page.locator('.piano-roll-chord[data-source-step-id="chord-a"]').first().click();
+  if (await playhead.count()) await expect(playhead).toHaveCount(0, { timeout: 8_000 });
   const beforeMinimum = await exportProjectText(page);
   await boundary.focus();
   for (let index = 0; index < 48; index += 1) await page.keyboard.press("ArrowLeft");
@@ -825,7 +2111,7 @@ test("keyboard boundary resize clamps both short neighbors and keeps project edg
   const afterMinimum = await exportProjectText(page);
   const minimumProject = decodePortableProject(afterMinimum);
   expect(step(minimumProject, "chord-a").duration.beats).toEqual(rational(1, 2));
-  expect(step(minimumProject, "chord-b").duration.beats).toEqual(rational(15, 2));
+  expect(step(minimumProject, "chord-b").duration.beats).toEqual(rational(7, 2));
   expect(stepStart(minimumProject, "chord-c")).toEqual(rational(8));
   expect(sumDuration(minimumProject)).toEqual(sumDuration(fixture));
   expect(await playhead.count()).toBe(0);
@@ -835,11 +2121,11 @@ test("keyboard boundary resize clamps both short neighbors and keeps project edg
   await finalChord.scrollIntoViewIfNeeded();
   await finalChord.click();
   if (await playhead.count()) await expect(playhead).toHaveCount(0, { timeout: 8_000 });
-  await expect(
-    page.locator(
-      '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-f"][data-boundary-edge="right"]',
-    ),
-  ).toHaveCount(0);
+  const finalEdge = page.locator(
+    '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-f"][data-boundary-edge="right"]',
+  );
+  await expect(finalEdge).toHaveAttribute("aria-valuemax", "24");
+  expect(Number(await finalEdge.getAttribute("aria-valuenow"))).toBeCloseTo(24, 6);
 });
 
 test("lost capture, blur, view change and stale Project updates cancel boundary previews", async ({

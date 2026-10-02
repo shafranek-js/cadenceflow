@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -17,6 +18,14 @@ import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { globalTiming, meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
+import {
+  addRational,
+  compareRational,
+  multiplyRational,
+  type Rational,
+} from "../../../src/domain/timing/rational";
+import { createEffectiveMelodyTimeline } from "../../../src/domain/melody/effectiveTimeline";
+import { decodePortableProject } from "../../../src/persistence/portableProject";
 import { groove } from "../../../src/domain/timing/swing";
 import type { ChordMelodyRecipe } from "../../../src/domain/melody/types";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
@@ -298,6 +307,231 @@ async function parsePartIds(
       return id;
     });
   return { partList: ids("//part-list/score-part"), score: ids("//part") };
+}
+
+interface MusicXmlTestNode {
+  type(): string;
+}
+
+interface MusicXmlTestElement extends MusicXmlTestNode {
+  name(): string;
+  text(): string;
+  attr(name: string): { value(): string } | null;
+  childNodes(): MusicXmlTestNode[];
+  find<T extends MusicXmlTestElement = MusicXmlTestElement>(path: string): T[];
+}
+
+interface MusicXmlTestDocument {
+  find<T extends MusicXmlTestElement = MusicXmlTestElement>(path: string): T[];
+  get<T extends MusicXmlTestElement = MusicXmlTestElement>(path: string): T | null;
+}
+
+function xmlText(node: MusicXmlTestElement, path: string): string {
+  const value = node.find(path)[0]?.text();
+  if (value === undefined) throw new Error(`Missing MusicXML element at ${path}`);
+  return value;
+}
+
+const MUSIC_XML_TYPE_BEATS: Readonly<Record<string, Rational>> = Object.freeze({
+  whole: rational(4),
+  half: rational(2),
+  quarter: rational(1),
+  eighth: rational(1, 2),
+  "16th": rational(1, 4),
+  "32nd": rational(1, 8),
+  "64th": rational(1, 16),
+});
+
+function writtenDurationFromXml(event: MusicXmlTestElement): Rational {
+  const noteType = xmlText(event, "./type");
+  let duration = MUSIC_XML_TYPE_BEATS[noteType];
+  if (!duration) throw new Error(`Unsupported MusicXML written type ${noteType}`);
+  for (const _dot of event.find("./dot")) duration = multiplyRational(duration, rational(3, 2));
+  const timeModification = event.find<MusicXmlTestElement>("./time-modification")[0];
+  if (timeModification) {
+    duration = multiplyRational(
+      duration,
+      rational(
+        Number(xmlText(timeModification, "./normal-notes")),
+        Number(xmlText(timeModification, "./actual-notes")),
+      ),
+    );
+  }
+  return duration;
+}
+
+interface ParsedMelodySegment {
+  readonly onsetBeats: Rational;
+  readonly durationBeats: Rational;
+  readonly midi: number;
+  readonly voice: string;
+  readonly instrumentId: string;
+  readonly ties: readonly string[];
+  readonly type: string;
+  readonly dots: number;
+  readonly timeModification?: {
+    readonly actualNotes: number;
+    readonly normalNotes: number;
+    readonly normalType: string;
+  };
+}
+
+interface ParsedMelodyRest {
+  readonly onsetBeats: Rational;
+  readonly durationBeats: Rational;
+  readonly type: string;
+  readonly dots: number;
+  readonly timeModification?: {
+    readonly actualNotes: number;
+    readonly normalNotes: number;
+    readonly normalType: string;
+  };
+}
+
+async function parseWrittenMelody(
+  xml: string,
+  beatsPerMeasure: Rational,
+  divisions: number,
+  validateWrittenDurations = true,
+) {
+  const libxml = await import("libxmljs2");
+  const document = libxml.parseXml(xml) as unknown as MusicXmlTestDocument;
+  const measures = document.find("/score-partwise/part[@id='P2']/measure");
+  const segments: ParsedMelodySegment[] = [];
+  const rests: ParsedMelodyRest[] = [];
+  const stepSemitones: Readonly<Record<string, number>> = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
+  };
+
+  for (const measure of measures) {
+    const measureNumber = Number(measure.attr("number")?.value());
+    let cursorUnits = 0;
+    const measureStart = multiplyRational(beatsPerMeasure, rational(measureNumber - 1));
+    const children = measure
+      .childNodes()
+      .filter((node) => node.type() === "element") as MusicXmlTestElement[];
+    for (const child of children) {
+      if (child.name() === "backup") {
+        cursorUnits -= Number(xmlText(child, "./duration"));
+        continue;
+      }
+      if (child.name() === "forward") {
+        cursorUnits += Number(xmlText(child, "./duration"));
+        continue;
+      }
+      if (child.name() !== "note") continue;
+
+      const durationUnits = Number(xmlText(child, "./duration"));
+      const onsetBeats = addRational(measureStart, rational(cursorUnits, divisions));
+      const durationBeats = rational(durationUnits, divisions);
+      if (validateWrittenDurations) expect(writtenDurationFromXml(child)).toEqual(durationBeats);
+      const rest = child.find("./rest").length > 0;
+      if (rest) {
+        const timeModification = child.find<MusicXmlTestElement>("./time-modification")[0];
+        rests.push({
+          onsetBeats,
+          durationBeats,
+          type: child.find("./type")[0]?.text() ?? "",
+          dots: child.find("./dot").length,
+          ...(timeModification
+            ? {
+                timeModification: {
+                  actualNotes: Number(xmlText(timeModification, "./actual-notes")),
+                  normalNotes: Number(xmlText(timeModification, "./normal-notes")),
+                  normalType: xmlText(timeModification, "./normal-type"),
+                },
+              }
+            : {}),
+        });
+      } else {
+        const step = xmlText(child, "./pitch/step");
+        const alter = Number(child.find("./pitch/alter")[0]?.text() ?? "0");
+        const octave = Number(xmlText(child, "./pitch/octave"));
+        const instrumentId = child.find("./instrument")[0]?.attr("id")?.value();
+        if (!instrumentId) throw new Error("MusicXML Melody note is missing its instrument id");
+        const timeModification = child.find<MusicXmlTestElement>("./time-modification")[0];
+        segments.push({
+          onsetBeats,
+          durationBeats,
+          midi: (octave + 1) * 12 + stepSemitones[step]! + alter,
+          voice: xmlText(child, "./voice"),
+          instrumentId,
+          ties: child.find("./tie").map((tie) => tie.attr("type")?.value() ?? ""),
+          type: child.find("./type")[0]?.text() ?? "",
+          dots: child.find("./dot").length,
+          ...(timeModification
+            ? {
+                timeModification: {
+                  actualNotes: Number(xmlText(timeModification, "./actual-notes")),
+                  normalNotes: Number(xmlText(timeModification, "./normal-notes")),
+                  normalType: xmlText(timeModification, "./normal-type"),
+                },
+              }
+            : {}),
+        });
+      }
+      cursorUnits += durationUnits;
+    }
+  }
+
+  const completed: {
+    readonly onsetBeats: Rational;
+    readonly durationBeats: Rational;
+    readonly midi: number;
+    readonly instrumentId: string;
+  }[] = [];
+  const open: {
+    readonly onsetBeats: Rational;
+    durationBeats: Rational;
+    readonly midi: number;
+    readonly voice: string;
+    readonly instrumentId: string;
+  }[] = [];
+  for (const segment of segments) {
+    const startsTie = segment.ties.includes("start");
+    const stopsTie = segment.ties.includes("stop");
+    if (stopsTie) {
+      const previousIndex = open.findLastIndex(
+        (candidate) =>
+          candidate.midi === segment.midi &&
+          candidate.voice === segment.voice &&
+          candidate.instrumentId === segment.instrumentId &&
+          compareRational(
+            addRational(candidate.onsetBeats, candidate.durationBeats),
+            segment.onsetBeats,
+          ) === 0,
+      );
+      if (previousIndex < 0) throw new Error("MusicXML tie stop has no contiguous source note");
+      const previous = open[previousIndex]!;
+      previous.durationBeats = addRational(previous.durationBeats, segment.durationBeats);
+      if (!startsTie) {
+        completed.push({
+          onsetBeats: previous.onsetBeats,
+          durationBeats: previous.durationBeats,
+          midi: previous.midi,
+          instrumentId: previous.instrumentId,
+        });
+        open.splice(previousIndex, 1);
+      }
+    } else if (startsTie) {
+      open.push({ ...segment });
+    } else {
+      completed.push({
+        onsetBeats: segment.onsetBeats,
+        durationBeats: segment.durationBeats,
+        midi: segment.midi,
+        instrumentId: segment.instrumentId,
+      });
+    }
+  }
+  if (open.length > 0) throw new Error("MusicXML Melody contains an unclosed tie");
+  return { notes: completed, segments, rests };
 }
 
 const PRE_T175_NO_MELODY_GOLDEN_BASE64 =
@@ -771,6 +1005,170 @@ describe("T175 Melody MusicXML part", () => {
     expect(parsed).toEqual({ partList: ["P2", "P1"], score: ["P2", "P1"] });
   });
 
+  it("exports the real eight-measure project with exact notes, rests, ties, and dotted rhythms", async () => {
+    const projectUrl = new URL(
+      "../../fixtures/exports/musicxml/real-project-8/8.cadenceflow",
+      import.meta.url,
+    );
+    const originalMusicXmlUrl = new URL(
+      "../../fixtures/exports/musicxml/real-project-8/8.original.musicxml",
+      import.meta.url,
+    );
+    const portableText = await readFile(projectUrl, "utf8");
+    const originalMusicXml = await readFile(originalMusicXmlUrl, "utf8");
+    const sha256 = (value: string) =>
+      createHash("sha256").update(value).digest("hex").toUpperCase();
+    expect(sha256(portableText)).toBe(
+      "606F0193B153AE56AAF6CE2B717C21D1C46707EE79E515FC97424C8C9E565E0A",
+    );
+    expect(sha256(originalMusicXml)).toBe(
+      "7F0D6BFDE0643FBF0B85B82CE8040EA231E28A5C429384931AD54B586A54D4E0",
+    );
+
+    const project = decodePortableProject(portableText);
+    const projection = projectProjectToMusicXml(project);
+    const melody = projection.melody;
+    expect(melody).toBeDefined();
+    const xml = writeMusicXml(projection);
+    const parsed = await parseWrittenMelody(
+      xml,
+      rational(projection.attributes.time.numerator * 4, projection.attributes.time.denominator),
+      projection.attributes.divisions,
+    );
+    const exactEvents = (
+      events: readonly { onsetBeats: Rational; durationBeats: Rational; midi: number }[],
+    ) =>
+      [...events]
+        .sort(
+          (left, right) =>
+            compareRational(left.onsetBeats, right.onsetBeats) ||
+            left.midi - right.midi ||
+            compareRational(left.durationBeats, right.durationBeats),
+        )
+        .map((event) => ({
+          onsetBeats: event.onsetBeats,
+          durationBeats: event.durationBeats,
+          midi: event.midi,
+        }));
+    const sourceTimeline = createEffectiveMelodyTimeline(project);
+    const libxml = await import("libxmljs2");
+    const originalDocument = libxml.parseXml(originalMusicXml) as unknown as MusicXmlTestDocument;
+    const originalDivisions = Number(
+      originalDocument
+        .find("/score-partwise/part[@id='P2']/measure[1]/attributes/divisions")[0]
+        ?.text(),
+    );
+    const originalTimeline = await parseWrittenMelody(
+      originalMusicXml,
+      rational(projection.attributes.time.numerator * 4, projection.attributes.time.denominator),
+      originalDivisions,
+      false,
+    );
+    expect(sourceTimeline).toHaveLength(24);
+    expect(originalTimeline.segments).toHaveLength(25);
+    expect(originalTimeline.notes).toHaveLength(24);
+    expect(parsed.segments).toHaveLength(27);
+    expect(exactEvents(parsed.notes)).toEqual(
+      exactEvents(
+        sourceTimeline.map((event) => ({
+          onsetBeats: event.startBeats,
+          durationBeats: event.durationBeats,
+          midi: event.sourcePitchMidi,
+        })),
+      ),
+    );
+    expect(exactEvents(originalTimeline.notes)).toEqual(
+      exactEvents(
+        sourceTimeline.map((event) => ({
+          onsetBeats: event.startBeats,
+          durationBeats: event.durationBeats,
+          midi: event.sourcePitchMidi,
+        })),
+      ),
+    );
+
+    const projectedNotes = melody!.measures.flatMap((measure) =>
+      measure.events
+        .filter((event): event is MusicXmlMelodyNoteEvent => event.kind === "note")
+        .map((event) => ({
+          ...event,
+          onsetBeats: addRational(measure.startBeats, event.onsetBeats),
+        })),
+    );
+    const writtenNoteEvents = [...parsed.segments]
+      .sort(
+        (left, right) =>
+          compareRational(left.onsetBeats, right.onsetBeats) ||
+          left.voice.localeCompare(right.voice) ||
+          left.midi - right.midi,
+      )
+      .map((event) => ({
+        onsetBeats: event.onsetBeats,
+        durationBeats: event.durationBeats,
+        midi: event.midi,
+        voice: event.voice,
+        instrumentId: event.instrumentId,
+        ties: event.ties,
+      }));
+    const projectedNoteEvents = [...projectedNotes]
+      .sort(
+        (left, right) =>
+          compareRational(left.onsetBeats, right.onsetBeats) ||
+          left.voice.localeCompare(right.voice) ||
+          left.sourceMidi - right.sourceMidi,
+      )
+      .map((event) => ({
+        onsetBeats: event.onsetBeats,
+        durationBeats: event.durationBeats,
+        midi: event.sourceMidi,
+        voice: event.voice,
+        instrumentId: event.instrumentId,
+        ties: event.ties,
+      }));
+    expect(writtenNoteEvents).toEqual(projectedNoteEvents);
+
+    const projectedRests = melody!.measures.flatMap((measure) =>
+      measure.events
+        .filter((event) => event.kind === "rest")
+        .map((event) => ({
+          ...event,
+          onsetBeats: addRational(measure.startBeats, event.onsetBeats),
+        })),
+    );
+    expect(
+      parsed.rests
+        .sort(
+          (left, right) =>
+            compareRational(left.onsetBeats, right.onsetBeats) ||
+            compareRational(left.durationBeats, right.durationBeats),
+        )
+        .map(({ onsetBeats, durationBeats }) => ({ onsetBeats, durationBeats })),
+    ).toEqual(
+      [...projectedRests]
+        .sort(
+          (left, right) =>
+            compareRational(left.onsetBeats, right.onsetBeats) ||
+            compareRational(left.durationBeats, right.durationBeats),
+        )
+        .map(({ onsetBeats, durationBeats }) => ({ onsetBeats, durationBeats })),
+    );
+
+    expect(parsed.notes).toContainEqual({
+      onsetBeats: rational(4),
+      durationBeats: rational(5, 2),
+      midi: 67,
+      instrumentId: expect.any(String),
+    });
+    expect(parsed.notes).toContainEqual({
+      onsetBeats: rational(51, 2),
+      durationBeats: rational(9, 2),
+      midi: 67,
+      instrumentId: expect.any(String),
+    });
+    expect(parsed.segments.some((event) => event.ties.includes("start"))).toBe(true);
+    expect(parsed.segments.some((event) => event.dots > 0)).toBe(true);
+  });
+
   it("projects contextual exact pitches, written types, rests, tuplets, ties, and complete bars", () => {
     const projection = projectProjectToMusicXml(melodyProject());
     const melody = projection.melody!;
@@ -791,7 +1189,13 @@ describe("T175 Melody MusicXML part", () => {
       "melody-rest",
       "melody-no-recipe",
       "__trailing-measure-gap__",
+      "__trailing-measure-gap__",
     ]);
+    expect(
+      melodyRests(projection)
+        .filter((event) => event.stepId === "__trailing-measure-gap__")
+        .map((event) => event.durationBeats),
+    ).toEqual([rational(2), rational(1, 2)]);
     expect(
       melodyNotes(projection)
         .filter((note) => note.stepId === "melody-quarter")

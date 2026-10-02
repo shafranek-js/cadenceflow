@@ -332,7 +332,12 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
       type: "progression/remove-step",
       payload: { stepId: "step-1", nowIso: T1 },
     });
-    expect(removed.project.progression.steps).toHaveLength(0);
+    expect(removed.project.progression.steps).toHaveLength(1);
+    expect(removed.project.progression.steps[0]).toMatchObject({
+      id: "step-1",
+      kind: "rest",
+      authoredMelody: { sourceRecipe: recipe },
+    });
     expect(
       applyInverseCommand(removed.project, removed.inverse).progression.steps[0],
     ).toHaveProperty("melody", { mode: "generated", recipe });

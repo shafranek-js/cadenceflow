@@ -42,6 +42,7 @@ import {
 } from "../../domain/timing/rational";
 import { createProgressionTimeline, type TimelineStepEntry } from "../../domain/timing/timeline";
 import { createProgressionMeasureLayout } from "../../domain/timing/measureLayout";
+import { projectWrittenRhythm } from "../../notation/writtenRhythmProjection";
 import { pianoProfile } from "../../instruments/piano/profile";
 
 export const MUSICXML_VERSION = "4.0";
@@ -126,10 +127,13 @@ export type MusicXmlMeasureEvent =
   MusicXmlHarmonyEvent | MusicXmlDirectionEvent | MusicXmlNoteEvent | MusicXmlRestEvent;
 
 export interface MusicXmlMelodyTimeModification {
-  readonly actualNotes: 3;
-  readonly normalNotes: 2;
-  readonly normalType: "quarter" | "eighth" | "16th";
+  readonly actualNotes: number;
+  readonly normalNotes: number;
+  readonly normalType: MusicXmlWrittenNoteType;
 }
+
+export type MusicXmlWrittenNoteType =
+  "whole" | "half" | "quarter" | "eighth" | "16th" | "32nd" | "64th";
 
 export interface MusicXmlMelodyNoteEvent {
   readonly eventKey: string;
@@ -148,7 +152,7 @@ export interface MusicXmlMelodyNoteEvent {
   readonly instrument: MelodyInstrument;
   readonly clef: { readonly sign: "G" | "F"; readonly line: 2 | 4 };
   readonly pitch: MusicXmlPitchSpelling & { readonly octave: number };
-  readonly type: "whole" | "half" | "quarter" | "eighth" | "16th";
+  readonly type: MusicXmlWrittenNoteType;
   readonly dots?: 1;
   readonly ties: readonly ("start" | "stop")[];
   readonly timeModification?: MusicXmlMelodyTimeModification;
@@ -164,6 +168,9 @@ export interface MusicXmlMelodyRestEvent {
   readonly duration: number;
   readonly voice: string;
   readonly staff: 1;
+  readonly type: MusicXmlWrittenNoteType;
+  readonly dots?: 1;
+  readonly timeModification?: MusicXmlMelodyTimeModification;
 }
 
 export type MusicXmlMelodyMeasureEvent = MusicXmlMelodyNoteEvent | MusicXmlMelodyRestEvent;
@@ -283,79 +290,58 @@ function melodyExportName(entry: MelodyInstrumentCatalogEntry): string {
   return entry.id === "synth-lead" ? "Synth Lead" : entry.label;
 }
 
-function melodyNoteType(grid: MelodyGrid): MusicXmlMelodyNoteEvent["type"] {
-  switch (grid) {
-    case "quarter":
-      return "quarter";
-    case "eighth":
-    case "eighth-triplet":
-      return "eighth";
-    case "sixteenth":
-    case "sixteenth-triplet":
-      return "16th";
-    default:
-      throw new MusicXmlExportError(
-        "invalid-projection",
-        `Unsupported Melody grid: ${String(grid)}.`,
-      );
-  }
+interface WrittenRhythmPart {
+  readonly durationBeats: Rational;
+  readonly notation: Pick<MusicXmlMelodyNoteEvent, "type" | "dots" | "timeModification">;
 }
 
-function melodyTimeModification(grid: MelodyGrid): MusicXmlMelodyTimeModification | undefined {
-  switch (grid) {
-    case "eighth-triplet":
-      return Object.freeze({ actualNotes: 3, normalNotes: 2, normalType: "eighth" });
-    case "sixteenth-triplet":
-      return Object.freeze({ actualNotes: 3, normalNotes: 2, normalType: "16th" });
-    default:
-      return undefined;
-  }
-}
+const MUSIC_XML_NOTE_TYPE: Readonly<Record<string, MusicXmlWrittenNoteType>> = Object.freeze({
+  w: "whole",
+  h: "half",
+  q: "quarter",
+  "8": "eighth",
+  "16": "16th",
+  "32": "32nd",
+  "64": "64th",
+});
 
-function melodyNotationForDuration(
+function writtenRhythmPartsForDuration(
   duration: Rational,
-  fallbackGrid: MelodyGrid,
-): Pick<MusicXmlMelodyNoteEvent, "type" | "dots" | "timeModification"> {
-  const value = `${duration.numerator}/${duration.denominator}`;
-  switch (value) {
-    case "4/1":
-      return { type: "whole" };
-    case "3/1":
-      return { type: "half", dots: 1 };
-    case "2/1":
-      return { type: "half" };
-    case "3/2":
-      return { type: "quarter", dots: 1 };
-    case "1/1":
-      return { type: "quarter" };
-    case "3/4":
-      return { type: "eighth", dots: 1 };
-    case "2/3":
-      return {
-        type: "quarter",
-        timeModification: { actualNotes: 3, normalNotes: 2, normalType: "quarter" },
-      };
-    case "1/2":
-      return { type: "eighth" };
-    case "1/3":
-      return {
-        type: "eighth",
-        timeModification: { actualNotes: 3, normalNotes: 2, normalType: "eighth" },
-      };
-    case "1/4":
-      return { type: "16th" };
-    case "1/6":
-      return {
-        type: "16th",
-        timeModification: { actualNotes: 3, normalNotes: 2, normalType: "16th" },
-      };
-    default: {
-      const timeModification = melodyTimeModification(fallbackGrid);
-      return timeModification
-        ? { type: melodyNoteType(fallbackGrid), timeModification }
-        : { type: melodyNoteType(fallbackGrid) };
-    }
+  startOffset: Rational,
+  timeSignature: Project["globalTiming"]["meter"],
+): readonly WrittenRhythmPart[] {
+  if (compareRational(duration, ZERO) <= 0) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      "Melody rhythm parts need positive durations.",
+    );
   }
+  return Object.freeze(
+    projectWrittenRhythm(duration, startOffset, timeSignature).map((part) => {
+      const type = MUSIC_XML_NOTE_TYPE[part.vexDuration];
+      if (!type)
+        throw new MusicXmlExportError(
+          "invalid-projection",
+          `Unsupported written rhythm value ${part.vexDuration}.`,
+        );
+      return Object.freeze({
+        durationBeats: part.beats,
+        notation: Object.freeze({
+          type,
+          ...(part.dots === 1 ? { dots: 1 as const } : {}),
+          ...(part.tuplet
+            ? {
+                timeModification: {
+                  actualNotes: part.tuplet.numNotes,
+                  normalNotes: part.tuplet.notesOccupied,
+                  normalType: type,
+                },
+              }
+            : {}),
+        }),
+      });
+    }),
+  );
 }
 
 function melodyTupletMarks(
@@ -712,6 +698,7 @@ function addMelodyRawEvent(
   rawEvent: MelodyRawEvent,
   divisions: number,
   barLengthBeats: Rational,
+  meter: Project["globalTiming"]["meter"],
   partId: string,
 ): void {
   if (compareRational(rawEvent.endBeats, rawEvent.startBeats) <= 0) {
@@ -737,56 +724,74 @@ function addMelodyRawEvent(
     const durationBeats = subtractRational(fragmentEnd, cursor);
     const isFirstFragment = compareRational(cursor, rawEvent.startBeats) === 0;
     const isLastFragment = compareRational(fragmentEnd, rawEvent.endBeats) === 0;
-    const ties: ("start" | "stop")[] = [];
-    if (!isFirstFragment) ties.push("stop");
-    if (!isLastFragment) ties.push("start");
-    const onsetBeats = subtractRational(cursor, measure.startBeats);
-    const duration = durationUnits(durationBeats, divisions);
-
-    if (rawEvent.kind === "note") {
-      const notation = melodyNotationForDuration(durationBeats, rawEvent.grid);
-      const tupletMarks: ("start" | "stop")[] = [];
-      if (isFirstFragment && rawEvent.tupletMarks.includes("start")) tupletMarks.push("start");
-      if (isLastFragment && rawEvent.tupletMarks.includes("stop")) tupletMarks.push("stop");
-      measure.events.push(
-        Object.freeze({
-          kind: "note",
-          onsetBeats,
-          stepIndex: rawEvent.stepIndex,
-          stepId: rawEvent.stepId,
-          eventKey: rawEvent.eventKey,
-          durationBeats,
-          duration,
-          voice: rawEvent.kind === "note" ? rawEvent.voice : "1",
-          staff: 1,
-          chord: false,
-          sourceMidi: rawEvent.sourceMidi,
-          sourcePitchMidi: rawEvent.sourcePitchMidi,
-          instrumentId: `${partId}-I${rawEvent.instrument}`,
-          instrument: rawEvent.instrument,
-          clef: melodyClef(getMelodyInstrument(rawEvent.instrument)),
-          pitch: rawEvent.pitch,
-          type: notation.type,
-          ...(notation.dots ? { dots: notation.dots } : {}),
-          ties: Object.freeze(ties),
-          ...(notation.timeModification ? { timeModification: notation.timeModification } : {}),
-          tupletMarks: Object.freeze(tupletMarks),
-        } satisfies MusicXmlMelodyNoteEvent),
-      );
-    } else {
-      measure.events.push(
-        Object.freeze({
-          kind: "rest",
-          onsetBeats,
-          stepIndex: rawEvent.stepIndex,
-          stepId: rawEvent.stepId,
-          durationBeats,
-          duration,
-          voice: "1",
-          staff: 1,
-        } satisfies MusicXmlMelodyRestEvent),
-      );
-    }
+    const writtenParts = writtenRhythmPartsForDuration(
+      durationBeats,
+      subtractRational(cursor, measure.startBeats),
+      meter,
+    );
+    let partCursor = cursor;
+    writtenParts.forEach((part, partIndex) => {
+      const firstPart = partIndex === 0;
+      const lastPart = partIndex === writtenParts.length - 1;
+      const partOnsetBeats = subtractRational(partCursor, measure.startBeats);
+      const partDuration = durationUnits(part.durationBeats, divisions);
+      if (rawEvent.kind === "note") {
+        const partTies: ("start" | "stop")[] = [];
+        if (!firstPart || !isFirstFragment) partTies.push("stop");
+        if (!lastPart || !isLastFragment) partTies.push("start");
+        const tupletMarks: ("start" | "stop")[] = [];
+        if (firstPart && isFirstFragment && rawEvent.tupletMarks.includes("start"))
+          tupletMarks.push("start");
+        if (lastPart && isLastFragment && rawEvent.tupletMarks.includes("stop"))
+          tupletMarks.push("stop");
+        measure.events.push(
+          Object.freeze({
+            kind: "note",
+            onsetBeats: partOnsetBeats,
+            stepIndex: rawEvent.stepIndex,
+            stepId: rawEvent.stepId,
+            eventKey: rawEvent.eventKey,
+            durationBeats: part.durationBeats,
+            duration: partDuration,
+            voice: rawEvent.voice,
+            staff: 1,
+            chord: false,
+            sourceMidi: rawEvent.sourceMidi,
+            sourcePitchMidi: rawEvent.sourcePitchMidi,
+            instrumentId: `${partId}-I${rawEvent.instrument}`,
+            instrument: rawEvent.instrument,
+            clef: melodyClef(getMelodyInstrument(rawEvent.instrument)),
+            pitch: rawEvent.pitch,
+            type: part.notation.type,
+            ...(part.notation.dots ? { dots: part.notation.dots } : {}),
+            ties: Object.freeze(partTies),
+            ...(part.notation.timeModification
+              ? { timeModification: part.notation.timeModification }
+              : {}),
+            tupletMarks: Object.freeze(tupletMarks),
+          } satisfies MusicXmlMelodyNoteEvent),
+        );
+      } else {
+        measure.events.push(
+          Object.freeze({
+            kind: "rest",
+            onsetBeats: partOnsetBeats,
+            stepIndex: rawEvent.stepIndex,
+            stepId: rawEvent.stepId,
+            durationBeats: part.durationBeats,
+            duration: partDuration,
+            voice: "1",
+            staff: 1,
+            type: part.notation.type,
+            ...(part.notation.dots ? { dots: part.notation.dots } : {}),
+            ...(part.notation.timeModification
+              ? { timeModification: part.notation.timeModification }
+              : {}),
+          } satisfies MusicXmlMelodyRestEvent),
+        );
+      }
+      partCursor = addRational(partCursor, part.durationBeats);
+    });
     measure.durationBeats = addRational(measure.durationBeats, durationBeats);
     cursor = fragmentEnd;
   }
@@ -955,7 +960,14 @@ function buildMelodyParts(
       }));
       const partId = `P${laneIndex + 2}`;
       filledEvents.forEach((rawEvent) => {
-        addMelodyRawEvent(measures, rawEvent, divisions, barLengthBeats, partId);
+        addMelodyRawEvent(
+          measures,
+          rawEvent,
+          divisions,
+          barLengthBeats,
+          project.globalTiming.meter,
+          partId,
+        );
       });
       const metadata = getMelodyInstrument(instrument);
       const midiChannel = 3 + (laneIndex % 14);

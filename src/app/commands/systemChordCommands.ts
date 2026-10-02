@@ -14,10 +14,12 @@ import { createMatrixChordStep } from "./matrixCommands";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import type { HarmonicVariant } from "../../domain/harmony/chord";
 import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
+import type { Meter } from "../../domain/timing/meter";
 import {
   addRational,
   compareRational,
   divideRational,
+  multiplyRational,
   rational,
   subtractRational,
   ZERO,
@@ -53,9 +55,21 @@ export interface SetSystemStepDurationCommand extends ProjectCommand<
 > {
   readonly type: "piano-roll/set-step-duration";
 }
+export interface ResizeSystemChordDurationCommand extends ProjectCommand<
+  SystemChordPayload & {
+    readonly stepId: string;
+    readonly duration: MusicalDuration;
+  }
+> {
+  readonly type: "progression/resize-chord-duration";
+}
 export interface TransferSystemChordBoundaryCommand extends ProjectCommand<
   SystemChordPayload & {
     readonly leftStepId: string;
+    /** Step whose editable edge the user dragged; used as the surviving ID on a full merge. */
+    readonly draggedStepId?: string;
+    readonly draggedEdge?: "left" | "right";
+    readonly resizeMode?: "boundary" | "isolated";
     readonly boundary: Rational;
     readonly snapQuantum: Rational;
   }
@@ -105,6 +119,25 @@ function startsFor(steps: readonly ProgressionStep[]): ReadonlyMap<string, Ratio
     cursor = addRational(cursor, step.duration.beats);
   }
   return starts;
+}
+
+function measureIndexAt(onset: Rational, meter: Meter): number {
+  const barLength = rational(meter.numerator * 4, meter.denominator);
+  return Math.floor(
+    (onset.numerator * barLength.denominator) / (onset.denominator * barLength.numerator),
+  );
+}
+
+function resizeRestId(
+  steps: readonly ProgressionStep[],
+  leftStepId: string,
+  rightStepId: string | undefined,
+): string {
+  const base = `resize-gap:${leftStepId}:${rightStepId ?? "end"}`;
+  if (!steps.some((step) => step.id === base)) return base;
+  let suffix = 1;
+  while (steps.some((step) => step.id === `${base}:${suffix}`)) suffix += 1;
+  return `${base}:${suffix}`;
 }
 
 function sourcePhrase(step: ProgressionStep): AuthoredMelodyPhrase | undefined {
@@ -306,6 +339,60 @@ function reanchorMelody(
       return chord;
     }),
   );
+}
+
+function effectiveGeneratedMelodyByStep(project: Project): ReadonlyMap<string, string> {
+  const generatedIds = new Set(
+    project.progression.steps
+      .filter(
+        (step): step is ChordStep => step.kind === "chord" && step.melody?.mode === "generated",
+      )
+      .map((step) => step.id),
+  );
+  const eventsByStep = new Map<string, string[]>();
+  for (const event of createEffectiveMelodyTimeline(project)) {
+    if (!generatedIds.has(event.sourceStepId)) continue;
+    const events = eventsByStep.get(event.sourceStepId) ?? [];
+    events.push(
+      JSON.stringify({
+        eventKey: event.eventKey,
+        pitch: event.pitch,
+        sourcePitchMidi: event.sourcePitchMidi,
+        startBeats: event.startBeats,
+        durationBeats: event.durationBeats,
+        instrument: event.instrument,
+      }),
+    );
+    eventsByStep.set(event.sourceStepId, events);
+  }
+  return new Map(
+    [...generatedIds].map((stepId) => [stepId, JSON.stringify(eventsByStep.get(stepId) ?? [])]),
+  );
+}
+
+function reanchorPreservingGeneratedMelody(
+  project: Project,
+  nextSteps: readonly ProgressionStep[],
+  initiallyMaterialized: ReadonlySet<string>,
+): readonly ProgressionStep[] {
+  const firstPass = reanchorMelody(project, nextSteps, {
+    materializeGeneratedStepIds: initiallyMaterialized,
+  });
+  const firstPassProject: Project = Object.freeze({
+    ...project,
+    progression: Object.freeze({ ...project.progression, steps: firstPass }),
+  });
+  const sourceMelody = effectiveGeneratedMelodyByStep(project);
+  const firstPassMelody = effectiveGeneratedMelodyByStep(firstPassProject);
+  const changedGeneratedIds = new Set(
+    [...firstPassMelody]
+      .filter(([stepId, signature]) => sourceMelody.get(stepId) !== signature)
+      .map(([stepId]) => stepId),
+  );
+  if (changedGeneratedIds.size === 0) return firstPass;
+  return reanchorMelody(project, nextSteps, {
+    materializeGeneratedStepIds: new Set([...initiallyMaterialized, ...changedGeneratedIds]),
+  });
 }
 
 function applyProgression(
@@ -511,10 +598,239 @@ export function setSystemStepDuration(
   return withSteps(project, reanchored, command.payload.nowIso);
 }
 
+/** Resizes a chord while keeping later absolute onsets fixed outside a same-bar chord pair. */
+export function resizeSystemChordDuration(
+  project: Project,
+  command: ResizeSystemChordDurationCommand,
+): AppliedCommand {
+  const steps = project.progression.steps;
+  const index = steps.findIndex((step) => step.id === command.payload.stepId);
+  if (index < 0)
+    throw new SystemChordCommandError("unknown-step", `Unknown Step ${command.payload.stepId}.`);
+  const target = steps[index]!;
+  if (target.kind !== "chord")
+    throw new SystemChordCommandError("invalid-duration", "Only chord Steps can be resized.");
+  const newDuration = command.payload.duration.beats;
+  if (compareRational(newDuration, ZERO) <= 0)
+    throw new SystemChordCommandError("invalid-duration", "Step duration must be positive.");
+  if (compareRational(target.duration.beats, newDuration) === 0)
+    return {
+      project,
+      inverse: {
+        type: "progression/restore",
+        payload: { progression: project.progression, nowIso: command.payload.nowIso },
+      },
+    };
+
+  const starts = startsFor(steps);
+  const start = starts.get(target.id)!;
+  const originalEnd = addRational(start, target.duration.beats);
+  const next = steps[index + 1];
+  const measureLength = rational(
+    project.globalTiming.meter.numerator * 4,
+    project.globalTiming.meter.denominator,
+  );
+  const measureIndex = measureIndexAt(start, project.globalTiming.meter);
+  const measureEnd = multiplyRational(measureLength, rational(measureIndex + 1));
+  const nextEnd = next ? addRational(originalEnd, next.duration.beats) : null;
+  const sameMeasureChordPair =
+    next?.kind === "chord" &&
+    measureIndexAt(start, project.globalTiming.meter) ===
+      measureIndexAt(originalEnd, project.globalTiming.meter) &&
+    nextEnd !== null &&
+    compareRational(nextEnd, measureEnd) <= 0;
+  const newEnd = addRational(start, newDuration);
+  const affectedGenerated = new Set<string>();
+  let updatedSteps: ProgressionStep[];
+
+  if (sameMeasureChordPair && next?.kind === "chord") {
+    const nextStart = starts.get(next.id)!;
+    const pairEnd = addRational(nextStart, next.duration.beats);
+    const nextDuration = subtractRational(pairEnd, newEnd);
+    if (compareRational(nextDuration, ZERO) <= 0)
+      throw new SystemChordCommandError(
+        "invalid-duration",
+        "The next chord must keep a positive duration inside this measure.",
+      );
+    updatedSteps = steps.map((step, stepIndex) =>
+      stepIndex === index
+        ? Object.freeze({ ...step, duration: musicalDuration(newDuration) })
+        : stepIndex === index + 1
+          ? Object.freeze({ ...step, duration: musicalDuration(nextDuration) })
+          : step,
+    );
+    if (target.melody?.mode === "generated") affectedGenerated.add(target.id);
+    if (next.melody?.mode === "generated") affectedGenerated.add(next.id);
+  } else {
+    const delta = subtractRational(newDuration, target.duration.beats);
+    const resizedTarget = Object.freeze({ ...target, duration: command.payload.duration });
+    updatedSteps = [...steps.slice(0, index), resizedTarget];
+    if (next?.kind === "rest") {
+      const restDuration = subtractRational(next.duration.beats, delta);
+      if (compareRational(restDuration, ZERO) <= 0)
+        throw new SystemChordCommandError(
+          "invalid-duration",
+          "A resize must leave a positive explicit Rest before the following Step.",
+        );
+      updatedSteps.push(Object.freeze({ ...next, duration: musicalDuration(restDuration) }));
+      updatedSteps.push(...steps.slice(index + 2));
+    } else if (next?.kind === "chord") {
+      if (compareRational(newEnd, originalEnd) > 0)
+        throw new SystemChordCommandError(
+          "invalid-duration",
+          "The following chord keeps its absolute onset across measure boundaries.",
+        );
+      const gap = subtractRational(originalEnd, newEnd);
+      if (compareRational(gap, ZERO) > 0) {
+        updatedSteps.push(
+          Object.freeze({
+            id: resizeRestId(steps, target.id, next.id),
+            kind: "rest" as const,
+            duration: musicalDuration(gap),
+            ...(target.melodyInstrumentOverride
+              ? { melodyInstrumentOverride: target.melodyInstrumentOverride }
+              : {}),
+          }),
+        );
+      }
+      updatedSteps.push(...steps.slice(index + 1));
+    } else if (next) {
+      throw new SystemChordCommandError("invalid-duration", "Unsupported following Step.");
+    } else {
+      if (compareRational(newEnd, originalEnd) > 0) {
+        if (compareRational(newEnd, measureEnd) > 0)
+          throw new SystemChordCommandError(
+            "invalid-duration",
+            "The final chord cannot extend beyond its measure boundary.",
+          );
+      } else {
+        const gap = subtractRational(originalEnd, newEnd);
+        updatedSteps.push(
+          Object.freeze({
+            id: resizeRestId(steps, target.id, undefined),
+            kind: "rest" as const,
+            duration: musicalDuration(gap),
+            ...(target.melodyInstrumentOverride
+              ? { melodyInstrumentOverride: target.melodyInstrumentOverride }
+              : {}),
+          }),
+        );
+      }
+    }
+    if (target.melody?.mode === "generated") affectedGenerated.add(target.id);
+  }
+
+  const reanchored = reanchorMelody(project, updatedSteps, {
+    materializeGeneratedStepIds: affectedGenerated,
+  });
+  return withSteps(project, reanchored, command.payload.nowIso);
+}
+
 export function transferSystemChordBoundary(
   project: Project,
   command: TransferSystemChordBoundaryCommand,
 ): AppliedCommand {
+  const resizeMode = command.payload.resizeMode ?? "boundary";
+  const requestedEdge = command.payload.draggedEdge ?? "right";
+  const requestedStepId = command.payload.draggedStepId ?? command.payload.leftStepId;
+  if (requestedEdge === "left" && requestedStepId) {
+    const draggedIndex = project.progression.steps.findIndex((step) => step.id === requestedStepId);
+    const dragged = project.progression.steps[draggedIndex];
+    if (draggedIndex === 0 && dragged?.kind === "chord") {
+      const start = ZERO;
+      const end = dragged.duration.beats;
+      const minimumDuration = rational(1, 24);
+      const maxBoundary = subtractRational(end, minimumDuration);
+      if (
+        compareRational(command.payload.snapQuantum, ZERO) <= 0 ||
+        compareRational(command.payload.boundary, start) < 0 ||
+        compareRational(command.payload.boundary, maxBoundary) > 0 ||
+        divideRational(command.payload.boundary, command.payload.snapQuantum).denominator !== 1
+      )
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "The left edge must leave at least 1/24 beat of chord duration.",
+        );
+      if (compareRational(command.payload.boundary, start) === 0)
+        return {
+          project,
+          inverse: {
+            type: "progression/restore",
+            payload: { progression: project.progression, nowIso: command.payload.nowIso },
+          },
+        };
+      const gap = subtractRational(command.payload.boundary, start);
+      const resized = Object.freeze({
+        ...dragged,
+        duration: musicalDuration(subtractRational(end, command.payload.boundary)),
+      });
+      const leadingRest: RestStep = Object.freeze({
+        id: resizeRestId(project.progression.steps, "start", dragged.id),
+        kind: "rest",
+        duration: musicalDuration(gap),
+        ...(dragged.melodyInstrumentOverride
+          ? { melodyInstrumentOverride: dragged.melodyInstrumentOverride }
+          : {}),
+      });
+      const generated =
+        dragged.melody?.mode === "generated" ? new Set([dragged.id]) : new Set<string>();
+      const reanchored = reanchorMelody(
+        project,
+        [leadingRest, resized, ...project.progression.steps.slice(1)],
+        {
+          materializeGeneratedStepIds: generated,
+        },
+      );
+      return withSteps(project, reanchored, command.payload.nowIso);
+    }
+  }
+  if (requestedEdge === "right" && requestedStepId) {
+    const draggedIndex = project.progression.steps.findIndex((step) => step.id === requestedStepId);
+    const dragged = project.progression.steps[draggedIndex];
+    if (draggedIndex === project.progression.steps.length - 1 && dragged?.kind === "chord") {
+      const start = startsFor(project.progression.steps).get(dragged.id)!;
+      const end = addRational(start, dragged.duration.beats);
+      const minBoundary = addRational(start, rational(1, 24));
+      if (
+        compareRational(command.payload.snapQuantum, ZERO) <= 0 ||
+        compareRational(command.payload.boundary, minBoundary) < 0 ||
+        compareRational(command.payload.boundary, end) > 0 ||
+        divideRational(command.payload.boundary, command.payload.snapQuantum).denominator !== 1
+      )
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "The right edge must leave at least 1/24 beat of chord duration.",
+        );
+      if (compareRational(command.payload.boundary, end) === 0)
+        return {
+          project,
+          inverse: {
+            type: "progression/restore",
+            payload: { progression: project.progression, nowIso: command.payload.nowIso },
+          },
+        };
+      const resized = Object.freeze({
+        ...dragged,
+        duration: musicalDuration(subtractRational(command.payload.boundary, start)),
+      });
+      const trailingRest: RestStep = Object.freeze({
+        id: resizeRestId(project.progression.steps, dragged.id, undefined),
+        kind: "rest",
+        duration: musicalDuration(subtractRational(end, command.payload.boundary)),
+        ...(dragged.melodyInstrumentOverride
+          ? { melodyInstrumentOverride: dragged.melodyInstrumentOverride }
+          : {}),
+      });
+      const generated =
+        dragged.melody?.mode === "generated" ? new Set([dragged.id]) : new Set<string>();
+      const reanchored = reanchorMelody(
+        project,
+        [...project.progression.steps.slice(0, -1), resized, trailingRest],
+        { materializeGeneratedStepIds: generated },
+      );
+      return withSteps(project, reanchored, command.payload.nowIso);
+    }
+  }
   const leftIndex = project.progression.steps.findIndex(
     (step) => step.id === command.payload.leftStepId,
   );
@@ -528,20 +844,131 @@ export function transferSystemChordBoundary(
   const right = steps[leftIndex + 1]!;
   const starts = startsFor(steps);
   const pairStart = starts.get(left.id)!;
-  const pairEnd = addRational(starts.get(right.id)!, right.duration.beats);
+  const originalBoundary = starts.get(right.id)!;
+  const pairEnd = addRational(originalBoundary, right.duration.beats);
   const leftEnd = addRational(pairStart, left.duration.beats);
-  const minLeft = addRational(pairStart, command.payload.snapQuantum);
-  const maxBoundary = subtractRational(pairEnd, command.payload.snapQuantum);
+  const barLength = rational(
+    project.globalTiming.meter.numerator * 4,
+    project.globalTiming.meter.denominator,
+  );
+  const measureEnd = multiplyRational(
+    barLength,
+    rational(measureIndexAt(pairStart, project.globalTiming.meter) + 1),
+  );
+  const boundaryMeasureStart = multiplyRational(
+    barLength,
+    rational(measureIndexAt(originalBoundary, project.globalTiming.meter)),
+  );
+  const boundaryMeasureEnd = addRational(boundaryMeasureStart, barLength);
+  const sameMeasureChordPair =
+    left.kind === "chord" &&
+    right.kind === "chord" &&
+    measureIndexAt(pairStart, project.globalTiming.meter) ===
+      measureIndexAt(originalBoundary, project.globalTiming.meter) &&
+    compareRational(pairEnd, measureEnd) <= 0;
+  const sameMeasurePair =
+    measureIndexAt(pairStart, project.globalTiming.meter) ===
+      measureIndexAt(originalBoundary, project.globalTiming.meter) &&
+    compareRational(pairEnd, measureEnd) <= 0;
+  const crossMeasureChordPair =
+    left.kind === "chord" && right.kind === "chord" && !sameMeasureChordPair;
+  const minimumDuration = rational(1, 24);
+  const transferMinimumDuration =
+    compareRational(command.payload.snapQuantum, minimumDuration) > 0
+      ? command.payload.snapQuantum
+      : minimumDuration;
+  const leftIsChord = left.kind === "chord";
+  const rightIsChord = right.kind === "chord";
+  const hasInternalSectionBoundary = (project.progression.sections ?? []).some(
+    (section) => section.startStepId === right.id,
+  );
+  const canFullyMerge = !hasInternalSectionBoundary;
+  const canFullyConsumeChord = sameMeasureChordPair;
+  const identicalChordPair =
+    sameMeasureChordPair && leftIsChord && rightIsChord && sameSystemChordIdentity(left, right);
+  const draggedStepId = command.payload.draggedStepId ?? left.id;
+  const draggedEdge = requestedEdge;
+  const isLeftEdgeOfRightChord = draggedEdge === "left" && draggedStepId === right.id;
+  const isRightEdgeOfLeftChord = draggedEdge === "right" && draggedStepId === left.id;
+  const leftRestExtensionStart =
+    compareRational(pairStart, boundaryMeasureStart) > 0 ? pairStart : boundaryMeasureStart;
+  const rightRestExtensionEnd =
+    compareRational(pairEnd, boundaryMeasureEnd) < 0 ? pairEnd : boundaryMeasureEnd;
+  const leftRestCanExtend =
+    left.kind === "rest" && compareRational(originalBoundary, leftRestExtensionStart) > 0;
+  const rightRestCanExtend =
+    right.kind === "rest" && compareRational(rightRestExtensionEnd, originalBoundary) > 0;
+  const canExtendLeft =
+    leftRestCanExtend ||
+    (sameMeasurePair && left.kind === "chord" && (resizeMode === "boundary" || identicalChordPair));
+  const canExtendRight =
+    rightRestCanExtend ||
+    (sameMeasurePair &&
+      right.kind === "chord" &&
+      (resizeMode === "boundary" || identicalChordPair));
+  const isLeftEdgeShrink =
+    isLeftEdgeOfRightChord && compareRational(command.payload.boundary, originalBoundary) > 0;
+  const isRightEdgeShrink =
+    isRightEdgeOfLeftChord && compareRational(command.payload.boundary, originalBoundary) < 0;
+  const isRightEdgeExpand =
+    isRightEdgeOfLeftChord && compareRational(command.payload.boundary, originalBoundary) > 0;
+  if (draggedStepId !== left.id && draggedStepId !== right.id)
+    throw new SystemChordCommandError(
+      "invalid-boundary",
+      "The dragged Step is not adjacent to this boundary.",
+    );
+  if (
+    isLeftEdgeOfRightChord &&
+    compareRational(command.payload.boundary, originalBoundary) < 0 &&
+    !canExtendLeft
+  )
+    throw new SystemChordCommandError(
+      "invalid-boundary",
+      "The left edge cannot extend into the adjacent Step at the current resize mode or measure boundary.",
+    );
+  if (isRightEdgeExpand && !canExtendRight)
+    throw new SystemChordCommandError(
+      "invalid-boundary",
+      "The right edge cannot extend into the adjacent Step at the current resize mode or measure boundary.",
+    );
+  let minBoundary = addRational(pairStart, leftIsChord ? minimumDuration : ZERO);
+  let maxBoundary = subtractRational(pairEnd, rightIsChord ? minimumDuration : ZERO);
+  if (isLeftEdgeOfRightChord) {
+    minBoundary = canExtendLeft
+      ? left.kind === "rest"
+        ? leftRestExtensionStart
+        : sameMeasureChordPair
+          ? pairStart
+          : addRational(pairStart, transferMinimumDuration)
+      : originalBoundary;
+  }
+  if (isRightEdgeOfLeftChord) {
+    maxBoundary = canExtendRight
+      ? right.kind === "rest"
+        ? canFullyMerge || compareRational(rightRestExtensionEnd, pairEnd) < 0
+          ? rightRestExtensionEnd
+          : subtractRational(pairEnd, minimumDuration)
+        : sameMeasureChordPair
+          ? pairEnd
+          : subtractRational(pairEnd, transferMinimumDuration)
+      : originalBoundary;
+  } else if (crossMeasureChordPair && !isLeftEdgeShrink) {
+    maxBoundary = originalBoundary;
+  } else if (left.kind === "chord" && right.kind === "rest" && !canExtendRight) {
+    maxBoundary = originalBoundary;
+  } else if (sameMeasurePair && left.kind === "rest" && rightIsChord) {
+    minBoundary = canFullyMerge ? pairStart : addRational(pairStart, minimumDuration);
+  }
   const snappedIndex = divideRational(command.payload.boundary, command.payload.snapQuantum);
   if (
     compareRational(command.payload.snapQuantum, ZERO) <= 0 ||
-    compareRational(command.payload.boundary, minLeft) < 0 ||
+    compareRational(command.payload.boundary, minBoundary) < 0 ||
     compareRational(command.payload.boundary, maxBoundary) > 0 ||
     snappedIndex.denominator !== 1
   )
     throw new SystemChordCommandError(
       "invalid-boundary",
-      "Both adjacent durations must remain at least one Snap unit.",
+      "The boundary must preserve a chord duration of at least 1/24 beat inside its editable measure.",
     );
   if (compareRational(command.payload.boundary, leftEnd) === 0)
     return {
@@ -551,26 +978,309 @@ export function transferSystemChordBoundary(
         payload: { progression: project.progression, nowIso: command.payload.nowIso },
       },
     };
-  const leftDuration = musicalDuration(subtractRational(command.payload.boundary, pairStart));
-  const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
-  const next = steps.map((step, index) =>
-    index === leftIndex
-      ? Object.freeze({ ...step, duration: leftDuration })
-      : index === leftIndex + 1
-        ? Object.freeze({ ...step, duration: rightDuration })
-        : step,
-  );
-  const affectedGenerated = new Set(
-    [left, right]
-      .filter(
-        (step): step is ChordStep => step.kind === "chord" && step.melody?.mode === "generated",
-      )
-      .map((step) => step.id),
-  );
+  const leftDurationBeats = subtractRational(command.payload.boundary, pairStart);
+  let next: ProgressionStep[];
+  const affectedGenerated = new Set<string>();
+  if (
+    isLeftEdgeShrink &&
+    (resizeMode === "isolated" || crossMeasureChordPair || left.kind === "rest")
+  ) {
+    const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+    if (left.kind === "rest") {
+      next = steps.map((step, index) =>
+        index === leftIndex
+          ? Object.freeze({ ...step, duration: musicalDuration(leftDurationBeats) })
+          : index === leftIndex + 1
+            ? Object.freeze({ ...step, duration: rightDuration })
+            : step,
+      );
+    } else {
+      const gap: RestStep = Object.freeze({
+        id: resizeRestId(steps, left.id, right.id),
+        kind: "rest",
+        duration: musicalDuration(subtractRational(command.payload.boundary, originalBoundary)),
+        ...(right.melodyInstrumentOverride
+          ? { melodyInstrumentOverride: right.melodyInstrumentOverride }
+          : {}),
+      });
+      next = [
+        ...steps.slice(0, leftIndex + 1),
+        gap,
+        Object.freeze({ ...right, duration: rightDuration }),
+        ...steps.slice(leftIndex + 2),
+      ];
+    }
+    if (right.kind === "chord" && right.melody?.mode === "generated")
+      affectedGenerated.add(right.id);
+  } else if (
+    isRightEdgeShrink &&
+    (resizeMode === "isolated" || crossMeasureChordPair || right.kind === "rest")
+  ) {
+    const leftDuration = musicalDuration(leftDurationBeats);
+    if (right.kind === "rest") {
+      const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+      next = steps.map((step, index) =>
+        index === leftIndex
+          ? Object.freeze({ ...step, duration: leftDuration })
+          : index === leftIndex + 1
+            ? Object.freeze({ ...step, duration: rightDuration })
+            : step,
+      );
+    } else {
+      const gap: RestStep = Object.freeze({
+        id: resizeRestId(steps, left.id, right.id),
+        kind: "rest",
+        duration: musicalDuration(subtractRational(originalBoundary, command.payload.boundary)),
+        ...(left.kind === "chord" && left.melodyInstrumentOverride
+          ? { melodyInstrumentOverride: left.melodyInstrumentOverride }
+          : {}),
+      });
+      next = [
+        ...steps.slice(0, leftIndex),
+        Object.freeze({ ...left, duration: leftDuration }),
+        gap,
+        Object.freeze({ ...right, duration: musicalDuration(right.duration.beats) }),
+        ...steps.slice(leftIndex + 2),
+      ];
+    }
+    if (left.kind === "chord" && left.melody?.mode === "generated") affectedGenerated.add(left.id);
+  } else if (sameMeasureChordPair) {
+    if (canFullyConsumeChord && compareRational(command.payload.boundary, pairEnd) === 0) {
+      if (draggedStepId !== left.id)
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "This edge cannot remove the adjacent chord.",
+        );
+      const merged = Object.freeze({
+        ...left,
+        duration: musicalDuration(subtractRational(pairEnd, pairStart)),
+      });
+      next = [...steps.slice(0, leftIndex), merged, ...steps.slice(leftIndex + 2)];
+      for (const step of [left, right])
+        if (step.kind === "chord" && step.melody?.mode === "generated")
+          affectedGenerated.add(step.id);
+      return applyFullyMergedBoundaryPair(
+        project,
+        next,
+        left.id,
+        right.id,
+        merged.id,
+        affectedGenerated,
+        command.payload.nowIso,
+      );
+    }
+    if (canFullyConsumeChord && compareRational(command.payload.boundary, pairStart) === 0) {
+      if (draggedStepId !== right.id)
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "This edge cannot remove the adjacent chord.",
+        );
+      const merged = Object.freeze({
+        ...right,
+        duration: musicalDuration(subtractRational(pairEnd, pairStart)),
+      });
+      next = [...steps.slice(0, leftIndex), merged, ...steps.slice(leftIndex + 2)];
+      for (const step of [left, right])
+        if (step.kind === "chord" && step.melody?.mode === "generated")
+          affectedGenerated.add(step.id);
+      return applyFullyMergedBoundaryPair(
+        project,
+        next,
+        left.id,
+        right.id,
+        merged.id,
+        affectedGenerated,
+        command.payload.nowIso,
+      );
+    }
+    const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+    next = steps.map((step, index) =>
+      index === leftIndex
+        ? Object.freeze({ ...step, duration: musicalDuration(leftDurationBeats) })
+        : index === leftIndex + 1
+          ? Object.freeze({ ...step, duration: rightDuration })
+          : step,
+    );
+    for (const step of [left, right])
+      if (step.kind === "chord" && step.melody?.mode === "generated")
+        affectedGenerated.add(step.id);
+  } else if (right.kind === "rest" && sameMeasurePair) {
+    if (compareRational(command.payload.boundary, pairEnd) === 0 && left.kind === "chord") {
+      if (!canFullyMerge || draggedStepId !== left.id)
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "This edge cannot remove the adjacent Rest.",
+        );
+      const merged = Object.freeze({
+        ...left,
+        duration: musicalDuration(subtractRational(pairEnd, pairStart)),
+      });
+      next = [...steps.slice(0, leftIndex), merged, ...steps.slice(leftIndex + 2)];
+      if (left.melody?.mode === "generated") affectedGenerated.add(left.id);
+      return applyFullyMergedBoundaryPair(
+        project,
+        next,
+        left.id,
+        right.id,
+        merged.id,
+        affectedGenerated,
+        command.payload.nowIso,
+      );
+    }
+    const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+    next =
+      compareRational(rightDuration.beats, ZERO) === 0
+        ? [
+            ...steps.slice(0, leftIndex),
+            Object.freeze({ ...left, duration: musicalDuration(leftDurationBeats) }),
+            ...steps.slice(leftIndex + 2),
+          ]
+        : steps.map((step, index) =>
+            index === leftIndex
+              ? Object.freeze({ ...step, duration: musicalDuration(leftDurationBeats) })
+              : index === leftIndex + 1
+                ? Object.freeze({ ...step, duration: rightDuration })
+                : step,
+          );
+    if (left.kind === "chord" && left.melody?.mode === "generated") affectedGenerated.add(left.id);
+  } else if (right.kind === "rest") {
+    const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+    next = steps.map((step, index) =>
+      index === leftIndex
+        ? Object.freeze({ ...step, duration: musicalDuration(leftDurationBeats) })
+        : index === leftIndex + 1
+          ? Object.freeze({ ...step, duration: rightDuration })
+          : step,
+    );
+    if (left.kind === "chord" && left.melody?.mode === "generated") affectedGenerated.add(left.id);
+  } else if (left.kind === "rest" && right.kind === "chord" && canExtendLeft) {
+    if (compareRational(command.payload.boundary, pairStart) === 0) {
+      if (!canFullyMerge || draggedStepId !== right.id)
+        throw new SystemChordCommandError(
+          "invalid-boundary",
+          "This edge cannot remove the adjacent Rest.",
+        );
+      const merged = Object.freeze({
+        ...right,
+        duration: musicalDuration(subtractRational(pairEnd, pairStart)),
+      });
+      next = [...steps.slice(0, leftIndex), merged, ...steps.slice(leftIndex + 2)];
+      if (right.melody?.mode === "generated") affectedGenerated.add(right.id);
+      return applyFullyMergedBoundaryPair(
+        project,
+        next,
+        left.id,
+        right.id,
+        merged.id,
+        affectedGenerated,
+        command.payload.nowIso,
+      );
+    }
+    const rightDuration = musicalDuration(subtractRational(pairEnd, command.payload.boundary));
+    next =
+      compareRational(leftDurationBeats, ZERO) === 0
+        ? [
+            ...steps.slice(0, leftIndex),
+            Object.freeze({ ...right, duration: rightDuration }),
+            ...steps.slice(leftIndex + 2),
+          ]
+        : steps.map((step, index) =>
+            index === leftIndex
+              ? Object.freeze({ ...step, duration: musicalDuration(leftDurationBeats) })
+              : index === leftIndex + 1
+                ? Object.freeze({ ...step, duration: rightDuration })
+                : step,
+          );
+    if (right.melody?.mode === "generated") affectedGenerated.add(right.id);
+  } else if (left.kind === "rest" && right.kind === "chord" && !isLeftEdgeShrink) {
+    throw new SystemChordCommandError(
+      "invalid-boundary",
+      "A chord starting in a new measure has no editable left resize edge.",
+    );
+  } else {
+    if (left.kind !== "chord" || compareRational(command.payload.boundary, originalBoundary) > 0)
+      throw new SystemChordCommandError(
+        "invalid-boundary",
+        "A chord across a measure boundary can only shorten into an explicit Rest gap.",
+      );
+    const gap = subtractRational(originalBoundary, command.payload.boundary);
+    const resizedLeft = Object.freeze({ ...left, duration: musicalDuration(leftDurationBeats) });
+    next = [...steps.slice(0, leftIndex), resizedLeft];
+    if (compareRational(gap, ZERO) > 0) {
+      const rest: RestStep = Object.freeze({
+        id: resizeRestId(steps, left.id, right.id),
+        kind: "rest",
+        duration: musicalDuration(gap),
+        ...(left.kind === "chord" && left.melodyInstrumentOverride
+          ? { melodyInstrumentOverride: left.melodyInstrumentOverride }
+          : {}),
+      });
+      next.push(rest);
+    }
+    next.push(...steps.slice(leftIndex + 1));
+    if (left.melody?.mode === "generated") affectedGenerated.add(left.id);
+  }
   const reanchored = reanchorMelody(project, next, {
     materializeGeneratedStepIds: affectedGenerated,
   });
   return withSteps(project, reanchored, command.payload.nowIso);
+}
+
+function applyFullyMergedBoundaryPair(
+  project: Project,
+  nextSteps: readonly ProgressionStep[],
+  leftId: string,
+  rightId: string,
+  retainedId: string,
+  generated: ReadonlySet<string>,
+  nowIso: string,
+): AppliedCommand {
+  const reanchored = reanchorPreservingGeneratedMelody(project, nextSteps, generated);
+  const mergedIds = new Set([leftId, rightId]);
+  const selectedStepId = project.progression.selectedStepId;
+  const loopRegion = project.progression.loopRegion
+    ? Object.freeze({
+        startStepId: mergedIds.has(project.progression.loopRegion.startStepId)
+          ? retainedId
+          : project.progression.loopRegion.startStepId,
+        endStepId: mergedIds.has(project.progression.loopRegion.endStepId)
+          ? retainedId
+          : project.progression.loopRegion.endStepId,
+      })
+    : undefined;
+  const sections = project.progression.sections?.map((section) =>
+    section.startStepId === leftId || section.startStepId === rightId
+      ? Object.freeze({ ...section, startStepId: retainedId })
+      : section,
+  );
+  const progression: Progression = Object.freeze({
+    ...project.progression,
+    steps: reanchored,
+    ...(selectedStepId && mergedIds.has(selectedStepId) ? { selectedStepId: retainedId } : {}),
+    ...(loopRegion ? { loopRegion } : {}),
+    ...(sections ? { sections: Object.freeze(sections) } : {}),
+  });
+  const branch = project.temporaryBranch
+    ? (() => {
+        const current = project.temporaryBranch!;
+        const { rejoinStepId, ...rest } = current;
+        const nextStepId = project.progression.steps.find((step) => step.id === rightId)
+          ? project.progression.steps[
+              project.progression.steps.findIndex((step) => step.id === rightId) + 1
+            ]?.id
+          : undefined;
+        const nextRejoinStepId =
+          rejoinStepId && mergedIds.has(rejoinStepId) ? nextStepId : rejoinStepId;
+        return Object.freeze({
+          ...rest,
+          ...(current.originStepId && mergedIds.has(current.originStepId)
+            ? { originStepId: retainedId }
+            : {}),
+          ...(nextRejoinStepId ? { rejoinStepId: nextRejoinStepId } : {}),
+        });
+      })()
+    : undefined;
+  return applyProgressionAndBranch(project, progression, branch, nowIso);
 }
 
 function uniqueStepId(project: Project, requested: string): string {
@@ -643,7 +1353,7 @@ export function splitSystemStep(
   return withSteps(project, reanchored, command.payload.nowIso);
 }
 
-function sameHarmonyAndPerformance(left: ChordStep, right: ChordStep): boolean {
+export function sameSystemChordIdentity(left: ChordStep, right: ChordStep): boolean {
   return (
     left.harmonicFunction.moduleId === right.harmonicFunction.moduleId &&
     left.harmonicFunction.functionId === right.harmonicFunction.functionId &&
@@ -671,15 +1381,35 @@ export function systemTieDisabledReason(
   if (sorted.some((index, offset) => offset > 0 && index !== sorted[offset - 1]! + 1))
     return "Tie is available only for contiguous Steps.";
   const selected = sorted.map((index) => project.progression.steps[index]!);
-  if (selected.some((step) => step.kind !== "chord")) return "Tie cannot include a Rest or gap.";
-  const chords = selected as ChordStep[];
-  if (chords.some((step) => !sameHarmonyAndPerformance(chords[0]!, step)))
-    return "Tie requires matching harmony, spelling, voicing, performance and melody instrument.";
-  const selectedIds = new Set(uniqueIds);
-  if (
-    (project.progression.sections ?? []).some(
-      (section) => selectedIds.has(section.startStepId) && section.startStepId !== chords[0]!.id,
+  const chords = selected.filter((step): step is ChordStep => step.kind === "chord");
+  const rests = selected.filter((step) => step.kind === "rest");
+  const starts = startsFor(project.progression.steps);
+  if (rests.length) {
+    if (selected.length !== 2 || chords.length !== 1 || rests.length !== 1)
+      return "Tie can include exactly one chord and one adjacent Rest.";
+    const start = starts.get(selected[0]!.id)!;
+    const chordStart = starts.get(selected[1]!.id)!;
+    const pairEnd = addRational(chordStart, selected[1]!.duration.beats);
+    const barLength = rational(
+      project.globalTiming.meter.numerator * 4,
+      project.globalTiming.meter.denominator,
+    );
+    const measureEnd = multiplyRational(
+      barLength,
+      rational(measureIndexAt(start, project.globalTiming.meter) + 1),
+    );
+    if (
+      measureIndexAt(start, project.globalTiming.meter) !==
+        measureIndexAt(chordStart, project.globalTiming.meter) ||
+      compareRational(pairEnd, measureEnd) > 0
     )
+      return "Tie between a chord and Rest must stay inside one measure.";
+  }
+  if (chords.length > 1 && chords.some((step) => !sameSystemChordIdentity(chords[0]!, step)))
+    return "Tie requires matching harmony, spelling, voicing, performance and melody instrument.";
+  const internalStepId = selected[1]?.id;
+  if (
+    (project.progression.sections ?? []).some((section) => section.startStepId === internalStepId)
   )
     return "Tie cannot cross an internal Song Section boundary.";
   return null;
@@ -695,12 +1425,13 @@ export function tieSystemSteps(project: Project, command: TieSystemChordsCommand
     .sort((a, b) => a - b);
   const steps = project.progression.steps;
   const selected = indices.map((index) => steps[index]!);
-  const chords = selected as ChordStep[];
+  const chords = selected.filter((step): step is ChordStep => step.kind === "chord");
+  const retainedChord = chords[0]!;
   const mergedIds = new Set(uniqueIds);
   let mergedDuration = ZERO;
-  for (const step of chords) mergedDuration = addRational(mergedDuration, step.duration.beats);
+  for (const step of selected) mergedDuration = addRational(mergedDuration, step.duration.beats);
   const firstIndex = indices[0]!;
-  const merged = Object.freeze({ ...chords[0]!, duration: musicalDuration(mergedDuration) });
+  const merged = Object.freeze({ ...retainedChord, duration: musicalDuration(mergedDuration) });
   const next = [...steps.slice(0, firstIndex), merged, ...steps.slice(indices.at(-1)! + 1)];
   const generated = new Set(
     chords.filter((step) => step.melody?.mode === "generated").map((step) => step.id),
@@ -740,6 +1471,17 @@ export function tieSystemSteps(project: Project, command: TieSystemChordsCommand
     steps: reanchored,
     ...(selectedStepId && mergedIds.has(selectedStepId) ? { selectedStepId: merged.id } : {}),
     ...(loopRegion ? { loopRegion: Object.freeze(loopRegion) } : {}),
+    ...(project.progression.sections
+      ? {
+          sections: Object.freeze(
+            project.progression.sections.map((section) =>
+              section.startStepId !== merged.id && mergedIds.has(section.startStepId)
+                ? Object.freeze({ ...section, startStepId: merged.id })
+                : section,
+            ),
+          ),
+        }
+      : {}),
   });
   return applyProgressionAndBranch(project, progression, temporaryBranch, command.payload.nowIso);
 }

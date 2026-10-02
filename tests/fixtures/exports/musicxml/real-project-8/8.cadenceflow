@@ -1,0 +1,873 @@
+{
+  "schemaVersion": 9,
+  "id": "e0b5cab9-a004-4626-a795-efa05d956dd0",
+  "name": "8",
+  "createdAt": "2026-10-01T17:22:07.658Z",
+  "updatedAt": "2026-10-02T09:36:31.155Z",
+  "activeModule": "progressions",
+  "tonic": {
+    "semitone": 0
+  },
+  "globalTiming": {
+    "tempoBpm": 120,
+    "meter": {
+      "numerator": 4,
+      "denominator": 4,
+      "grouping": [
+        4
+      ]
+    }
+  },
+  "groove": {
+    "feel": "straight",
+    "swingAmount": 0
+  },
+  "presentation": {
+    "expertiseMode": "composer",
+    "theme": "dark",
+    "globalMatrixCardView": "harmonic",
+    "progressionView": "piano-roll",
+    "measuresPerSystem": 8,
+    "showBassInStaff": false,
+    "noteColorMode": "standard",
+    "resolutionArrows": true,
+    "genreFocus": "all",
+    "guitarChordOrientation": "horizontal",
+    "sidePanelMode": "fixed"
+  },
+  "harmonyTrack": {
+    "instrument": "piano",
+    "muted": false,
+    "solo": false,
+    "volume": 23,
+    "pianoEngine": "hq-samples",
+    "guitarEngine": "hq-samples",
+    "pianoSoundfontInstrument": "gm-000",
+    "guitarSoundfontInstrument": "gm-025"
+  },
+  "melodyTrack": {
+    "instrument": "gm-000",
+    "muted": false,
+    "solo": false,
+    "volume": 127
+  },
+  "defaults": {
+    "piano": {
+      "duration": {
+        "beats": {
+          "numerator": 2,
+          "denominator": 1
+        }
+      },
+      "performance": {
+        "articulation": "humanized",
+        "register": "auto",
+        "voicingMode": "auto",
+        "bass": {
+          "choice": "auto",
+          "octaveOffset": "auto"
+        },
+        "masterVelocity": 80,
+        "perNoteVelocityOverrides": {},
+        "dynamicsViewPreference": "musical"
+      }
+    }
+  },
+  "moduleTemplateStates": {
+    "progressions": {
+      "cards": {}
+    },
+    "dark-harmony": {
+      "cards": {}
+    }
+  },
+  "progression": {
+    "steps": [
+      {
+        "id": "resize-gap:87149897-f66e-493a-80e3-8666072d7948:70478720-085d-4670-a881-aa8abc6fdc78",
+        "kind": "rest",
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "authoredMelody": {
+          "notes": [
+            {
+              "id": "c6089031-0d59-4cd6-9b18-597bf130e2ed",
+              "pitch": {
+                "midiNumber": 60,
+                "pitchClassIdentity": 0,
+                "octave": 4,
+                "spelling": {
+                  "step": "C",
+                  "alter": 0
+                }
+              },
+              "onset": {
+                "numerator": 3,
+                "denominator": 1
+              },
+              "duration": {
+                "numerator": 1,
+                "denominator": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "70478720-085d-4670-a881-aa8abc6fdc78",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "iii",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "be320c32-c9fd-434a-9ac6-843d6f0a5fbe",
+                "pitch": {
+                  "midiNumber": 67,
+                  "pitchClassIdentity": 7,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "G",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 5,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "e8de634c-4fc6-40be-93e1-b104f8e9d5b7",
+                "pitch": {
+                  "midiNumber": 69,
+                  "pitchClassIdentity": 9,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "A",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 5,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "7a07f9f1-6571-41d4-9a1e-0e044552e339",
+                "pitch": {
+                  "midiNumber": 67,
+                  "pitchClassIdentity": 7,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "G",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "71e9ad51-4f86-4ed0-90f1-c3f27aeb92d0",
+                "pitch": {
+                  "midiNumber": 69,
+                  "pitchClassIdentity": 9,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "A",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 7,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "9b1de643-b48f-4727-ac12-a1be9f358409",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "IV",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "e7af4e5a-16ae-40e9-ad92-07bf03a6f1c4",
+                "pitch": {
+                  "midiNumber": 67,
+                  "pitchClassIdentity": 7,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "G",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "d170d640-1c19-45e8-8d6f-f4134bf0fcd6",
+                "pitch": {
+                  "midiNumber": 65,
+                  "pitchClassIdentity": 5,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "F",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "a6fcd45e-f617-4ebd-ab71-a08a7e137b63",
+                "pitch": {
+                  "midiNumber": 64,
+                  "pitchClassIdentity": 4,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "E",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 1
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "3548481c-1650-47f1-a1a4-b1741b2bca37",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "V",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "d49ea5be-a33c-4ad4-a886-ec68ce1c1f11",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 2,
+                  "denominator": 1
+                }
+              },
+              {
+                "id": "91124d1a-f9e6-491e-8b6b-07325128b93d",
+                "pitch": {
+                  "midiNumber": 64,
+                  "pitchClassIdentity": 4,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "E",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 2,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 1
+                }
+              },
+              {
+                "id": "5069aa09-d7bd-41e1-8f0b-97cb2acd484d",
+                "pitch": {
+                  "midiNumber": 65,
+                  "pitchClassIdentity": 5,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "F",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 1
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "537f0ad2-ff1e-4d04-948c-7f3cf0810a70",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "vi",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "c215bc16-f722-4190-849a-e764815f743d",
+                "pitch": {
+                  "midiNumber": 64,
+                  "pitchClassIdentity": 4,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "E",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "91cac8ef-12de-4fa7-affd-2a93f2a618ad",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 1,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "2d13c421-5126-419d-9f02-f5e7d5f67ade",
+                "pitch": {
+                  "midiNumber": 60,
+                  "pitchClassIdentity": 0,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "C",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 1,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "2ae42896-a6e4-4a13-915c-d609cec7e02e",
+                "pitch": {
+                  "midiNumber": 64,
+                  "pitchClassIdentity": 4,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "E",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "3e06a038-fe60-4bf5-bfb5-ca53c85868b9",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "af3953f6-5767-4f8d-99af-77a68199fb1d",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "IV",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "4a48d4b9-be3c-4947-bd76-9ea49b298d5b",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "a852af2b-33a3-418d-97ff-e0d0028657a2",
+                "pitch": {
+                  "midiNumber": 60,
+                  "pitchClassIdentity": 0,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "C",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "d76522fd-0346-4393-8de4-0b6ed0b60b8f",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "e5b1240a-e366-4ff4-ab0d-ff763ffb5f87",
+                "pitch": {
+                  "midiNumber": 64,
+                  "pitchClassIdentity": 4,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "E",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 7,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 2
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "2f2af0d1-417f-46f6-914a-90e9f41a3337",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "V",
+          "category": "core",
+          "mixPolicy": "mix-freely"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "a907d5d6-d137-4ed3-9875-de55bd84ea42",
+                "pitch": {
+                  "midiNumber": 62,
+                  "pitchClassIdentity": 2,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "D",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 0,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 3,
+                  "denominator": 2
+                }
+              },
+              {
+                "id": "2c5d963f-438d-49df-9580-f2ef3c35ffc3",
+                "pitch": {
+                  "midiNumber": 67,
+                  "pitchClassIdentity": 7,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "G",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 2
+                },
+                "duration": {
+                  "numerator": 9,
+                  "denominator": 2
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "e2529b17-bcf2-4721-b0a8-d4cc850cf64e",
+        "kind": "chord",
+        "harmonicFunction": {
+          "moduleId": "progressions",
+          "functionId": "V7/IV",
+          "category": "secondary-dominant",
+          "targetFunctionId": "IV",
+          "targetId": "IV",
+          "mixPolicy": "must-resolve"
+        },
+        "harmonicVariant": {
+          "extensions": [],
+          "suspensions": [],
+          "alterations": []
+        },
+        "duration": {
+          "beats": {
+            "numerator": 4,
+            "denominator": 1
+          }
+        },
+        "performance": {
+          "articulation": "humanized",
+          "register": "auto",
+          "voicingMode": "auto",
+          "bass": {
+            "choice": "auto",
+            "octaveOffset": "auto"
+          },
+          "masterVelocity": 80,
+          "perNoteVelocityOverrides": {},
+          "dynamicsViewPreference": "musical"
+        },
+        "cardView": "harmonic",
+        "melody": {
+          "mode": "authored",
+          "phrase": {
+            "notes": [
+              {
+                "id": "6627d16c-53a8-4604-b4a9-3fc3d02eeeda",
+                "pitch": {
+                  "midiNumber": 60,
+                  "pitchClassIdentity": 0,
+                  "octave": 4,
+                  "spelling": {
+                    "step": "C",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 1
+                }
+              },
+              {
+                "id": "dac2cbd8-fdc2-4c1c-b6ce-c83daf039c50",
+                "pitch": {
+                  "midiNumber": 55,
+                  "pitchClassIdentity": 7,
+                  "octave": 3,
+                  "spelling": {
+                    "step": "G",
+                    "alter": 0
+                  }
+                },
+                "onset": {
+                  "numerator": 3,
+                  "denominator": 1
+                },
+                "duration": {
+                  "numerator": 1,
+                  "denominator": 1
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "sections": []
+  },
+  "customPresets": []
+}

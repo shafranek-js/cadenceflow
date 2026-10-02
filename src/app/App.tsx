@@ -195,6 +195,7 @@ import {
   selectStep,
   repeatChordStep,
   duplicateSteps,
+  removeProgressionRange,
   removeSteps,
   reorderSteps,
   insertStepsAfter,
@@ -206,6 +207,7 @@ import {
   type BatchSetStepDurationCommand,
   type EditStepPerformanceCommand,
   type RemoveStepCommand,
+  type RemoveProgressionRangeCommand,
   type RemoveStepsCommand,
   type ReorderStepCommand,
   type ReplaceStepCommand,
@@ -223,12 +225,14 @@ import {
 } from "./commands/progressionCommands";
 import {
   replaceSystemChord,
+  resizeSystemChordDuration,
   setSystemRest,
   setSystemStepDuration,
   splitSystemStep,
   tieSystemSteps,
   transferSystemChordBoundary,
   type ReplaceSystemChordCommand,
+  type ResizeSystemChordDurationCommand,
   type SetSystemRestCommand,
   type SetSystemStepDurationCommand,
   type SplitSystemChordCommand,
@@ -2051,6 +2055,13 @@ export function App() {
     };
     store.dispatch(command, setSystemStepDuration);
   };
+  const resizeProgressionChordDuration = (stepId: string, duration: MusicalDuration) => {
+    const command: ResizeSystemChordDurationCommand = {
+      type: "progression/resize-chord-duration",
+      payload: { stepId, duration, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, resizeSystemChordDuration);
+  };
   const splitPianoRollStep = (stepId: string) => {
     const command: SplitSystemChordCommand = {
       type: "piano-roll/split-step",
@@ -2069,10 +2080,21 @@ export function App() {
     leftStepId: string,
     boundary: Rational,
     snapQuantum: Rational,
+    draggedStepId?: string,
+    draggedEdge?: "left" | "right",
+    resizeMode?: "boundary" | "isolated",
   ) => {
     const command: TransferSystemChordBoundaryCommand = {
       type: "piano-roll/transfer-boundary",
-      payload: { leftStepId, boundary, snapQuantum, nowIso: new Date().toISOString() },
+      payload: {
+        leftStepId,
+        boundary,
+        snapQuantum,
+        ...(draggedStepId ? { draggedStepId } : {}),
+        ...(draggedEdge ? { draggedEdge } : {}),
+        ...(resizeMode ? { resizeMode } : {}),
+        nowIso: new Date().toISOString(),
+      },
     };
     store.dispatch(command, transferSystemChordBoundary);
   };
@@ -2893,11 +2915,11 @@ export function App() {
         .slice(0, firstIndex)
         .reverse()
         .find((step) => !ids.has(step.id));
-    const command: RemoveStepsCommand = {
-      type: "progression/remove-steps",
+    const command: RemoveProgressionRangeCommand = {
+      type: "progression/remove-range-harmony",
       payload: { stepIds, nowIso: new Date().toISOString() },
     };
-    store.dispatch(command, removeSteps);
+    store.dispatch(command, removeProgressionRange);
     setProgressionSelection(fallbackStep?.id);
   };
 
@@ -3781,6 +3803,14 @@ export function App() {
           presetsPanelOpen ||
           savePresetDialogOpen ||
           Boolean(pendingSwitch)
+        ) {
+          return;
+        }
+        if (
+          e.target instanceof Element &&
+          e.target
+            .closest(".progression-track")
+            ?.querySelector('[data-testid="range-selection-toolbar"]')
         ) {
           return;
         }
@@ -5017,7 +5047,7 @@ export function App() {
             onSelectStep={selectProgressionStep}
             onClearSelection={() => setProgressionSelection()}
             onEditPerformance={editProgressionPerformance}
-            onSetStepDuration={changeStepDuration}
+            onSetStepDuration={resizeProgressionChordDuration}
             onDurationResizeStatusChange={setDurationResizeStatus}
             labelMode={labelHierarchyMode}
             onSetProgressionView={changeProgressionView}

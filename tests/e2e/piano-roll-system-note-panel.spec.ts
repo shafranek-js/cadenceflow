@@ -673,9 +673,13 @@ test("System note panel edits selected notes and keeps empty-cell clicks transie
               panelLeft: panelRect.left,
             };
           });
-          expect(Math.abs(rowAlignment.titleCenter - rowAlignment.panelCenter)).toBeLessThan(1);
-          expect(Math.abs(rowAlignment.measureCenter - rowAlignment.panelCenter)).toBeLessThan(1);
-          expect(rowAlignment.panelLeft).toBeGreaterThanOrEqual(rowAlignment.measureRight - 1);
+          if (viewport.width > 760) {
+            expect(Math.abs(rowAlignment.titleCenter - rowAlignment.panelCenter)).toBeLessThan(1);
+            expect(Math.abs(rowAlignment.measureCenter - rowAlignment.panelCenter)).toBeLessThan(1);
+            expect(rowAlignment.panelLeft).toBeGreaterThanOrEqual(rowAlignment.measureRight - 1);
+          } else {
+            expect(rowAlignment.panelTop).toBeGreaterThanOrEqual(rowAlignment.measureBottom - 1);
+          }
           await page.screenshot({
             path: `test-results/system-note-panel-${viewport.width}x${viewport.height}-${themeName.toLowerCase()}-${gridMode.toLowerCase()}-${paletteMode.toLowerCase()}.png`,
           });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { AppStore } from "../../../src/app/appStore";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
+import { removeStep } from "../../../src/app/commands/progressionCommands";
 import {
   replaceSystemChord,
+  resizeSystemChordDuration,
   setSystemRest,
   setSystemStepDuration,
   splitSystemStep,
@@ -77,6 +79,26 @@ function withNotes(
   });
 }
 
+function rest(
+  id: string,
+  duration: ReturnType<typeof rational>,
+  notes: readonly {
+    readonly id: string;
+    readonly pitch: typeof C4;
+    readonly onset: ReturnType<typeof rational>;
+    readonly duration: ReturnType<typeof rational>;
+  }[] = [],
+): RestStep {
+  return Object.freeze({
+    id,
+    kind: "rest",
+    duration: musicalDuration(duration),
+    ...(notes.length
+      ? { authoredMelody: Object.freeze({ notes: Object.freeze([...notes]) }) }
+      : {}),
+  });
+}
+
 function absoluteNotes(project: Project) {
   return createEffectiveMelodyTimeline(project).map((note) => ({
     sourceStepId: note.sourceStepId,
@@ -87,7 +109,88 @@ function absoluteNotes(project: Project) {
   }));
 }
 
+function melodyTimelineSignature(project: Project) {
+  return absoluteNotes(project)
+    .map((note) => ({ midi: note.midi, start: note.start, duration: note.duration }))
+    .sort(
+      (left, right) =>
+        compareRational(left.start, right.start) ||
+        left.midi - right.midi ||
+        compareRational(left.duration, right.duration),
+    );
+}
+
+function melodySoundSignature(project: Project) {
+  return createEffectiveMelodyTimeline(project).map((note) => ({
+    eventKey: note.eventKey,
+    midi: note.pitch.midiNumber,
+    start: note.startBeats,
+    duration: note.durationBeats,
+    instrument: note.instrument,
+  }));
+}
+
+function stepStart(project: Project, stepId: string) {
+  let cursor = rational(0);
+  for (const step of project.progression.steps) {
+    if (step.id === stepId) return cursor;
+    cursor = addRational(cursor, step.duration.beats);
+  }
+  throw new Error(`Unknown Step ${stepId}`);
+}
+
 describe("Piano Roll System chord commands", () => {
+  it("removes Harmony as Rest without moving Melody, sections, branches or following Steps", () => {
+    const source = createPianoRollSystemChordFixture();
+    const generated = source.progression.steps.find((step) => step.id === "generated-e");
+    if (generated?.kind !== "chord" || generated.melody?.mode !== "generated")
+      throw new Error("Fixture is missing its generated Harmony Step.");
+    const beforeMelody = absoluteNotes(source);
+    const beforeFollowingStart = rational(20);
+    expect(
+      source.progression.steps
+        .slice(0, 5)
+        .reduce((total, step) => addRational(total, step.duration.beats), rational(0)),
+    ).toEqual(beforeFollowingStart);
+    const store = new AppStore(source);
+    store.dispatch(
+      { type: "progression/remove-step", payload: { stepId: generated.id, nowIso: T1 } },
+      removeStep,
+    );
+    const updated = store.project;
+    const rest = updated.progression.steps.find((step) => step.id === generated.id);
+    expect(rest?.kind).toBe("rest");
+    if (rest?.kind !== "rest") throw new Error("Removing Harmony did not preserve a Rest Step.");
+    expect(rest.id).toBe(generated.id);
+    expect(rest.duration).toEqual(generated.duration);
+    expect(rest.melodyInstrumentOverride).toBe(generated.melodyInstrumentOverride);
+    expect(rest.authoredMelody?.sourceRecipe).toEqual(generated.melody.recipe);
+    expect(absoluteNotes(updated)).toEqual(beforeMelody);
+    expect(
+      updated.progression.steps
+        .slice(0, 5)
+        .reduce((total, step) => addRational(total, step.duration.beats), rational(0)),
+    ).toEqual(beforeFollowingStart);
+    expect(updated.progression.sections).toEqual(source.progression.sections);
+    expect(updated.temporaryBranch).toEqual(source.temporaryBranch);
+    const committed = updated;
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.project.temporaryBranch).toEqual(source.temporaryBranch);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression).toEqual(committed.progression);
+    expect(store.project.temporaryBranch).toEqual(committed.temporaryBranch);
+
+    const afterRedo = store.project;
+    const canUndo = store.canUndo;
+    store.dispatch(
+      { type: "progression/remove-step", payload: { stepId: generated.id, nowIso: T1 } },
+      removeStep,
+    );
+    expect(store.project).toBe(afterRedo);
+    expect(store.canUndo).toBe(canUndo);
+  });
+
   it("replaces chords and Rest while preserving Step identity, duration, performance and authored Melody", () => {
     const project = createDefaultProject("system-chords", "System chords", T0);
     const original = withNotes(chord(project, "source", "I", rational(5, 2)), [
@@ -238,12 +341,12 @@ describe("Piano Roll System chord commands", () => {
     expect(store.project.progression).toEqual(updated.progression);
   });
 
-  it("transfers a shared boundary within its pair, retaining crossing notes and exact total duration", () => {
+  it("transfers a shared boundary for two chords in one measure, retaining exact note onsets", () => {
     const project = createDefaultProject("boundary-transfer", "Boundary transfer", T0);
-    const left = withNotes(chord(project, "left", "I", rational(4)), [
-      { id: "crossing", pitch: E4, onset: rational(7, 2), duration: rational(2) },
+    const left = withNotes(chord(project, "left", "I", rational(2)), [
+      { id: "crossing", pitch: E4, onset: rational(1, 2), duration: rational(2) },
     ]);
-    const right = withNotes(chord(project, "right", "V", rational(4)), [
+    const right = withNotes(chord(project, "right", "I", rational(2)), [
       { id: "right-boundary", pitch: C4, onset: rational(1), duration: rational(1, 2) },
     ]);
     const afterPair = chord(project, "after", "vi", rational(2));
@@ -255,7 +358,7 @@ describe("Piano Roll System chord commands", () => {
         type: "piano-roll/transfer-boundary",
         payload: {
           leftStepId: left.id,
-          boundary: rational(5),
+          boundary: rational(3),
           snapQuantum: rational(1, 2),
           nowIso: T1,
         },
@@ -263,21 +366,21 @@ describe("Piano Roll System chord commands", () => {
       transferSystemChordBoundary,
     );
     const updated = store.project;
-    expect((updated.progression.steps[0] as ChordStep).duration.beats).toEqual(rational(5));
-    expect((updated.progression.steps[1] as ChordStep).duration.beats).toEqual(rational(3));
+    expect((updated.progression.steps[0] as ChordStep).duration.beats).toEqual(rational(3));
+    expect((updated.progression.steps[1] as ChordStep).duration.beats).toEqual(rational(1));
     expect(updated.progression.steps[2]?.id).toBe(afterPair.id);
     expect(
       addRational(
         updated.progression.steps[0]!.duration.beats,
         updated.progression.steps[1]!.duration.beats,
       ),
-    ).toEqual(rational(8));
+    ).toEqual(rational(4));
     const after = absoluteNotes(updated);
     expect(after).toHaveLength(original.length);
     expect(after.find((note) => note.id === "crossing")).toEqual(
       original.find((note) => note.id === "crossing"),
     );
-    expect(after.find((note) => note.id === "right-boundary")?.start).toEqual(rational(5));
+    expect(after.find((note) => note.id === "right-boundary")?.start).toEqual(rational(3));
     expect(after.find((note) => note.id === "right-boundary")?.sourceStepId).toBe(right.id);
     expect(store.undo()).toBe(true);
     expect(store.project.progression).toEqual(source.progression);
@@ -286,7 +389,501 @@ describe("Piano Roll System chord commands", () => {
     expect(compareRational(rational(1, 4), rational(1, 2))).toBeLessThan(0);
   });
 
-  it("materializes generated Melody when a transferred boundary changes owners and keeps destination instruments", () => {
+  it("resizes through a same-measure Rest partially or fully while preserving its Melody and next onset", () => {
+    const project = createDefaultProject("boundary-rest", "Boundary Rest", T0);
+    const left = withNotes(chord(project, "chord-left", "I", rational(2)), [
+      { id: "left-note", pitch: E4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const gap = rest("gap", rational(2), [
+      { id: "rest-note", pitch: C4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const next = chord(project, "next", "V", rational(2));
+    const source = withSteps(project, [left, gap, next]);
+    const beforeMelody = melodyTimelineSignature(source);
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: left.id,
+          draggedStepId: left.id,
+          boundary: rational(3),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(store.project.progression.steps.map((step) => step.id)).toEqual([
+      left.id,
+      gap.id,
+      next.id,
+    ]);
+    expect(store.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(3),
+      rational(1),
+      rational(2),
+    ]);
+    expect(stepStart(store.project, next.id)).toEqual(rational(4));
+    expect(melodyTimelineSignature(store.project)).toEqual(beforeMelody);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+
+    const full = new AppStore(source);
+    full.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: left.id,
+          draggedStepId: left.id,
+          boundary: rational(4),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(full.project.progression.steps.map((step) => step.id)).toEqual([left.id, next.id]);
+    expect(full.project.progression.steps[0]?.duration.beats).toEqual(rational(4));
+    expect(stepStart(full.project, next.id)).toEqual(rational(4));
+    expect(melodyTimelineSignature(full.project)).toEqual(beforeMelody);
+    const merged = full.project.progression.steps[0];
+    expect(merged?.kind).toBe("chord");
+    if (merged?.kind !== "chord" || merged.melody?.mode !== "authored")
+      throw new Error("Full Rest transfer did not materialize both Melody owners on the chord");
+    expect(new Set(merged.melody.phrase.notes.map((note) => note.id)).size).toBe(2);
+    expect(full.undo()).toBe(true);
+    expect(full.project.progression).toEqual(source.progression);
+    expect(full.redo()).toBe(true);
+    expect(full.project.progression.steps.map((step) => step.id)).toEqual([left.id, next.id]);
+
+    const leadingRest = rest("leading-rest", rational(2), [
+      { id: "leading-note", pitch: C4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const rightChord = withNotes(chord(project, "right-chord", "I", rational(2)), [
+      { id: "right-note", pitch: E4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const rightSource = withSteps(project, [leadingRest, rightChord, next]);
+    const rightMelody = melodyTimelineSignature(rightSource);
+    const rightStore = new AppStore(rightSource);
+    rightStore.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: leadingRest.id,
+          draggedStepId: rightChord.id,
+          boundary: rational(0),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(rightStore.project.progression.steps.map((step) => step.id)).toEqual([
+      rightChord.id,
+      next.id,
+    ]);
+    expect(rightStore.project.progression.steps[0]?.duration.beats).toEqual(rational(4));
+    expect(stepStart(rightStore.project, next.id)).toEqual(rational(4));
+    expect(melodyTimelineSignature(rightStore.project)).toEqual(rightMelody);
+    expect(rightStore.undo()).toBe(true);
+    expect(rightStore.project.progression).toEqual(rightSource.progression);
+    expect(rightStore.redo()).toBe(true);
+    expect(rightStore.project.progression.steps[0]?.id).toBe(rightChord.id);
+  });
+
+  it("fully consumes a different same-measure chord and retains the dragged Step ID", () => {
+    const project = createDefaultProject("boundary-merge", "Boundary merge", T0);
+    const left = withNotes(chord(project, "left", "I", rational(2)), [
+      { id: "same-local-id", pitch: E4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const rightBase = withNotes(chord(project, "right", "V", rational(2)), [
+      { id: "same-local-id", pitch: C4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const leftWithParameters = Object.freeze({
+      ...left,
+      performance: Object.freeze({
+        ...left.performance,
+        articulation: "block" as const,
+        masterVelocity: 91,
+      }),
+      melodyInstrumentOverride: "violin" as const,
+    });
+    const right = Object.freeze({
+      ...rightBase,
+      performance: Object.freeze({
+        ...rightBase.performance,
+        articulation: "arp-up" as const,
+        masterVelocity: 57,
+      }),
+      melodyInstrumentOverride: "oboe" as const,
+    });
+    const after = chord(project, "after", "V", rational(2));
+    const source = withSteps(project, [leftWithParameters, right, after]);
+    const beforeMelody = melodyTimelineSignature(source);
+    const partial = new AppStore(source);
+    partial.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: left.id,
+          draggedStepId: left.id,
+          boundary: rational(3),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(partial.project.progression.steps.map((step) => step.id)).toEqual([
+      left.id,
+      right.id,
+      after.id,
+    ]);
+    expect(partial.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(3),
+      rational(1),
+      rational(2),
+    ]);
+    expect(stepStart(partial.project, after.id)).toEqual(rational(4));
+    expect(melodyTimelineSignature(partial.project)).toEqual(beforeMelody);
+
+    for (const retainedId of [left.id, right.id]) {
+      const full = new AppStore(source);
+      full.dispatch(
+        {
+          type: "piano-roll/transfer-boundary",
+          payload: {
+            leftStepId: left.id,
+            draggedStepId: retainedId,
+            draggedEdge: retainedId === left.id ? "right" : "left",
+            boundary: retainedId === left.id ? rational(4) : rational(0),
+            snapQuantum: rational(2, 3),
+            nowIso: T1,
+          },
+        },
+        transferSystemChordBoundary,
+      );
+      expect(full.project.progression.steps.map((step) => step.id)).toEqual([retainedId, after.id]);
+      expect(full.project.progression.steps[0]?.duration.beats).toEqual(rational(4));
+      expect(stepStart(full.project, after.id)).toEqual(rational(4));
+      expect(melodyTimelineSignature(full.project)).toEqual(beforeMelody);
+      const merged = full.project.progression.steps[0];
+      expect(merged?.kind).toBe("chord");
+      if (merged?.kind !== "chord" || merged.melody?.mode !== "authored")
+        throw new Error("Full different-chord merge lost authored Melody");
+      const dragged = retainedId === left.id ? leftWithParameters : right;
+      expect(merged.harmonicFunction).toEqual(dragged.harmonicFunction);
+      expect(merged.performance).toEqual(dragged.performance);
+      expect(merged.melodyInstrumentOverride).toBe(dragged.melodyInstrumentOverride);
+      expect(new Set(merged.melody.phrase.notes.map((note) => note.id)).size).toBe(2);
+      expect(full.undo()).toBe(true);
+      expect(full.project.progression).toEqual(source.progression);
+      expect(full.redo()).toBe(true);
+      expect(full.project.progression.steps[0]?.id).toBe(retainedId);
+    }
+
+    const belowSnap = withSteps(project, [leftWithParameters, right]);
+    expect(() =>
+      transferSystemChordBoundary(belowSnap, {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: left.id,
+          draggedStepId: left.id,
+          draggedEdge: "right",
+          boundary: rational(11, 3),
+          snapQuantum: rational(2, 3),
+          nowIso: T1,
+        },
+      }),
+    ).toThrow("preserve a chord duration");
+  });
+
+  it("shrinks left edges into explicit exact Rest space and lets same-measure Rest extend left", () => {
+    const project = createDefaultProject("left-boundary", "Left boundary", T0);
+    const previous = withNotes(chord(project, "previous", "I", rational(2)), [
+      { id: "previous-note", pitch: C4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const selected = withNotes(chord(project, "selected", "I", rational(2)), [
+      { id: "selected-note", pitch: E4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const following = chord(project, "following", "V", rational(2));
+    const source = withSteps(project, [previous, selected, following]);
+    const beforeMelody = melodyTimelineSignature(source);
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: previous.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          resizeMode: "isolated",
+          boundary: rational(7, 3),
+          snapQuantum: rational(1, 3),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    const updated = store.project;
+    expect(updated.progression.steps.map((step) => step.id)).toEqual([
+      previous.id,
+      "resize-gap:previous:selected",
+      selected.id,
+      following.id,
+    ]);
+    expect(updated.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(2),
+      rational(1, 3),
+      rational(5, 3),
+      rational(2),
+    ]);
+    expect(stepStart(updated, selected.id)).toEqual(rational(7, 3));
+    const resizedSelected = updated.progression.steps.find(
+      (step): step is ChordStep => step.id === selected.id && step.kind === "chord",
+    );
+    expect(resizedSelected).toBeDefined();
+    expect(addRational(stepStart(updated, selected.id), resizedSelected!.duration.beats)).toEqual(
+      rational(4),
+    );
+    expect(stepStart(updated, following.id)).toEqual(rational(4));
+    expect(updated.progression.steps[0]?.duration.beats).toEqual(previous.duration.beats);
+    expect(melodyTimelineSignature(updated)).toEqual(beforeMelody);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression).toEqual(updated.progression);
+
+    const leadingSource = withSteps(project, [selected, following]);
+    const leadingStore = new AppStore(leadingSource);
+    leadingStore.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: selected.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          boundary: rational(1),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(leadingStore.project.progression.steps.map((step) => step.kind)).toEqual([
+      "rest",
+      "chord",
+      "chord",
+    ]);
+    expect(leadingStore.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(1),
+      rational(1),
+      rational(2),
+    ]);
+    expect(stepStart(leadingStore.project, selected.id)).toEqual(rational(1));
+    expect(addRational(stepStart(leadingStore.project, selected.id), rational(1))).toEqual(
+      rational(2),
+    );
+    expect(stepStart(leadingStore.project, following.id)).toEqual(rational(2));
+    expect(melodyTimelineSignature(leadingStore.project)).toEqual(
+      melodyTimelineSignature(leadingSource),
+    );
+
+    const beforeRest = rest("before", rational(1));
+    const restSource = withSteps(project, [beforeRest, selected, following]);
+    const restStore = new AppStore(restSource);
+    restStore.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: beforeRest.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          boundary: rational(1, 2),
+          snapQuantum: rational(1, 2),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(restStore.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(1, 2),
+      rational(5, 2),
+      rational(2),
+    ]);
+    expect(stepStart(restStore.project, following.id)).toEqual(rational(3));
+    expect(restStore.undo()).toBe(true);
+    expect(restStore.project.progression).toEqual(restSource.progression);
+    restStore.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: beforeRest.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          boundary: rational(0),
+          snapQuantum: rational(1, 2),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(restStore.project.progression.steps.map((step) => step.id)).toEqual([
+      selected.id,
+      following.id,
+    ]);
+    expect(restStore.project.progression.steps[0]?.duration.beats).toEqual(rational(3));
+    expect(stepStart(restStore.project, following.id)).toEqual(rational(3));
+  });
+
+  it("shrinks right edges into an explicit Rest without moving the following chord", () => {
+    const project = createDefaultProject("right-boundary", "Right boundary", T0);
+    const selected = withNotes(chord(project, "selected", "I", rational(2)), [
+      { id: "selected-note", pitch: E4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const following = withNotes(chord(project, "following", "V", rational(2)), [
+      { id: "following-note", pitch: C4, onset: rational(1, 2), duration: rational(1, 2) },
+    ]);
+    const tail = chord(project, "tail", "vi", rational(2));
+    const source = withSteps(project, [selected, following, tail]);
+    const beforeMelody = melodyTimelineSignature(source);
+    const originalFollowingStart = stepStart(source, following.id);
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: selected.id,
+          draggedStepId: selected.id,
+          draggedEdge: "right",
+          resizeMode: "isolated",
+          boundary: rational(5, 3),
+          snapQuantum: rational(1, 3),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    const updated = store.project;
+    expect(updated.progression.steps.map((step) => step.kind)).toEqual([
+      "chord",
+      "rest",
+      "chord",
+      "chord",
+    ]);
+    expect(updated.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(5, 3),
+      rational(1, 3),
+      rational(2),
+      rational(2),
+    ]);
+    expect(updated.progression.steps[1]?.id).toBe("resize-gap:selected:following");
+    expect(stepStart(updated, following.id)).toEqual(originalFollowingStart);
+    expect(stepStart(updated, tail.id)).toEqual(rational(4));
+    expect(melodyTimelineSignature(updated)).toEqual(beforeMelody);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression).toEqual(updated.progression);
+
+    const nextRest = rest("next-rest", rational(2));
+    const restSource = withSteps(project, [selected, nextRest, following]);
+    const restStore = new AppStore(restSource);
+    restStore.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: selected.id,
+          draggedStepId: selected.id,
+          draggedEdge: "right",
+          boundary: rational(3, 2),
+          snapQuantum: rational(1, 2),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    expect(restStore.project.progression.steps.map((step) => step.id)).toEqual([
+      selected.id,
+      nextRest.id,
+      following.id,
+    ]);
+    expect(restStore.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(3, 2),
+      rational(5, 2),
+      rational(2),
+    ]);
+    expect(stepStart(restStore.project, following.id)).toEqual(rational(4));
+  });
+
+  it("lets a left edge re-expand to the barline after shrinking across a leading Rest", () => {
+    const project = createDefaultProject("cross-measure-rest-edge", "Cross-measure Rest edge", T0);
+    const firstMeasure = rest("first-measure-only-rest", rational(4));
+    const selected = withNotes(chord(project, "selected", "I", rational(4)), [
+      { id: "selected-note", pitch: E4, onset: rational(1), duration: rational(1, 2) },
+    ]);
+    const following = chord(project, "following", "V", rational(4));
+    const source = withSteps(project, [firstMeasure, selected, following]);
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: firstMeasure.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          boundary: rational(5),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    const shrunk = store.project;
+    expect(shrunk.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(5),
+      rational(3),
+      rational(4),
+    ]);
+    expect(stepStart(shrunk, selected.id)).toEqual(rational(5));
+    expect(stepStart(shrunk, following.id)).toEqual(rational(8));
+
+    store.dispatch(
+      {
+        type: "piano-roll/transfer-boundary",
+        payload: {
+          leftStepId: firstMeasure.id,
+          draggedStepId: selected.id,
+          draggedEdge: "left",
+          boundary: rational(4),
+          snapQuantum: rational(1),
+          nowIso: T1,
+        },
+      },
+      transferSystemChordBoundary,
+    );
+    const restored = store.project;
+    expect(restored.progression.steps.map((step) => step.id)).toEqual([
+      firstMeasure.id,
+      selected.id,
+      following.id,
+    ]);
+    expect(restored.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(4),
+      rational(4),
+      rational(4),
+    ]);
+    expect(stepStart(restored, selected.id)).toEqual(rational(4));
+    expect(stepStart(restored, following.id)).toEqual(rational(8));
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(shrunk.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression).toEqual(restored.progression);
+  });
+
+  it("materializes generated Melody into a cross-measure Rest gap without moving the next chord", () => {
     const fixture = createPianoRollSystemChordFixture();
     const source = withSteps(
       fixture,
@@ -322,7 +919,7 @@ describe("Piano Roll System chord commands", () => {
         type: "piano-roll/transfer-boundary",
         payload: {
           leftStepId: generated.id,
-          boundary: rational(21),
+          boundary: rational(19),
           snapQuantum: rational(1, 2),
           nowIso: T1,
         },
@@ -333,19 +930,25 @@ describe("Piano Roll System chord commands", () => {
     const updated = store.project;
     const updatedGenerated = updated.progression.steps.find((step) => step.id === generated.id);
     const updatedRight = updated.progression.steps.find((step) => step.id === "chord-f");
+    const generatedIndex = updated.progression.steps.findIndex((step) => step.id === generated.id);
+    const insertedRest = updated.progression.steps[generatedIndex + 1];
     expect(updatedGenerated?.kind).toBe("chord");
     expect(updatedRight?.kind).toBe("chord");
     if (
       updatedGenerated?.kind !== "chord" ||
       updatedGenerated.melody?.mode !== "authored" ||
-      updatedRight?.kind !== "chord"
+      updatedRight?.kind !== "chord" ||
+      insertedRest?.kind !== "rest"
     )
-      throw new Error("Generated boundary owner was not materialized");
+      throw new Error("Generated boundary resize did not preserve its following Rest and chord");
     expect(updatedGenerated.melody.sourceRecipe).toEqual(generated.melody.recipe);
     expect(updatedGenerated.melodyInstrumentOverride).toBe(generated.melodyInstrumentOverride);
     expect(updatedRight.melodyInstrumentOverride).toBe("violin");
-    expect(updatedGenerated.duration.beats).toEqual(rational(5));
-    expect(updatedRight.duration.beats).toEqual(rational(3));
+    expect(updatedGenerated.duration.beats).toEqual(rational(3));
+    expect(insertedRest.duration.beats).toEqual(rational(1));
+    expect(updatedRight.duration.beats).toEqual(rational(4));
+    expect(stepStart(updated, "chord-f")).toEqual(rational(20));
+    expect(insertedRest.melodyInstrumentOverride).toBe(generated.melodyInstrumentOverride);
 
     const afterEvents = createEffectiveMelodyTimeline(updated);
     const afterSignature = afterEvents
@@ -358,14 +961,86 @@ describe("Piano Roll System chord commands", () => {
       );
     expect(afterSignature).toEqual(originalEvents);
     const movedNote = afterEvents.find((note) => note.eventKey === "following-note");
-    expect(movedNote?.sourceStepId).toBe("generated-e");
+    expect(movedNote?.sourceStepId).toBe("chord-f");
     expect(movedNote?.startBeats).toEqual(rational(41, 2));
-    expect(movedNote?.instrument).toBe("flute");
+    expect(movedNote?.instrument).toBe("violin");
 
     expect(store.undo()).toBe(true);
     expect(store.project.progression).toEqual(source.progression);
     expect(store.redo()).toBe(true);
     expect(store.project.progression).toEqual(updated.progression);
+  });
+
+  it("resizes a cross-measure chord into an explicit Rest and keeps the next chord at its absolute onset", () => {
+    const source = createPianoRollSystemChordFixture();
+    const generated = source.progression.steps.find(
+      (step): step is ChordStep => step.kind === "chord" && step.id === "generated-e",
+    );
+    if (!generated) throw new Error("Fixture is missing generated-e");
+    const beforeMelody = melodySoundSignature(source);
+    const beforeSections = source.progression.sections;
+    const beforeBranch = source.temporaryBranch;
+    const beforeDuration = source.progression.steps.reduce(
+      (total, step) => addRational(total, step.duration.beats),
+      rational(0),
+    );
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "progression/resize-chord-duration",
+        payload: { stepId: generated.id, duration: musicalDuration(rational(3)), nowIso: T1 },
+      },
+      resizeSystemChordDuration,
+    );
+
+    const updated = store.project;
+    const resized = updated.progression.steps.find((step) => step.id === generated.id);
+    const restIndex = updated.progression.steps.findIndex((step) => step.id === generated.id) + 1;
+    const gap = updated.progression.steps[restIndex];
+    expect(resized?.duration.beats).toEqual(rational(3));
+    expect(gap?.kind).toBe("rest");
+    expect(gap?.duration.beats).toEqual(rational(1));
+    expect(stepStart(updated, "chord-f")).toEqual(rational(20));
+    expect(melodySoundSignature(updated)).toEqual(beforeMelody);
+    expect(updated.progression.sections).toEqual(beforeSections);
+    expect(updated.temporaryBranch).toEqual(beforeBranch);
+    expect(
+      updated.progression.steps.reduce(
+        (total, step) => addRational(total, step.duration.beats),
+        rational(0),
+      ),
+    ).toEqual(beforeDuration);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression).toEqual(updated.progression);
+  });
+
+  it("redistributes a direct resize only across a same-measure chord pair", () => {
+    const project = createDefaultProject("resize-same-measure", "Resize same measure", T0);
+    const left = chord(project, "left", "I", rational(2));
+    const right = chord(project, "right", "I", rational(2));
+    const after = chord(project, "after", "vi", rational(2));
+    const source = withSteps(project, [left, right, after]);
+    const store = new AppStore(source);
+    store.dispatch(
+      {
+        type: "progression/resize-chord-duration",
+        payload: { stepId: left.id, duration: musicalDuration(rational(3)), nowIso: T1 },
+      },
+      resizeSystemChordDuration,
+    );
+    expect(store.project.progression.steps.map((step) => step.duration.beats)).toEqual([
+      rational(3),
+      rational(1),
+      rational(2),
+    ]);
+    expect(stepStart(store.project, right.id)).toEqual(rational(3));
+    expect(stepStart(store.project, after.id)).toEqual(rational(4));
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+    expect(stepStart(store.project, after.id)).toEqual(rational(4));
   });
 
   it("retains stored Melody tails while the effective timeline clips at the changed progression end", () => {
@@ -407,10 +1082,10 @@ describe("Piano Roll System chord commands", () => {
     expect(createEffectiveMelodyTimeline(store.project)[0]?.durationBeats).toEqual(rational(1, 2));
   });
 
-  it("snaps a shared boundary to an exact triplet quantum and rejects a short neighbor", () => {
+  it("accepts exact triplet boundaries and rejects a neighbor shorter than 1/24 beat", () => {
     const project = createDefaultProject("triplet-boundary", "Triplet boundary", T0);
-    const left = chord(project, "left", "I", rational(4));
-    const right = chord(project, "right", "V", rational(4));
+    const left = chord(project, "left", "I", rational(2));
+    const right = chord(project, "right", "I", rational(2));
     const source = withSteps(project, [left, right]);
     const store = new AppStore(source);
     store.dispatch(
@@ -418,7 +1093,7 @@ describe("Piano Roll System chord commands", () => {
         type: "piano-roll/transfer-boundary",
         payload: {
           leftStepId: left.id,
-          boundary: rational(14, 3),
+          boundary: rational(8, 3),
           snapQuantum: rational(2, 3),
           nowIso: T1,
         },
@@ -426,27 +1101,27 @@ describe("Piano Roll System chord commands", () => {
       transferSystemChordBoundary,
     );
     expect(store.project.progression.steps.map((step) => step.duration.beats)).toEqual([
-      rational(14, 3),
-      rational(10, 3),
+      rational(8, 3),
+      rational(4, 3),
     ]);
     expect(
       addRational(
         store.project.progression.steps[0]!.duration.beats,
         store.project.progression.steps[1]!.duration.beats,
       ),
-    ).toEqual(rational(8));
-    expect(divideRational(rational(14, 3), rational(2, 3))).toEqual(rational(7));
+    ).toEqual(rational(4));
+    expect(divideRational(rational(8, 3), rational(2, 3))).toEqual(rational(4));
     expect(() =>
       transferSystemChordBoundary(source, {
         type: "piano-roll/transfer-boundary",
         payload: {
           leftStepId: left.id,
-          boundary: rational(1, 3),
-          snapQuantum: rational(2, 3),
+          boundary: rational(1, 48),
+          snapQuantum: rational(1, 48),
           nowIso: T1,
         },
       }),
-    ).toThrow("at least one Snap unit");
+    ).toThrow("at least 1/24 beat");
   });
 
   it("splits exactly in half, assigns an exact-boundary event to the new Step, and preserves crossing notes", () => {
@@ -625,5 +1300,81 @@ describe("Piano Roll System chord commands", () => {
       [first, second, third],
     );
     expect(systemTieDisabledReason(sectioned, [first.id, second.id])).toContain("Song Section");
+  });
+
+  it("ties a chord with a same-measure Rest in either order and retains chord identity and exact Melody", () => {
+    const project = createDefaultProject("tie-rest", "Tie Rest", T0);
+    const before = rest("rest-before", rational(1), [
+      { id: "collision", pitch: C4, onset: rational(1, 4), duration: rational(1, 2) },
+    ]);
+    const selectedChord = withNotes(chord(project, "chord-after", "I", rational(1)), [
+      { id: "collision", pitch: E4, onset: rational(1, 4), duration: rational(1, 2) },
+    ]);
+    const following = chord(project, "following", "V", rational(2));
+    const source = withSteps(project, [before, selectedChord, following], before.id);
+    const melody = melodyTimelineSignature(source);
+    const store = new AppStore(source);
+    expect(systemTieDisabledReason(source, [before.id, selectedChord.id])).toBeNull();
+    store.dispatch(
+      {
+        type: "piano-roll/tie-steps",
+        payload: { stepIds: [selectedChord.id, before.id], nowIso: T1 },
+      },
+      tieSystemSteps,
+    );
+    expect(store.project.progression.steps.map((step) => step.id)).toEqual([
+      selectedChord.id,
+      following.id,
+    ]);
+    expect(store.project.progression.steps[0]?.duration.beats).toEqual(rational(2));
+    expect(store.project.progression.selectedStepId).toBe(selectedChord.id);
+    expect(stepStart(store.project, following.id)).toEqual(rational(2));
+    expect(melodyTimelineSignature(store.project)).toEqual(melody);
+    const tied = store.project.progression.steps[0];
+    expect(tied?.kind).toBe("chord");
+    if (tied?.kind !== "chord" || tied.melody?.mode !== "authored")
+      throw new Error("Tie through Rest did not preserve Melody on the chord");
+    expect(new Set(tied.melody.phrase.notes.map((note) => note.id)).size).toBe(2);
+    expect(store.undo()).toBe(true);
+    expect(store.project.progression).toEqual(source.progression);
+    expect(store.redo()).toBe(true);
+    expect(store.project.progression.steps[0]?.id).toBe(selectedChord.id);
+
+    const after = rest("rest-after", rational(1), [
+      { id: "rest-after-note", pitch: C4, onset: rational(1, 4), duration: rational(1, 2) },
+    ]);
+    const chordBefore = withNotes(chord(project, "chord-before", "I", rational(1)), [
+      { id: "chord-before-note", pitch: E4, onset: rational(1, 4), duration: rational(1, 2) },
+    ]);
+    const afterSource = withSteps(project, [chordBefore, after, following]);
+    const afterMelody = melodyTimelineSignature(afterSource);
+    const afterStore = new AppStore(afterSource);
+    expect(systemTieDisabledReason(afterSource, [chordBefore.id, after.id])).toBeNull();
+    afterStore.dispatch(
+      {
+        type: "piano-roll/tie-steps",
+        payload: { stepIds: [chordBefore.id, after.id], nowIso: T1 },
+      },
+      tieSystemSteps,
+    );
+    expect(afterStore.project.progression.steps.map((step) => step.id)).toEqual([
+      chordBefore.id,
+      following.id,
+    ]);
+    expect(afterStore.project.progression.steps[0]?.duration.beats).toEqual(rational(2));
+    expect(melodyTimelineSignature(afterStore.project)).toEqual(afterMelody);
+    expect(afterStore.undo()).toBe(true);
+    expect(afterStore.project.progression).toEqual(afterSource.progression);
+    expect(afterStore.redo()).toBe(true);
+    expect(afterStore.project.progression.steps[0]?.id).toBe(chordBefore.id);
+
+    const crossingMeasure = withSteps(project, [
+      chord(project, "bar-start", "I", rational(3)),
+      rest("bar-rest", rational(1)),
+      chord(project, "bar-chord", "I", rational(1)),
+    ]);
+    expect(systemTieDisabledReason(crossingMeasure, ["bar-rest", "bar-chord"])).toContain(
+      "one measure",
+    );
   });
 });

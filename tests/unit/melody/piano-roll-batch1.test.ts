@@ -46,7 +46,9 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     );
     if (!step || step.kind !== "chord" || step.melody?.mode !== "generated")
       throw new Error("Expected a generated Melody step");
-    const before = createEffectiveMelodyTimeline(project).filter((note) => note.sourceStepId === step.id);
+    const before = createEffectiveMelodyTimeline(project).filter(
+      (note) => note.sourceStepId === step.id,
+    );
     const target = before[0]!;
     const store = new AppStore(project);
     store.dispatch(
@@ -54,31 +56,52 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
         type: "melody/apply-authored-transaction",
         payload: {
           nowIso: "direct-edit",
-          edits: [{
-            type: "upsert",
-            sourceStepId: step.id,
-            note: {
-              id: target.eventKey,
-              pitch: target.pitch,
-              startBeats: target.startBeats,
-              durationBeats: rational(1, 3),
+          edits: [
+            {
+              type: "upsert",
+              sourceStepId: step.id,
+              note: {
+                id: target.eventKey,
+                pitch: target.pitch,
+                startBeats: target.startBeats,
+                durationBeats: rational(1, 3),
+              },
             },
-          }],
+          ],
         },
       },
       applyAuthoredMelodyTransaction,
     );
-    const materialized = store.project.progression.steps.find((candidate) => candidate.id === step.id);
-    expect(materialized).toMatchObject({ melody: { mode: "authored", sourceRecipe: step.melody.recipe } });
-    const after = createEffectiveMelodyTimeline(store.project).filter((note) => note.sourceStepId === step.id);
+    const materialized = store.project.progression.steps.find(
+      (candidate) => candidate.id === step.id,
+    );
+    expect(materialized).toMatchObject({
+      melody: { mode: "authored", sourceRecipe: step.melody.recipe },
+    });
+    const after = createEffectiveMelodyTimeline(store.project).filter(
+      (note) => note.sourceStepId === step.id,
+    );
     expect(after).toHaveLength(before.length);
-    expect(after.find((note) => note.eventKey === target.eventKey)?.durationBeats).toEqual(rational(1, 3));
-    expect(after.filter((note) => note.eventKey !== target.eventKey).map((note) => [note.pitch, note.startBeats, note.durationBeats]))
-      .toEqual(before.filter((note) => note.eventKey !== target.eventKey).map((note) => [note.pitch, note.startBeats, note.durationBeats]));
+    expect(after.find((note) => note.eventKey === target.eventKey)?.durationBeats).toEqual(
+      rational(1, 3),
+    );
+    expect(
+      after
+        .filter((note) => note.eventKey !== target.eventKey)
+        .map((note) => [note.pitch, note.startBeats, note.durationBeats]),
+    ).toEqual(
+      before
+        .filter((note) => note.eventKey !== target.eventKey)
+        .map((note) => [note.pitch, note.startBeats, note.durationBeats]),
+    );
     expect(store.undo()).toBe(true);
-    expect(store.project.progression.steps.find((candidate) => candidate.id === step.id)).toEqual(step);
+    expect(store.project.progression.steps.find((candidate) => candidate.id === step.id)).toEqual(
+      step,
+    );
     expect(store.redo()).toBe(true);
-    expect(store.project.progression.steps.find((candidate) => candidate.id === step.id)).toEqual(materialized);
+    expect(store.project.progression.steps.find((candidate) => candidate.id === step.id)).toEqual(
+      materialized,
+    );
   });
 
   it("preserves the full generated destination when inserting a note there", () => {
@@ -88,23 +111,37 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     );
     if (!step || step.kind !== "chord" || step.melody?.mode !== "generated")
       throw new Error("Expected a generated Melody step");
-    const before = createEffectiveMelodyTimeline(project).filter((note) => note.sourceStepId === step.id);
+    const before = createEffectiveMelodyTimeline(project).filter(
+      (note) => note.sourceStepId === step.id,
+    );
     const inserted = applyAuthoredMelodyTransaction(project, {
       type: "melody/apply-authored-transaction",
       payload: {
         nowIso: "direct-insert",
-        edits: [{ type: "upsert", note: {
-          id: "inserted-generated-destination",
-          pitch,
-          startBeats: before[0]!.startBeats,
-          durationBeats: rational(1, 4),
-        } }],
+        edits: [
+          {
+            type: "upsert",
+            note: {
+              id: "inserted-generated-destination",
+              pitch,
+              startBeats: before[0]!.startBeats,
+              durationBeats: rational(1, 4),
+            },
+          },
+        ],
       },
     });
-    const after = createEffectiveMelodyTimeline(inserted.project).filter((note) => note.sourceStepId === step.id);
+    const after = createEffectiveMelodyTimeline(inserted.project).filter(
+      (note) => note.sourceStepId === step.id,
+    );
     expect(after).toHaveLength(before.length + 1);
-    expect(after.filter((note) => note.eventKey !== "inserted-generated-destination").map((note) => [note.eventKey, note.pitch, note.startBeats, note.durationBeats]))
-      .toEqual(before.map((note) => [note.eventKey, note.pitch, note.startBeats, note.durationBeats]));
+    expect(
+      after
+        .filter((note) => note.eventKey !== "inserted-generated-destination")
+        .map((note) => [note.eventKey, note.pitch, note.startBeats, note.durationBeats]),
+    ).toEqual(
+      before.map((note) => [note.eventKey, note.pitch, note.startBeats, note.durationBeats]),
+    );
     const undone = restoreAuthoredMelodyTransaction(inserted.project, inserted.inverse!);
     expect(undone.project.progression.steps).toEqual(project.progression.steps);
   });
@@ -266,27 +303,30 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
       (note) => note.sourceStepId === generatedStep.id,
     );
     const inserted = applyAuthoredMelodyTransaction(generatedProject, {
-        type: "melody/apply-authored-transaction",
-        payload: {
-          nowIso: "now",
-          edits: [
-            {
-              type: "upsert",
-              note: {
-                id: "blocked",
-                pitch,
-                startBeats: rational(0),
-                durationBeats: rational(1, 4),
-              },
+      type: "melody/apply-authored-transaction",
+      payload: {
+        nowIso: "now",
+        edits: [
+          {
+            type: "upsert",
+            note: {
+              id: "blocked",
+              pitch,
+              startBeats: rational(0),
+              durationBeats: rational(1, 4),
             },
-          ],
-        },
-      });
-    expect(inserted.project.progression.steps.find((step) => step.id === generatedStep.id))
-      .toMatchObject({ melody: { mode: "authored" } });
-    expect(createEffectiveMelodyTimeline(inserted.project).filter(
-      (note) => note.sourceStepId === generatedStep.id,
-    )).toHaveLength(before.length + 1);
+          },
+        ],
+      },
+    });
+    expect(
+      inserted.project.progression.steps.find((step) => step.id === generatedStep.id),
+    ).toMatchObject({ melody: { mode: "authored" } });
+    expect(
+      createEffectiveMelodyTimeline(inserted.project).filter(
+        (note) => note.sourceStepId === generatedStep.id,
+      ),
+    ).toHaveLength(before.length + 1);
     expect(() =>
       applyAuthoredMelodyTransaction(withSteps([rest("only")]), {
         type: "melody/apply-authored-transaction",
@@ -410,7 +450,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     ).toEqual(rational(2, 3));
   });
 
-  it("deletes owner Melody with the Step in one undoable command while other notes continue", () => {
+  it("keeps Rest-owned Melody when a Rest remove action is a history no-op", () => {
     const project = withSteps([
       Object.freeze({
         ...rest("deleted-owner"),
@@ -437,11 +477,12 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
       },
       removeStep,
     );
-    expect(store.project.progression.steps).toHaveLength(1);
+    expect(store.project.progression.steps).toHaveLength(2);
     expect(createEffectiveMelodyTimeline(store.project).map((event) => event.eventKey)).toEqual([
+      "delete-with-owner",
       "continues",
     ]);
-    expect(store.undo()).toBe(true);
-    expect(store.project.progression).toEqual(project.progression);
+    expect(store.history.undoDepth).toBe(0);
+    expect(store.undo()).toBe(false);
   });
 });

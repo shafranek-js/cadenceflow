@@ -95,7 +95,7 @@ test.describe("T201 — direct duration resize", () => {
     await page.mouse.move(x, y);
     await page.mouse.down();
     await expect(page.getByTestId("duration-resize-status")).toBeVisible();
-    await page.mouse.move(x + 120, y, { steps: 4 });
+    await page.mouse.move(x - 120, y, { steps: 4 });
     await expect(page.getByTestId("duration-resize-status")).toBeVisible();
     expect((await handle.boundingBox())!.y).toBe(box!.y);
     await page.mouse.up();
@@ -217,12 +217,12 @@ test.describe("T201 — direct duration resize", () => {
       const y = box!.y + box!.height / 2;
       await page.mouse.move(x, y);
       await page.mouse.down();
-      await page.mouse.move(x + 50, y, { steps: 4 });
+      await page.mouse.move(x - 50, y, { steps: 4 });
       await expect(page.getByTestId("duration-resize-status")).toBeVisible();
       expect((await handle.boundingBox())!.y).toBe(box!.y);
       await page.mouse.up();
       await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-      expect(Number(await handle.getAttribute("aria-valuenow"))).toBeGreaterThan(Number(before));
+      expect(Number(await handle.getAttribute("aria-valuenow"))).toBeLessThan(Number(before));
     }
   });
 

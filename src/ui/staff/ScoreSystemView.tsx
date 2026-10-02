@@ -157,6 +157,7 @@ function harmonySequenceEntry(
     projection: projectPitchesToStaff(item.pitches),
     ...(item.bassPitch ? { bassProjection: projectPitchesToStaff([item.bassPitch]) } : {}),
     ...(tabPositions ? { tabPositions } : {}),
+    sourceEventKeys: [item.stepId],
     duration: item.duration,
     startOffsetBeats: item.startOffsetBeats,
     continuesFromPrevious: item.continuesFromPrevious,
@@ -191,8 +192,8 @@ function melodySequenceEntries(
       duration,
       startOffsetBeats,
       writtenRhythm,
-      continuesFromPrevious: entry.continuesFromPrevious || writtenRhythm.index > 0,
-      continuesToNext: entry.continuesToNext || writtenRhythm.index < writtenRhythm.count - 1,
+      continuesFromPrevious: entry.continuesFromPrevious,
+      continuesToNext: entry.continuesToNext,
     };
   });
 }

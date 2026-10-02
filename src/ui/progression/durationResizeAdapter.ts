@@ -240,10 +240,47 @@ export function createDurationResizeSnapshot(
   );
   const fourBars = multiplyRational(layout.barLengthBeats, rational(4));
   const minimumHorizon = addRational(entry.startBeats, fourBars);
-  const editableEnd =
+  let editableEnd =
     compareRational(layout.playbackDurationBeats, minimumHorizon) >= 0
       ? layout.playbackDurationBeats
       : minimumHorizon;
+  const step = project.progression.steps[stepIndex]!;
+  if (step.kind === "chord") {
+    const minimumNeighbor = rational(1, 24);
+    const originalEnd = addRational(entry.startBeats, step.duration.beats);
+    const next = project.progression.steps[stepIndex + 1];
+    const nextTimelineEntry = next
+      ? timeline.steps.find((candidate) => candidate.step.id === next.id)
+      : undefined;
+    const measureIndex = Math.floor(
+      (entry.startBeats.numerator * layout.barLengthBeats.denominator) /
+        (entry.startBeats.denominator * layout.barLengthBeats.numerator),
+    );
+    const measureEnd = multiplyRational(layout.barLengthBeats, rational(measureIndex + 1));
+    let chordEndLimit = originalEnd;
+    if (next?.kind === "chord" && nextTimelineEntry) {
+      const nextStart = nextTimelineEntry.startBeats;
+      const nextMeasure = Math.floor(
+        (nextStart.numerator * layout.barLengthBeats.denominator) /
+          (nextStart.denominator * layout.barLengthBeats.numerator),
+      );
+      if (nextMeasure === measureIndex) {
+        const pairEnd = addRational(nextStart, next.duration.beats);
+        const pairLimit = subtractRational(pairEnd, minimumNeighbor);
+        const measureLimit = subtractRational(measureEnd, minimumNeighbor);
+        chordEndLimit = compareRational(pairLimit, measureLimit) < 0 ? pairLimit : measureLimit;
+      }
+    } else if (next?.kind === "rest" && nextTimelineEntry) {
+      chordEndLimit = subtractRational(
+        addRational(nextTimelineEntry.startBeats, next.duration.beats),
+        minimumNeighbor,
+      );
+    } else if (!next && compareRational(originalEnd, measureEnd) <= 0) {
+      chordEndLimit = measureEnd;
+    }
+    editableEnd = compareRational(chordEndLimit, editableEnd) < 0 ? chordEndLimit : editableEnd;
+    if (compareRational(editableEnd, originalEnd) < 0) editableEnd = originalEnd;
+  }
   const stepBoundaries = timeline.steps.flatMap((timelineStep) => [
     timelineStep.startBeats,
     timelineStep.endBeats,

@@ -461,7 +461,10 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await inspector.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(
       score.locator(`.measure-staff-event-select[data-step-id="${secondStepId}"]`),
-    ).toHaveCount(0);
+    ).toHaveCount(1);
+    await expect(
+      score.locator(`.measure-staff-event-select[data-step-id="${secondStepId}"]`).first(),
+    ).toContainText("Rest");
 
     const rest = score.locator(`.measure-staff-event-select[data-step-id="${restStepId}"]`).first();
     await rest.click();
@@ -471,6 +474,6 @@ test.describe("US13 T185 — direct Staff interaction", () => {
       .click();
     await expect(
       score.locator(`.measure-staff-event-select[data-step-id="${restStepId}"]`),
-    ).toHaveCount(0);
+    ).toHaveCount(1);
   });
 });

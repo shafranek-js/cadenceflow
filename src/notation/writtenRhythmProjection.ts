@@ -4,8 +4,10 @@ import {
   divideRational,
   subtractRational,
   ZERO,
+  rational,
   type Rational,
 } from "../domain/timing/rational";
+import type { Meter } from "../domain/timing/meter";
 
 export interface WrittenRhythmValue {
   readonly beats: Rational;
@@ -112,13 +114,30 @@ function customValue(beats: Rational): WrittenRhythmValue {
   });
 }
 
-/** Decomposes an exact beat duration into standard written values and exact ratios. */
-export function projectWrittenRhythm(duration: Rational): readonly WrittenRhythmPart[] {
+function beatsToNextGroupingBoundary(startOffset: Rational, value: Meter): Rational {
+  let pulse = 0;
+  for (const groupSize of value.grouping) {
+    pulse += groupSize;
+    const boundary = rational(pulse * 4, value.denominator);
+    if (compareRational(startOffset, boundary) < 0) return subtractRational(boundary, startOffset);
+  }
+  const barLength = rational(value.numerator * 4, value.denominator);
+  return compareRational(startOffset, barLength) < 0
+    ? subtractRational(barLength, startOffset)
+    : barLength;
+}
+
+/** Decomposes exact beats into written values without crossing a metric group. */
+export function projectWrittenRhythm(
+  duration: Rational,
+  startOffset: Rational = ZERO,
+  value?: Meter,
+): readonly WrittenRhythmPart[] {
   if (compareRational(duration, ZERO) <= 0) throw new RangeError("duration must be positive");
   const candidates = [...ordinaryValues, ...tripletValues].sort((a, b) =>
     compareRational(b.beats, a.beats),
   );
-  if (!standardBeatDenominators.has(duration.denominator)) {
+  if (!value && !standardBeatDenominators.has(duration.denominator)) {
     const custom = customValue(duration);
     return Object.freeze([Object.freeze({ ...custom, offsetBeats: ZERO, index: 0, count: 1 })]);
   }
@@ -126,8 +145,13 @@ export function projectWrittenRhythm(duration: Rational): readonly WrittenRhythm
   let remaining = duration;
   let offsetBeats = ZERO;
   while (compareRational(remaining, ZERO) > 0) {
-    const value = candidates.find((candidate) => compareRational(candidate.beats, remaining) <= 0);
-    const selected = value ?? customValue(remaining);
+    const absoluteOnset = addRational(startOffset, offsetBeats);
+    const groupRemainder = value ? beatsToNextGroupingBoundary(absoluteOnset, value) : remaining;
+    const available = compareRational(groupRemainder, remaining) < 0 ? groupRemainder : remaining;
+    const writtenValue = candidates.find(
+      (candidate) => compareRational(candidate.beats, available) <= 0,
+    );
+    const selected = writtenValue ?? customValue(available);
     parts.push({ value: selected, offsetBeats });
     remaining = subtractRational(remaining, selected.beats);
     offsetBeats = addRational(offsetBeats, selected.beats);

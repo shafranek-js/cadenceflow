@@ -137,6 +137,7 @@ function endOfSpan(span: TimelineSpan): Rational {
 function splitTimelineSpan(
   span: TimelineSpan,
   barLength: Rational,
+  meter: Project["globalTiming"]["meter"],
   measures: {
     readonly startBeats: Rational;
     readonly endBeats: Rational;
@@ -170,7 +171,11 @@ function splitTimelineSpan(
           instrument: event.instrument,
           clef: event.clef,
           harmonicRole: event.harmonicRole,
-          writtenRhythm: projectWrittenRhythm(durationBeats),
+          writtenRhythm: projectWrittenRhythm(
+            durationBeats,
+            subtractRational(cursor, measure.startBeats),
+            meter,
+          ),
         }),
       );
     } else {
@@ -183,7 +188,11 @@ function splitTimelineSpan(
           startBeats: cursor,
           durationBeats,
           startOffsetBeats: subtractRational(cursor, measure.startBeats),
-          writtenRhythm: projectWrittenRhythm(durationBeats),
+          writtenRhythm: projectWrittenRhythm(
+            durationBeats,
+            subtractRational(cursor, measure.startBeats),
+            meter,
+          ),
         }),
       );
     }
@@ -195,13 +204,14 @@ function buildMeasures(
   layout: ReturnType<typeof createProgressionMeasureLayout>,
   spans: readonly TimelineSpan[],
   barLengthBeats: Rational,
+  meter: Project["globalTiming"]["meter"],
 ): readonly MelodyStaffMeasure[] {
   const mutableMeasures = layout.measures.map((measure) => ({
     startBeats: measure.startBeats,
     endBeats: measure.endBeats,
     entries: [] as MelodyStaffEntry[],
   }));
-  spans.forEach((span) => splitTimelineSpan(span, barLengthBeats, mutableMeasures));
+  spans.forEach((span) => splitTimelineSpan(span, barLengthBeats, meter, mutableMeasures));
   return Object.freeze(
     layout.measures.map((measure, measureIndex) => {
       const entries = mutableMeasures[measureIndex]!.entries.sort(
@@ -392,7 +402,7 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
     });
   }
 
-  const measures = buildMeasures(layout, spans, layout.barLengthBeats);
+  const measures = buildMeasures(layout, spans, layout.barLengthBeats, project.globalTiming.meter);
   const lanes = [...laneBuckets.entries()]
     .sort(
       ([a, aValue], [b, bValue]) =>
@@ -406,6 +416,7 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
         layout,
         fillLaneSpans(laneEvents, layout.playbackDurationBeats),
         layout.barLengthBeats,
+        project.globalTiming.meter,
       );
       const activeSystemIndexes = Object.freeze(
         laneMeasures

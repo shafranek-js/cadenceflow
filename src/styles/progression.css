@@ -767,32 +767,30 @@
 }
 @media (max-width: 760px) {
   .progression-step-cards[data-view="piano-roll"] .score-system-header {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     padding: 4px 6px;
   }
   .piano-roll-system-note-panel {
-    flex: 0 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
     max-width: none;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     margin: 0;
     gap: 3px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    white-space: nowrap;
+    overflow: visible;
+    white-space: normal;
   }
   .piano-roll-system-note-panel [role="group"] {
-    flex: 0 0 auto;
-    min-width: max-content;
-    flex-wrap: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
     gap: 1px;
   }
   .piano-roll-note-palette {
-    flex: 0 0 auto !important;
-    width: max-content !important;
-    max-width: none;
-    flex-wrap: nowrap !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 100%;
+    flex-wrap: wrap !important;
   }
   .piano-roll-note-selection-count {
     flex: 0 0 auto;
@@ -1480,18 +1478,41 @@ button.piano-roll-note > span {
   border-top: 3px solid var(--score-border);
   background: var(--score-paper);
 }
+.piano-roll-harmony-grid-lines {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.piano-roll-harmony-grid-line {
+  stroke: color-mix(in srgb, var(--score-ink) 38%, transparent);
+  stroke-width: 0.8px;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: crispEdges;
+}
+.piano-roll-harmony-grid-line.is-beat {
+  stroke: color-mix(in srgb, var(--score-ink) 55%, transparent);
+  stroke-width: 1px;
+}
+.piano-roll-harmony-grid-line.is-bar {
+  stroke: var(--score-ink);
+  stroke-width: 1.2px;
+}
 .piano-roll-harmony-fragment {
   position: relative;
   display: flex;
   min-width: 0;
 }
-.piano-roll-chord-boundary-handle {
+.progression-track .piano-roll-chord-boundary-handle {
   position: absolute;
   z-index: 4;
   top: 0;
   bottom: 0;
-  width: 10px;
-  min-width: 10px;
+  width: min(10px, 34%);
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1500,23 +1521,29 @@ button.piano-roll-note > span {
   touch-action: none;
 }
 .piano-roll-chord-boundary-handle.is-left {
-  left: -5px;
+  left: 0;
+  transform: translateX(0);
 }
 .piano-roll-chord-boundary-handle.is-right {
-  right: -5px;
+  right: 0;
+  transform: translateX(50%);
 }
 .piano-roll-chord-boundary-handle::after {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 4px;
+  left: 50%;
   width: 2px;
+  transform: translateX(-50%);
   background: transparent;
   content: "";
 }
 .piano-roll-chord-boundary-handle:hover::after,
 .piano-roll-chord-boundary-handle:focus-visible::after,
 .piano-roll-chord-boundary-handle.is-previewing::after {
+  background: var(--score-focus, #2167b2);
+}
+.piano-roll-chord-boundary-handle:active::after {
   background: var(--score-focus, #2167b2);
 }
 .piano-roll-chord-boundary-preview {
@@ -1917,6 +1944,26 @@ button.piano-roll-note > span {
 }
 .piano-roll-guide-segment.is-neutral {
   background: color-mix(in srgb, var(--score-border) 7%, var(--piano-roll-palette-surface));
+}
+.piano-roll-guide-segment.is-neutral.is-no-harmony {
+  background: color-mix(
+    in srgb,
+    var(--piano-roll-degree-color) 12%,
+    var(--piano-roll-palette-surface)
+  );
+}
+.piano-roll-grid.is-chromatic
+  .piano-roll-guide-segment.is-neutral.is-no-harmony[data-palette-degrees*="-"] {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--piano-roll-degree-color) 12%, var(--piano-roll-palette-surface)) 0 7px,
+    color-mix(
+        in srgb,
+        var(--piano-roll-degree-color-secondary) 12%,
+        var(--piano-roll-palette-surface)
+      )
+      7px 14px
+  );
 }
 @media (max-width: 767px) {
   .piano-roll-grid {
