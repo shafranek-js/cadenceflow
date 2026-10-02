@@ -3,6 +3,8 @@ import { AppStore } from "../../../src/app/appStore";
 import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
 import { addMatrixPreview } from "../../../src/app/commands/matrixCommands";
 import {
+  applyMelodyCommand,
+  createSetAuthoredMelodyCommand,
   MelodyCommandError,
   removeMelodyRecipe,
   setMelodyRecipe,
@@ -25,6 +27,7 @@ import { createDefaultProject } from "../../../src/domain/project/factory";
 import { MelodyValidationError } from "../../../src/domain/melody/types";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
+import { exactPitch } from "../../../src/domain/harmony/pitch";
 
 const T0 = "2026-09-10T12:00:00.000Z";
 const T1 = "2026-09-10T12:01:00.000Z";
@@ -64,7 +67,10 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     const command = setRecipeCommand();
     const applied = setMelodyRecipe(initial, command);
 
-    expect(applied.project.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(applied.project.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated",
+      recipe,
+    });
     expect(applied.project.melodyTrack.instrument).toBe("violin");
     expect(applied.project.progression.selectedStepId).toBe("step-1");
     expect(applied.project.updatedAt).toBe(T1);
@@ -79,7 +85,10 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     expect(store.undo()).toBe(true);
     expect(store.project).toEqual(initial);
     expect(store.redo()).toBe(true);
-    expect(store.project.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(store.project.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated",
+      recipe,
+    });
     expect(store.project.melodyTrack.instrument).toBe("violin");
   });
 
@@ -255,6 +264,33 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     expect(JSON.stringify(initial)).toBe(before);
   });
 
+  it("sets and restores authored melody on a Rest step", () => {
+    const initial = addRestStep(createChordProject(), {
+      type: "progression/add-rest",
+      payload: { stepId: "rest-1", nowIso: T1 },
+    }).project;
+    const command = createSetAuthoredMelodyCommand(
+      "rest-1",
+      {
+        notes: [
+          {
+            id: "rest-note-1",
+            pitch: exactPitch(69, { step: "A", alter: 0 }),
+            onset: rational(0),
+            duration: rational(1),
+          },
+        ],
+      },
+      "2026-09-10T12:02:00.000Z",
+    );
+    const applied = applyMelodyCommand(initial, command);
+
+    expect(applied.project.progression.steps[1]).toHaveProperty("authoredMelody.notes", [
+      expect.objectContaining({ id: "rest-note-1", duration: rational(1) }),
+    ]);
+    expect(applyInverseCommand(applied.project, applied.inverse)).toEqual(initial);
+  });
+
   it("preserves recipes through Repeat, Extend/duration, Replace, Reorder, Remove, and Reset Performance", () => {
     const initial = createChordProject();
     const withRecipe = setMelodyRecipe(initial, setRecipeCommand()).project;
@@ -271,26 +307,26 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
       repeated.progression.steps[1]?.kind === "chord"
         ? repeated.progression.steps[1].melody
         : undefined;
-    expect(repeatedRecipe).toEqual(recipe);
+    expect(repeatedRecipe).toEqual({ mode: "generated", recipe });
     expect(repeatedRecipe).not.toBe(withRecipe.progression.steps[0]?.melody);
 
     const extended = setStepDuration(withRecipe, {
       type: "timing/set-step-duration",
       payload: { stepId: "step-1", duration: musicalDuration(rational(6)), nowIso: T1 },
     }).project;
-    expect(extended.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(extended.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
 
     const replaced = replaceStep(withRecipe, {
       type: "progression/replace-step",
       payload: { stepId: "step-1", functionId: "V", nowIso: T1 },
     }).project;
-    expect(replaced.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(replaced.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
 
     const reordered = reorderStep(repeated, {
       type: "progression/reorder-step",
       payload: { stepId: "step-2", targetIndex: 0, nowIso: T1 },
     }).project;
-    expect(reordered.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(reordered.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
 
     const removed = removeStep(withRecipe, {
       type: "progression/remove-step",
@@ -299,13 +335,13 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     expect(removed.project.progression.steps).toHaveLength(0);
     expect(
       applyInverseCommand(removed.project, removed.inverse).progression.steps[0],
-    ).toHaveProperty("melody", recipe);
+    ).toHaveProperty("melody", { mode: "generated", recipe });
 
     const reset = resetStepPerformance(withRecipe, {
       type: "progression/reset-performance",
       payload: { stepId: "step-1", nowIso: T1 },
     }).project;
-    expect(reset.progression.steps[0]).toHaveProperty("melody", recipe);
+    expect(reset.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
   });
 
   it("keeps generated events out of Custom Presets", () => {

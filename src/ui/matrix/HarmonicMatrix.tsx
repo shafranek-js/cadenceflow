@@ -49,6 +49,9 @@ export function HarmonicMatrix({
   onOpenMatrixMenu,
   onOpenPresets,
   onOpenModesExplorer,
+  onOpenQuickChord,
+  onOpenAlternatives,
+  canOpenAlternatives = false,
 }: {
   readonly project: Project;
   readonly previewFunctionId?: string;
@@ -70,6 +73,9 @@ export function HarmonicMatrix({
   readonly onGenreFocusChange?: (genre: GenreFocusId) => void;
   readonly onOpenPresets?: () => void;
   readonly onOpenModesExplorer?: () => void;
+  readonly onOpenQuickChord?: () => void;
+  readonly onOpenAlternatives?: () => void;
+  readonly canOpenAlternatives?: boolean;
 }) {
   const module = getHarmonicModule(project.activeModule);
   const best = recommendations?.bestMatch?.functionId;
@@ -341,6 +347,41 @@ export function HarmonicMatrix({
               <span className="btn-label">Modes</span>
             </button>
           )}
+          {onOpenQuickChord ? (
+            <button
+              type="button"
+              className="matrix-formulas-btn matrix-quick-chord-btn"
+              onClick={onOpenQuickChord}
+              data-testid="matrix-quick-chord-trigger"
+              title="Open Quick Chord / Command Palette (Ctrl/Cmd+K)"
+              aria-label="Open Quick Chord and Command Palette"
+            >
+              <span className="btn-icon" aria-hidden="true">
+                ⌘
+              </span>
+              <span className="btn-label">Quick Chord</span>
+            </button>
+          ) : null}
+          {onOpenAlternatives ? (
+            <button
+              type="button"
+              className="matrix-formulas-btn matrix-alternatives-btn"
+              onClick={onOpenAlternatives}
+              disabled={!canOpenAlternatives}
+              data-testid="matrix-explore-alternative"
+              title={
+                canOpenAlternatives
+                  ? "Explore deterministic alternatives for the selected Step"
+                  : "Select a chord Step to explore alternatives"
+              }
+              aria-label="Explore alternatives for selected Step"
+            >
+              <span className="btn-icon" aria-hidden="true">
+                ✦
+              </span>
+              <span className="btn-label">Alternatives</span>
+            </button>
+          ) : null}
           <button
             ref={focusModeToggleRef}
             type="button"
@@ -355,7 +396,9 @@ export function HarmonicMatrix({
           </button>
           <ViewModeToggle
             currentView={project.presentation.globalMatrixCardView}
-            onChangeView={onGlobalView}
+            onChangeView={(view) => {
+              if (view !== "piano-roll") onGlobalView(view);
+            }}
             selectAriaLabel="Global Card View"
             testIdPrefix="matrix-view"
             availableViews={["harmonic", "piano", "staff", "guitar"]}

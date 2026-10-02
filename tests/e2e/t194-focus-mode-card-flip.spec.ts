@@ -66,7 +66,11 @@ for (const acceptance of acceptanceModes) {
           : Number.POSITIVE_INFINITY,
       };
     });
-    expect(["0s", "0.001ms", "1e-06s"]).toContain(reducedMotionAndOverflow.animationDuration);
+    const animationDuration = reducedMotionAndOverflow.animationDuration ?? "";
+    const durationMatch = /^(\d+(?:\.\d+)?(?:e[+-]?\d+)?)(ms|s)$/i.exec(animationDuration);
+    expect(durationMatch).not.toBeNull();
+    const durationSeconds = Number(durationMatch![1]) * (durationMatch![2] === "ms" ? 0.001 : 1);
+    expect(durationSeconds).toBeLessThanOrEqual(0.000001);
     expect(reducedMotionAndOverflow.pageOverflow).toBeLessThanOrEqual(0);
     expect(reducedMotionAndOverflow.panelOverflow).toBeLessThanOrEqual(0);
 

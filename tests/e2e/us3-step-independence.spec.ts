@@ -7,7 +7,7 @@ test("US3 keeps repeated steps independent and requires explicit Replace Step", 
   const tonic = page.getByTestId("chord-card-I");
 
   await tonic.locator(".chord-main").click();
-  await page.getByLabel("Master Velocity").fill("92");
+  await page.getByLabel("Master Velocity", { exact: true }).fill("92");
   await page.getByRole("button", { name: "Articulation: Arp Up" }).click();
   await expect(page.getByLabel(/Customized/)).toBeVisible();
 
@@ -20,7 +20,7 @@ test("US3 keeps repeated steps independent and requires explicit Replace Step", 
   await first.getByRole("button", { name: /Select progression step 1:/ }).click();
   const selectedInspector = page.getByTestId("step-performance-inspector");
   await selectedInspector.getByRole("button", { name: "MIDI velocity view" }).click();
-  await selectedInspector.getByLabel("Master Velocity").fill("55");
+  await selectedInspector.getByLabel("Master Velocity", { exact: true }).fill("55");
   await expect(first).toContainText("v55");
   await expect(second).toContainText("v92");
 
@@ -37,7 +37,7 @@ test("US3 keeps repeated steps independent and requires explicit Replace Step", 
   await expect(first).toContainText("V");
 
   await selectedInspector.getByRole("button", { name: "MIDI velocity view" }).click();
-  await selectedInspector.getByLabel("Master Velocity").fill("121");
+  await selectedInspector.getByLabel("Master Velocity", { exact: true }).fill("121");
   await selectedInspector.getByRole("button", { name: "Reset Performance" }).click();
   await expect(first).toContainText("v80");
   await expect(first).toContainText("V");

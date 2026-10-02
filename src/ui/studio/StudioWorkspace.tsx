@@ -18,8 +18,10 @@ export interface StudioWorkspaceProps {
   readonly transport: ReactNode;
   readonly matrix: ReactNode;
   readonly inspector: ReactNode;
+  readonly selectedStepQuickEdit?: ReactNode;
   readonly selectedStepInspector?: ReactNode;
   readonly progression: ReactNode;
+  readonly printable?: ReactNode;
   readonly statusBar?: ReactNode;
   readonly onProgressionBackgroundClick?: () => void;
   readonly onMatrixBackgroundClick?: () => void;
@@ -40,8 +42,10 @@ export function StudioWorkspace({
   transport,
   matrix,
   inspector,
+  selectedStepQuickEdit,
   selectedStepInspector,
   progression,
+  printable,
   statusBar,
   onProgressionBackgroundClick,
   onMatrixBackgroundClick,
@@ -49,6 +53,7 @@ export function StudioWorkspace({
   sidePanelMode = "fixed",
   onSidePanelModeChange,
 }: StudioWorkspaceProps) {
+  const hasSelectedStep = Boolean(selectedStepQuickEdit || selectedStepInspector);
   const progressionStripRef = useRef<HTMLElement>(null);
   const staffAnchorRef = useRef<StaffAnchor | null>(null);
   const inspectorStackRef = useRef<HTMLElement>(null);
@@ -132,7 +137,7 @@ export function StudioWorkspace({
   const isCollapsed = sidePanelMode === "autohide" && !isHovered;
 
   useLayoutEffect(() => {
-    if (!selectedStepInspector) {
+    if (!hasSelectedStep) {
       setOffsetY(0);
       staffAnchorRef.current = null;
       return;
@@ -234,7 +239,8 @@ export function StudioWorkspace({
 
       const stripRect = strip.getBoundingClientRect();
       const targetRect = targetCard.getBoundingClientRect();
-      const calculatedOffset = Math.max(0, Math.round(targetRect.top - stripRect.top));
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      const calculatedOffset = Math.max(0, Math.round((targetRect.top - stripRect.top) / zoom));
       setOffsetY(calculatedOffset);
     };
 
@@ -272,7 +278,7 @@ export function StudioWorkspace({
       window.removeEventListener("resize", updateOffset);
       strip.removeEventListener("focusin", updateOffset);
     };
-  }, [selectedStepInspector, progression]);
+  }, [hasSelectedStep, progression]);
 
   return (
     <main className="app-shell" aria-label="CadenceFlow Studio">
@@ -283,7 +289,7 @@ export function StudioWorkspace({
         {transport}
       </section>
       <section
-        className={`studio-grid${selectedStepInspector ? " has-selected-step" : ""}${
+        className={`studio-grid${hasSelectedStep ? " has-selected-step" : ""}${
           isCollapsed ? " is-collapsed" : ""
         }`}
         aria-label="Studio work area"
@@ -346,7 +352,7 @@ export function StudioWorkspace({
         >
           {progression}
         </section>
-        {selectedStepInspector ? (
+        {hasSelectedStep ? (
           <aside
             ref={selectedStepStackRef}
             className="selected-step-stack"
@@ -366,7 +372,10 @@ export function StudioWorkspace({
             }}
             style={offsetY > 0 ? { marginTop: `${offsetY}px` } : undefined}
           >
-            <div className="selected-step-stack-content">{selectedStepInspector}</div>
+            <div className="selected-step-stack-content">
+              {selectedStepQuickEdit}
+              {selectedStepInspector}
+            </div>
           </aside>
         ) : null}
       </section>
@@ -385,6 +394,7 @@ export function StudioWorkspace({
       <footer className="app-status-bar" role="contentinfo" aria-label="Status bar">
         {statusBar}
       </footer>
+      {printable}
     </main>
   );
 }

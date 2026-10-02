@@ -60,7 +60,6 @@ const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
 const GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-groove-disclosure-open";
-const GLOBAL_LOOP_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.progression-global-loop-disclosure-open";
 const GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-tracks-disclosure-open";
 const GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY =
@@ -138,6 +137,8 @@ export interface ProgressionGlobalInspectorProps {
   readonly onOpenPresets?: (() => void) | undefined;
   readonly onSaveAsPreset?: (() => void) | undefined;
   readonly onSetNoteColorMode?: ((mode: NoteColorMode) => void) | undefined;
+  readonly selectedPianoNote?: { readonly stepId: string; readonly eventKey: string } | null;
+  readonly onEditSelectedPianoNote?: (() => void) | undefined;
 }
 
 export function ProgressionGlobalInspector({
@@ -163,6 +164,8 @@ export function ProgressionGlobalInspector({
   onOpenPresets,
   onSaveAsPreset,
   onSetNoteColorMode,
+  selectedPianoNote = null,
+  onEditSelectedPianoNote,
 }: ProgressionGlobalInspectorProps) {
   const [tracksOpen, setTracksOpen] = useState(() =>
     readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
@@ -986,7 +989,20 @@ export function ProgressionGlobalInspector({
               : `${measureCount} measure${measureCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
           </span>
         </div>
-        <div style={{ display: "flex", gap: "4px" }}>
+        <div className="progression-global-header-actions">
+          {project.presentation.progressionView === "piano-roll" ? (
+            <button
+              type="button"
+              className="piano-roll-edit-selected-note"
+              data-testid="piano-roll-edit-selected-note"
+              disabled={!selectedPianoNote}
+              onClick={onEditSelectedPianoNote}
+              aria-label="Edit selected note"
+              title={selectedPianoNote ? "Edit selected Piano Roll note" : "Select a Piano Roll note to edit"}
+            >
+              Edit note
+            </button>
+          ) : null}
           {isCustomOrder ? (
             <button
               type="button"

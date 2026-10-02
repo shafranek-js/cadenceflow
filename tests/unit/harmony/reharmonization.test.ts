@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   getAvailableSubstitutions,
   getSubstitutionKindBadge,
-  realizeSubstitutionChordSymbol,
 } from "../../../src/domain/harmony/reharmonization";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 
 describe("Reharmonization & Chord Substitutions Assistant", () => {
-  const projectMajor = createDefaultProject("test-major", "Major Project", "2026-09-15T00:00:00.000Z");
+  const projectMajor = createDefaultProject(
+    "test-major",
+    "Major Project",
+    "2026-09-15T00:00:00.000Z",
+  );
 
   const projectMinor = Object.freeze({
     ...createDefaultProject("test-minor", "Minor Project", "2026-09-15T00:00:00.000Z"),
@@ -136,7 +139,7 @@ describe("Reharmonization & Chord Substitutions Assistant", () => {
       const subs = getAvailableSubstitutions(stepIv, "dark-harmony", 9);
 
       const neapolitan = subs.find((s) => s.targetFunctionId === "N6")!;
-      expect(neapolitan.chordSymbol).toBe("Bb");
+      expect(neapolitan.chordSymbol).toBe("Bb/D");
       expect(neapolitan.kind).toBe("modal-swap");
 
       const secDim = subs.find((s) => s.targetFunctionId === "vii°7/iv")!;

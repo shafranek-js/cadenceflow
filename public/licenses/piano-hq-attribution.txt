@@ -8,7 +8,7 @@ SFZ Instrument Reference: https://github.com/sfzinstruments/SalamanderGrandPiano
 Pinned Upstream Revision: 370497372ece1603d1ca7b9892c82c1da566565e
 License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
 License URL: https://creativecommons.org/licenses/by/3.0/
-Committed Test Fixtures: public/audio/piano-hq/samples/C4v2.ogg, C4v10.ogg, C4v14.ogg
+Committed Sample Regions: 480 Ogg Vorbis files under public/audio/piano-hq/samples/
 ================================================================================
 
 ATTRIBUTION SUMMARY
@@ -26,10 +26,8 @@ CadenceFlow includes web-ready derivative audio assets and a companion metadata
 manifest prepared specifically for low-latency in-browser WebAudio playback.
 
 CadenceFlow performs the following transformations on the source recordings:
-1. Encoding: Uncompressed 24-bit 48kHz PCM WAV/FLAC audio is encoded to
-   bandwidth-efficient Ogg Vorbis/Opus formats at 48kHz stereo, preserving full
-   acoustic transient integrity, timbral nuances, and decay envelopes while
-   reducing total transfer size by over 93%.
+1. Encoding: Source recordings are prepared as Ogg Vorbis at 48kHz stereo for
+   in-browser playback.
 2. Organization: Preserves all 16 discrete velocity layers across all 30 sampled
    minor-third root pitches (480 sample regions total).
 3. Metadata: Strips extraneous DAW headers and generates a structured,

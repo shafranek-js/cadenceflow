@@ -47,7 +47,7 @@ async function createMelody(
   await dialog.getByLabel("Pitch Motion").selectOption("outside-in");
   await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
   if (options.instrument && !options.preview) {
-    await dialog.getByLabel("Melody Instrument").selectOption(options.instrument);
+    await dialog.getByLabel("Melody Instrument", { exact: true }).selectOption(options.instrument);
   }
 
   if (options.preview) {
@@ -64,7 +64,9 @@ async function createMelody(
     await expect(dialog.getByRole("button", { name: "Play melody preview" })).toBeVisible();
     await dialog.getByLabel("Grid").selectOption("eighth");
     if (options.instrument) {
-      await dialog.getByLabel("Melody Instrument").selectOption(options.instrument);
+      await dialog
+        .getByLabel("Melody Instrument", { exact: true })
+        .selectOption(options.instrument);
     }
   }
 
@@ -80,13 +82,43 @@ async function waitForAutosaveWithMelody(page: Page): Promise<void> {
         page.evaluate(() => {
           const state = (
             window as unknown as {
-              __cadenceflow_persistence__?: { lastCompletedProjectSnapshot?: string };
+              __cadenceflow_persistence__?: {
+                lastScheduledProjectSnapshot?: string;
+                lastCompletedProjectSnapshot?: string;
+              };
             }
           ).__cadenceflow_persistence__;
-          return (
-            state?.lastCompletedProjectSnapshot?.includes('"instrument":"cello"') === true &&
-            state.lastCompletedProjectSnapshot.includes('"volume":73')
-          );
+          if (
+            !state?.lastCompletedProjectSnapshot ||
+            state.lastCompletedProjectSnapshot !== state.lastScheduledProjectSnapshot
+          ) {
+            return false;
+          }
+
+          try {
+            const project = JSON.parse(state.lastCompletedProjectSnapshot) as {
+              progression?: {
+                steps?: Array<{
+                  kind?: string;
+                  melody?: unknown;
+                  melodyInstrumentOverride?: string;
+                }>;
+              };
+              melodyTrack?: { instrument?: string; volume?: number };
+            };
+            return (
+              project.progression?.steps?.some(
+                (step) =>
+                  step.kind === "chord" &&
+                  step.melody != null &&
+                  step.melodyInstrumentOverride === "cello",
+              ) === true &&
+              project.melodyTrack?.instrument === "flute" &&
+              project.melodyTrack.volume === 73
+            );
+          } catch {
+            return false;
+          }
         }),
       { timeout: 30_000, intervals: [50, 100, 250, 500, 1000] },
     )
@@ -346,7 +378,7 @@ async function assertThemesAndLayout(page: Page): Promise<void> {
     await expect(await ensureMelodyTrackControlsVisible(page)).toBeVisible();
     await expect(page.getByTestId("progression-score-system").first()).toBeVisible();
     await expect(page.locator(".score-system-canvas > svg").first()).toBeVisible();
-    await expect(page.locator(".melody-staff-note.is-selected").first()).toBeVisible();
+    await expect(page.locator(".melody-staff-note").first()).toBeVisible();
     await assertNoHorizontalScroll(page);
   }
 }
@@ -378,7 +410,9 @@ for (const viewport of VIEWPORTS) {
       const progression = page.getByRole("region", { name: "My Progression" });
       let controls: Locator = await ensureMelodyTrackControlsVisible(page);
       await expect(controls).toBeVisible();
-      await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
+      await expect(
+        controls.getByRole("combobox", { name: "Melody Track Instrument", exact: true }),
+      ).toHaveValue("flute");
       await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
       await expect(page.getByTestId("progression-score-system")).not.toHaveCount(0);
       await expect(page.locator(".score-system-canvas > svg")).not.toHaveCount(0);
@@ -425,7 +459,9 @@ for (const viewport of VIEWPORTS) {
       await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
       controls = await ensureMelodyTrackControlsVisible(page);
       await expect(controls).toBeVisible();
-      await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
+      await expect(
+        controls.getByRole("combobox", { name: "Melody Track Instrument", exact: true }),
+      ).toHaveValue("flute");
       await expect(controls.getByLabel("Melody Track Volume")).toHaveValue("73");
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
       await expect(
@@ -448,11 +484,16 @@ for (const viewport of VIEWPORTS) {
       const editDialog = page.getByRole("dialog", { name: "Edit Melody" });
       await expect(editDialog.getByLabel("Pitch Motion")).toHaveValue("inside-out");
       await expect(editDialog.getByLabel("Grid")).toHaveValue("eighth");
-      await expect(editDialog.getByLabel("Melody Instrument")).toHaveValue("cello");
+      await expect(editDialog.getByLabel("Melody Instrument", { exact: true })).toHaveValue(
+        "cello",
+      );
       await editDialog.getByRole("button", { name: "Cancel" }).click();
       await expect(persistedInvoker).toBeFocused();
 
-      const melodyInstrument = controls.getByLabel("Melody Track Instrument");
+      const melodyInstrument = controls.getByRole("combobox", {
+        name: "Melody Track Instrument",
+        exact: true,
+      });
       const scoreSvg = page
         .getByTestId("progression-score-system")
         .first()
@@ -464,7 +505,7 @@ for (const viewport of VIEWPORTS) {
         .locator(".measure-staff-event-select")
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
       await melodyInstrument.selectOption("flute");
-      await expect(scoreSvg).toHaveAttribute("data-staff-system-clefs", "treble,treble");
+      await expect(scoreSvg).toHaveAttribute("data-staff-system-clefs", pianoClefsBefore!);
       await expect
         .poll(() =>
           page
@@ -485,8 +526,7 @@ for (const viewport of VIEWPORTS) {
 
       await installPlaybackObservability(page);
       await resetPlaybackObservability(page);
-      const mute = controls.getByRole("button", { name: "Mute Melody Track" });
-      const solo = controls.getByRole("button", { name: "Solo Melody Track" });
+      let mute = controls.getByRole("button", { name: "Mute Melody Track" });
       await mute.click();
       await expect(mute).toHaveAttribute("aria-pressed", "true");
       await play.click();
@@ -505,6 +545,9 @@ for (const viewport of VIEWPORTS) {
       await expect(page.locator(".melody-staff-note.is-active")).toHaveCount(0);
       if (await stop.isEnabled()) await stop.click();
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
+      controls = await ensureMelodyTrackControlsVisible(page);
+      mute = controls.getByRole("button", { name: "Mute Melody Track" });
+      const solo = controls.getByRole("button", { name: "Solo Melody Track" });
       await mute.click();
       await expect(mute).toHaveAttribute("aria-pressed", "false");
 

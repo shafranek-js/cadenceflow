@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import type { HarmonicRouteDecision } from "../../domain/harmony/routing";
 import { useModalFocus } from "../common/useModalFocus";
 
@@ -5,14 +6,17 @@ export function RouteWarningDialog({
   decision,
   onCancel,
   onConfirm,
+  restoreFocusRef,
 }: {
   readonly decision: HarmonicRouteDecision;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
+  readonly restoreFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const dialogRef = useModalFocus<HTMLElement>({
     isOpen: true,
     onClose: onCancel,
+    ...(restoreFocusRef ? { restoreFocusRef } : {}),
   });
 
   return (

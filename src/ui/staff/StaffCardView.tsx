@@ -6,6 +6,8 @@ import { projectPitchesToStaff } from "../../notation/staffProjection";
 import { renderStaffProjection } from "../../notation/vexflowAdapter";
 import { Icon } from "../common/Icon";
 import type { StaffOctaveDirection } from "./staffOctave";
+import type { LabelHierarchyMode } from "../progression/labelHierarchy";
+import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
 
 function formatPitch(pitch: ExactPitch): string {
   return `${formatPitchSpelling(pitch.spelling)}${pitch.octave}`;
@@ -15,6 +17,8 @@ export function StaffCardView({
   pitches,
   chordPitches = pitches,
   chordLabel,
+  labelMode,
+  functionLabel,
   duration,
   className = "",
   selected,
@@ -34,6 +38,8 @@ export function StaffCardView({
   readonly pitches: readonly ExactPitch[];
   readonly chordPitches?: readonly ExactPitch[];
   readonly chordLabel: string;
+  readonly labelMode?: LabelHierarchyMode;
+  readonly functionLabel?: string;
   readonly duration: MusicalDuration;
   readonly className?: string;
   readonly selected: boolean;
@@ -75,7 +81,16 @@ export function StaffCardView({
   return (
     <div className={`mini-staff-card-visual ${className}`.trim()}>
       <div className="mini-staff-heading">
-        <strong className="mini-staff-chord-name">{chordLabel}</strong>
+        {labelMode && functionLabel ? (
+          <ProgressionChordLabel
+            mode={labelMode}
+            functionLabel={functionLabel}
+            chordLabel={chordLabel}
+            className="mini-staff-chord-name"
+          />
+        ) : (
+          <strong className="mini-staff-chord-name">{chordLabel}</strong>
+        )}
         <span className="mini-staff-octave" aria-label={`Chord starts in octave ${chordOctave}`}>
           {`Oct ${chordOctave}`}
         </span>

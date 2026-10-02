@@ -154,6 +154,99 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
     }
   });
 
+  it("publishes one audio-clock snapshot through count-in, pause, resume and stop", () => {
+    vi.useFakeTimers();
+    try {
+      const clock = new FakeAudioClock(10);
+      const provider = new MockAudioProvider();
+      const transportStore = new TransportStore();
+      const controller = new PlaybackController({
+        clock,
+        pianoProvider: provider,
+        transportStore,
+        lookAheadHorizonSeconds: 10,
+      });
+
+      controller.start({
+        steps: [makeChord("snapshot-chord", 2), makeRest("snapshot-rest", 2)],
+        meter: meter(4, 4),
+        tempoBpm: 120,
+        groove: groove("straight"),
+        tonic: 0,
+        context: "major",
+        countInEnabled: true,
+      });
+
+      const startingSnapshot = transportStore.getState().playbackClockSnapshot;
+      expect(startingSnapshot).not.toBeNull();
+      expect(startingSnapshot?.audioClockAnchorSeconds).toBeCloseTo(12, 6);
+      expect(startingSnapshot?.startBeats).toEqual(rational(0));
+      expect(startingSnapshot?.endBeats).toEqual(rational(4));
+      expect(startingSnapshot?.schedulerStartOffsetSeconds).toBeCloseTo(2, 6);
+
+      clock.advance(2.25);
+      controller.pause();
+      const pausedSnapshot = transportStore.getState().playbackClockSnapshot;
+      expect(transportStore.getState().status).toBe("paused");
+      expect(pausedSnapshot?.state).toBe("paused");
+      expect(pausedSnapshot?.musicalPositionAnchorBeats).toBeCloseTo(0.5, 6);
+
+      clock.advance(5);
+      controller.resume();
+      const resumedSnapshot = transportStore.getState().playbackClockSnapshot;
+      expect(transportStore.getState().status).toBe("playing");
+      expect(resumedSnapshot?.state).toBe("playing");
+      expect(resumedSnapshot?.musicalPositionAnchorBeats).toBeCloseTo(0.5, 6);
+      expect(resumedSnapshot?.audioClockAnchorSeconds).toBeCloseTo(clock.now(), 6);
+
+      clock.advance(0.25);
+      controller.pause();
+      expect(
+        transportStore.getState().playbackClockSnapshot?.musicalPositionAnchorBeats,
+      ).toBeCloseTo(1, 6);
+
+      controller.stop();
+      expect(transportStore.getState().playbackClockSnapshot).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("publishes exact loop bounds in the shared playback-clock snapshot", () => {
+    const clock = new FakeAudioClock(4);
+    const provider = new MockAudioProvider();
+    const transportStore = new TransportStore();
+    const controller = new PlaybackController({
+      clock,
+      pianoProvider: provider,
+      transportStore,
+      lookAheadHorizonSeconds: 10,
+    });
+    const steps = [
+      makeChord("snapshot-loop-a", 1),
+      makeChord("snapshot-loop-b", 1),
+      makeChord("snapshot-loop-c", 1),
+      makeChord("snapshot-loop-d", 1),
+    ];
+
+    controller.start({
+      steps,
+      meter: meter(4, 4),
+      tempoBpm: 120,
+      groove: groove("straight"),
+      tonic: 0,
+      context: "major",
+      loopState: setLoopRange("snapshot-loop-b", "snapshot-loop-c", steps),
+    });
+
+    const snapshot = transportStore.getState().playbackClockSnapshot;
+    expect(snapshot?.startBeats).toEqual(rational(1));
+    expect(snapshot?.endBeats).toEqual(rational(3));
+    expect(snapshot?.loopStartBeats).toEqual(rational(1));
+    expect(snapshot?.loopEndBeats).toEqual(rational(3));
+    controller.stop();
+  });
+
   it("schedules canonical AudioNoteEvents with exact beat-to-seconds conversion", () => {
     const clock = new FakeAudioClock(0.0);
     const provider = new MockAudioProvider();

@@ -1,5 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import {
+  addRestToProgression,
+  setProgressionView,
+  startBranchAlternative,
+} from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -107,7 +112,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
       .getByTestId("chord-card-I")
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
     await expect(page.getByTestId("progression-score-systems")).toHaveAttribute(
       "aria-label",
       /^Staff score systems; /,
@@ -197,7 +202,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
 
     expect(await middleStep.getAttribute("role")).toBeNull();
     expect(await middleStep.getAttribute("tabindex")).toBeNull();
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     const restStep = page.locator('[data-testid="progression-step"]').last();
     const restStepSelect = restStep.getByRole("button", {
       name: `Select progression step ${beforeAdd + 4}: Rest`,
@@ -234,10 +239,8 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
       .click({
         modifiers: ["Control"],
       });
-    const progressionView = page.getByLabel("Progression Card View");
-    await progressionView.focus();
-    await progressionView.selectOption("staff");
-    await expect(progressionView).toHaveValue("staff");
+    const progressionView = page.getByTestId("progression-view-btn-staff");
+    await setProgressionView(page, "staff", "keyboard");
     await expect(progressionView).toBeFocused();
     await expect(
       page.getByTestId("progression-score-systems").locator(".measure-staff-event-select").first(),
@@ -404,7 +407,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await expect(metronome).toHaveAttribute("aria-pressed", "true");
 
     await expect(page.getByText("What-if branch active", { exact: true })).not.toBeVisible();
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page);
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
 
     const readThemeEvidence = async (theme: "dark" | "light") => {
@@ -423,7 +426,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
       );
       const activeVelocityViewContrast = await contrastRatio(
         page,
-        page.locator(".view-preference-toggle button.is-active"),
+        page.getByRole("button", { name: "Musical view" }),
       );
       const activeLoopContrast = await contrastRatio(
         page,

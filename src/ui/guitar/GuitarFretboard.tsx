@@ -65,14 +65,7 @@ export function GuitarFretboard({
 
         {/* Nut (vertical bar) if base fret is 1, otherwise regular fret line */}
         {isNut ? (
-          <rect
-            x={HORIZ_X_NUT - 3.5}
-            y="19"
-            width="4"
-            height="78"
-            rx="1"
-            className="guitar-nut"
-          />
+          <rect x={HORIZ_X_NUT - 3.5} y="19" width="4" height="78" rx="1" className="guitar-nut" />
         ) : (
           <>
             <line
@@ -141,14 +134,15 @@ export function GuitarFretboard({
             );
           }
           if (fret === 0) {
+            const isRoot = voicing.items[stringIdx]?.role === "root";
             return (
               <circle
                 key={`open-${stringIdx}`}
                 cx={x}
                 cy={y}
                 r="3.5"
-                className="guitar-string-marker is-open"
-                aria-label={`String ${6 - stringIdx} open`}
+                className={`guitar-string-marker is-open${isRoot ? " is-root" : ""}`}
+                aria-label={`String ${6 - stringIdx} open${isRoot ? " root" : ""}`}
               />
             );
           }
@@ -216,12 +210,7 @@ export function GuitarFretboard({
                   className={`guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`}
                 />
                 {showFingerings && item.finger ? (
-                  <text
-                    x={cx}
-                    y={cy + 3}
-                    className="guitar-dot-finger-text"
-                    textAnchor="middle"
-                  >
+                  <text x={cx} y={cy + 3} className="guitar-dot-finger-text" textAnchor="middle">
                     {item.finger}
                   </text>
                 ) : null}
@@ -280,14 +269,7 @@ export function GuitarFretboard({
 
       {/* Nut (fret 0 bar) if base fret is 1, otherwise regular fret line */}
       {isNut ? (
-        <rect
-          x="19"
-          y={VERT_Y_TOP - 3.5}
-          width="82"
-          height="4"
-          rx="1"
-          className="guitar-nut"
-        />
+        <rect x="19" y={VERT_Y_TOP - 3.5} width="82" height="4" rx="1" className="guitar-nut" />
       ) : (
         <>
           <line
@@ -358,14 +340,15 @@ export function GuitarFretboard({
         }
         if (fret === 0) {
           // Open string 'O'
+          const isRoot = voicing.items[stringIdx]?.role === "root";
           return (
             <circle
               key={`open-${stringIdx}`}
               cx={x}
               cy={y}
               r="3.5"
-              className="guitar-string-marker is-open"
-              aria-label={`String ${6 - stringIdx} open`}
+              className={`guitar-string-marker is-open${isRoot ? " is-root" : ""}`}
+              aria-label={`String ${6 - stringIdx} open${isRoot ? " root" : ""}`}
             />
           );
         }
@@ -433,12 +416,7 @@ export function GuitarFretboard({
                 className={`guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`}
               />
               {showFingerings && item.finger ? (
-                <text
-                  x={cx}
-                  y={cy + 3}
-                  className="guitar-dot-finger-text"
-                  textAnchor="middle"
-                >
+                <text x={cx} y={cy + 3} className="guitar-dot-finger-text" textAnchor="middle">
                   {item.finger}
                 </text>
               ) : null}

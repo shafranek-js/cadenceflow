@@ -10,7 +10,7 @@ test("US1 builds a four-step progression through Ctrl-click", async ({ page }) =
   await expect(first.getByRole("button", { name: /Add I to progression/i })).toHaveCount(0);
   await expect(first.locator(".chord-main")).toHaveAttribute(
     "title",
-    "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
+    "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add; when selected, press + to add to My Progression; Alt-click to reset card settings",
   );
 
   // Ordinary chord-card activation via mouse -> Preview/Audition -> progression count unchanged

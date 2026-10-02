@@ -16,10 +16,9 @@ import {
 import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import { modeForModule } from "../../domain/harmony/functions";
 import { exactPitch, type ExactPitch } from "../../domain/harmony/pitch";
-import { melodyGridDuration } from "../../domain/melody/patterns";
-import { realizeChordMelody } from "../../domain/melody/projection";
+import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
 import {
-  validateChordMelodyRecipe,
+  snapshotChordMelody,
   validateMelodyTrackSettings,
   type MelodyGrid,
   type MelodyInstrument,
@@ -27,7 +26,6 @@ import {
 } from "../../domain/melody/types";
 import {
   getMelodyInstrument,
-  resolveEffectiveMelodyInstrument,
   type MelodyInstrumentCatalogEntry,
 } from "../../domain/melody/instrumentCatalog";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
@@ -134,13 +132,14 @@ export interface MusicXmlMelodyTimeModification {
 }
 
 export interface MusicXmlMelodyNoteEvent {
+  readonly eventKey: string;
   readonly kind: "note";
   readonly onsetBeats: Rational;
   readonly stepIndex: number;
   readonly stepId: string;
   readonly durationBeats: Rational;
   readonly duration: number;
-  readonly voice: "1";
+  readonly voice: string;
   readonly staff: 1;
   readonly chord: false;
   readonly sourceMidi: number;
@@ -163,7 +162,7 @@ export interface MusicXmlMelodyRestEvent {
   readonly stepId: string;
   readonly durationBeats: Rational;
   readonly duration: number;
-  readonly voice: "1";
+  readonly voice: string;
   readonly staff: 1;
 }
 
@@ -249,6 +248,8 @@ interface MelodyRawEventBase {
 }
 
 interface MelodyRawNoteEvent extends MelodyRawEventBase {
+  readonly voice: string;
+  readonly eventKey: string;
   readonly kind: "note";
   readonly sourceMidi: number;
   readonly sourcePitchMidi: number;
@@ -362,20 +363,25 @@ function melodyTupletMarks(
   rhythm: MelodyRhythm,
   eventIndex: number,
   eventCount: number,
-  duration: Rational,
 ): readonly ("start" | "stop")[] {
-  if (
-    rhythm !== "even" ||
-    !grid.endsWith("-triplet") ||
-    `${duration.numerator}/${duration.denominator}` !== (grid === "eighth-triplet" ? "1/3" : "1/6")
-  )
-    return Object.freeze([]);
+  if (rhythm !== "even" || !grid.endsWith("-triplet")) return Object.freeze([]);
   const groupStart = Math.floor(eventIndex / 3) * 3;
   const groupEnd = Math.min(groupStart + 2, eventCount - 1);
   const marks: ("start" | "stop")[] = [];
   if (eventIndex === groupStart) marks.push("start");
   if (eventIndex === groupEnd) marks.push("stop");
   return Object.freeze(marks);
+}
+
+function effectiveMelodyForExport(project: Project) {
+  try {
+    return createEffectiveMelodyTimeline(project);
+  } catch (error) {
+    throw new MusicXmlExportError(
+      "invalid-projection",
+      `Invalid effective Melody data: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  }
 }
 
 function gcd(a: number, b: number): number {
@@ -748,9 +754,10 @@ function addMelodyRawEvent(
           onsetBeats,
           stepIndex: rawEvent.stepIndex,
           stepId: rawEvent.stepId,
+          eventKey: rawEvent.eventKey,
           durationBeats,
           duration,
-          voice: "1",
+          voice: rawEvent.kind === "note" ? rawEvent.voice : "1",
           staff: 1,
           chord: false,
           sourceMidi: rawEvent.sourceMidi,
@@ -788,19 +795,16 @@ function addMelodyRawEvent(
 function buildMelodyParts(
   project: Project,
   timeline: ReturnType<typeof createProgressionTimeline>,
-  projectedChords: ReadonlyMap<number, ProjectedChord>,
   measureLayout: ReturnType<typeof createProgressionMeasureLayout>,
   divisions: number,
   barLengthBeats: Rational,
 ): readonly MusicXmlMelodyPart[] | undefined {
-  const hasAuthoredMelody = project.progression.steps.some(
-    (step) => step.kind === "chord" && step.melody !== undefined,
-  );
+  const effectiveMelody = effectiveMelodyForExport(project);
+  const hasAuthoredMelody = effectiveMelody.length > 0;
   if (!hasAuthoredMelody) return undefined;
 
-  let melodyTrack;
   try {
-    melodyTrack = validateMelodyTrackSettings(project.melodyTrack);
+    validateMelodyTrackSettings(project.melodyTrack);
   } catch (error) {
     throw new MusicXmlExportError(
       "invalid-projection",
@@ -811,8 +815,17 @@ function buildMelodyParts(
   const rawEventsByInstrument = new Map<MelodyInstrument, MelodyRawEvent[]>();
   const firstStepByInstrument = new Map<MelodyInstrument, number>();
   const inactiveSpans: MelodyRawRestEvent[] = [];
+  const occupied: { startBeats: Rational; endBeats: Rational }[] = effectiveMelody.map((note) => ({
+    startBeats: note.startBeats,
+    endBeats: addRational(note.startBeats, note.durationBeats),
+  }));
   for (const entry of timeline.steps) {
-    if (entry.step.kind !== "chord" || !entry.step.melody) {
+    const covered = occupied.some(
+      (span) =>
+        compareRational(span.startBeats, entry.endBeats) < 0 &&
+        compareRational(span.endBeats, entry.startBeats) > 0,
+    );
+    if (!covered)
       inactiveSpans.push(
         Object.freeze({
           kind: "rest",
@@ -822,73 +835,43 @@ function buildMelodyParts(
           stepId: entry.step.id,
         }),
       );
-      continue;
-    }
-    const recipe = validateChordMelodyRecipe(entry.step.melody);
-    const instrument = resolveEffectiveMelodyInstrument(
-      entry.step.melodyInstrumentOverride,
-      melodyTrack.instrument,
-    ).id;
+  }
+  for (const note of effectiveMelody) {
+    const step = project.progression.steps[note.stepIndex]!;
+    const instrument = note.instrument;
     if (!firstStepByInstrument.has(instrument))
-      firstStepByInstrument.set(instrument, entry.stepIndex);
-    const instrumentEvents = rawEventsByInstrument.get(instrument) ?? [];
-
-    const projectedChord = projectedChords.get(entry.stepIndex);
-    if (!projectedChord) {
-      throw new MusicXmlExportError(
-        "invalid-projection",
-        `Missing contextual Piano realization for Melody step ${entry.step.id}.`,
-      );
-    }
-    const nextChordEntry = timeline.steps
-      .slice(entry.stepIndex + 1)
-      .find((candidate) => candidate.step.kind === "chord");
-    const targetPitches = nextChordEntry
-      ? (projectedChords.get(nextChordEntry.stepIndex)?.pitches.map((item) => item.pitch) ?? [])
-      : [];
-
-    try {
-      const phrase = realizeChordMelody({
-        sourceStepId: entry.step.id,
-        upperPitches: projectedChord.pitches
-          .filter((item) => item.role === "upper")
-          .map((item) => item.pitch),
-        durationBeats: entry.durationBeats,
-        recipe,
-        targetPitches,
-      });
-      phrase.events.forEach((event) => {
-        const startBeats = addRational(entry.startBeats, event.startOffsetBeats);
-        instrumentEvents.push(
-          Object.freeze({
-            kind: "note",
-            startBeats,
-            endBeats: addRational(startBeats, event.durationBeats),
-            stepIndex: entry.stepIndex,
-            stepId: entry.step.id,
-            sourceMidi: event.pitch.midiNumber,
-            sourcePitchMidi: event.sourcePitchMidi,
-            instrument,
-            pitch: musicXmlPitchForExactPitch(event.pitch),
-            grid: recipe.grid,
-            tupletMarks: melodyTupletMarks(
-              recipe.grid,
-              recipe.rhythm,
-              event.index,
-              phrase.events.length,
-              event.durationBeats,
-            ),
-          }),
-        );
-      });
-      rawEventsByInstrument.set(instrument, instrumentEvents);
-    } catch (error) {
-      if (error instanceof MusicXmlExportError) throw error;
-      throw new MusicXmlExportError(
-        "invalid-projection",
-        `Invalid Melody recipe on step ${entry.step.id}: ${error instanceof Error ? error.message : String(error)}.`,
-      );
-    }
+      firstStepByInstrument.set(instrument, note.stepIndex);
+    const rawEvents = rawEventsByInstrument.get(instrument) ?? [];
+    const savedMelody =
+      step.kind === "chord" && step.melody ? snapshotChordMelody(step.melody) : undefined;
+    const recipe = savedMelody?.mode === "generated" ? savedMelody.recipe : undefined;
+    const grid =
+      recipe?.grid ??
+      (savedMelody?.mode === "authored" ? savedMelody.sourceRecipe?.grid : undefined) ??
+      "quarter";
+    rawEvents.push(
+      Object.freeze({
+        kind: "note",
+        voice: "1",
+        startBeats: note.startBeats,
+        endBeats: addRational(note.startBeats, note.durationBeats),
+        stepIndex: note.stepIndex,
+        stepId: note.sourceStepId,
+        sourceMidi: note.pitch.midiNumber,
+        sourcePitchMidi: note.sourcePitchMidi,
+        eventKey: note.eventKey,
+        instrument,
+        pitch: musicXmlPitchForExactPitch(note.pitch),
+        grid,
+        tupletMarks: melodyTupletMarks(
+          grid,
+          recipe?.rhythm ?? "even",
+          note.eventIndex,
+          note.eventCount,
+        ),
+      }),
+    );
+    rawEventsByInstrument.set(instrument, rawEvents);
   }
   if (compareRational(measureLayout.trailingSilenceBeats, ZERO) > 0) {
     inactiveSpans.push(
@@ -913,6 +896,17 @@ function buildMelodyParts(
       const rawEvents = [...(rawEventsByInstrument.get(instrument) ?? [])].sort(
         (a, b) => compareRational(a.startBeats, b.startBeats) || a.stepIndex - b.stepIndex,
       );
+      const voiceEnds: Rational[] = [];
+      const voicedEvents = rawEvents.map((rawEvent) => {
+        let lane = voiceEnds.findIndex(
+          (voiceEnd) => compareRational(voiceEnd, rawEvent.startBeats) <= 0,
+        );
+        if (lane < 0) lane = voiceEnds.length;
+        voiceEnds[lane] = rawEvent.endBeats;
+        return rawEvent.kind === "note"
+          ? Object.freeze({ ...rawEvent, voice: String(lane + 1) })
+          : rawEvent;
+      });
       const filledEvents: MelodyRawEvent[] = [];
       let cursor = ZERO;
       let restOrdinal = 0;
@@ -941,7 +935,7 @@ function buildMelodyParts(
           restCursor = restEnd;
         }
       };
-      rawEvents.forEach((rawEvent) => {
+      voicedEvents.forEach((rawEvent) => {
         if (compareRational(cursor, rawEvent.startBeats) < 0) {
           addRestGap(cursor, rawEvent.startBeats);
         }
@@ -998,19 +992,12 @@ function calculateDivisions(project: Project, barLengthBeats: Rational): number 
   let divisions = 1;
   for (const step of project.progression.steps) {
     divisions = lcmOrThrow(divisions, step.duration.beats.denominator);
-    if (step.kind === "chord" && step.melody) {
-      try {
-        const recipe = validateChordMelodyRecipe(step.melody);
-        divisions = lcmOrThrow(divisions, melodyGridDuration(recipe.grid).denominator);
-      } catch (error) {
-        if (error instanceof MusicXmlExportError) throw error;
-        throw new MusicXmlExportError(
-          "invalid-projection",
-          `Invalid Melody recipe on step ${step.id}: ${error instanceof Error ? error.message : String(error)}.`,
-        );
-      }
-    }
   }
+  for (const note of effectiveMelodyForExport(project))
+    divisions = lcmOrThrow(
+      lcmOrThrow(divisions, note.startBeats.denominator),
+      note.durationBeats.denominator,
+    );
   divisions = lcmOrThrow(divisions, barLengthBeats.denominator);
   return divisions;
 }
@@ -1168,14 +1155,7 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
     .map(([, measure]) => freezeMeasure(measure, divisions));
 
   const key = mapTonicToMusicXmlKey(project.tonic, modeForModule(project.activeModule));
-  const melodyParts = buildMelodyParts(
-    project,
-    timeline,
-    projectedChords,
-    measureLayout,
-    divisions,
-    barLengthBeats,
-  );
+  const melodyParts = buildMelodyParts(project, timeline, measureLayout, divisions, barLengthBeats);
   const projection: MusicXmlProjection = Object.freeze({
     version: MUSICXML_VERSION,
     title: project.name,

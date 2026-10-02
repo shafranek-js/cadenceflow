@@ -116,6 +116,34 @@ describe("GuitarCardView & GuitarFretboard", () => {
     mounted.unmount();
   });
 
+  it.each(["vertical", "horizontal"] as const)(
+    "marks open root strings with a red-outline class in %s orientation",
+    (orientation) => {
+      const voicing = resolveGuitarChordVoicing({
+        rootPitchClass: 4,
+        baseQuality: "major",
+        spelling: { symbol: "E", root: { step: "E", alter: 0 } },
+      });
+      const mounted = mount(el(GuitarFretboard, { voicing, orientation }));
+      const openMarkers = Array.from(
+        mounted.container.querySelectorAll<SVGCircleElement>(".guitar-string-marker.is-open"),
+      );
+
+      expect(openMarkers).toHaveLength(3);
+      expect(openMarkers.filter((marker) => marker.classList.contains("is-root"))).toHaveLength(2);
+      expect(
+        openMarkers.find((marker) => marker.getAttribute("aria-label") === "String 6 open root"),
+      ).toBeDefined();
+      expect(
+        openMarkers
+          .find((marker) => marker.getAttribute("aria-label") === "String 2 open")
+          ?.classList.contains("is-root"),
+      ).toBe(false);
+
+      mounted.unmount();
+    },
+  );
+
   it("renders scale tones when showScaleTones is true", () => {
     const mounted = mount(
       el(GuitarCardView, {

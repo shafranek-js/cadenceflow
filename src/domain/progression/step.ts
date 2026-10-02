@@ -2,7 +2,7 @@ import type { HarmonicFunctionIdentity } from "../harmony/functions";
 import type { HarmonicVariant } from "../harmony/chord";
 import type { ExactPitch, PitchSpelling } from "../harmony/pitch";
 import type { MusicalDuration } from "../timing/duration";
-import type { ChordMelodyRecipe, MelodyInstrument } from "../melody/types";
+import type { AuthoredMelodyPhrase, ChordMelody, MelodyInstrument } from "../melody/types";
 
 export type CardViewId = "harmonic" | "piano" | "staff" | "guitar" | "tablature";
 export type PianoArticulation = "block" | "arp-up" | "arp-down" | "broken-chord" | "humanized";
@@ -39,7 +39,8 @@ export interface ChordStep {
   readonly duration: MusicalDuration;
   readonly performance: StepPerformance;
   readonly cardView: CardViewId;
-  readonly melody?: ChordMelodyRecipe;
+  /** Chord-only generated or authored Melody. RestStep stores authored Melody directly. */
+  readonly melody?: ChordMelody;
   /** Optional Step-local override; absence inherits Melody Track settings. */
   readonly melodyInstrumentOverride?: MelodyInstrument;
 }
@@ -48,6 +49,10 @@ export interface RestStep {
   readonly id: string;
   readonly kind: "rest";
   readonly duration: MusicalDuration;
+  /** Authored Melody is independent of Harmony; a Rest excludes only chord generation. */
+  readonly authoredMelody?: AuthoredMelodyPhrase;
+  /** Optional Step-local override; absence inherits Melody Track settings. */
+  readonly melodyInstrumentOverride?: MelodyInstrument;
 }
 
 export type ProgressionStep = ChordStep | RestStep;

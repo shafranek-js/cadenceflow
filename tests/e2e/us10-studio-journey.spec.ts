@@ -1,4 +1,5 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
+import { setProgressionView, startBranchAlternative } from "./test-helpers/progression-settings";
 
 const VIEWPORTS = [
   { width: 1280, height: 720 },
@@ -58,15 +59,14 @@ test.describe("T149 — complete Studio journey", () => {
       await addChord(page, "V", "Control");
       await expect(page.getByTestId("progression-step")).toHaveCount(2);
 
-      await page.getByLabel("Branch origin").selectOption({ label: "After 1: I" });
-      await page.getByRole("button", { name: "Explore Alternative" }).click();
+      await startBranchAlternative(page, 0);
       await expect(page.getByTestId("branch-controls-active")).toBeVisible();
       await addChord(page, "vi");
       const branch = page.getByRole("region", { name: "Original versus Alternative" });
       await expect(branch).toBeVisible();
       await expect(branch.locator(".branch-path").nth(1)).toContainText("vi");
 
-      await page.getByLabel("Progression Card View").selectOption("staff");
+      await setProgressionView(page, "staff");
       const score = page.getByTestId("progression-score-systems");
       const firstTarget = score.locator(".measure-staff-event-select").first();
       await firstTarget.click();

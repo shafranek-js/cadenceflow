@@ -13,7 +13,7 @@ import { createRichProjectFixture } from "../../fixtures/rich-project.fixture";
 import type { ChordStep } from "../../../src/domain/progression/step";
 
 describe("T197 + T192 — schema v6 cutover", () => {
-  it("migrates v5 engine and tone gaps plus Suzuki presentation to v6 defaults", () => {
+  it("migrates v5 through v6 engine/tone changes to v7 defaults", () => {
     const raw = JSON.parse(encodePortableProject(createDefaultProject("v5-cutover"))) as {
       schemaVersion: number;
       harmonyTrack: Record<string, unknown>;
@@ -29,8 +29,8 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const migrated = decodePortableProject(JSON.stringify(raw));
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(6);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(9);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.harmonyTrack).toMatchObject({
       pianoEngine: "hq-samples",
       guitarEngine: "hq-samples",
@@ -52,7 +52,7 @@ describe("T197 + T192 — schema v6 cutover", () => {
     expect(decodePortableProject(JSON.stringify(raw)).presentation.noteColorMode).toBe("standard");
   });
 
-  it("rejects an invalid noteColorMode in a current v6 document", () => {
+  it("rejects an invalid noteColorMode in a current v7 document", () => {
     const raw = JSON.parse(encodePortableProject(createDefaultProject("v6-invalid-mode"))) as {
       presentation: Record<string, unknown>;
     };
@@ -80,7 +80,7 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const restored = decodePortableProject(encodePortableProject(configured));
 
-    expect(restored.schemaVersion).toBe(6);
+    expect(restored.schemaVersion).toBe(9);
     expect(restored.harmonyTrack).toEqual(configured.harmonyTrack);
     expect(restored.presentation.noteColorMode).toBe("harmonic-role");
   });
@@ -90,7 +90,17 @@ describe("T197 + T192 — schema v6 cutover", () => {
     const step = project.progression.steps[0] as ChordStep;
     const targetedStep = Object.freeze({
       ...step,
-      melody: Object.freeze({ ...step.melody!, targetNextPitchClass: 2 }),
+      melody: Object.freeze({
+        mode: "generated" as const,
+        recipe: Object.freeze({
+          pitchMotion: "up",
+          rhythm: "even",
+          connection: "retrigger",
+          grid: "quarter",
+          octaveOffset: 0,
+          targetNextPitchClass: 2,
+        }),
+      }),
     });
     const targetedProject = Object.freeze({
       ...project,
@@ -101,12 +111,12 @@ describe("T197 + T192 — schema v6 cutover", () => {
     });
 
     const encoded = encodePortableProject(targetedProject);
-    expect(JSON.parse(encoded).progression.steps[0].melody).toHaveProperty(
-      "targetNextPitchClass",
-      2,
-    );
+    expect(JSON.parse(encoded).progression.steps[0].melody).toMatchObject({
+      mode: "generated",
+      recipe: { targetNextPitchClass: 2 },
+    });
     expect(decodePortableProject(encoded).progression.steps[0]).toHaveProperty(
-      "melody.targetNextPitchClass",
+      "melody.recipe.targetNextPitchClass",
       2,
     );
   });

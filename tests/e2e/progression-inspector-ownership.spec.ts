@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { addRestToProgression } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -73,7 +74,9 @@ test.describe("Progression inspector ownership", () => {
     await expect(globalInspector).toHaveCount(0);
     await expect(progressionSettings).not.toHaveAttribute("open", "");
     await expectActionsBeforeProgressionSettings(selectedInspector, 720);
-    await expect(page.getByText("Progression settings", { exact: true })).toHaveCount(1);
+    await expect(progressionSettings.locator(":scope > summary")).toContainText(
+      "Progression settings",
+    );
 
     await progressionSettings.locator(":scope > summary").click();
     await expect(progressionSettings).toHaveAttribute("open", "");
@@ -121,7 +124,7 @@ test.describe("Progression inspector ownership", () => {
     await expect(globalInspector.locator(".loop-disclosure .disclosure-status")).toHaveText("All");
     await expectNoPageHorizontalScroll(page);
 
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     const restStep = page.locator('[data-testid="progression-step"]').last();
     await restStep.getByRole("button", { name: /Select progression step .*: Rest/ }).click();
 

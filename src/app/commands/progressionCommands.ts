@@ -1,5 +1,7 @@
 import type { Project } from "../../domain/project/project";
 import type { Progression } from "../../domain/progression/progression";
+import { normalizeSongSections } from "../../domain/progression/sections";
+import { deleteStepsAndReanchorSections } from "./sectionCommands";
 import type {
   CardViewId,
   ChordStep,
@@ -12,7 +14,7 @@ import { musicalDuration, type MusicalDuration } from "../../domain/timing/durat
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
 import { createMatrixChordStep } from "./matrixCommands";
-import { snapshotChordMelodyRecipe, type ChordMelodyRecipe } from "../../domain/melody/types";
+import { snapshotAuthoredMelodyPhrase, snapshotChordMelody, type ChordMelodyRecipe } from "../../domain/melody/types";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import type { HarmonicVariant } from "../../domain/harmony/chord";
 import type { AppliedCommand, ProjectCommand } from ".";
@@ -42,11 +44,24 @@ export function restoreProgression(
 }
 
 function withInverse(project: Project, progression: Progression, nowIso: string): AppliedCommand {
+  const normalizedProgression = normalizeSongSections(progression);
   return {
-    project: updateProgression(project, progression, nowIso),
-    forward: { type: "progression/restore", payload: { progression, nowIso } },
+    project: updateProgression(project, normalizedProgression, nowIso),
+    forward: { type: "progression/restore", payload: { progression: normalizedProgression, nowIso } },
     inverse: { type: "progression/restore", payload: { progression: project.progression, nowIso } },
   };
+}
+
+function assertTargetStepIds(project: Project, stepIds: readonly string[]): ReadonlySet<string> {
+  const targetIds = new Set(stepIds);
+  if (targetIds.size !== stepIds.length) {
+    throw new RangeError("Progression batch target IDs must be unique");
+  }
+  const currentIds = new Set(project.progression.steps.map((step) => step.id));
+  for (const stepId of targetIds) {
+    if (!currentIds.has(stepId)) throw new RangeError(`Unknown progression step: ${stepId}`);
+  }
+  return targetIds;
 }
 
 export interface SelectStepPayload {
@@ -179,6 +194,7 @@ export function resetStepPerformance(
 }
 
 export interface BatchEditStepPerformancePayload {
+  readonly stepIds?: readonly string[];
   readonly performance: Partial<StepPerformance>;
   readonly nowIso: string;
 }
@@ -189,8 +205,11 @@ export function batchEditStepPerformance(
   project: Project,
   command: BatchEditStepPerformanceCommand,
 ): AppliedCommand {
+  const targetIds = command.payload.stepIds
+    ? assertTargetStepIds(project, command.payload.stepIds)
+    : undefined;
   const steps = project.progression.steps.map((step) => {
-    if (step.kind !== "chord") return step;
+    if (step.kind !== "chord" || (targetIds && !targetIds.has(step.id))) return step;
     const performance = Object.freeze({
       ...step.performance,
       ...command.payload.performance,
@@ -214,6 +233,7 @@ export function batchEditStepPerformance(
 }
 
 export interface BatchSetStepDurationPayload {
+  readonly stepIds?: readonly string[];
   readonly duration: MusicalDuration;
   readonly nowIso: string;
 }
@@ -224,8 +244,13 @@ export function batchSetStepDuration(
   project: Project,
   command: BatchSetStepDurationCommand,
 ): AppliedCommand {
+  const targetIds = command.payload.stepIds
+    ? assertTargetStepIds(project, command.payload.stepIds)
+    : undefined;
   const steps = project.progression.steps.map((step) =>
-    Object.freeze({ ...step, duration: command.payload.duration }),
+    targetIds && !targetIds.has(step.id)
+      ? step
+      : Object.freeze({ ...step, duration: command.payload.duration }),
   );
   return withInverse(
     project,
@@ -303,14 +328,7 @@ export type RemoveStepCommand = ProjectCommand<RemoveStepPayload> & {
 export function removeStep(project: Project, command: RemoveStepCommand): AppliedCommand {
   if (!project.progression.steps.some((step) => step.id === command.payload.stepId))
     throw new RangeError(`Unknown progression step: ${command.payload.stepId}`);
-  const steps = project.progression.steps.filter((step) => step.id !== command.payload.stepId);
-  const { selectedStepId, ...rest } = project.progression;
-  const progression = Object.freeze({
-    ...rest,
-    steps: Object.freeze(steps),
-    ...(selectedStepId && selectedStepId !== command.payload.stepId ? { selectedStepId } : {}),
-  });
-  return withInverse(project, progression, command.payload.nowIso);
+  return deleteStepsAndReanchorSections(project, [command.payload.stepId], command.payload.nowIso);
 }
 
 export interface RemoveStepsPayload {
@@ -322,15 +340,8 @@ export type RemoveStepsCommand = ProjectCommand<RemoveStepsPayload> & {
 };
 /** Removes a set of steps from progression (e.g. when deleting a Score System). */
 export function removeSteps(project: Project, command: RemoveStepsCommand): AppliedCommand {
-  const idsToRemove = new Set(command.payload.stepIds);
-  const steps = project.progression.steps.filter((step) => !idsToRemove.has(step.id));
-  const { selectedStepId, ...rest } = project.progression;
-  const progression = Object.freeze({
-    ...rest,
-    steps: Object.freeze(steps),
-    ...(selectedStepId && !idsToRemove.has(selectedStepId) ? { selectedStepId } : {}),
-  });
-  return withInverse(project, progression, command.payload.nowIso);
+  const idsToRemove = assertTargetStepIds(project, command.payload.stepIds);
+  return deleteStepsAndReanchorSections(project, [...idsToRemove], command.payload.nowIso);
 }
 
 export interface ReorderStepPayload {
@@ -417,7 +428,7 @@ export function repeatChordStep(project: Project, command: RepeatChordStepComman
     id: command.payload.stepId,
     duration: command.payload.duration,
     performance: snapshotStepPerformance(source.performance),
-    ...(source.melody !== undefined ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+    ...(source.melody !== undefined ? { melody: cloneStepMelody(source.melody) } : {}),
   });
   const steps = Object.freeze([...project.progression.steps, repeated]);
   return withInverse(
@@ -425,6 +436,25 @@ export function repeatChordStep(project: Project, command: RepeatChordStepComman
     Object.freeze({ ...project.progression, steps }),
     command.payload.nowIso,
   );
+}
+
+function cloneStepMelody(melody: NonNullable<ChordStep["melody"]>): NonNullable<ChordStep["melody"]> {
+  if (melody.mode === "generated") return snapshotChordMelody(melody);
+  return snapshotChordMelody({
+    ...melody,
+    phrase: snapshotAuthoredMelodyPhrase({
+      ...melody.phrase,
+      notes: melody.phrase.notes.map((note) => ({ ...note, id: crypto.randomUUID() })),
+    }),
+  });
+}
+
+function cloneRestAuthoredMelody(step: RestStep): RestStep["authoredMelody"] {
+  if (!step.authoredMelody) return undefined;
+  return snapshotAuthoredMelodyPhrase({
+    ...step.authoredMelody,
+    notes: step.authoredMelody.notes.map((note) => ({ ...note, id: crypto.randomUUID() })),
+  });
 }
 
 export interface DuplicateStepsPayload {
@@ -446,6 +476,7 @@ export function duplicateSteps(project: Project, command: DuplicateStepsCommand)
       const rest: RestStep = Object.freeze({
         ...source,
         id,
+        ...(source.authoredMelody ? { authoredMelody: cloneRestAuthoredMelody(source)! } : {}),
       });
       return rest;
     }
@@ -453,7 +484,7 @@ export function duplicateSteps(project: Project, command: DuplicateStepsCommand)
       ...source,
       id,
       performance: snapshotStepPerformance(source.performance),
-      ...(source.melody !== undefined ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+      ...(source.melody !== undefined ? { melody: cloneStepMelody(source.melody) } : {}),
       ...(source.explicitSpellingOverrides
         ? { explicitSpellingOverrides: Object.freeze({ ...source.explicitSpellingOverrides }) }
         : {}),
@@ -484,10 +515,17 @@ export function reorderSteps(project: Project, command: ReorderStepsCommand): Ap
     );
   }
   const currentIds = new Set(project.progression.steps.map((s) => s.id));
+  const reorderedIds = new Set<string>();
   for (const s of command.payload.steps) {
     if (!currentIds.has(s.id)) {
       throw new Error(`Step ${s.id} does not exist in current progression`);
     }
+    if (reorderedIds.has(s.id))
+      throw new Error(`Step ${s.id} appears more than once in reordered progression`);
+    reorderedIds.add(s.id);
+  }
+  if (reorderedIds.size !== currentIds.size) {
+    throw new Error("Reordered progression must preserve every current Step ID");
   }
   return withInverse(
     project,
@@ -586,10 +624,14 @@ export type BatchPatchStepsCommand = ProjectCommand<BatchPatchStepsPayload> & {
 };
 /** Applies performance and/or melody patches across an arbitrary set of steps. */
 export function batchPatchSteps(project: Project, command: BatchPatchStepsCommand): AppliedCommand {
+  const targetIds = assertTargetStepIds(
+    project,
+    command.payload.updates.map((update) => update.stepId),
+  );
   const patchMap = new Map(command.payload.updates.map((u) => [u.stepId, u.patch]));
   const steps = project.progression.steps.map((step) => {
     const patch = patchMap.get(step.id);
-    if (!patch || step.kind !== "chord") return step;
+    if (!patch || !targetIds.has(step.id) || step.kind !== "chord") return step;
 
     let updatedPerformance = step.performance;
     if (patch.performance) {
@@ -612,7 +654,7 @@ export function batchPatchSteps(project: Project, command: BatchPatchStepsComman
     if (patch.melody === null) {
       updatedMelody = undefined;
     } else if (patch.melody !== undefined) {
-      updatedMelody = snapshotChordMelodyRecipe(patch.melody);
+      updatedMelody = snapshotChordMelody(patch.melody);
     }
 
     const {

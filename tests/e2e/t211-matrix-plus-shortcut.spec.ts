@@ -10,7 +10,7 @@ const acceptanceModes = [
 async function selectCardAndPress(
   page: import("@playwright/test").Page,
   functionId: string,
-  key: "Shift+=" | "NumpadAdd",
+  key: "Shift+Equal" | "NumpadAdd",
 ) {
   const card = page.getByTestId(`chord-card-${functionId}`).locator(".chord-main");
   await card.click();
@@ -50,7 +50,7 @@ for (const acceptance of acceptanceModes) {
     await expect(steps).toHaveCount(0);
 
     await focusToggle.focus();
-    await page.keyboard.press("Shift+=");
+    await page.keyboard.press("Shift+Equal");
     await expect(steps).toHaveCount(0);
 
     const viewSelect = page.getByLabel("Global Card View");
@@ -58,7 +58,7 @@ for (const acceptance of acceptanceModes) {
     await viewSelect.dispatchEvent("keydown", { key: "+", code: "NumpadAdd" });
     await expect(steps).toHaveCount(0);
 
-    await selectCardAndPress(page, "I", "Shift+=");
+    await selectCardAndPress(page, "I", "Shift+Equal");
     await expect(steps).toHaveCount(1);
 
     await selectCardAndPress(page, "bIII", "NumpadAdd");
@@ -72,7 +72,7 @@ for (const acceptance of acceptanceModes) {
     });
     await expect(steps).toHaveCount(2);
 
-    await selectCardAndPress(page, "bVI", "Shift+=");
+    await selectCardAndPress(page, "bVI", "Shift+Equal");
     const routeDialog = page.getByRole("dialog", { name: "Confirm harmonic route" });
     await expect(routeDialog).toBeVisible();
     await expect(steps).toHaveCount(2);

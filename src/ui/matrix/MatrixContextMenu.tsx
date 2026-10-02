@@ -1,20 +1,9 @@
-import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import { modeForModule } from "../../domain/harmony/functions";
 import { defaultTonicSpelling, formatPitchSpelling } from "../../domain/harmony/spelling";
-import type {
-  CardViewId,
-  PianoArticulation,
-  RegisterOffset,
-} from "../../domain/progression/step";
+import type { CardViewId, PianoArticulation, RegisterOffset } from "../../domain/progression/step";
 
 export interface MatrixContextMenuPosition {
   readonly x: number;
@@ -182,17 +171,6 @@ export function MatrixContextMenu({
     setActiveSubmenu(type);
   };
 
-  const toggleSubmenu = (
-    type: "transpose" | "module" | "view" | "articulation" | "register",
-    btnEl: HTMLButtonElement,
-  ) => {
-    if (activeSubmenu === type) {
-      setActiveSubmenu(null);
-    } else {
-      openSubmenu(type, btnEl);
-    }
-  };
-
   const handleSubmenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!submenuRef.current) return;
     const items = Array.from(
@@ -248,12 +226,7 @@ export function MatrixContextMenu({
       case "ArrowRight": {
         const currentBtn = items[currentIndex];
         const submenuType = currentBtn?.getAttribute("data-submenu") as
-          | "transpose"
-          | "module"
-          | "view"
-          | "articulation"
-          | "register"
-          | null;
+          "transpose" | "module" | "view" | "articulation" | "register" | null;
         if (submenuType && currentBtn) {
           event.preventDefault();
           event.stopPropagation();
@@ -368,7 +341,7 @@ export function MatrixContextMenu({
           data-submenu="transpose"
           data-testid="matrix-menu-open-transpose"
           onMouseEnter={(e) => openSubmenu("transpose", e.currentTarget)}
-          onClick={(e) => toggleSubmenu("transpose", e.currentTarget)}
+          onClick={(e) => openSubmenu("transpose", e.currentTarget)}
         >
           <span className="score-system-menu-item-row">
             <span>Transpose Matrix</span>
@@ -383,7 +356,7 @@ export function MatrixContextMenu({
           data-submenu="module"
           data-testid="matrix-menu-open-module"
           onMouseEnter={(e) => openSubmenu("module", e.currentTarget)}
-          onClick={(e) => toggleSubmenu("module", e.currentTarget)}
+          onClick={(e) => openSubmenu("module", e.currentTarget)}
         >
           <span className="score-system-menu-item-row">
             <span>Harmonic Module</span>
@@ -402,7 +375,7 @@ export function MatrixContextMenu({
           data-submenu="view"
           data-testid="matrix-menu-open-view"
           onMouseEnter={(e) => openSubmenu("view", e.currentTarget)}
-          onClick={(e) => toggleSubmenu("view", e.currentTarget)}
+          onClick={(e) => openSubmenu("view", e.currentTarget)}
         >
           <span className="score-system-menu-item-row">
             <span>Card View Mode</span>
@@ -469,7 +442,7 @@ export function MatrixContextMenu({
           data-submenu="articulation"
           data-testid="matrix-menu-open-articulation"
           onMouseEnter={(e) => openSubmenu("articulation", e.currentTarget)}
-          onClick={(e) => toggleSubmenu("articulation", e.currentTarget)}
+          onClick={(e) => openSubmenu("articulation", e.currentTarget)}
         >
           <span className="score-system-menu-item-row">
             <span>Audition Articulation</span>
@@ -484,7 +457,7 @@ export function MatrixContextMenu({
           data-submenu="register"
           data-testid="matrix-menu-open-register"
           onMouseEnter={(e) => openSubmenu("register", e.currentTarget)}
-          onClick={(e) => toggleSubmenu("register", e.currentTarget)}
+          onClick={(e) => openSubmenu("register", e.currentTarget)}
         >
           <span className="score-system-menu-item-row">
             <span>Audition Register</span>
@@ -677,7 +650,8 @@ export function MatrixContextMenu({
               >
                 <span className="score-system-menu-item-row">
                   <span>
-                    {opt.label} <small style={{ color: "var(--text-muted)" }}>({opt.subtitle})</small>
+                    {opt.label}{" "}
+                    <small style={{ color: "var(--text-muted)" }}>({opt.subtitle})</small>
                   </span>
                   {isActive ? <span className="score-system-menu-check">✓</span> : null}
                 </span>

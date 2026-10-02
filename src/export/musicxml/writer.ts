@@ -143,9 +143,9 @@ function validateMelodyNote(event: MusicXmlMelodyNoteEvent): void {
       `Melody note ${event.stepId} pitch does not match its source MIDI value.`,
     );
   }
-  if (event.voice !== "1" || event.staff !== 1 || event.chord !== false) {
+  if (!/^[1-9][0-9]*$/.test(event.voice) || event.staff !== 1 || event.chord !== false) {
     throw new MusicXmlWriterError(
-      `Melody note ${event.stepId} must use voice 1, staff 1, and no chord.`,
+      `Melody note ${event.stepId} must use a positive voice, staff 1, and no chord.`,
     );
   }
   if (!["whole", "half", "quarter", "eighth", "16th"].includes(event.type)) {
@@ -201,8 +201,10 @@ function validateMelodyRest(event: MusicXmlMelodyMeasureEvent & { readonly kind:
     throw new MusicXmlWriterError("MusicXML Melody rest must be an object.");
   }
   assertInteger(event.duration, `duration for ${event.stepId}`, 1);
-  if (event.voice !== "1" || event.staff !== 1) {
-    throw new MusicXmlWriterError(`Melody rest ${event.stepId} must use voice 1 and staff 1.`);
+  if (!/^[1-9][0-9]*$/.test(event.voice) || event.staff !== 1) {
+    throw new MusicXmlWriterError(
+      `Melody rest ${event.stepId} must use a positive voice and staff 1.`,
+    );
   }
 }
 
@@ -303,7 +305,12 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
       );
     }
     assertInteger(measure.capacity, `Melody capacity for measure ${measure.number}`, 1);
-    let duration = 0;
+    if (measure.capacity !== projection.measures[index]?.capacity) {
+      throw new MusicXmlWriterError(
+        `Melody measure ${measure.number} duration ${measure.capacity} does not equal capacity ${projection.measures[index]?.capacity}.`,
+      );
+    }
+    const voiceIntervals = new Map<string, { start: number; end: number }[]>();
     measure.events.forEach((event: MusicXmlMelodyMeasureEvent) => {
       if (event?.kind === "note") {
         validateMelodyNote(event);
@@ -314,13 +321,23 @@ function validateMelodyPart(projection: MusicXmlProjection, melody: MusicXmlMelo
         }
       } else if (event?.kind === "rest") validateMelodyRest(event);
       else throw new MusicXmlWriterError("MusicXML Melody measure contains an invalid event.");
-      duration += event.duration;
+      const start =
+        (event.onsetBeats.numerator * projection.attributes.divisions) /
+        event.onsetBeats.denominator;
+      if (!Number.isSafeInteger(start) || start < 0 || start + event.duration > measure.capacity) {
+        throw new MusicXmlWriterError(`Melody event ${event.stepId} falls outside its measure.`);
+      }
+      const intervals = voiceIntervals.get(event.voice) ?? [];
+      if (
+        intervals.some(
+          (interval) => start < interval.end && start + event.duration > interval.start,
+        )
+      ) {
+        throw new MusicXmlWriterError(`Melody voice ${event.voice} contains overlapping events.`);
+      }
+      intervals.push({ start, end: start + event.duration });
+      voiceIntervals.set(event.voice, intervals);
     });
-    if (duration !== measure.capacity) {
-      throw new MusicXmlWriterError(
-        `Melody measure ${measure.number} duration ${duration} does not equal capacity ${measure.capacity}.`,
-      );
-    }
   });
 }
 
@@ -568,20 +585,57 @@ function writeMelodyPart(
   melody.measures.forEach((measure, index) => {
     lines.push(`${"  ".repeat(level + 1)}<measure${xmlAttribute("number", measure.number)}>`);
     if (index === 0) lines.push(...writeMelodyAttributes(projection, melody, level + 2));
-    for (const event of measure.events) {
-      if (
-        event.kind === "note" &&
-        (event.clef.sign !== currentClef.sign || event.clef.line !== currentClef.line)
-      ) {
-        lines.push(...writeMelodyClefChange(event.clef, level + 2));
-        currentClef = event.clef;
+    const voices = [...new Set(measure.events.map((event) => event.voice))].sort(
+      (a, b) => Number(a) - Number(b),
+    );
+    voices.forEach((voice, voiceIndex) => {
+      if (voiceIndex > 0)
+        lines.push(
+          emptyElement("backup", level + 2),
+          element("duration", measure.capacity, level + 3),
+          closeElement("backup", level + 2),
+        );
+      let cursor = 0;
+      const events = measure.events
+        .filter((event) => event.voice === voice)
+        .sort(
+          (a, b) =>
+            a.onsetBeats.numerator / a.onsetBeats.denominator -
+            b.onsetBeats.numerator / b.onsetBeats.denominator,
+        );
+      for (const event of events) {
+        const onset =
+          (event.onsetBeats.numerator * projection.attributes.divisions) /
+          event.onsetBeats.denominator;
+        if (onset > cursor)
+          lines.push(
+            emptyElement("forward", level + 2),
+            element("duration", onset - cursor, level + 3),
+            element("voice", voice, level + 3),
+            closeElement("forward", level + 2),
+          );
+        if (
+          event.kind === "note" &&
+          (event.clef.sign !== currentClef.sign || event.clef.line !== currentClef.line)
+        ) {
+          lines.push(...writeMelodyClefChange(event.clef, level + 2));
+          currentClef = event.clef;
+        }
+        lines.push(
+          ...(event.kind === "note"
+            ? writeMelodyNote(event, level + 2)
+            : writeMelodyRest(event, level + 2)),
+        );
+        cursor = onset + event.duration;
       }
-      lines.push(
-        ...(event.kind === "note"
-          ? writeMelodyNote(event, level + 2)
-          : writeMelodyRest(event, level + 2)),
-      );
-    }
+      if (cursor < measure.capacity)
+        lines.push(
+          emptyElement("forward", level + 2),
+          element("duration", measure.capacity - cursor, level + 3),
+          element("voice", voice, level + 3),
+          closeElement("forward", level + 2),
+        );
+    });
     lines.push(`${"  ".repeat(level + 1)}</measure>`);
   });
   lines.push(closeElement("part", level));

@@ -9,6 +9,10 @@ export interface PreviewAuditionControllerOptions {
   readonly provider: InstrumentAudioProvider;
   readonly clock?: AudioClock;
 }
+export type PreviewAuditionScheduledCallback = (
+  playback: ScheduledPlayback,
+  clock: AudioClock,
+) => void;
 
 interface PreviewCapableProvider extends InstrumentAudioProvider {
   schedulePreview?(events: readonly AudioNoteEvent[], clock: AudioClock): ScheduledPlayback;
@@ -32,6 +36,7 @@ export class PreviewAuditionController {
     readonly events: readonly AudioNoteEvent[];
     readonly token: number;
     readonly requestedAt: number;
+    readonly onScheduled?: PreviewAuditionScheduledCallback;
   } | null = null;
   private pendingToken = 0;
 
@@ -50,7 +55,10 @@ export class PreviewAuditionController {
     return this.activePlayback;
   }
 
-  audition(events: readonly AudioNoteEvent[]): ScheduledPlayback | null {
+  audition(
+    events: readonly AudioNoteEvent[],
+    onScheduled?: PreviewAuditionScheduledCallback,
+  ): ScheduledPlayback | null {
     // 1. Cancel / stop prior Matrix preview playback scope immediately
     this.stop();
 
@@ -63,7 +71,12 @@ export class PreviewAuditionController {
       if (this.provider.state === "idle" || this.provider.state === "loading") {
         const token = ++this.pendingToken;
         const requestedAt = Date.now();
-        this.pendingAudition = { events, token, requestedAt };
+        this.pendingAudition = {
+          events,
+          token,
+          requestedAt,
+          ...(onScheduled ? { onScheduled } : {}),
+        };
 
         void this.provider
           .prepare()
@@ -74,8 +87,9 @@ export class PreviewAuditionController {
               Date.now() - requestedAt < 3000
             ) {
               const pendingEvents = this.pendingAudition.events;
+              const pendingCallback = this.pendingAudition.onScheduled;
               this.pendingAudition = null;
-              this.playEvents(pendingEvents);
+              this.playEvents(pendingEvents, pendingCallback);
             }
           })
           .catch(() => {
@@ -87,10 +101,13 @@ export class PreviewAuditionController {
       return null;
     }
 
-    return this.playEvents(events);
+    return this.playEvents(events, onScheduled);
   }
 
-  private playEvents(events: readonly AudioNoteEvent[]): ScheduledPlayback | null {
+  private playEvents(
+    events: readonly AudioNoteEvent[],
+    onScheduled?: PreviewAuditionScheduledCallback,
+  ): ScheduledPlayback | null {
     // Resume AudioContext if suspended (browser autoplay policy on user gesture)
     const providerWithCtx = this.provider as unknown as { audioCtx?: AudioContext | null };
     if (providerWithCtx.audioCtx && providerWithCtx.audioCtx.state === "suspended") {
@@ -102,6 +119,20 @@ export class PreviewAuditionController {
       this.activePlayback = previewProvider.schedulePreview
         ? previewProvider.schedulePreview(events, this.clock)
         : this.provider.schedule(events, this.clock);
+      const scheduled = this.activePlayback;
+      if (onScheduled) {
+        const notify = () => {
+          if (this.activePlayback === scheduled) onScheduled(scheduled, this.clock);
+        };
+        if (scheduled.ready) {
+          void scheduled.ready.then(notify).catch(() => {
+            if (this.activePlayback === scheduled) this.activePlayback = null;
+            scheduled.cancel();
+          });
+        } else {
+          notify();
+        }
+      }
       return this.activePlayback;
     } catch {
       // Audio scheduling failure must not corrupt application state

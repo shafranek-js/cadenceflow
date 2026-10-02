@@ -6,7 +6,7 @@ import { createDefaultMelodyTrackSettings, validateChordMelodyRecipe } from "../
 import { validateMelodyInstrumentId } from "../melody/instrumentCatalog";
 import { createDefaultHarmonyTrackSettings } from "../harmony/track";
 
-export const CURRENT_PROJECT_SCHEMA_VERSION = 6;
+export const CURRENT_PROJECT_SCHEMA_VERSION = 9;
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(
@@ -52,20 +52,111 @@ export function migrateProjectData(data: unknown): Record<string, unknown> {
   }
 
   if (version === 1) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(record)))));
+    return migrateV8ToV9(migrateV7ToV8(
+      migrateV6ToV7(
+        migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(record))))),
+      ),
+    ));
   }
 
-  if (version === 2) return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(record))));
+  if (version === 2)
+    return migrateV8ToV9(migrateV7ToV8(
+      migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(record))))),
+    ));
 
-  if (version === 3) return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(record)));
+  if (version === 3)
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(record))))));
 
-  if (version === 4) return migrateV5ToV6(migrateV4ToV5(record));
+  if (version === 4) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(record)))));
 
-  if (version === 5) return migrateV5ToV6(record);
+  if (version === 5) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(record))));
+  if (version === 6) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(record)));
+  if (version === 7) return migrateV8ToV9(migrateV7ToV8(record));
+  if (version === 8) return migrateV8ToV9(record);
 
   // A shallow root copy keeps current decoding pure while preserving every supported
   // current field exactly as supplied. Future migrations can be appended above.
   return { ...record };
+}
+
+function migrateV8ToV9(record: Record<string, unknown>): Record<string, unknown> {
+  const migrateContainer = (value: unknown): unknown => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const container = value as Record<string, unknown>;
+    if (!Array.isArray(container.steps)) return value;
+    return {
+      ...container,
+      steps: container.steps.map((raw) => {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+        const step = raw as Record<string, unknown>;
+        return { ...step };
+      }),
+    };
+  };
+  const progression = migrateContainer(record.progression) as Record<string, unknown> | undefined;
+  const presentation = (record.presentation && typeof record.presentation === "object")
+    ? record.presentation as Record<string, unknown>
+    : {};
+  return {
+    ...record,
+    schemaVersion: 9,
+    progression,
+    ...(record.temporaryBranch !== undefined ? { temporaryBranch: migrateContainer(record.temporaryBranch) } : {}),
+    presentation: { ...presentation },
+  };
+}
+
+function migrateV7ToV8(record: Record<string, unknown>): Record<string, unknown> {
+  const progression = record.progression;
+  const migratedProgression =
+    progression && typeof progression === "object" && !Array.isArray(progression)
+      ? { ...(progression as Record<string, unknown>), sections: [] }
+      : progression;
+  return { ...record, schemaVersion: 8, progression: migratedProgression };
+}
+
+function migrateV6ToV7(record: Record<string, unknown>): Record<string, unknown> {
+  const migrateContainer = (value: unknown): unknown => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const container = value as Record<string, unknown>;
+    return {
+      ...container,
+      ...(Array.isArray(container.steps)
+        ? {
+            steps: container.steps.map((step) => {
+              if (!step || typeof step !== "object" || Array.isArray(step)) return step;
+              const item = step as Record<string, unknown>;
+              if (
+                item.kind !== "chord" ||
+                item.melody === undefined ||
+                (item.melody &&
+                  typeof item.melody === "object" &&
+                  "mode" in (item.melody as object))
+              )
+                return { ...item };
+              try {
+                return {
+                  ...item,
+                  melody: { mode: "generated", recipe: validateChordMelodyRecipe(item.melody) },
+                };
+              } catch (error) {
+                throw new InvalidProjectDataError(
+                  `Invalid Melody recipe during v6→v7 migration: ${error instanceof Error ? error.message : String(error)}`,
+                );
+              }
+            }),
+          }
+        : {}),
+    };
+  };
+  return {
+    ...record,
+    schemaVersion: 7,
+    progression: migrateContainer(record.progression),
+    ...(record.temporaryBranch !== undefined
+      ? { temporaryBranch: migrateContainer(record.temporaryBranch) }
+      : {}),
+  };
 }
 
 function migrateV1ToV2(record: Record<string, unknown>): Record<string, unknown> {

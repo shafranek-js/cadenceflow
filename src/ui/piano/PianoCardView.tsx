@@ -7,6 +7,8 @@ import {
   type HarmonicNoteRoleContext,
 } from "../../domain/harmony/noteRoles";
 import type { NoteColorMode } from "../../domain/project/project";
+import type { LabelHierarchyMode } from "../progression/labelHierarchy";
+import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
 
 function formatChordPitch(pitch: ExactPitch): string {
   return `${formatPitchSpelling(pitch.spelling)}${pitch.octave}`;
@@ -61,12 +63,16 @@ export function PianoCardView({
   chordPitches,
   bassPitch,
   chordLabel,
+  labelMode,
+  functionLabel,
   noteColorMode = "standard",
   roleContext,
 }: {
   readonly chordPitches: readonly ExactPitch[];
   readonly bassPitch?: ExactPitch | undefined;
   readonly chordLabel: string;
+  readonly labelMode?: LabelHierarchyMode;
+  readonly functionLabel?: string;
   readonly noteColorMode?: NoteColorMode;
   readonly roleContext?: HarmonicNoteRoleContext;
 }) {
@@ -87,7 +93,16 @@ export function PianoCardView({
   return (
     <div className="mini-piano-card-visual">
       <div className="mini-piano-heading">
-        <strong className="mini-piano-chord-name">{chordLabel}</strong>
+        {labelMode && functionLabel ? (
+          <ProgressionChordLabel
+            mode={labelMode}
+            functionLabel={functionLabel}
+            chordLabel={chordLabel}
+            className="mini-piano-chord-name"
+          />
+        ) : (
+          <strong className="mini-piano-chord-name">{chordLabel}</strong>
+        )}
         <span className="mini-piano-octave" aria-label={`Chord starts in octave ${chordOctave}`}>
           {`Oct ${chordOctave}`}
         </span>

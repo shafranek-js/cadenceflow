@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { startBranchAlternative } from "./test-helpers/progression-settings";
 
 test("US2 explores a mid-progression branch, compares paths, rejoins, and commits", async ({
   page,
@@ -12,8 +13,7 @@ test("US2 explores a mid-progression branch, compares paths, rejoins, and commit
   await expect(page.getByTestId("progression-step")).toHaveCount(4);
   await expect(page.locator('[data-context="composition-intent"]')).toHaveCount(0);
 
-  await page.getByLabel("Branch origin").selectOption({ label: "After 2: vi" });
-  await page.getByRole("button", { name: "Explore Alternative" }).click();
+  await startBranchAlternative(page, 1);
   await expect(page.locator('[data-context="composition-intent"]')).toBeVisible();
   await page.getByLabel("Branch rejoin").selectOption({ label: "4: V" });
 

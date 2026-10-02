@@ -36,6 +36,7 @@ interface ActivePlaybackRecord {
   readonly nodes: ActiveNodeEntry[];
   readonly events: readonly AudioNoteEvent[];
   cancelled: boolean;
+  scheduledAt: number | null;
 }
 
 export class HqSamplePianoProvider implements InstrumentAudioProvider {
@@ -209,6 +210,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
       nodes: [],
       events,
       cancelled: false,
+      scheduledAt: null,
     };
     this.activePlaybacks.push(activeRecord);
 
@@ -217,13 +219,20 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
 
     // Schedule each note event asynchronously with buffer resolution
     for (const evt of events) {
-      notePromises.push(this.scheduleSingleNote(evt, baseClockTime, activeRecord));
+      const earliestStart = events.reduce(
+        (earliest, event) => Math.min(earliest, event.startSeconds),
+        Number.POSITIVE_INFINITY,
+      );
+      notePromises.push(this.scheduleSingleNote(evt, baseClockTime, earliestStart, activeRecord));
     }
 
     const readyPromise = Promise.all(notePromises).then(() => undefined);
 
     return {
       id: playbackId,
+      get scheduledAt() {
+        return activeRecord.scheduledAt ?? baseClockTime;
+      },
       cancel: () => {
         activeRecord.cancelled = true;
         this.stopRecordNodes(activeRecord);
@@ -290,6 +299,7 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
   private async scheduleSingleNote(
     evt: AudioNoteEvent,
     baseClockTime: number,
+    earliestStart: number,
     record: ActivePlaybackRecord,
   ): Promise<void> {
     if (record.cancelled || !this.manifest || !this.sampleCache || !this.audioContext) {
@@ -305,7 +315,8 @@ export class HqSamplePianoProvider implements InstrumentAudioProvider {
       }
 
       const audioCtx = this.audioContext;
-      const startTime = baseClockTime + evt.startSeconds;
+      record.scheduledAt ??= Math.max(baseClockTime, audioCtx.currentTime - earliestStart);
+      const startTime = record.scheduledAt + evt.startSeconds;
       const stopTime = startTime + evt.durationSeconds;
 
       const source = audioCtx.createBufferSource();

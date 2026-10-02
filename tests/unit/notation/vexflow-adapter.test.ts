@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { musicalDuration, type MusicalDuration } from "../../../src/domain/timing/duration";
 import { meter } from "../../../src/domain/timing/meter";
-import { rational } from "../../../src/domain/timing/rational";
+import { addRational, rational } from "../../../src/domain/timing/rational";
 import { projectPitchesToStaff } from "../../../src/notation/staffProjection";
 import {
   renderStaffProjection,
@@ -16,6 +16,7 @@ import {
   type StaffSequenceEntry,
   type StaffSequencePosition,
 } from "../../../src/notation/vexflowAdapter";
+import { projectWrittenRhythm } from "../../../src/notation/writtenRhythmProjection";
 
 function projectionFor(
   pitches: readonly ReturnType<typeof exactPitch>[],
@@ -170,6 +171,48 @@ describe("renderStaffProjection", () => {
     }
   });
 
+  it("decomposes long, dotted, triplet, and custom rhythms without changing their exact sum", () => {
+    const cases = [
+      [rational(5, 2), [rational(2), rational(1, 2)]],
+      [rational(9, 2), [rational(4), rational(1, 2)]],
+      [rational(3, 2), [rational(3, 2)]],
+      [rational(2, 3), [rational(2, 3)]],
+      [rational(3, 7), [rational(3, 7)]],
+    ] as const;
+
+    for (const [duration, expected] of cases) {
+      const parts = projectWrittenRhythm(duration);
+      expect(parts.map((part) => part.beats)).toEqual(expected);
+      expect(parts.reduce((sum, part) => addRational(sum, part.beats), rational(0))).toEqual(
+        duration,
+      );
+      expect(parts.map((part) => part.offsetBeats)).toEqual(
+        expected.reduce<ReturnType<typeof rational>[]>((offsets) => {
+          offsets.push(
+            offsets.length === 0
+              ? rational(0)
+              : addRational(offsets.at(-1)!, expected[offsets.length - 1]!),
+          );
+          return offsets;
+        }, []),
+      );
+    }
+
+    expect(projectWrittenRhythm(rational(5, 2)).map((part) => part.notation)).toEqual([
+      "half",
+      "eighth",
+    ]);
+    expect(projectWrittenRhythm(rational(3, 2))[0]?.dots).toBe(1);
+    expect(projectWrittenRhythm(rational(2, 3))[0]?.tuplet).toEqual({
+      numNotes: 3,
+      notesOccupied: 2,
+    });
+    expect(projectWrittenRhythm(rational(3, 7))[0]?.tuplet).toEqual({
+      numNotes: 7,
+      notesOccupied: 6,
+    });
+  });
+
   it("colors noteheads with Suzuki palette when suzukiColors option is enabled", () => {
     const pitches = [
       exactPitch(60, { step: "C", alter: 0 }),
@@ -177,9 +220,14 @@ describe("renderStaffProjection", () => {
       exactPitch(67, { step: "G", alter: 0 }),
     ];
     const containerWithColors = document.createElement("div");
-    renderStaffProjection(containerWithColors, projectionFor(pitches), musicalDuration(rational(4)), {
-      suzukiColors: true,
-    });
+    renderStaffProjection(
+      containerWithColors,
+      projectionFor(pitches),
+      musicalDuration(rational(4)),
+      {
+        suzukiColors: true,
+      },
+    );
     const svgWithColors = containerWithColors.querySelector("svg");
     expect(svgWithColors).not.toBeNull();
     const htmlWithColors = svgWithColors!.outerHTML;
@@ -432,6 +480,146 @@ describe("renderStaffSystem", () => {
       ...(melodyEntries ? { melodyEntries } : {}),
     };
   }
+
+  it("renders exact durations from direct resize without overfilling a 4/4 voice", () => {
+    const container = document.createElement("div");
+    const entries: StaffSequenceEntry[] = [
+      {
+        key: "resized-short",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(1, 24)),
+      },
+      {
+        key: "resized-long",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(1, 24),
+        duration: musicalDuration(rational(95, 24)),
+      },
+    ];
+
+    expect(() =>
+      renderStaffSystem(container, [systemMeasure(0, entries)], meter(4, 4)),
+    ).not.toThrow();
+  });
+
+  it("renders a triplet-length rest followed by a chord without overfilling the voice", () => {
+    const container = document.createElement("div");
+    const entries: StaffSequenceEntry[] = [
+      {
+        key: "triplet-rest",
+        kind: "rest",
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(1, 3)),
+      },
+      {
+        key: "remaining-chord",
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: rational(1, 3),
+        duration: musicalDuration(rational(11, 3)),
+      },
+    ];
+
+    expect(() =>
+      renderStaffSystem(container, [systemMeasure(0, entries)], meter(4, 4)),
+    ).not.toThrow();
+  });
+
+  it("renders exact rhythmic rests and tuplets in tablature", () => {
+    const container = document.createElement("div");
+    const entries: StaffSequenceEntry[] = [
+      {
+        key: "tab-rest",
+        kind: "rest",
+        startOffsetBeats: rational(0),
+        duration: musicalDuration(rational(1, 3)),
+      },
+      {
+        key: "tab-chord",
+        kind: "chord",
+        projection: cMajor,
+        tabPositions: [{ str: 5, fret: 3 }],
+        startOffsetBeats: rational(1, 3),
+        duration: musicalDuration(rational(11, 3)),
+      },
+    ];
+
+    expect(() =>
+      renderStaffSystem(container, [systemMeasure(0, entries)], meter(4, 4), undefined, {
+        isTablature: true,
+      }),
+    ).not.toThrow();
+    expect(container.querySelectorAll('.vf-stavenote[data-staff-entry="tab-rest"]')).toHaveLength(
+      1,
+    );
+    expect(container.querySelectorAll(".vf-tuplet")).toHaveLength(2);
+  });
+
+  it("does not generate non-finite beam paths for exact resized durations", () => {
+    const container = document.createElement("div");
+    const lengths = [
+      rational(1, 4),
+      rational(7, 24),
+      rational(1, 4),
+      rational(1, 4),
+      rational(71, 24),
+    ];
+    let offset = rational(0);
+    const entries: StaffSequenceEntry[] = lengths.map((duration, index) => {
+      const entry: StaffSequenceEntry = {
+        key: `resized-${index}`,
+        kind: "chord",
+        projection: cMajor,
+        startOffsetBeats: offset,
+        duration: musicalDuration(duration),
+      };
+      offset = addRational(offset, duration);
+      return entry;
+    });
+
+    renderStaffSystem(container, [systemMeasure(0, entries)], meter(4, 4));
+
+    expect(container.querySelectorAll('svg path[d*="NaN"]')).toHaveLength(0);
+    expect(container.querySelectorAll("svg .vf-beam").length).toBeGreaterThan(0);
+  });
+
+  it("keeps triplet rests exact on Melody and Bass staves in 7/8", () => {
+    const container = document.createElement("div");
+    const rest: StaffSequenceEntry = {
+      key: "short-rest",
+      kind: "rest",
+      startOffsetBeats: rational(0),
+      duration: musicalDuration(rational(1, 6)),
+    };
+    const harmony: StaffSequenceEntry = {
+      key: "harmony",
+      kind: "chord",
+      projection: cMajor,
+      bassProjection,
+      startOffsetBeats: rational(1, 6),
+      duration: musicalDuration(rational(10, 3)),
+    };
+    const melody: StaffSequenceEntry = {
+      key: "melody",
+      kind: "note",
+      projection: projectionFor([exactPitch(72, { step: "C", alter: 0 })]),
+      startOffsetBeats: rational(1, 6),
+      duration: musicalDuration(rational(10, 3)),
+    };
+
+    expect(() =>
+      renderStaffSystem(
+        container,
+        [systemMeasure(0, [rest, harmony], [rest, melody])],
+        meter(7, 8, [2, 2, 3]),
+        undefined,
+        { showBass: true },
+      ),
+    ).not.toThrow();
+  });
 
   it("renders two consecutive measures as one SVG with shared Melody/Harmony attacks", () => {
     const harmony = (key: string, bass = false): StaffSequenceEntry => ({
@@ -826,6 +1014,7 @@ describe("renderStaffSystem", () => {
     // 4 melody TabNotes + 1 accompaniment chord TabNote = 5 TabNotes on the stave
     const tabNotes = svg!.querySelectorAll(".vf-tabnote");
     expect(tabNotes.length).toBe(5);
+    expect(svg!.querySelectorAll(".vf-stavenote")).toHaveLength(0);
 
     const textContents = Array.from(svg!.querySelectorAll("text")).map((t) => t.textContent);
     // Frets: 8 (melody C5), 3 (melody G4 and bass C3), 0 (melody E4 and harmony G3), 1 (melody C4), 2 (harmony E3)
@@ -1108,10 +1297,10 @@ describe("renderStaffSystem", () => {
     const chordTabNote = svg!.querySelector('.vf-tabnote[data-staff-entry="c-chord"]');
     expect(chordTabNote).not.toBeNull();
 
-    // The chord has 4 frets rendered (str 1 was filtered out for melody):
-    // str 2 (fret 1), str 3 (fret 0), str 4 (fret 2), str 5 (fret 3)
+    // The chord keeps all five frets and marks the overlapping string explicitly.
     const texts = Array.from(chordTabNote!.querySelectorAll("text:not(.vf-tab-finger)"));
-    expect(texts).toHaveLength(4);
+    expect(texts).toHaveLength(5);
+    expect(chordTabNote?.getAttribute("data-tab-position-conflict")).toBe("true");
 
     // Badges must be attached to:
     // str 2: finger 1
@@ -1123,12 +1312,15 @@ describe("renderStaffSystem", () => {
     expect(badges.map((b) => b.getAttribute("data-tab-finger"))).toEqual(["1", "2", "3"]);
 
     const textYMap = texts.map((t) => parseFloat(t.getAttribute("y") || "0"));
-    const badgeCyMap = badges.map((b) => parseFloat(b.querySelector("circle")?.getAttribute("cy") || "0"));
+    const badgeCyMap = badges.map((b) =>
+      parseFloat(b.querySelector("circle")?.getAttribute("cy") || "0"),
+    );
 
-    // Verify each badge matches the exact Y of its fret text
-    expect(badgeCyMap[0]).toBeCloseTo(textYMap[0]!, 1); // finger 1 on fret 1 (str 2)
-    expect(badgeCyMap[1]).toBeCloseTo(textYMap[2]!, 1); // finger 2 on fret 2 (str 4)
-    expect(badgeCyMap[2]).toBeCloseTo(textYMap[3]!, 1); // finger 3 on fret 3 (str 5)
+    // Verify each badge matches the exact Y of its fret text; the fifth label
+    // is the retained, overlapping low-string position.
+    expect(badgeCyMap[0]).toBeCloseTo(textYMap[1]!, 1); // finger 1 on fret 1 (str 2)
+    expect(badgeCyMap[1]).toBeCloseTo(textYMap[3]!, 1); // finger 2 on fret 2 (str 4)
+    expect(badgeCyMap[2]).toBeCloseTo(textYMap[4]!, 1); // finger 3 on fret 3 (str 5)
   });
 
   it("renders ledger lines with 1px stroke-width and crispEdges shape-rendering in staff projection", () => {
@@ -1183,4 +1375,3 @@ describe("renderStaffSystem", () => {
     cleanup();
   });
 });
-

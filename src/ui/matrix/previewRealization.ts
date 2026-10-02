@@ -31,15 +31,20 @@ export interface MatrixCardPreviewRealization {
 
 /**
  * Resolves the previous chord realization context from the latest progression or branch chord step
- * to enable continuous, smooth voice leading during preview and audition.
+ * to enable continuous, smooth voice leading during preview and audition. When a stable Step ID is
+ * supplied, that exact Step is used; this is required for continuation previews opened in the
+ * middle of a progression.
  */
 export function resolvePreviousHarmonicContext(
   project: Project,
+  stepId?: string,
 ): PreviousHarmonicRealizationContext | undefined {
-  const steps = project.temporaryBranch?.steps ?? project.progression.steps;
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const step = steps[i];
-    if (step && step.kind === "chord") {
+  const steps = stepId
+    ? [...project.progression.steps, ...(project.temporaryBranch?.steps ?? [])]
+    : (project.temporaryBranch?.steps ?? project.progression.steps);
+  const candidates = stepId ? steps.filter((step) => step.id === stepId) : [...steps].reverse();
+  for (const step of candidates) {
+    if (step.kind === "chord") {
       const context: HarmonicContext = {
         tonic: project.tonic,
         mode: getHarmonicModule(project.activeModule).mode,

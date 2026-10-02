@@ -27,15 +27,20 @@ Project
 - presentation: PresentationState
 - defaults: ProjectDefaults
 - moduleTemplateStates: Map<HarmonicModuleId, ModuleTemplateState>
-- progression: Progression
+- progression: Progression (steps and schema-v8 Song Sections)
 - temporaryBranch?: TemporaryBranch
 - customPresets: CustomPreset[]
 ```
 
-The current portable contract is schema v6. Schema v5 added the optional Step-local Melody instrument
+The current portable contract is schema v9. Schema v5 added the optional Step-local Melody instrument
 override while preserving global Melody Track inheritance. The atomic v5-to-v6 migration adds persisted
 Piano/Guitar engines and SoundFont tones together with `noteColorMode`; it also supplies defaults for
 fields absent from v5 projects. Schema v1–v4 projects migrate sequentially through v5.
+The v6-to-v7 migration wraps existing Melody recipes as generated Melody without materializing note arrays;
+authored notes are persisted only after an explicit edit. The v7-to-v8 migration adds an empty canonical
+`progression.sections` array. The v8-to-v9 migration preserves legacy Chord Melody recipes/phrases and adds
+Rest-owned authored Melody support plus the persisted `piano-roll` view identifier; it does not materialize
+generated notes or add a separate timeline/history.
 
 ### HarmonyTrackSettings
 
@@ -177,7 +182,7 @@ ChordStep
 - explicitSpellingOverrides?: ...
 - duration: MusicalDuration
 - performance: StepPerformance
-- melody?: ChordMelodyRecipe
+- melody?: ChordMelody
 - melodyInstrumentOverride?: MelodyInstrumentId
 - cardView: CardViewId (legacy compatibility only; hidden and ignored by My Progression rendering)
 ```
@@ -259,9 +264,36 @@ RestStep
 - id: UUID
 - kind: "rest"
 - duration: MusicalDuration
+- authoredMelody?: AuthoredMelodyPhrase
+- melodyInstrumentOverride?: MelodyInstrumentId
 ```
 
-Rest does not become harmonic recommendation context; the previous sounding harmonic event remains the harmonic predecessor.
+Rest does not become harmonic recommendation context; the previous sounding harmonic event remains the harmonic predecessor. Authored Melody belongs to the Step containing its onset, including a Rest. Generated Melody remains Chord-only.
+
+### AuthoredMelodyPhrase (schema v9)
+
+```text
+AuthoredMelodyPhrase
+- notes: AuthoredMelodyNote[] (polyphonic; equal pitch/onset is allowed)
+- sourceRecipe?: ChordMelodyRecipe (regeneration context only)
+
+AuthoredMelodyNote
+- id: stable note ID unique within its owner phrase
+- pitch: ExactPitch
+- onset: non-negative Rational relative to owner Step start
+- duration: positive Rational, unchanged by progression shortening
+```
+
+Absolute onset is derived by summing preceding Step durations. A move computes the destination from absolute
+onset; exact Step boundaries belong to the following Step. One multi-Step transaction applies ownership,
+instrument inheritance and phrase edits. A destination with generated Melody rejects the edit until explicit
+conversion. Duplicate Steps allocate fresh authored note IDs. Playback, Staff/Tab, inline Melody, MIDI and
+MusicXML use one effective projection that omits events starting at/after the current progression end and
+clips crossing events there without mutating stored duration. New edits that extend beyond the end are rejected.
+
+Until the Piano Roll renderer arrives, an imported persisted `progressionView: "piano-roll"` is retained by
+the codec/export but the current UI renders the Harmonic view. The fallback is derived and does not rewrite
+the saved preference.
 
 ## StepPerformance
 
@@ -602,6 +634,11 @@ SongSection
 ```
 
 Sections represent ordered boundaries only. Repeats, alternate arrangement instances, and graph topology are not part of v8.
+`Project.progression.sections` is canonical alongside `steps`; each boundary refers to an existing
+stable Step ID. Runtime and portable order is by current Step position, with section ID ascending for
+multiple names at one boundary. Same-boundary sections are allowed and remain separate labels. Deleting
+Steps transfers affected boundaries to the next surviving Step in old order, then the previous surviving
+Step; an empty progression removes those sections. Reorder keeps each boundary attached to its Step ID.
 
 ### CompositionEditorProjection (derived)
 

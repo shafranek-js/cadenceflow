@@ -259,6 +259,7 @@ export class AcousticGuitarProvider implements InstrumentAudioProvider {
 
     return {
       id: playback.id,
+      scheduledAt: baseTime,
       cancel: () => this.cancelPlayback(playback),
     };
   }

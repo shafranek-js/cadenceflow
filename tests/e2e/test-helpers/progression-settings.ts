@@ -48,22 +48,44 @@ export async function setLayoutMeasuresPerSystem(
   await page.getByTestId(`progression-menu-layout-${count}`).click();
 }
 
+/** Selects a Progression view through the visible Studio view buttons. */
+export async function setProgressionView(
+  page: Page,
+  view: "harmonic" | "piano" | "staff" | "guitar" | "tablature",
+  activation: "pointer" | "keyboard" = "pointer",
+): Promise<void> {
+  const button = page.getByTestId(`progression-view-btn-${view}`);
+  await expect(button).toBeVisible();
+  if (activation === "keyboard") {
+    await button.focus();
+    await page.keyboard.press("Enter");
+  } else {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+}
+
 /** Adds a rest to the end of the progression via the My Progression context menu. */
 export async function addRestToProgression(page: Page): Promise<void> {
   const heading = page.getByTestId("progression-heading");
   await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
-  await page.getByTestId("progression-menu-add-rest").click();
+  const menu = page.getByTestId("progression-context-menu");
+  await expect(menu).toBeVisible();
+  await menu.getByTestId("progression-menu-add-rest").click();
 }
 
 /** Starts a branch alternative via the My Progression context menu. */
 export async function startBranchAlternative(page: Page, stepIndex?: number): Promise<void> {
   const heading = page.getByTestId("progression-heading");
   await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
-  await page.getByTestId("progression-menu-open-explore-alternative").hover();
+  const menu = page.getByTestId("progression-context-menu");
+  await expect(menu).toBeVisible();
+  await menu.getByTestId("progression-menu-open-explore-alternative").hover();
+  const submenu = page.getByTestId("progression-menu-explore-alternative-submenu");
+  await expect(submenu).toBeVisible();
   if (stepIndex !== undefined) {
-    await page.getByTestId(`progression-menu-branch-step-${stepIndex}`).click();
+    await submenu.getByTestId(`progression-menu-branch-step-${stepIndex}`).click();
   } else {
-    await page.getByTestId("progression-menu-branch-end").click();
+    await submenu.getByTestId("progression-menu-branch-end").click();
   }
 }
-

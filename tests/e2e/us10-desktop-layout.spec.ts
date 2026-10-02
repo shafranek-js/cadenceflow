@@ -238,7 +238,7 @@ async function expectSharedLayoutSpacing(page: Page): Promise<void> {
     const grid = document.querySelector<HTMLElement>(".studio-grid");
     const matrix = document.querySelector<HTMLElement>(".matrix-panel");
     const progression = document.querySelector<HTMLElement>(".progression-strip");
-    const inspector = document.querySelector<HTMLElement>(".inspector");
+    const inspector = document.querySelector<HTMLElement>(".progression-global-inspector");
     if (!shell || !grid || !matrix || !progression || !inspector) {
       throw new Error("Studio layout surfaces are missing");
     }
@@ -264,7 +264,8 @@ async function expectSharedLayoutSpacing(page: Page): Promise<void> {
   expect(spacing.mainGap).toBe(spacing.panelGap);
   expect(spacing.matrixPadding).toBe(spacing.panelPadding);
   expect(spacing.progressionPadding).toBe(spacing.panelPadding);
-  expect(spacing.inspectorPadding).toBe(spacing.panelPadding);
+  // Inspector controls deliberately use the compact inset, unlike the outer panels.
+  expect(spacing.inspectorPadding).toBe("7px 9px");
 }
 
 async function expectVisibleControlsFit(page: Page): Promise<void> {

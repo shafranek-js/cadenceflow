@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { addRestToProgression } from "./test-helpers/progression-settings";
 
 async function addChord(page: Page, functionId: string): Promise<void> {
   await page
@@ -9,7 +10,7 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 }
 
 async function addRest(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Add Rest to progression" }).click();
+  await addRestToProgression(page);
 }
 
 async function readProgressionIdentity(page: Page): Promise<string[]> {

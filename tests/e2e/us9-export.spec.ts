@@ -1,7 +1,11 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
-import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
+import {
+  addRestToProgression,
+  ensureSelectedProgressionSettingsVisible,
+  startBranchAlternative,
+} from "./test-helpers/progression-settings";
 
 async function openProjectMenu(page: Page): Promise<void> {
   await page.getByTestId("project-menu-toggle").click();
@@ -159,7 +163,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     // the branch itself is never used as the export source.
     await ensureSelectedProgressionSettingsVisible(page);
     await page.getByRole("button", { name: "Toggle Swing Feel" }).click();
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page);
     await expect(page.getByRole("button", { name: "Commit Branch" })).toBeVisible();
     await page.getByTestId("chord-card-iv").locator("button.chord-main").click();
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
@@ -189,7 +193,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
   test("blocks both musical exports for a completely empty progression", async ({ page }) => {
     await page.goto("/");
     await waitForApp(page);
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page);
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
     await openExportMenu(page);
     await expect(page.getByTestId("export-empty-message")).toHaveText(
@@ -203,7 +207,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
   test("exports a Rest-only progression and supports repeated downloads", async ({ page }) => {
     await page.goto("/");
     await waitForApp(page);
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
 
     await openExportMenu(page);

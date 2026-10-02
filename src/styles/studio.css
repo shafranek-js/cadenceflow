@@ -302,6 +302,10 @@
   min-width: 316px;
   box-sizing: border-box;
 }
+.selected-step-stack-content {
+  display: grid;
+  gap: 8px;
+}
 
 @media (min-width: 1101px) {
   .studio-grid.is-collapsed .inspector-stack,
@@ -936,6 +940,10 @@
   stroke-width: 1.5px;
 }
 
+.guitar-string-marker.is-open.is-root {
+  stroke: #f43f5e;
+}
+
 .guitar-barre {
   fill: color-mix(in srgb, var(--primary, #38bdf8) 75%, transparent);
   stroke: var(--primary, #38bdf8);
@@ -1319,7 +1327,7 @@
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 80;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -1457,6 +1465,60 @@
   gap: 8px;
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+.label-hierarchy-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-badge);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.label-hierarchy-control-label {
+  flex: 0 0 auto;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.label-hierarchy-control-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+
+.label-hierarchy-btn {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.label-hierarchy-btn:hover,
+.label-hierarchy-btn:focus-visible {
+  border-color: var(--border-strong);
+  color: var(--text);
+  outline: none;
+}
+
+.label-hierarchy-btn.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
 }
 .view-mode-toggle {
   display: inline-flex;
@@ -3523,6 +3585,123 @@ summary:focus-visible,
   color: var(--text);
 }
 
+.progression-chord-label {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.progression-chord-label-primary,
+.progression-chord-label-secondary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progression-chord-label-primary {
+  font-weight: 800;
+}
+
+.progression-chord-label-secondary {
+  color: var(--text-muted);
+  font-size: 0.82em;
+  font-weight: 650;
+}
+
+.progression-chord-label-inline {
+  gap: 3px;
+}
+
+.progression-chord-label-function {
+  flex: 0 1 auto;
+}
+
+.progression-chord-label-chord {
+  flex: 0 1 auto;
+}
+
+.progression-quick-edit {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-2));
+}
+
+.progression-quick-edit-heading {
+  display: grid;
+  flex: 1 1 150px;
+  min-width: 120px;
+  gap: 2px;
+  align-self: center;
+}
+
+.progression-quick-edit-kicker {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.progression-quick-edit-label {
+  justify-content: flex-start;
+  font-size: 0.82rem;
+}
+
+.progression-quick-edit > label {
+  display: grid;
+  flex: 0 1 124px;
+  min-width: 96px;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
+.progression-quick-edit > label select {
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 20px 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.72rem;
+}
+
+.progression-quick-edit-more {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.progression-quick-edit-more:hover,
+.progression-quick-edit-more:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  outline-offset: 1px;
+}
+
 .progression-step-select-button {
   display: grid;
   width: 100%;
@@ -4300,6 +4479,23 @@ summary:focus-visible,
 .performance-inspector-header > div {
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.progression-global-header-actions {
+  display: flex;
+  flex: 0 0 auto !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.progression-global-header-actions .piano-roll-edit-selected-note {
+  min-width: 0;
+  min-height: 26px;
+  max-width: 100%;
+  padding: 3px 7px;
+  font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .card-template-inspector header .inspector-header-icon-btn,

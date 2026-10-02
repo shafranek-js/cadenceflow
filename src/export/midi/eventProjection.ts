@@ -1,5 +1,6 @@
 import { realizeProgressionPerformanceEvents } from "../../audio/eventRealizer";
 import { realizeProgressionMelodyPerformance } from "../../audio/melodyPerformance";
+import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { modeForModule } from "../../domain/harmony/functions";
 import type { MelodyInstrument } from "../../domain/melody/types";
@@ -20,6 +21,7 @@ export const MIDI_PPQ = 120;
 export type MidiProjectionRole = "upper" | "bass";
 
 export interface MidiProjectionMelodyNote {
+  readonly eventKey: string;
   readonly stepIndex: number;
   readonly stepId: string;
   readonly order: number;
@@ -173,9 +175,7 @@ function rawNoteComparator(a: RawProjectionNote, b: RawProjectionNote): number {
 }
 
 function hasAuthoredMelody(project: Project): boolean {
-  return project.progression.steps.some(
-    (step) => step.kind === "chord" && step.melody !== undefined,
-  );
+  return createEffectiveMelodyTimeline(project).length > 0;
 }
 
 function projectMelodyToMidiTracks(
@@ -218,6 +218,7 @@ function projectMelodyToMidiTracks(
       startTick,
       endTick,
       emissionIndex: event.eventIndex,
+      eventKey: event.eventKey,
       instrument: event.instrument,
     };
   });
@@ -252,6 +253,7 @@ function projectMelodyToMidiTracks(
           Object.freeze({
             stepIndex: note.stepIndex,
             stepId: note.stepId,
+            eventKey: note.eventKey,
             order,
             channel,
             pitch: note.pitch,

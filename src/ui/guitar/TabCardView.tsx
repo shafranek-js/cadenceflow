@@ -7,10 +7,14 @@ import {
   resolveGuitarTabEntry,
   type GuitarTabEntry,
 } from "../../domain/instruments/guitar/tablature";
+import type { LabelHierarchyMode } from "../progression/labelHierarchy";
+import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
 
 export interface TabCardViewProps {
   readonly chord: ChordDefinition;
   readonly chordLabel: string;
+  readonly labelMode?: LabelHierarchyMode;
+  readonly functionLabel?: string;
   readonly duration?: MusicalDuration | undefined;
   readonly articulation?: PianoArticulation | undefined;
   readonly playing?: boolean | undefined;
@@ -33,6 +37,8 @@ function formatArticulationGlyph(articulation?: PianoArticulation): string | nul
 export function TabCardView({
   chord,
   chordLabel,
+  labelMode,
+  functionLabel,
   duration,
   articulation,
   playing = false,
@@ -57,7 +63,16 @@ export function TabCardView({
       data-playing={playing ? "true" : undefined}
     >
       <div className="mini-tab-heading">
-        <strong className="mini-tab-chord-name">{tabEntry.chordSymbol}</strong>
+        {labelMode && functionLabel ? (
+          <ProgressionChordLabel
+            mode={labelMode}
+            functionLabel={functionLabel}
+            chordLabel={tabEntry.chordSymbol}
+            className="mini-tab-chord-name"
+          />
+        ) : (
+          <strong className="mini-tab-chord-name">{tabEntry.chordSymbol}</strong>
+        )}
         <div className="mini-tab-meta">
           {tabEntry.positionLabel ? (
             <span className="mini-tab-position" aria-label={`Position fret ${tabEntry.baseFret}`}>

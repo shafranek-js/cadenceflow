@@ -18,7 +18,7 @@ import {
 
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
-export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar" | "tablature";
+export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar" | "tablature" | "piano-roll";
 export type NoteColorMode = "standard" | "suzuki" | "harmonic-role";
 export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 

@@ -60,11 +60,11 @@ function clone<T>(value: T): T {
 }
 
 describe("T188 — US12 Project schema v6, migration, and persistence", () => {
-  it("creates v6 projects with frozen default Harmony and Melody Track settings", () => {
+  it("creates v8 projects with frozen default Harmony and Melody Track settings", () => {
     const project = createDefaultProject("melody-defaults", "Melody Defaults");
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(6);
-    expect(project.schemaVersion).toBe(6);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(9);
+    expect(project.schemaVersion).toBe(9);
     expect(project.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(project.melodyTrack).toEqual({
       instrument: "flute",
@@ -99,14 +99,14 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     expect(() => validateMelodyTrackSettings({ ...settings, volume: 127.5 })).toThrow();
   });
 
-  it("migrates v1 to v6 without mutating the root, progression, or steps", () => {
+  it("migrates v1 through v8 without mutating the root, progression, or steps", () => {
     const v1 = createV1Payload();
     const before = clone(v1);
     const migrated = migrateProjectData(v1);
 
     expect(v1).toEqual(before);
     expect(migrated).not.toBe(v1);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(migrated.melodyTrack).toEqual({
       instrument: "flute",
@@ -142,28 +142,34 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     const before = clone(v3);
     const migrated = migrateProjectData(v3);
 
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated).not.toBe(v3);
     expect(v3).toEqual(before);
     expect(
       (migrated.progression as { steps: Array<Record<string, unknown>> }).steps[0]!.melody,
     ).toEqual({
-      pitchMotion: "outside-in",
-      rhythm: "even",
-      connection: "retrigger",
-      grid: "eighth-triplet",
-      octaveOffset: 1,
+      mode: "generated",
+      recipe: {
+        pitchMotion: "outside-in",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "eighth-triplet",
+        octaveOffset: 1,
+      },
     });
     expect(
       (migrated.temporaryBranch as { steps: Array<Record<string, unknown>> }).steps[0]!.melody,
     ).toEqual({
-      pitchMotion: "down",
-      rhythm: "even",
-      connection: "retrigger",
-      grid: "quarter",
-      octaveOffset: 0,
+      mode: "generated",
+      recipe: {
+        pitchMotion: "down",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "quarter",
+        octaveOffset: 0,
+      },
     });
-    expect(() => migrateProjectData({ ...v3, schemaVersion: 7 })).toThrow(
+    expect(() => migrateProjectData({ ...v3, schemaVersion: 10 })).toThrow(
       UnsupportedProjectVersionError,
     );
   });
@@ -187,14 +193,14 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     expect(() => migrateProjectData(v3)).toThrow(InvalidProjectDataError);
   });
 
-  it("round-trips recipe/settings deterministically without generated event arrays", () => {
+  it("round-trips generated recipe/settings deterministically without generated event arrays", () => {
     const original = createRichProjectFixture();
     const first = encodePortableProject(original);
     const second = encodePortableProject(original);
     const raw = JSON.parse(first) as MutableProjectPayload;
 
     expect(first).toBe(second);
-    expect(raw.schemaVersion).toBe(6);
+    expect(raw.schemaVersion).toBe(9);
     expect(raw.harmonyTrack).toEqual({
       instrument: "piano",
       muted: false,
@@ -212,11 +218,14 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
       volume: 96,
     });
     expect(raw.progression.steps[0].melody).toEqual({
-      pitchMotion: "outside-in",
-      rhythm: "even",
-      connection: "retrigger",
-      grid: "eighth-triplet",
-      octaveOffset: 1,
+      mode: "generated",
+      recipe: {
+        pitchMotion: "outside-in",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "eighth-triplet",
+        octaveOffset: 1,
+      },
     });
     expect(raw.progression.steps[0].melody).not.toHaveProperty("events");
     expect(raw.progression.steps[0].melody).not.toHaveProperty("generatedNotes");
@@ -242,21 +251,25 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
 
     const restored = decodePortableProject(JSON.stringify(raw));
     expect(restored.progression.steps[0]?.melody).toEqual({
-      pitchMotion: "outside-in",
-      rhythm: "even",
-      connection: "retrigger",
-      grid: "eighth-triplet",
-      octaveOffset: 1,
+      mode: "generated",
+      recipe: {
+        pitchMotion: "outside-in",
+        rhythm: "even",
+        connection: "retrigger",
+        grid: "eighth-triplet",
+        octaveOffset: 1,
+      },
     });
 
     const saved = JSON.parse(encodePortableProject(restored)) as MutableProjectPayload;
     expect(saved.progression.steps[0]?.melody).toEqual(restored.progression.steps[0]?.melody);
   });
 
-  it("rejects a legacy recipe on the current v6 wire schema", () => {
+  it("rejects a legacy untagged recipe on the current v7 wire schema", () => {
     const raw = JSON.parse(
       encodePortableProject(createRichProjectFixture()),
     ) as MutableProjectPayload;
+    raw.schemaVersion = 7;
     raw.progression.steps[0].melody = {
       pattern: "outside-in",
       grid: "eighth",
@@ -270,6 +283,7 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     const raw = JSON.parse(
       encodePortableProject(createRichProjectFixture()),
     ) as MutableProjectPayload;
+    raw.schemaVersion = 6;
     raw.temporaryBranch.steps[0].melody = {
       pitchMotion: "up",
       rhythm: "even",
@@ -281,9 +295,10 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     const restored = decodePortableProject(JSON.stringify(raw));
     const branchStep = restored.temporaryBranch?.steps[0];
     expect(branchStep).toHaveProperty("melody");
-    expect((branchStep as { melody?: unknown }).melody).toEqual(
-      raw.temporaryBranch.steps[0].melody,
-    );
+    expect((branchStep as { melody?: unknown }).melody).toEqual({
+      mode: "generated",
+      recipe: raw.temporaryBranch.steps[0].melody,
+    });
   });
 
   it.each([
@@ -360,7 +375,7 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     await repo.setLastActiveProjectId(v1.id);
 
     const recovered = await autosave.loadAutosavedProject();
-    expect(recovered?.schemaVersion).toBe(6);
+    expect(recovered?.schemaVersion).toBe(9);
     expect(recovered?.harmonyTrack).toEqual(createDefaultHarmonyTrackSettings());
     expect(recovered?.melodyTrack).toEqual(createDefaultMelodyTrackSettings());
     expect(recovered?.progression.steps[0]).not.toHaveProperty("melody");
@@ -368,8 +383,8 @@ describe("T188 — US12 Project schema v6, migration, and persistence", () => {
     if (recovered) await repo.saveProject(recovered);
     expect(await db.projects.count()).toBe(1);
     const stored = await db.projects.get(v1.id);
-    expect(stored?.schemaVersion).toBe(6);
-    expect(JSON.parse(stored!.payload).schemaVersion).toBe(6);
+    expect(stored?.schemaVersion).toBe(9);
+    expect(JSON.parse(stored!.payload).schemaVersion).toBe(9);
 
     autosave.dispose();
     await db.delete();

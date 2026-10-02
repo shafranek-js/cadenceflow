@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrations";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
-import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
+import {
+  addRestToProgression,
+  ensureSelectedProgressionSettingsVisible,
+  startBranchAlternative,
+} from "./test-helpers/progression-settings";
 
 const ACCEPTANCE_PROJECT_NAME = "US8 Acceptance";
 
@@ -367,7 +372,7 @@ test.describe("US8 Batch C — project actions", () => {
     await addChord(page, "i");
     await addChord(page, "V");
     await addChord(page, "VI");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(4);
 
@@ -429,7 +434,7 @@ test.describe("US8 Batch C — project actions", () => {
     await expect(page.locator(".swing-percent")).toContainText("70%");
 
     // Keep an active, uncommitted temporary branch outside My Progression.
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page);
     await expect(page.getByRole("button", { name: "Commit Branch" })).toBeVisible();
     await page.getByTestId("chord-card-iv").locator("button.chord-main").click();
     await assertTemporaryBranch(page, 4);
@@ -502,7 +507,7 @@ test.describe("US8 Batch C — project actions", () => {
     const exportedEnvelope = JSON.parse(await readFile(downloadPath!, "utf8")) as {
       schemaVersion: number;
     };
-    expect(exportedEnvelope.schemaVersion).toBe(4);
+    expect(exportedEnvelope.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     const sourceSnapshotForPortableRoundTrip = await captureUs8AcceptanceSnapshot(page);
 
     // Fresh browser context: no IndexedDB from the source context can satisfy this import.

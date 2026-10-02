@@ -1,4 +1,5 @@
 import type { Project } from "../../domain/project/project";
+import { normalizeSongSections } from "../../domain/progression/sections";
 import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
 import {
   applyPresetToProgression,
@@ -159,12 +160,14 @@ export function applyPreset(project: Project, command: ApplyPresetCommand): Appl
     },
   };
 
-  const nextProgression = applyPresetToProgression(
-    project.progression,
-    command.payload.preset,
-    command.payload.mode,
-    context,
-    project.defaults,
+  const nextProgression = normalizeSongSections(
+    applyPresetToProgression(
+      project.progression,
+      command.payload.preset,
+      command.payload.mode,
+      context,
+      project.defaults,
+    ),
   );
 
   return {

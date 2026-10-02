@@ -17,6 +17,7 @@ const PROGRESSION_VIEWS: readonly { id: ProgressionView; label: string }[] = [
   { id: "staff", label: "Staff" },
   { id: "guitar", label: "Guitar" },
   { id: "tablature", label: "Tablature" },
+  { id: "piano-roll", label: "Piano Roll" },
 ];
 
 export interface AppMenuBarProps {

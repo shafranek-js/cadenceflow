@@ -900,7 +900,8 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   region and visually identify that region.
 - **FR-124**: Clearing the explicit loop region MUST restore whole-progression loop behavior.
 - **FR-125**: During playback, the product MUST visually identify the current step and traversal through
-  the harmonic map without obscuring chord identity.
+  the harmonic map without obscuring chord identity, independently of the selected Progression Step.
+  Transport actions MUST preserve that selection through Play, Pause, Resume, Play From Here, and Stop.
 - **FR-126**: v1 MUST provide an independently switchable metronome.
 - **FR-127**: v1 MUST provide an optional Count-in before progression playback.
 - **FR-128**: Count-in MUST default to one complete bar in the current Time Signature and Tempo.

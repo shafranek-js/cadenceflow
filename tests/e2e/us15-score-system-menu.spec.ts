@@ -224,6 +224,9 @@ test("score system context menu pitch, performance and submenus", async ({ page 
   const ascUpChecked = page.getByRole("menuitem", { name: /Ascending \(Up\)/ });
   await expect(ascUpChecked.locator(".score-system-menu-check")).toContainText("✓");
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("score-system-context-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("score-system-context-menu")).toHaveCount(0);
 
   // Now Clear Melody should be enabled
   await header0.click({ button: "right" });

@@ -20,12 +20,15 @@ import {
   performanceOctaveShiftPatch,
   type StaffOctaveDirection,
 } from "../staff/staffOctave";
+import type { LabelHierarchyMode } from "./labelHierarchy";
+import { ProgressionChordLabel } from "./ProgressionChordLabel";
 
 export function ProgressionStepCard({
   step,
   stepNumber = 1,
   tonic,
   view = "harmonic",
+  labelMode,
   compactStaff = false,
   selected,
   playing = false,
@@ -46,6 +49,8 @@ export function ProgressionStepCard({
   readonly tonic: PitchClassIdentity;
   /** Global My Progression view; legacy step.cardView is intentionally ignored. */
   readonly view?: ProgressionView;
+  /** Session-only label hierarchy; omitted for legacy/direct component callers. */
+  readonly labelMode?: LabelHierarchyMode;
   readonly compactStaff?: boolean;
   readonly selected: boolean;
   readonly playing?: boolean;
@@ -185,16 +190,24 @@ export function ProgressionStepCard({
           <span className="step-view">
             {view === "harmonic" ? (
               <>
-                <strong data-testid="step-function">
-                  {step.harmonicFunction.functionId}
-                  {isInvertedBass ? (
-                    <span className="step-inversion-badge">
-                      /{formatPitchSpelling(realization.bassPitch!.spelling)}
-                    </span>
-                  ) : null}
-                </strong>
+                {labelMode ? (
+                  <ProgressionChordLabel
+                    mode={labelMode}
+                    functionLabel={step.harmonicFunction.functionId}
+                    chordLabel={chordLabel}
+                  />
+                ) : (
+                  <strong data-testid="step-function">
+                    {step.harmonicFunction.functionId}
+                    {isInvertedBass ? (
+                      <span className="step-inversion-badge">
+                        /{formatPitchSpelling(realization.bassPitch!.spelling)}
+                      </span>
+                    ) : null}
+                  </strong>
+                )}
                 <span>
-                  {isInvertedBass ? `${chordLabel} · ` : ""}
+                  {!labelMode && isInvertedBass ? `${chordLabel} · ` : ""}
                   {step.performance.articulation} · v{step.performance.masterVelocity} ·{" "}
                   {durationLabel}
                 </span>
@@ -205,6 +218,9 @@ export function ProgressionStepCard({
                 chordPitches={pianoPitches}
                 bassPitch={isInvertedBass ? realization.bassPitch : undefined}
                 chordLabel={chordLabel}
+                {...(labelMode
+                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
+                  : {})}
                 noteColorMode={noteColorMode}
                 roleContext={roleContext}
               />
@@ -213,6 +229,9 @@ export function ProgressionStepCard({
               <GuitarCardView
                 chord={displayedChord}
                 chordLabel={chordLabel}
+                {...(labelMode
+                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
+                  : {})}
                 orientation={guitarChordOrientation}
               />
             ) : null}
@@ -220,6 +239,9 @@ export function ProgressionStepCard({
               <TabCardView
                 chord={displayedChord}
                 chordLabel={chordLabel}
+                {...(labelMode
+                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
+                  : {})}
                 duration={step.duration}
                 articulation={step.performance.articulation}
                 playing={playing}
@@ -227,7 +249,15 @@ export function ProgressionStepCard({
             ) : null}
             {view === "staff" ? (
               <span className="compact-staff-label">
-                <strong>{chordLabel}</strong>
+                {labelMode ? (
+                  <ProgressionChordLabel
+                    mode={labelMode}
+                    functionLabel={step.harmonicFunction.functionId}
+                    chordLabel={chordLabel}
+                  />
+                ) : (
+                  <strong>{chordLabel}</strong>
+                )}
                 <small>{durationLabel}</small>
               </span>
             ) : null}

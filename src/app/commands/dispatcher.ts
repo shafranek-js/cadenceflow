@@ -74,6 +74,8 @@ import {
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
+import { setSongSections, type SetSongSectionsCommand } from "./sectionCommands";
+import { applyAuthoredMelodyTransaction, restoreAuthoredMelodyTransaction, type AuthoredMelodyTransactionCommand, type RestoreAuthoredMelodyCommand } from "./authoredMelodyTransaction";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -87,6 +89,8 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setStepDuration(project, command as SetStepDurationCommand).project;
     case "progression/restore":
       return restoreProgression(project, command as RestoreProgressionCommand).project;
+    case "progression/set-sections":
+      return setSongSections(project, command as SetSongSectionsCommand).project;
     case "progression/remove-step":
       return removeStep(project, command as RemoveStepCommand).project;
     case "progression/repeat-chord":
@@ -143,6 +147,10 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setSidePanelMode(project, command as SetSidePanelModeCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
+    case "melody/restore-authored-transaction":
+      return restoreAuthoredMelodyTransaction(project, command as RestoreAuthoredMelodyCommand).project;
+    case "melody/apply-authored-transaction":
+      return applyAuthoredMelodyTransaction(project, command as AuthoredMelodyTransactionCommand).project;
     case "harmony/restore-state":
       return restoreHarmonyState(project, command as RestoreHarmonyStateCommand).project;
     default:

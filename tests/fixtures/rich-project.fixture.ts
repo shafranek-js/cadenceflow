@@ -29,10 +29,13 @@ export function createRichProjectFixture(): Project {
     duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
     performance: DEFAULT_PIANO_PERFORMANCE,
     cardView: "harmonic",
-    melody: snapshotChordMelodyRecipe({
-      pattern: "outside-in",
-      grid: "eighth-triplet",
-      octaveOffset: 1,
+    melody: Object.freeze({
+      mode: "generated",
+      recipe: snapshotChordMelodyRecipe({
+        pattern: "outside-in",
+        grid: "eighth-triplet",
+        octaveOffset: 1,
+      }),
     }),
   });
 

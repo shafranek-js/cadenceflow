@@ -20,6 +20,7 @@ import type {
   StepPerformance,
 } from "../domain/progression/step";
 import { snapshotStepPerformance } from "../domain/progression/step";
+import { orderSongSections, validateSongSections } from "../domain/progression/sections";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicVariant } from "../domain/harmony/chord";
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
@@ -28,8 +29,10 @@ import type { CompositionIntent, TemporaryBranch } from "../domain/progression/b
 import {
   snapshotChordMelodyRecipe,
   snapshotMelodyTrackSettings,
-  validateChordMelodyRecipe,
+  snapshotChordMelody,
+  snapshotAuthoredMelodyPhrase,
   validateMelodyTrackSettings,
+  type ChordMelody,
   type ChordMelodyRecipe,
   type MelodyTrackSettings,
 } from "../domain/melody/types";
@@ -216,8 +219,25 @@ function encodeMelodyRecipe(recipe: ChordMelodyRecipe): Record<string, unknown> 
   };
 }
 
-function decodeMelodyRecipe(raw: unknown): ChordMelodyRecipe {
-  return validateChordMelodyRecipe(raw);
+function encodeChordMelody(value: ChordMelody): Record<string, unknown> {
+  const melody = snapshotChordMelody(value);
+  return melody.mode === "generated"
+    ? { mode: "generated", recipe: encodeMelodyRecipe(melody.recipe) }
+    : {
+        mode: "authored",
+        phrase: {
+          notes: melody.phrase.notes.map((note) => ({
+            id: note.id,
+            pitch: note.pitch,
+            onset: note.onset,
+            duration: note.duration,
+          })),
+        },
+        ...(melody.sourceRecipe ? { sourceRecipe: encodeMelodyRecipe(melody.sourceRecipe) } : {}),
+      };
+}
+function decodeChordMelody(raw: unknown): ChordMelody {
+  return snapshotChordMelody(raw);
 }
 
 function encodeMelodyTrackSettings(settings: MelodyTrackSettings): Record<string, unknown> {
@@ -240,8 +260,13 @@ function isProgressionView(value: unknown): value is ProgressionView {
     value === "piano" ||
     value === "staff" ||
     value === "guitar" ||
-    value === "tablature"
+    value === "tablature" ||
+    value === "piano-roll"
   );
+}
+
+function isCardView(value: unknown): value is CardViewId {
+  return value === "harmonic" || value === "piano" || value === "staff" || value === "guitar" || value === "tablature";
 }
 
 function isMeasuresPerSystem(value: unknown): value is MeasuresPerSystem {
@@ -273,7 +298,7 @@ function inferLegacyProgressionView(rawDoc: Record<string, unknown>): Progressio
     const step = rawStep as Record<string, unknown>;
     if (step["kind"] !== "chord") continue;
     const cardView = step["cardView"];
-    if (!isProgressionView(cardView)) return "harmonic";
+    if (!isCardView(cardView)) return "harmonic";
     chordViews.push(cardView);
   }
 
@@ -328,6 +353,8 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
       id: step.id,
       kind: "rest",
       duration: encodeDuration(step.duration),
+      ...(step.authoredMelody !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(step.authoredMelody) } : {}),
+      ...(step.melodyInstrumentOverride !== undefined ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) } : {}),
     };
   }
   return {
@@ -338,7 +365,7 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
     duration: encodeDuration(step.duration),
     performance: step.performance,
     cardView: step.cardView,
-    ...(step.melody !== undefined ? { melody: encodeMelodyRecipe(step.melody) } : {}),
+    ...(step.melody !== undefined ? { melody: encodeChordMelody(step.melody) } : {}),
     ...(step.melodyInstrumentOverride !== undefined
       ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) }
       : {}),
@@ -352,6 +379,8 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
       id: String(raw["id"]),
       kind: "rest",
       duration,
+      ...(raw["authoredMelody"] !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) } : {}),
+      ...(raw["melodyInstrumentOverride"] !== undefined ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) } : {}),
     });
     return rest;
   }
@@ -363,7 +392,8 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
     duration,
     performance: raw["performance"] as StepPerformance,
     cardView: (raw["cardView"] as CardViewId | undefined) ?? "harmonic",
-    ...(raw["melody"] !== undefined ? { melody: decodeMelodyRecipe(raw["melody"]) } : {}),
+    ...(raw["melody"] !== undefined ? { melody: decodeChordMelody(raw["melody"]) } : {}),
+    ...(raw["authoredMelody"] !== undefined ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) } : {}),
     ...(raw["melodyInstrumentOverride"] !== undefined
       ? { melodyInstrumentOverride: validateMelodyInstrumentId(raw["melodyInstrumentOverride"]) }
       : {}),
@@ -387,6 +417,13 @@ const validateProjectSchema = ajv.compile(projectSchema);
  * Strictly excludes session Undo/Redo history and audio/transport playback runtime state.
  */
 export function encodePortableProject(project: Project): string {
+  try {
+    validateSongSections(project.progression);
+  } catch (error) {
+    throw new InvalidPortableProjectError(
+      `Invalid Song Sections: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   // Encode steps in progression
   const steps = project.progression.steps.map(encodeStep);
 
@@ -400,6 +437,7 @@ export function encodePortableProject(project: Project): string {
   if (project.progression.loopRegion !== undefined) {
     progression["loopRegion"] = project.progression.loopRegion;
   }
+  progression["sections"] = orderSongSections(project.progression);
 
   // Encode temporary branch if present
   let temporaryBranch: Record<string, unknown> | null = null;
@@ -589,10 +627,20 @@ export function decodePortableProject(jsonString: string): Project {
   // Validate progression steps
   const progressionRaw = migrated["progression"] as {
     steps: Record<string, unknown>[];
+    sections?: { id: string; name: string; startStepId: string }[];
     selectedStepId?: string | null;
     loopRegion?: { startStepId: string; endStepId: string } | null;
   };
   const steps = progressionRaw.steps.map(decodeStep);
+  const decodedSections = Object.freeze(
+    (progressionRaw.sections ?? []).map((section) =>
+      Object.freeze({
+        id: String(section.id),
+        name: String(section.name),
+        startStepId: String(section.startStepId),
+      }),
+    ),
+  );
 
   // Validate temporary branch if present
   let temporaryBranch: TemporaryBranch | undefined = undefined;
@@ -770,10 +818,18 @@ export function decodePortableProject(jsonString: string): Project {
       ...(progressionRaw.loopRegion !== null && progressionRaw.loopRegion !== undefined
         ? { loopRegion: progressionRaw.loopRegion }
         : {}),
+      sections: orderSongSections({ steps, sections: decodedSections }),
     }),
     ...(temporaryBranch !== undefined ? { temporaryBranch } : {}),
     customPresets: Object.freeze(customPresets),
   });
 
+  try {
+    validateSongSections(project.progression);
+  } catch (error) {
+    throw new InvalidPortableProjectError(
+      `Invalid Song Sections: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   return project;
 }

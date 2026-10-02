@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { addRestToProgression, setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -56,8 +57,8 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await ensureHistoryControlsVisible(page);
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await addRestToProgression(page);
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     await expect(score.locator(".measure-staff-event-select")).toHaveCount(3);
@@ -100,7 +101,7 @@ test.describe("US13 T185 — direct Staff interaction", () => {
   }) => {
     await openStudio(page);
     await addChord(page, "I");
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
 
     const target = staff(page).locator(".measure-staff-event-select").first();
     await target.focus();
@@ -125,7 +126,7 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openStudio(page);
     for (const functionId of ["I", "IV", "V", "vi"]) await addChord(page, functionId);
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     await expect(score.locator(".measure-staff-event-select")).toHaveCount(4);
@@ -221,8 +222,8 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await openStudio(page);
     await ensureHistoryControlsVisible(page);
     await addChord(page, "I");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await addRestToProgression(page);
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     const inspector = page.getByTestId("step-performance-inspector");
@@ -296,7 +297,7 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await addChord(page, "I");
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     const stepIds = await score.locator(".measure-staff-event-select").evaluateAll((targets) => {
@@ -337,8 +338,8 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await ensureHistoryControlsVisible(page);
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await addRestToProgression(page);
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     const readIds = () =>
@@ -404,8 +405,8 @@ test.describe("US13 T185 — direct Staff interaction", () => {
     await openStudio(page);
     await addChord(page, "I");
     await addChord(page, "V");
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await addRestToProgression(page);
+    await setProgressionView(page, "staff");
 
     const score = staff(page);
     const firstTarget = score.locator(".measure-staff-event-select").first();

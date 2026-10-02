@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -75,7 +76,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await dialog.getByLabel("Connection").selectOption("tie-repeated");
     await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
     await dialog.getByLabel("Octave offset").selectOption("1");
-    await dialog.getByLabel("Melody Instrument").selectOption("cello");
+    await dialog.getByLabel("Melody Instrument", { exact: true }).selectOption("cello");
 
     const browse = dialog.getByRole("button", { name: "Browse motions" });
     await browse.click();
@@ -95,7 +96,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(dialog.getByLabel("Connection")).toHaveValue("tie-repeated");
     await expect(dialog.getByLabel("Grid")).toHaveValue("sixteenth-triplet");
     await expect(dialog.getByLabel("Octave offset")).toHaveValue("1");
-    await expect(dialog.getByLabel("Melody Instrument")).toHaveValue("cello");
+    await expect(dialog.getByLabel("Melody Instrument", { exact: true })).toHaveValue("cello");
     await expect
       .poll(() => dialog.getByTestId("melody-staff-measure").getAttribute("aria-label"))
       .not.toBe(notationBefore);
@@ -122,7 +123,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(dialog.getByLabel("Connection")).toHaveValue("retrigger");
     await expect(dialog.getByLabel("Grid")).toHaveValue("eighth");
     await expect(dialog.getByLabel("Octave offset")).toHaveValue("0");
-    await expect(dialog.getByLabel("Melody Instrument")).toHaveValue("flute");
+    await expect(dialog.getByLabel("Melody Instrument", { exact: true })).toHaveValue("flute");
     await dialog.getByLabel("Pitch Motion", { exact: true }).selectOption("down");
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByRole("dialog", { name: "Create Melody" })).toHaveCount(0);
@@ -132,7 +133,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await dialog.getByLabel("Connection").selectOption("tie-repeated");
     await dialog.getByLabel("Grid").selectOption("quarter");
     await dialog.getByLabel("Octave offset").selectOption("-1");
-    await dialog.getByLabel("Melody Instrument").selectOption("violin");
+    await dialog.getByLabel("Melody Instrument", { exact: true }).selectOption("violin");
     await dialog.getByRole("button", { name: "Browse motions" }).click();
     await dialog
       .getByTestId("melody-pitch-motion-gallery")
@@ -151,7 +152,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(editDialog.getByLabel("Connection")).toHaveValue("tie-repeated");
     await expect(editDialog.getByLabel("Grid")).toHaveValue("quarter");
     await expect(editDialog.getByLabel("Octave offset")).toHaveValue("-1");
-    await expect(editDialog.getByLabel("Melody Instrument")).toHaveValue("violin");
+    await expect(editDialog.getByLabel("Melody Instrument", { exact: true })).toHaveValue("violin");
     await editDialog.getByRole("button", { name: "Cancel" }).click();
   });
 
@@ -202,10 +203,8 @@ test.describe("US12 — melody editor and derived staff", () => {
         await browse.click();
       }
 
-      await page.setViewportSize({ width: 1280, height: 720 });
-      await page.evaluate(() => {
-        document.documentElement.style.zoom = "2";
-      });
+      // A 640x360 CSS viewport models the reduced layout viewport at 200% zoom.
+      await page.setViewportSize({ width: 640, height: 360 });
       await browse.click();
       const zoomedGallery = dialog.getByTestId("melody-pitch-motion-gallery");
       await expect(zoomedGallery).toBeVisible();
@@ -214,9 +213,6 @@ test.describe("US12 — melody editor and derived staff", () => {
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
       ).toBeLessThanOrEqual(0);
-      await page.evaluate(() => {
-        document.documentElement.style.zoom = "";
-      });
       const cancel = dialog.getByRole("button", { name: "Cancel" });
       await dialog.evaluate((dialogElement) => {
         dialogElement.scrollTop = dialogElement.scrollHeight;
@@ -234,7 +230,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     });
     await openStudio(page);
     await addChord(page, "I");
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
 
     const step = page.locator("[data-progression-step-select]").last();
     await step.click({ button: "right" });
@@ -307,7 +303,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(page.getByTestId("progression-step")).toHaveCount(2);
     await addChord(page, "vi");
     await expect(page.getByTestId("progression-step")).toHaveCount(3);
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
     await expect(page.getByTestId("progression-staff-step-grids")).toHaveCount(0);
     await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
       0,
@@ -370,7 +366,7 @@ test.describe("US12 — melody editor and derived staff", () => {
     await expect(dialog.getByLabel("Grid")).toHaveValue("eighth");
     await dialog.getByLabel("Pitch Motion").selectOption("outside-in");
     await dialog.getByLabel("Grid").selectOption("sixteenth-triplet");
-    await dialog.getByLabel("Melody Instrument").selectOption("cello");
+    await dialog.getByLabel("Melody Instrument", { exact: true }).selectOption("cello");
     await dialog.getByRole("button", { name: "Apply Melody" }).click();
 
     const progressionSettings = selectedInspector.getByTestId("selected-progression-settings");
@@ -379,7 +375,9 @@ test.describe("US12 — melody editor and derived staff", () => {
     }
     const controls = selectedInspector.getByRole("region", { name: "Melody Track controls" });
     await expect(controls).toBeVisible();
-    await expect(controls.getByLabel("Melody Track Instrument")).toHaveValue("cello");
+    await expect(
+      controls.getByRole("combobox", { name: "Melody Track Instrument", exact: true }),
+    ).toHaveValue("flute");
     await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
     const scoreSystems = page.getByTestId("progression-score-system");
     await expect(scoreSystems).toHaveCount(1);

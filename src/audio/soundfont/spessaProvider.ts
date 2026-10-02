@@ -223,7 +223,7 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
     const batchTimers: ScheduledNoteTimer[] = [];
     let isCancelled = false;
     const synthRef = this.synth;
-    void clock.now();
+    const scheduledAt = clock.now();
 
     for (const event of events) {
       const channel = channelOverride ?? midiChannelForRole(event.channelRole);
@@ -254,6 +254,7 @@ export class SpessaSoundFontProvider implements InstrumentAudioProvider {
 
     return {
       id: playbackId,
+      scheduledAt,
       cancel: () => {
         if (isCancelled) return;
         isCancelled = true;

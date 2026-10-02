@@ -1,5 +1,21 @@
+import type { Rational } from "../../domain/timing/rational";
+
 export type TransportStatus = "stopped" | "playing" | "paused";
 export type TransportPlayMode = "from-start" | "from-here";
+
+export interface PlaybackClockSnapshot {
+  readonly sessionId: string;
+  readonly state: "playing" | "paused";
+  readonly audioClockAnchorSeconds: number;
+  readonly performanceClockAnchorMs: number;
+  readonly musicalPositionAnchorBeats: number;
+  readonly startBeats: Rational;
+  readonly endBeats: Rational;
+  readonly tempoBpm: number;
+  readonly schedulerStartOffsetSeconds: number;
+  readonly loopStartBeats?: Rational;
+  readonly loopEndBeats?: Rational;
+}
 
 export interface TransportState {
   readonly status: TransportStatus;
@@ -8,7 +24,9 @@ export interface TransportState {
   readonly currentStepIndex: number | null;
   readonly activeMelodyEventKey: string | null;
   readonly activeEventStartedAt: number | null;
+  readonly currentStepStartedAt: number | null;
   readonly pausedPositionSeconds: number | null;
+  readonly playbackClockSnapshot: PlaybackClockSnapshot | null;
   readonly loopAwareResetTarget: number;
   readonly playMode: TransportPlayMode;
   readonly error: string | null;
@@ -43,7 +61,9 @@ export class TransportStore {
       currentStepIndex: null,
       activeMelodyEventKey: null,
       activeEventStartedAt: null,
+      currentStepStartedAt: null,
       pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
       loopAwareResetTarget: 0,
       playMode: "from-start",
       error: null,
@@ -90,7 +110,9 @@ export class TransportStore {
       currentStepIndex: startingIndex,
       activeMelodyEventKey: null,
       activeEventStartedAt: performance.now(),
+      currentStepStartedAt: performance.now(),
       pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
       loopAwareResetTarget: startingIndex,
       playMode: "from-start",
       error: null,
@@ -142,7 +164,9 @@ export class TransportStore {
       currentStepIndex: targetIndex,
       activeMelodyEventKey: null,
       activeEventStartedAt: performance.now(),
+      currentStepStartedAt: performance.now(),
       pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
       loopAwareResetTarget: targetIndex,
       playMode: "from-here",
       error: null,
@@ -154,7 +178,10 @@ export class TransportStore {
   /**
    * Transitions to paused state, retaining session information and paused position.
    */
-  pause(pausedPositionSeconds?: number): void {
+  pause(
+    pausedPositionSeconds?: number,
+    playbackClockSnapshot?: PlaybackClockSnapshot | null,
+  ): void {
     if (this.#state.status !== "playing") {
       return;
     }
@@ -164,10 +191,12 @@ export class TransportStore {
       status: "paused",
       activeMelodyEventKey: null,
       activeEventStartedAt: null,
+      currentStepStartedAt: null,
       pausedPositionSeconds:
         pausedPositionSeconds !== undefined
           ? pausedPositionSeconds
           : this.#state.pausedPositionSeconds,
+      ...(playbackClockSnapshot !== undefined ? { playbackClockSnapshot } : {}),
     });
     this.emit();
   }
@@ -175,7 +204,7 @@ export class TransportStore {
   /**
    * Resumes playback from paused position without resetting to start.
    */
-  resume(): boolean {
+  resume(playbackClockSnapshot?: PlaybackClockSnapshot | null): boolean {
     if (this.#state.status !== "paused") {
       return false;
     }
@@ -185,7 +214,9 @@ export class TransportStore {
       status: "playing",
       activeMelodyEventKey: null,
       activeEventStartedAt: performance.now(),
+      currentStepStartedAt: performance.now(),
       error: null,
+      ...(playbackClockSnapshot !== undefined ? { playbackClockSnapshot } : {}),
     });
     this.emit();
     return true;
@@ -211,7 +242,9 @@ export class TransportStore {
       currentStepIndex: null,
       activeMelodyEventKey: null,
       activeEventStartedAt: null,
+      currentStepStartedAt: null,
       pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",
       error: this.#state.error,
@@ -238,6 +271,7 @@ export class TransportStore {
       ...this.#state,
       currentStepIndex: index,
       activeEventStartedAt: index !== null ? (startedAt ?? performance.now()) : null,
+      currentStepStartedAt: index !== null ? (startedAt ?? performance.now()) : null,
     });
     this.emit();
   }
@@ -247,6 +281,12 @@ export class TransportStore {
       ...this.#state,
       pausedPositionSeconds: seconds,
     });
+    this.emit();
+  }
+
+  setPlaybackClockSnapshot(snapshot: PlaybackClockSnapshot | null): void {
+    if (snapshot && snapshot.sessionId !== this.#state.sessionId) return;
+    this.#state = Object.freeze({ ...this.#state, playbackClockSnapshot: snapshot });
     this.emit();
   }
 
@@ -295,7 +335,9 @@ export class TransportStore {
       currentStepIndex: null,
       activeMelodyEventKey: null,
       activeEventStartedAt: null,
+      currentStepStartedAt: null,
       pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
       playMode: "from-start",
       error: null,

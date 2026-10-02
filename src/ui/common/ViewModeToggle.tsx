@@ -1,21 +1,17 @@
 import type { ChangeEvent } from "react";
 import type { CardViewId } from "../../domain/progression/step";
 
+type ViewModeId = CardViewId | "piano-roll";
+
 export interface ViewModeToggleProps {
-  readonly currentView: CardViewId;
-  readonly onChangeView: (view: CardViewId) => void;
+  readonly currentView: ViewModeId;
+  readonly onChangeView: (view: ViewModeId) => void;
   readonly selectAriaLabel: string;
   readonly testIdPrefix?: string;
-  readonly availableViews?: readonly CardViewId[];
+  readonly availableViews?: readonly ViewModeId[];
 }
 
-const DEFAULT_VIEWS: readonly CardViewId[] = [
-  "harmonic",
-  "piano",
-  "staff",
-  "guitar",
-  "tablature",
-];
+const DEFAULT_VIEWS: readonly CardViewId[] = ["harmonic", "piano", "staff", "guitar", "tablature"];
 
 export function ViewModeToggle({
   currentView,
@@ -27,11 +23,7 @@ export function ViewModeToggle({
   const views = availableViews;
 
   return (
-    <div
-      className="view-mode-toggle"
-      role="group"
-      data-testid={`${testIdPrefix}-toggle`}
-    >
+    <div className="view-mode-toggle" role="group" data-testid={`${testIdPrefix}-toggle`}>
       {views.includes("harmonic") && (
         <button
           type="button"
@@ -97,12 +89,25 @@ export function ViewModeToggle({
           T
         </button>
       )}
+      {views.includes("piano-roll") && (
+        <button
+          type="button"
+          className={`view-mode-btn ${currentView === "piano-roll" ? "is-active" : ""}`}
+          onClick={() => onChangeView("piano-roll")}
+          title="Piano Roll View"
+          aria-label="Piano Roll View"
+          aria-pressed={currentView === "piano-roll"}
+          data-testid={`${testIdPrefix}-btn-piano-roll`}
+        >
+          PR
+        </button>
+      )}
       <select
         className="view-mode-hidden-select"
         aria-label={selectAriaLabel}
         value={currentView}
         onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-          onChangeView(event.target.value as CardViewId)
+          onChangeView(event.target.value as ViewModeId)
         }
         tabIndex={-1}
       >
@@ -111,6 +116,7 @@ export function ViewModeToggle({
         {views.includes("staff") && <option value="staff">Staff</option>}
         {views.includes("guitar") && <option value="guitar">Guitar</option>}
         {views.includes("tablature") && <option value="tablature">Tablature</option>}
+        {views.includes("piano-roll") && <option value="piano-roll">Piano Roll</option>}
       </select>
     </div>
   );

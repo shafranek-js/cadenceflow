@@ -6,10 +6,14 @@ import {
 } from "../../domain/instruments/guitar/voicings";
 import { getInPositionScaleTones } from "../../domain/instruments/guitar/scaleTones";
 import { GuitarFretboard } from "./GuitarFretboard";
+import type { LabelHierarchyMode } from "../progression/labelHierarchy";
+import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
 
 export interface GuitarCardViewProps {
   readonly chord: ChordDefinition;
   readonly chordLabel: string;
+  readonly labelMode?: LabelHierarchyMode;
+  readonly functionLabel?: string;
   readonly scalePitchClasses?: readonly PitchClassIdentity[];
   readonly showScaleTones?: boolean;
   readonly orientation?: "vertical" | "horizontal";
@@ -18,6 +22,8 @@ export interface GuitarCardViewProps {
 export function GuitarCardView({
   chord,
   chordLabel,
+  labelMode,
+  functionLabel,
   scalePitchClasses,
   showScaleTones = false,
   orientation = "vertical",
@@ -53,7 +59,16 @@ export function GuitarCardView({
       data-orientation={orientation}
     >
       <div className="mini-guitar-heading">
-        <strong className="mini-guitar-chord-name">{chordLabel}</strong>
+        {labelMode && functionLabel ? (
+          <ProgressionChordLabel
+            mode={labelMode}
+            functionLabel={functionLabel}
+            chordLabel={chordLabel}
+            className="mini-guitar-chord-name"
+          />
+        ) : (
+          <strong className="mini-guitar-chord-name">{chordLabel}</strong>
+        )}
         <span className="mini-guitar-position" aria-label={`Position fret ${voicing.baseFret}`}>
           {voicing.baseFret === 1 ? "Open" : `Fret ${voicing.baseFret}`}
         </span>

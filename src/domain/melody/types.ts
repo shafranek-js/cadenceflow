@@ -1,4 +1,5 @@
 import type { ExactPitch } from "../harmony/pitch";
+import { exactPitch } from "../harmony/pitch";
 import type { Rational } from "../timing/rational";
 import {
   MELODY_INSTRUMENT_CATALOG,
@@ -38,6 +39,142 @@ export interface ChordMelodyRecipe {
   readonly targetNextPitchClass?: number;
 }
 
+export interface AuthoredMelodyNote {
+  readonly id: string;
+  readonly pitch: ExactPitch;
+  readonly onset: Rational;
+  readonly duration: Rational;
+}
+export interface AuthoredMelodyPhrase {
+  readonly notes: readonly AuthoredMelodyNote[];
+  /** Generator settings retained for explicit regeneration; never affect authored timing. */
+  readonly sourceRecipe?: ChordMelodyRecipe;
+}
+export type ChordMelody =
+  | { readonly mode: "generated"; readonly recipe: ChordMelodyRecipe }
+  | {
+      readonly mode: "authored";
+      readonly phrase: AuthoredMelodyPhrase;
+      readonly sourceRecipe?: ChordMelodyRecipe;
+    };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isPitchSpelling(
+  value: unknown,
+): value is { readonly step: ExactPitch["spelling"]["step"]; readonly alter: number } {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => ["step", "alter"].includes(key)) &&
+    ["C", "D", "E", "F", "G", "A", "B"].includes(String(value.step)) &&
+    Number.isInteger(value.alter)
+  );
+}
+export function snapshotAuthoredMelodyPhrase(value: unknown): AuthoredMelodyPhrase {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !["notes", "sourceRecipe"].includes(key)) ||
+    !Array.isArray(value.notes)
+  )
+    throw new MelodyValidationError("Authored phrase requires notes", "invalid-recipe");
+  const ids = new Set<string>();
+  const notes = value.notes.map((raw) => {
+    if (
+      !isRecord(raw) ||
+      Object.keys(raw).some((key) => !["id", "pitch", "onset", "duration"].includes(key)) ||
+      typeof raw.id !== "string" ||
+      raw.id.trim() === "" ||
+      ids.has(raw.id) ||
+      !isRecord(raw.pitch) ||
+      Object.keys(raw.pitch).some(
+        (key) => !["midiNumber", "pitchClassIdentity", "octave", "spelling"].includes(key),
+      ) ||
+      !Number.isInteger(raw.pitch.midiNumber) ||
+      (raw.pitch.midiNumber as number) < 0 ||
+      (raw.pitch.midiNumber as number) > 127 ||
+      !Number.isInteger(raw.pitch.pitchClassIdentity) ||
+      !Number.isInteger(raw.pitch.octave) ||
+      !isPitchSpelling(raw.pitch.spelling) ||
+      !isRecord(raw.onset) ||
+      Object.keys(raw.onset).some((key) => !["numerator", "denominator"].includes(key)) ||
+      !Number.isInteger(raw.onset.numerator) ||
+      (raw.onset.numerator as number) < 0 ||
+      !Number.isInteger(raw.onset.denominator) ||
+      (raw.onset.denominator as number) <= 0 ||
+      !isRecord(raw.duration) ||
+      Object.keys(raw.duration).some((key) => !["numerator", "denominator"].includes(key)) ||
+      !Number.isInteger(raw.duration.numerator) ||
+      (raw.duration.numerator as number) <= 0 ||
+      !Number.isInteger(raw.duration.denominator) ||
+      (raw.duration.denominator as number) <= 0
+    )
+      throw new MelodyValidationError("Invalid authored Melody note", "invalid-recipe");
+    ids.add(raw.id);
+    const pitch = exactPitch(raw.pitch.midiNumber as number, {
+      step: raw.pitch.spelling.step as ExactPitch["spelling"]["step"],
+      alter: raw.pitch.spelling.alter as number,
+    });
+    if (
+      raw.pitch.pitchClassIdentity !== pitch.pitchClassIdentity ||
+      raw.pitch.octave !== pitch.octave
+    )
+      throw new MelodyValidationError(
+        "Authored pitch identity does not match MIDI pitch",
+        "invalid-pitch",
+      );
+    return Object.freeze({
+      id: raw.id,
+      pitch,
+      onset: Object.freeze({
+        numerator: raw.onset.numerator as number,
+        denominator: raw.onset.denominator as number,
+      }),
+      duration: Object.freeze({
+        numerator: raw.duration.numerator as number,
+        denominator: raw.duration.denominator as number,
+      }),
+    });
+  });
+  return Object.freeze({
+    notes: Object.freeze(notes),
+    ...(value.sourceRecipe !== undefined
+      ? { sourceRecipe: validateChordMelodyRecipe(value.sourceRecipe) }
+      : {}),
+  });
+}
+export function snapshotChordMelody(value: unknown): ChordMelody {
+  if (!isRecord(value)) throw new MelodyValidationError("Invalid ChordMelody", "invalid-recipe");
+  // In-memory callers may still construct a pre-v7 Step; persisted input is migrated first.
+  if (value.mode === undefined)
+    return Object.freeze({ mode: "generated", recipe: validateChordMelodyRecipe(value) });
+  if (
+    value.mode === "generated" &&
+    Object.keys(value).every((key) => ["mode", "recipe"].includes(key))
+  )
+    return Object.freeze({ mode: "generated", recipe: validateChordMelodyRecipe(value.recipe) });
+  if (
+    value.mode === "authored" &&
+    Object.keys(value).every((key) => ["mode", "phrase", "sourceRecipe"].includes(key))
+  )
+    return Object.freeze({
+      mode: "authored",
+      phrase: snapshotAuthoredMelodyPhrase(value.phrase),
+      ...(value.sourceRecipe !== undefined
+        ? { sourceRecipe: validateChordMelodyRecipe(value.sourceRecipe) }
+        : {}),
+    });
+  throw new MelodyValidationError(
+    "ChordMelody mode must be generated or authored",
+    "invalid-recipe",
+  );
+}
+export function generatedMelodyRecipe(
+  value: ChordMelody | undefined,
+): ChordMelodyRecipe | undefined {
+  return value?.mode === "generated" ? value.recipe : undefined;
+}
+
 /** Pre-T186 wire shape retained only as a load/command compatibility input. */
 export interface LegacyChordMelodyRecipe {
   readonly pattern: MelodyPattern;
@@ -64,6 +201,7 @@ export const DEFAULT_MELODY_TRACK_SETTINGS: MelodyTrackSettings = Object.freeze(
 export interface MelodyEvent {
   readonly sourceStepId: string;
   readonly index: number;
+  readonly eventKey: string;
   readonly pitch: ExactPitch;
   /** MIDI identity of the contextual upper pitch before octave offset. */
   readonly sourcePitchMidi: number;
@@ -131,15 +269,18 @@ export const MELODY_GRIDS: readonly MelodyGrid[] = Object.freeze([
   "sixteenth-triplet",
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   return Object.keys(value).every((key) => keys.includes(key));
 }
 
-export function snapshotChordMelodyRecipe(recipe: MelodyRecipeInput): ChordMelodyRecipe {
+export function snapshotChordMelodyRecipe(
+  recipe: MelodyRecipeInput | ChordMelody,
+): ChordMelodyRecipe {
+  if ("mode" in recipe) {
+    if (recipe.mode !== "generated")
+      throw new MelodyValidationError("Authored Melody has no generated recipe", "invalid-recipe");
+    return validateChordMelodyRecipe(recipe.recipe);
+  }
   return validateChordMelodyRecipe(recipe);
 }
 

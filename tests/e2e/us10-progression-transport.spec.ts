@@ -47,6 +47,7 @@ test.describe("US10 — progression-owned playback transport", () => {
     const stop = controls.getByRole("button", { name: "Stop", exact: true });
     const status = controls.getByTestId("transport-status");
     const steps = page.locator('[data-testid="progression-step"]');
+    const selectedInspector = page.getByTestId("step-performance-inspector");
 
     await page
       .getByTestId("chord-card-I")
@@ -58,8 +59,10 @@ test.describe("US10 — progression-owned playback transport", () => {
       .click({ modifiers: ["Control"] });
     await expect(steps).toHaveCount(2);
 
-    await steps.nth(0).click();
+    await steps.nth(1).click();
     await expect(fromHere).toBeEnabled();
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await play.click();
     await expect(status).toContainText("Playing");
@@ -68,17 +71,23 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(fromHere).toBeDisabled();
     await expect(stop).toBeEnabled();
     await expect(steps.nth(0)).toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await pause.click();
     await expect(status).toContainText("Paused");
     await expect(pause).toBeDisabled();
     await expect(resume).toBeEnabled();
     await expect(stop).toBeEnabled();
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await resume.click();
     await expect(status).toContainText("Playing");
     await expect(resume).toBeDisabled();
     await expect(pause).toBeEnabled();
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await stop.click();
     await expect(status).toContainText("Stopped");
@@ -89,12 +98,16 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(stop).toBeDisabled();
     await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
     await expect(steps.nth(1)).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
-    await steps.nth(1).click();
+    await expect(fromHere).toBeEnabled();
     await fromHere.click();
     await expect(status).toContainText("Playing");
     await expect(steps.nth(1)).toHaveClass(/is-playing/);
     await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await stop.click();
   });

@@ -16,7 +16,7 @@ import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ProgressionStep } from "../domain/progression/step";
 import type { MelodyTrackSettings } from "../domain/melody/types";
 import type { HarmonyTrackSettings } from "../domain/harmony/track";
-import type { TransportStore } from "../ui/transport/transportStore";
+import type { PlaybackClockSnapshot, TransportStore } from "../ui/transport/transportStore";
 import type { LoopState } from "../ui/transport/loopState";
 import { resolveLoopRegion } from "../ui/transport/loopState";
 import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
@@ -194,7 +194,19 @@ export class PlaybackController {
     }
 
     const pausedSeconds = this.scheduler.pause();
-    this.transportStore.pause(pausedSeconds);
+    const snapshot = this.transportStore.getState().playbackClockSnapshot;
+    const audioNow = this.clock.now();
+    const performanceNow = performance.now();
+    const pausedSnapshot = snapshot
+      ? Object.freeze({
+          ...snapshot,
+          state: "paused" as const,
+          audioClockAnchorSeconds: audioNow,
+          performanceClockAnchorMs: performanceNow,
+          musicalPositionAnchorBeats: this.musicalPositionAtAudioTime(snapshot, audioNow),
+        })
+      : null;
+    this.transportStore.pause(pausedSeconds, pausedSnapshot);
     this.clearStepTracking();
   }
 
@@ -206,8 +218,23 @@ export class PlaybackController {
       return false;
     }
 
-    this.transportStore.resume();
+    const state = this.transportStore.getState();
+    const snapshot = state.playbackClockSnapshot;
     this.scheduler.resume();
+    const audioNow = this.clock.now();
+    const performanceNow = performance.now();
+    const resumeDelaySeconds = snapshot
+      ? Math.max(0, snapshot.schedulerStartOffsetSeconds - (state.pausedPositionSeconds ?? 0))
+      : 0;
+    const resumedSnapshot: PlaybackClockSnapshot | null = snapshot
+      ? Object.freeze({
+          ...snapshot,
+          state: "playing",
+          audioClockAnchorSeconds: audioNow + resumeDelaySeconds,
+          performanceClockAnchorMs: performanceNow + resumeDelaySeconds * 1000,
+        })
+      : null;
+    this.transportStore.resume(resumedSnapshot);
     this.startStepTracking();
     return true;
   }
@@ -477,6 +504,31 @@ export class PlaybackController {
         0,
         countInDurationSeconds + playbackDurationSeconds,
       );
+      const playbackStartBeats = sliceBaseBeats;
+      const playbackEndBeats = addRational(playbackStartBeats, playbackDurationBeats);
+      const playbackAudioAnchor =
+        sessionStartAudioTime + (isLoopIteration ? 0 : countInDurationSeconds);
+      const anchorPerformanceNow = performance.now();
+      const anchorAudioNow = this.clock.now();
+      const playbackClockSnapshot: PlaybackClockSnapshot = Object.freeze({
+        sessionId,
+        state: "playing",
+        audioClockAnchorSeconds: playbackAudioAnchor,
+        performanceClockAnchorMs:
+          anchorPerformanceNow + (playbackAudioAnchor - anchorAudioNow) * 1000,
+        musicalPositionAnchorBeats: rationalToNumber(playbackStartBeats),
+        startBeats: playbackStartBeats,
+        endBeats: playbackEndBeats,
+        tempoBpm,
+        schedulerStartOffsetSeconds: isLoopIteration ? 0 : countInDurationSeconds,
+        ...(resolvedLoop
+          ? {
+              loopStartBeats: resolvedLoop.startBeats,
+              loopEndBeats: playbackEndBeats,
+            }
+          : {}),
+      });
+      this.transportStore.setPlaybackClockSnapshot(playbackClockSnapshot);
       this.startStepTracking();
       return true;
     } catch (err) {
@@ -484,6 +536,20 @@ export class PlaybackController {
       this.transportStore.stop();
       return false;
     }
+  }
+
+  private musicalPositionAtAudioTime(
+    snapshot: PlaybackClockSnapshot,
+    audioTimeSeconds: number,
+  ): number {
+    const elapsedSeconds = Math.max(0, audioTimeSeconds - snapshot.audioClockAnchorSeconds);
+    let beat = snapshot.musicalPositionAnchorBeats + (elapsedSeconds * snapshot.tempoBpm) / 60;
+    const loopStart = snapshot.loopStartBeats ? rationalToNumber(snapshot.loopStartBeats) : null;
+    const loopEnd = snapshot.loopEndBeats ? rationalToNumber(snapshot.loopEndBeats) : null;
+    if (loopStart !== null && loopEnd !== null && loopEnd > loopStart && beat >= loopEnd) {
+      beat = loopStart + ((beat - loopStart) % (loopEnd - loopStart));
+    }
+    return Math.min(beat, rationalToNumber(snapshot.endBeats));
   }
 
   private createCompositeProvider(): InstrumentAudioProvider {

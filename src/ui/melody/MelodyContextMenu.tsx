@@ -25,6 +25,7 @@ export interface MelodyContextMenuProps {
   readonly onCreate?: (() => void) | undefined;
   readonly onEdit?: (() => void) | undefined;
   readonly onRemove?: (() => void) | undefined;
+  readonly onReturnToGeneration?: (() => void) | undefined;
   readonly onDuplicate?: (() => void) | undefined;
   readonly onInsertSelectedBefore?: (() => void) | null | undefined;
   readonly onInsertSelectedAfter?: (() => void) | null | undefined;
@@ -33,6 +34,9 @@ export interface MelodyContextMenuProps {
   readonly onApplySubstitution?: ((substitution: ChordSubstitution) => void) | undefined;
   readonly onOpenModulation?: (() => void) | undefined;
   readonly onDeleteStep?: (() => void) | undefined;
+  readonly onSplitStep?: (() => void) | undefined;
+  readonly onTieSteps?: (() => void) | undefined;
+  readonly tieDisabledReason?: string | null | undefined;
   readonly onClose: () => void;
 }
 
@@ -52,6 +56,7 @@ export function MelodyContextMenu({
   onCreate,
   onEdit,
   onRemove,
+  onReturnToGeneration,
   onDuplicate,
   onInsertSelectedBefore,
   onInsertSelectedAfter,
@@ -60,6 +65,9 @@ export function MelodyContextMenu({
   onApplySubstitution,
   onOpenModulation,
   onDeleteStep,
+  onSplitStep,
+  onTieSteps,
+  tieDisabledReason,
   onClose,
 }: MelodyContextMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -139,7 +147,10 @@ export function MelodyContextMenu({
       case " ":
         event.preventDefault();
         event.stopPropagation();
-        if (document.activeElement instanceof HTMLButtonElement && !document.activeElement.disabled) {
+        if (
+          document.activeElement instanceof HTMLButtonElement &&
+          !document.activeElement.disabled
+        ) {
           document.activeElement.click();
         }
         break;
@@ -151,14 +162,23 @@ export function MelodyContextMenu({
     }
   };
 
-  const melodyItems: Array<{ label: string; action?: () => void }> = isChord
-    ? hasRecipe
-      ? [
-          ...(onEdit ? [{ label: "Edit Melody…", action: onEdit }] : []),
-          ...(onRemove ? [{ label: "Remove Melody", action: onRemove }] : []),
-        ]
-      : [...(onCreate ? [{ label: "Create Melody…", action: onCreate }] : [])]
-    : [];
+  const hasAuthoredRestMelody = step.kind === "rest" && step.authoredMelody !== undefined;
+  const melodyItems: Array<{ label: string; action?: () => void }> =
+    isChord || step.kind === "rest"
+      ? hasRecipe || hasAuthoredRestMelody
+        ? [
+            ...(isChord &&
+            step.kind === "chord" &&
+            step.melody?.mode === "authored" &&
+            step.melody.sourceRecipe &&
+            onReturnToGeneration
+              ? [{ label: "Return to generated Melody", action: onReturnToGeneration }]
+              : []),
+            ...(onEdit ? [{ label: "Edit Melody…", action: onEdit }] : []),
+            ...(isChord && onRemove ? [{ label: "Remove Melody", action: onRemove }] : []),
+          ]
+        : [...(onCreate ? [{ label: "Create Melody…", action: onCreate }] : [])]
+      : [];
 
   const deleteLabel = isChord ? "Delete Chord" : "Delete Rest";
   const insertChordLabel = selectedMatrixChordName
@@ -230,9 +250,7 @@ export function MelodyContextMenu({
             disabled={!onInsertSelectedBefore}
             data-testid="step-menu-insert-before"
             title={
-              onInsertSelectedBefore
-                ? undefined
-                : "Select a chord in the Harmonic Matrix to insert"
+              onInsertSelectedBefore ? undefined : "Select a chord in the Harmonic Matrix to insert"
             }
             onClick={onInsertSelectedBefore ?? undefined}
           >
@@ -247,14 +265,52 @@ export function MelodyContextMenu({
             disabled={!onInsertSelectedAfter}
             data-testid="step-menu-insert-after"
             title={
-              onInsertSelectedAfter
-                ? undefined
-                : "Select a chord in the Harmonic Matrix to insert"
+              onInsertSelectedAfter ? undefined : "Select a chord in the Harmonic Matrix to insert"
             }
             onClick={onInsertSelectedAfter ?? undefined}
           >
             Insert {insertChordLabel} After
           </button>
+        </>
+      ) : null}
+
+      {onSplitStep || onTieSteps ? (
+        <>
+          <div className="melody-context-menu-separator" role="separator" />
+          {onSplitStep ? (
+            <button
+              ref={(node) => {
+                itemRefs.current[btnIndex++] = node;
+              }}
+              type="button"
+              role="menuitem"
+              data-testid="step-menu-split"
+              onClick={() => {
+                onSplitStep();
+                onClose();
+              }}
+            >
+              Split Step in half
+            </button>
+          ) : null}
+          {onTieSteps ? (
+            <button
+              ref={(node) => {
+                itemRefs.current[btnIndex++] = node;
+              }}
+              type="button"
+              role="menuitem"
+              disabled={Boolean(tieDisabledReason)}
+              title={tieDisabledReason ?? "Tie the selected contiguous chords"}
+              data-testid="step-menu-tie"
+              onClick={() => {
+                onTieSteps();
+                onClose();
+              }}
+            >
+              Tie selected chords
+            </button>
+          ) : null}
         </>
       ) : null}
 

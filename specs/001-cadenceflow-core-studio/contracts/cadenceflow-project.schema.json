@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadenceflow.local/schema/project-v6.json",
-  "title": "CadenceFlow Project v6",
-  "$comment": "Schema v6 atomically adds noteColorMode and persistent Piano/Guitar engine and SoundFont tone settings. Harmonic roles remain derived projection metadata and are not stored in MelodyEvent.",
+  "$id": "https://cadenceflow.local/schema/project-v9.json",
+  "title": "CadenceFlow Project v9",
+  "$comment": "Schema v9 permits authored Melody on Rest Steps and persists the planned Piano Roll view preference. Authored timing is relative Rational; absolute timeline and progression-tail clipping are derived. Generated recipes remain chord-only.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,7 @@
     "customPresets"
   ],
   "properties": {
-    "schemaVersion": { "const": 6 },
+    "schemaVersion": { "const": 9 },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -39,6 +39,7 @@
       "type": "object",
       "required": ["noteColorMode"],
       "properties": {
+        "progressionView": { "enum": ["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"] },
         "noteColorMode": { "enum": ["standard", "suzuki", "harmonic-role"] }
       },
       "$comment": "Presentation-only note color mode and existing view preferences."
@@ -161,14 +162,27 @@
     "progression": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["steps"],
+      "required": ["steps", "sections"],
       "properties": {
         "steps": {
           "type": "array",
           "items": { "$ref": "#/$defs/step" }
         },
         "selectedStepId": { "type": ["string", "null"] },
-        "loopRegion": { "type": ["object", "null"] }
+        "loopRegion": { "type": ["object", "null"] },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "startStepId"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "startStepId": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
       }
     },
     "temporaryBranch": {
@@ -215,7 +229,7 @@
         "performance": { "type": "object" },
         "cardView": { "enum": ["harmonic", "piano", "staff"] },
         "explicitSpellingOverrides": { "type": "object" },
-        "melody": { "$ref": "#/$defs/melodyRecipe" },
+        "melody": { "$ref": "#/$defs/chordMelody" },
         "melodyInstrumentOverride": { "$ref": "#/$defs/melodyInstrument" }
       }
     },
@@ -226,7 +240,9 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "kind": { "const": "rest" },
-        "duration": { "$ref": "#/$defs/duration" }
+        "duration": { "$ref": "#/$defs/duration" },
+        "authoredMelody": { "$ref": "#/$defs/authoredMelodyPhrase" },
+        "melodyInstrumentOverride": { "$ref": "#/$defs/melodyInstrument" }
       }
     },
     "melodyInstrument": {
@@ -361,6 +377,70 @@
         "gm-126",
         "gm-127"
       ]
+    },
+    "chordMelody": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "recipe"],
+          "properties": {
+            "mode": { "const": "generated" },
+            "recipe": { "$ref": "#/$defs/melodyRecipe" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "phrase"],
+          "properties": {
+            "mode": { "const": "authored" },
+            "phrase": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["notes"],
+              "properties": { "notes": { "type": "array", "items": { "$ref": "#/$defs/authoredMelodyNote" } } }
+            },
+            "sourceRecipe": { "$ref": "#/$defs/melodyRecipe" }
+          }
+        }
+      ]
+    },
+    "authoredMelodyPhrase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["notes"],
+      "properties": {
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/authoredMelodyNote" } },
+        "sourceRecipe": { "$ref": "#/$defs/melodyRecipe" }
+      }
+    },
+    "authoredMelodyNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pitch", "onset", "duration"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "pitch": { "$ref": "#/$defs/exactPitch" },
+        "onset": { "$ref": "#/$defs/rational" },
+        "duration": { "allOf": [{ "$ref": "#/$defs/rational" }], "properties": { "numerator": { "type": "integer", "minimum": 1 } } }
+      }
+    },
+    "exactPitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["midiNumber", "pitchClassIdentity", "octave", "spelling"],
+      "properties": {
+        "midiNumber": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "pitchClassIdentity": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "octave": { "type": "integer" },
+        "spelling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["step", "alter"],
+          "properties": { "step": { "enum": ["C", "D", "E", "F", "G", "A", "B"] }, "alter": { "type": "integer" } }
+        }
+      }
     },
     "melodyRecipe": {
       "type": "object",

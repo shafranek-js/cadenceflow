@@ -48,7 +48,9 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await expect(panel).toBeVisible();
 
     // Assert sections
-    await expect(panel.getByRole("heading", { name: "Presets", exact: true })).toBeVisible();
+    await expect(
+      panel.getByRole("heading", { name: "Presets & Cadence Formulas", exact: true }),
+    ).toBeVisible();
     await expect(panel.getByRole("heading", { name: /Built-in Presets/i })).toBeVisible();
     await expect(panel.getByRole("heading", { name: /Custom Presets/i })).toBeVisible();
 
@@ -58,26 +60,27 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await expect(cards).toHaveCount(6);
 
     // Assert neutral names and absence of genre taxonomy
-    const panelText = await panel.textContent();
-    expect(panelText).toContain("Major I–vi–IV–V");
-    expect(panelText).toContain("Major I–IV–V–I");
-    expect(panelText).toContain("Major ii–V–I");
-    expect(panelText).toContain("Minor i–iv–V–i");
-    expect(panelText).toContain("Minor i–VII–VI–V");
-    expect(panelText).toContain("Minor ii°–V–i");
+    const builtinText = await builtinGrid.innerText();
+    expect(builtinText).toContain("Major I–vi–IV–V");
+    expect(builtinText).toContain("Major I–IV–V–I");
+    expect(builtinText).toContain("Major ii–V–I");
+    expect(builtinText).toContain("Minor i–iv–V–i");
+    expect(builtinText).toContain("Minor i–VII–VI–V");
+    expect(builtinText).toContain("Minor ii°–V–i");
 
-    // No removed genre taxonomy
-    expect(panelText).not.toMatch(/jazz/i);
-    expect(panelText).not.toMatch(/doo-wop/i);
-    expect(panelText).not.toMatch(/andalusian/i);
-    expect(panelText).not.toMatch(/pop/i);
-    expect(panelText).not.toMatch(/blues/i);
-    expect(panelText).not.toMatch(/cinematic/i);
+    // Built-in presets keep neutral names; genre labels belong to Cadence Formulas.
+    expect(builtinText).not.toMatch(/jazz/i);
+    expect(builtinText).not.toMatch(/doo-wop/i);
+    expect(builtinText).not.toMatch(/andalusian/i);
+    expect(builtinText).not.toMatch(/pop/i);
+    expect(builtinText).not.toMatch(/blues/i);
+    expect(builtinText).not.toMatch(/cinematic/i);
 
     // Functional sequence, duration sequence, and contextual realization visible
-    expect(panelText).toContain("I · vi · IV · V");
-    expect(panelText).toContain("Durations:");
-    expect(panelText).toContain("Context (C Major): C · Am · F · G");
+    expect(builtinText).toContain("I · vi · IV · V");
+    expect(builtinText).toContain("Durations:");
+    expect(builtinText).toContain("Context (C Major):");
+    expect(builtinText).toContain("C · Am · F · G");
 
     // Close with close button
     await panel.locator(".dialog-close-btn").click();
@@ -497,7 +500,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     const panel = page.locator(".presets-panel");
     await expect(panel).toBeVisible();
 
-    const cards = panel.locator(".preset-card");
+    const cards = page.getByTestId("builtin-preset-grid").locator(".preset-card");
     await expect(cards).toHaveCount(6);
 
     await page.keyboard.press("Escape");

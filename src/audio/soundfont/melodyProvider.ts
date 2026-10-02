@@ -364,7 +364,12 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
         if (!player && this.failedInstruments.includes(instrument)) continue;
         // Silently skip notes while the instrument is loading or not yet started —
         // the scheduler's next tick will catch up once the player is ready.
-        if (!player && (this.loads.has(instrument) || this.providerState === "loading" || this.providerState === "idle")) {
+        if (
+          !player &&
+          (this.loads.has(instrument) ||
+            this.providerState === "loading" ||
+            this.providerState === "idle")
+        ) {
           // Kick off loading if not already in progress
           if (!this.loads.has(instrument) && !this.players.has(instrument)) {
             void this.loadPlayer(instrument as MelodyInstrument).catch(() => {});
@@ -386,6 +391,7 @@ export class MelodySoundFontProvider implements InstrumentAudioProvider {
 
     return {
       id: playback.id,
+      scheduledAt: baseTime,
       cancel: () => this.cancelPlayback(playback, collection),
     };
   }

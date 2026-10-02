@@ -126,6 +126,9 @@ test("my progression header context menu: actions, melody contour/grid all, octa
     page.getByTestId("progression-menu-grid-eighth").locator(".score-system-menu-check"),
   ).toContainText("✓");
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("progression-menu-grid-submenu")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("progression-context-menu")).toHaveCount(0);
 
   // 5. Test right-clicking on empty track / canvas space
   const track = page.locator(".progression-track");

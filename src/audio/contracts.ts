@@ -31,6 +31,8 @@ export interface PlaybackScope {
 
 export interface ScheduledPlayback {
   readonly id: string;
+  /** Audio-clock time at which the provider scheduled the playback base. */
+  readonly scheduledAt?: number | undefined;
   cancel(): void;
   readonly ready?: Promise<void> | undefined;
 }

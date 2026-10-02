@@ -16,6 +16,8 @@ import {
   type MelodyRecipeInput,
   type MelodyEvent,
   type MelodyPhrase,
+  snapshotChordMelody,
+  type ChordMelody,
 } from "./types";
 
 export type {
@@ -122,6 +124,7 @@ export function realizeChordMelody(input: MelodyProjectionInput): MelodyPhrase {
         Object.freeze({
           sourceStepId: input.sourceStepId,
           index: events.length,
+          eventKey: `${input.sourceStepId}:${events.length}`,
           pitch,
           sourcePitchMidi: sourcePitch.midiNumber,
           startOffsetBeats,
@@ -154,4 +157,27 @@ export function realizeChordMelody(input: MelodyProjectionInput): MelodyPhrase {
     }
   }
   return Object.freeze({ events: Object.freeze(events) });
+}
+
+/** Canonical source of effective note content for a Step. */
+export function resolveEffectiveMelodyPhrase(
+  input: MelodyProjectionInput & { readonly melody: ChordMelody },
+): MelodyPhrase {
+  const melody = snapshotChordMelody(input.melody);
+  if (melody.mode === "generated") return realizeChordMelody({ ...input, recipe: melody.recipe });
+  return Object.freeze({
+    events: Object.freeze(
+      melody.phrase.notes.map((note, index) =>
+        Object.freeze({
+          sourceStepId: input.sourceStepId,
+          index,
+          eventKey: note.id,
+          pitch: note.pitch,
+          sourcePitchMidi: note.pitch.midiNumber,
+          startOffsetBeats: note.onset,
+          durationBeats: note.duration,
+        }),
+      ),
+    ),
+  });
 }

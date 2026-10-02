@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+import {
+  setLayoutMeasuresPerSystem,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 async function openCreateMelodyDialog(page: Page) {
   await page
@@ -119,12 +122,13 @@ test.describe("T188 — canonical Melody instrument picker", () => {
     test.setTimeout(120_000);
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
-    const dialog = await openCreateMelodyDialog(page);
+    await page.setViewportSize({ width: 1280, height: 720 });
     const theme = page.getByRole("group", { name: "Theme" });
-    const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
 
     for (const themeName of ["Dark theme", "Light theme"] as const) {
       await theme.getByRole("button", { name: themeName, exact: true }).click();
+      const dialog = await openCreateMelodyDialog(page);
+      const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
       for (const viewport of [
         { width: 1280, height: 720 },
         { width: 1920, height: 1080 },
@@ -140,20 +144,19 @@ test.describe("T188 — canonical Melody instrument picker", () => {
           await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
         ).toBeLessThanOrEqual(0);
       }
+      await dialog.getByRole("button", { name: "Cancel" }).click();
     }
 
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.evaluate(() => {
-      document.documentElement.style.zoom = "2";
-    });
+    // A 640x360 CSS viewport models the reduced layout viewport at 200% zoom.
+    await page.setViewportSize({ width: 640, height: 360 });
+    const dialog = await openCreateMelodyDialog(page);
+    const picker = dialog.getByRole("combobox", { name: "Melody Instrument", exact: true });
     await expect(picker).toBeVisible();
+    await picker.scrollIntoViewIfNeeded();
     await expect(dialog.getByRole("button", { name: "Apply Melody" })).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
     ).toBeLessThanOrEqual(0);
-    await page.evaluate(() => {
-      document.documentElement.style.zoom = "";
-    });
     await dialog.getByRole("button", { name: "Cancel" }).click();
   });
 
@@ -194,7 +197,7 @@ test.describe("T188 — canonical Melody instrument picker", () => {
     await dialog.getByRole("button", { name: "Apply Melody" }).click();
     await expect(dialog).toHaveCount(0);
 
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
     await setLayoutMeasuresPerSystem(page, 1);
     const systems = page.getByTestId("progression-score-system");
     await expect(systems).toHaveCount(2);

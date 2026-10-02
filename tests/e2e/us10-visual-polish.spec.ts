@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  addRestToProgression,
+  setProgressionView,
+  startBranchAlternative,
+} from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -47,7 +52,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await expect(card.getByTestId("chord-card-notes")).toContainText("C");
     await expect(card.locator(".chord-main")).toHaveAttribute(
       "title",
-      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add to My Progression; Alt-click to reset card settings",
+      "Click or Enter to preview; Ctrl-click or Ctrl+Enter to add; when selected, press + to add to My Progression; Alt-click to reset card settings",
     );
     await expect(page.getByLabel("Global Card View")).toBeVisible();
     await expect(card.getByRole("group", { name: "View for I" })).toHaveCount(0);
@@ -66,7 +71,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
   }) => {
     await waitForStudio(page);
     await addProgression(page, 20);
-    await page.getByRole("button", { name: "Add Rest to progression" }).click();
+    await addRestToProgression(page);
 
     const steps = page.locator('[data-testid="progression-step"]');
     await expect(steps).toHaveCount(21);
@@ -103,7 +108,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     expect(flow.widths.some((width) => width > 170)).toBe(true);
     expect(flow.scrollWidth).toBeLessThanOrEqual(flow.clientWidth);
 
-    await page.getByLabel("Progression Card View").selectOption("piano");
+    await setProgressionView(page, "piano");
     await expect(steps.first().locator(".mini-piano")).toBeVisible();
     await expect(steps.first().locator(".mini-key.is-active")).not.toHaveCount(0);
 
@@ -121,7 +126,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     expect(dragFromControl.defaultPrevented).toBe(true);
     expect(dragFromControl.payload).toBe("");
 
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await setProgressionView(page, "staff");
     await expect(page.getByTestId("progression-score-systems")).toBeVisible();
     await expect(
       page.getByTestId("progression-score-systems").locator(".measure-staff-event-select").first(),
@@ -143,8 +148,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await addProgression(page, 4);
     const stepCountBeforeBranch = await page.locator('[data-testid="progression-step"]').count();
 
-    await page.getByLabel("Branch origin").selectOption({ label: "After 2: vi" });
-    await page.getByRole("button", { name: "Explore Alternative" }).click();
+    await startBranchAlternative(page, 1);
     await expect(page.getByTestId("branch-controls-active")).toContainText("Temporary branch");
     await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
 

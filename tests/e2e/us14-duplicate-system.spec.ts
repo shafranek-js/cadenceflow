@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -30,7 +31,7 @@ test("duplicate system via right-click context menu on score-system-header", asy
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
 
   // Set Measures Layout to 2
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   // Ensure two systems exist initially
   const systems = page.locator('[data-testid="progression-score-system"]');
@@ -82,7 +83,7 @@ test("delete system via context menu", async ({ page }) => {
 
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const systems = page.locator('[data-testid="progression-score-system"]');
   await expect(systems).toHaveCount(2);
@@ -126,7 +127,7 @@ test("delete system via [X] button in header", async ({ page }) => {
 
   const globalInspector = page.getByTestId("progression-global-inspector");
   await globalInspector.getByRole("button", { name: "Staff view" }).click();
-  await page.getByLabel("Measures Layout").selectOption("2");
+  await setLayoutMeasuresPerSystem(page, 2);
 
   const systems = page.locator('[data-testid="progression-score-system"]');
   await expect(systems).toHaveCount(2);

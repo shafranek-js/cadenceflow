@@ -30,6 +30,11 @@ import {
 import { createDefaultProject, DEFAULT_PIANO_PERFORMANCE } from "../domain/project/factory";
 import { recommend } from "../domain/recommendations/engine";
 import {
+  createAlternativesTraySnapshot,
+  type AlternativesTrayCandidate,
+  type AlternativesTraySnapshot,
+} from "../domain/recommendations/alternatives";
+import {
   baselineFunctionIdentities,
   getHarmonicModule,
   recommendationVocabulary,
@@ -85,9 +90,15 @@ import {
 } from "../domain/progression/voiceLeadingOptimizer";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
 import { ProgressionTrack } from "../ui/progression/ProgressionTrack";
+import { SongSectionControls } from "../ui/progression/SongSectionControls";
+import { ProgressionQuickEdit } from "../ui/progression/ProgressionQuickEdit";
+import { AlternativesTray } from "../ui/progression/AlternativesTray";
+import { PrintableProgression } from "../ui/progression/PrintableProgression";
 import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
 import { MatrixContextMenu } from "../ui/matrix/MatrixContextMenu";
 import { ViewModeToggle } from "../ui/common/ViewModeToggle";
+import { LabelHierarchyControl } from "../ui/progression/LabelHierarchyControl";
+import type { LabelHierarchyMode } from "../ui/progression/labelHierarchy";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { AudioEnginesInspector } from "../ui/inspector/AudioEnginesInspector";
 import { HarmonicStyleInspector } from "../ui/inspector/HarmonicStyleInspector";
@@ -104,15 +115,22 @@ import {
   MelodySoundFontProvider,
   type MelodyPreparationResult,
 } from "../audio/soundfont/melodyProvider";
-import type { AudioProviderState } from "../audio/contracts";
+import type {
+  AudioClock,
+  AudioProviderState,
+  InstrumentAudioProvider,
+  ScheduledPlayback,
+} from "../audio/contracts";
 import {
   realizeStepAudioEvents,
   realizeProgressionAudioEvents,
   realizeGuitarStepAudioEvents,
 } from "../audio/eventRealizer";
+import { realizePianoRollChordAudition } from "../audio/pianoRollAudition";
 import { realizeProgressionStepPitches } from "../instruments/piano/profile";
 import { PlaybackSupportControls, TempoControls } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
+import { getPianoRollGesture, setPianoRollGesture } from "../ui/melody/pianoRollSession";
 import { TransportStore, type TransportState } from "../ui/transport/transportStore";
 import { isAppShortcutProtectedTarget } from "../ui/studio/focusManagement";
 import {
@@ -129,6 +147,8 @@ import {
   realizeMatrixCardPreview,
   resolvePreviousHarmonicContext,
 } from "../ui/matrix/previewRealization";
+import { QuickChordPalette } from "../ui/matrix/QuickChordPalette";
+import { createQuickChordCandidates } from "../domain/recommendations/quickChord";
 import { MetronomeClickProvider } from "../audio/metronome";
 import {
   realizeMelodyStepAudition,
@@ -138,7 +158,7 @@ import type { ChordSubstitution } from "../domain/harmony/reharmonization";
 import type { Meter, MeterChangePolicy } from "../domain/timing/meter";
 import type { GrooveSettings } from "../domain/timing/swing";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
-import { addRational } from "../domain/timing/rational";
+import { addRational, rationalToNumber, type Rational } from "../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
 import {
   createSetStepDurationCommand,
@@ -201,9 +221,28 @@ import {
   type BatchPatchStepsCommand,
   type StepPatch,
 } from "./commands/progressionCommands";
+import {
+  replaceSystemChord,
+  setSystemRest,
+  setSystemStepDuration,
+  splitSystemStep,
+  tieSystemSteps,
+  transferSystemChordBoundary,
+  type ReplaceSystemChordCommand,
+  type SetSystemRestCommand,
+  type SetSystemStepDurationCommand,
+  type SplitSystemChordCommand,
+  type TieSystemChordsCommand,
+  type TransferSystemChordBoundaryCommand,
+} from "./commands/systemChordCommands";
+import { setSongSections, type SetSongSectionsCommand } from "./commands/sectionCommands";
 import { projectScoreSystems, type ScoreSystem } from "../notation/scoreSystemProjection";
 import { durationBars } from "../domain/timing/duration";
-import { snapshotChordMelodyRecipe, validateChordMelodyRecipe } from "../domain/melody/types";
+import {
+  generatedMelodyRecipe,
+  snapshotChordMelody,
+  validateChordMelodyRecipe,
+} from "../domain/melody/types";
 import {
   saveCustomPreset,
   deleteCustomPreset,
@@ -297,10 +336,13 @@ import {
   createPatchMelodyTrackSettingsCommand,
   createRemoveMelodyRecipeCommand,
   createSetMelodyRecipeCommand,
+  createSetAuthoredMelodyCommand,
+  applyMelodyCommand,
   removeMelodyRecipe as applyRemoveMelodyRecipe,
   setMelodyRecipe as applySetMelodyRecipe,
   setMelodyTrackSettings as applyMelodyTrackSettings,
 } from "./commands/melodyCommands";
+import type { AuthoredMelodyEdit } from "./commands/authoredMelodyTransaction";
 import {
   createPatchHarmonyTrackSettingsCommand,
   setHarmonyTrackSettings as applyHarmonyTrackSettings,
@@ -327,9 +369,25 @@ export function App() {
     readonly restoreMatrixPreview: string | undefined;
     readonly clearMatrixPreviewOnCancel: boolean;
   } | null>(null);
+  const routeRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const [quickChordPaletteOpen, setQuickChordPaletteOpen] = useState(false);
+  const quickChordPreviewBeforeOpenRef = useRef<string | undefined>(undefined);
   const [selectedBranchStepIds, setSelectedBranchStepIds] = useState<readonly string[]>(
     Object.freeze([]),
   );
+  const [selectedPianoNote, setSelectedPianoNote] = useState<{
+    readonly stepId: string;
+    readonly eventKey: string;
+  } | null>(null);
+  const [activePianoRollChordStepId, setActivePianoRollChordStepId] = useState<string | null>(null);
+  const [pianoRollInspectorRequest, setPianoRollInspectorRequest] = useState<{
+    readonly stepId: string;
+    readonly eventKey: string;
+    readonly requestId: number;
+  } | null>(null);
+  const [labelHierarchyMode, setLabelHierarchyMode] =
+    useState<LabelHierarchyMode>("function-first");
+  const [durationResizeStatus, setDurationResizeStatus] = useState<string | null>(null);
   const [settingsFunctionId, setSettingsFunctionId] = useState<string | null>(null);
   const [voicingEditorOpen, setVoicingEditorOpen] = useState(false);
   const [audioState, setAudioState] = useState<AudioProviderState>("idle");
@@ -357,6 +415,13 @@ export function App() {
     anchor?: HTMLElement | undefined;
     position: { x: number; y: number };
   } | null>(null);
+  const [alternativesSession, setAlternativesSession] = useState<{
+    readonly sourceProject: Project;
+    readonly snapshot: AlternativesTraySnapshot;
+    readonly invoker: HTMLElement | null;
+    readonly applyError: string | null;
+  } | null>(null);
+  const [alternativesStatus, setAlternativesStatus] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<HelpTabId>("overview");
   const [isFingeringLegendOpen, setIsFingeringLegendOpen] = useState(false);
@@ -372,6 +437,7 @@ export function App() {
     null,
   );
   const playbackControllerRef = useRef<PlaybackController | null>(null);
+  const playbackControllerProviderRef = useRef<InstrumentAudioProvider | null>(null);
   const previewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
   const guitarProviderRef = useRef<AcousticGuitarProvider | null>(null);
   const guitarPreviewAuditionControllerRef = useRef<PreviewAuditionController | null>(null);
@@ -383,6 +449,59 @@ export function App() {
   const [previewActiveMelodyEventKey, setPreviewActiveMelodyEventKey] = useState<string | null>(
     null,
   );
+  const [pianoRollAuditionPlayhead, setPianoRollAuditionPlayhead] = useState<{
+    readonly requestId: number;
+    readonly startBeat: number;
+    readonly endBeat: number;
+    readonly startedAt: number;
+    readonly clockNow: () => number;
+  } | null>(null);
+  const pianoRollAuditionPlayheadRef = useRef<typeof pianoRollAuditionPlayhead>(null);
+  const pianoRollMatrixReplacementTargetRef = useRef<string | null>(null);
+  const [pianoRollMatrixReplacement, setPianoRollMatrixReplacement] = useState<{
+    readonly stepId: string;
+    readonly functionId: string | null;
+  } | null>(null);
+  const pianoRollViewRef = useRef(project.presentation.progressionView);
+  const pianoRollAuditionRequestRef = useRef(0);
+  const clearPianoRollAuditionPlayhead = useCallback(() => {
+    pianoRollAuditionRequestRef.current += 1;
+    pianoRollAuditionPlayheadRef.current = null;
+    setPianoRollAuditionPlayhead(null);
+  }, []);
+  const startPianoRollAuditionPlayhead = useCallback(
+    (
+      requestId: number,
+      startBeat: number,
+      endBeat: number,
+      playback: ScheduledPlayback,
+      clock: AudioClock,
+    ) => {
+      const audition = {
+        requestId,
+        startBeat,
+        endBeat,
+        startedAt: playback.scheduledAt ?? clock.now(),
+        clockNow: clock.now,
+      };
+      pianoRollAuditionPlayheadRef.current = audition;
+      setPianoRollAuditionPlayhead(audition);
+    },
+    [],
+  );
+  const finishPianoRollAuditionPlayhead = useCallback((requestId: number) => {
+    if (pianoRollAuditionPlayheadRef.current?.requestId !== requestId) return;
+    pianoRollAuditionPlayheadRef.current = null;
+    if (pianoRollAuditionRequestRef.current === requestId) pianoRollAuditionRequestRef.current += 1;
+    setPianoRollAuditionPlayhead(null);
+  }, []);
+  useEffect(() => {
+    if (pianoRollViewRef.current === project.presentation.progressionView) return;
+    pianoRollViewRef.current = project.presentation.progressionView;
+    clearPianoRollAuditionPlayhead();
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
+  }, [clearPianoRollAuditionPlayhead, project.presentation.progressionView]);
   const stepPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const melodyHighlightTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [projectReady, setProjectReady] = useState(false);
@@ -399,14 +518,18 @@ export function App() {
   const openTabsUserChangedRef = useRef(false);
   const openTabsUpdatedAtRef = useRef(0);
   const hasMelodyRecipe = useMemo(
-    () => project.progression.steps.some((step) => step.kind === "chord" && step.melody),
+    () =>
+      project.progression.steps.some((step) =>
+        step.kind === "chord" ? step.melody !== undefined : step.authoredMelody !== undefined,
+      ),
     [project.progression.steps],
   );
   const effectiveMelodyInstruments = useMemo<readonly MelodyInstrument[]>(() => {
     const instruments = project.progression.steps
-      .filter((step) => step.kind === "chord" && step.melody !== undefined)
+      .filter((step) =>
+        step.kind === "chord" ? step.melody !== undefined : step.authoredMelody !== undefined,
+      )
       .map((step) => {
-        if (step.kind !== "chord") return project.melodyTrack.instrument;
         return resolveEffectiveMelodyInstrument(
           step.melodyInstrumentOverride,
           project.melodyTrack.instrument,
@@ -679,8 +802,10 @@ export function App() {
   }, [globalSettingsVisibility]);
 
   const stopProjectRuntime = useCallback(() => {
+    clearPianoRollAuditionPlayhead();
     playbackControllerRef.current?.stop();
     previewAuditionControllerRef.current?.stop();
+    guitarPreviewAuditionControllerRef.current?.stop();
     melodyPreviewAuditionControllerRef.current?.stop();
     if (melodyPreviewStopTimerRef.current !== null) {
       clearTimeout(melodyPreviewStopTimerRef.current);
@@ -698,7 +823,8 @@ export function App() {
     setApplyDialogPreset(null);
     setMatrixMenu(null);
     setProgressionMenu(null);
-  }, [clearStepPreviewHighlights, transportStore]);
+    setAlternativesSession(null);
+  }, [clearStepPreviewHighlights, clearPianoRollAuditionPlayhead, transportStore]);
 
   const projectController = useMemo(() => new ProjectController({ store }), [store]);
 
@@ -955,6 +1081,7 @@ export function App() {
   useEffect(() => {
     playbackControllerRef.current?.stop();
     playbackControllerRef.current = null;
+    playbackControllerProviderRef.current = null;
   }, [
     hasMelodyRecipe,
     project.harmonyTrack.instrument,
@@ -962,7 +1089,6 @@ export function App() {
     project.harmonyTrack.pianoSoundfontInstrument,
     project.harmonyTrack.guitarEngine,
     project.harmonyTrack.guitarSoundfontInstrument,
-    project.presentation.progressionView,
   ]);
 
   useEffect(() => {
@@ -990,8 +1116,14 @@ export function App() {
     document.documentElement.style.colorScheme = project.presentation.theme;
   }, [project.presentation.theme]);
 
-  const selectedProgressionStep: ProgressionStep | undefined = project.progression.selectedStepId
-    ? project.progression.steps.find((step) => step.id === project.progression.selectedStepId)
+  const activePianoRollChordStep =
+    project.presentation.progressionView === "piano-roll" && activePianoRollChordStepId
+      ? project.progression.steps.find((step) => step.id === activePianoRollChordStepId)
+      : undefined;
+  const selectedProgressionStepId =
+    activePianoRollChordStep?.id ?? project.progression.selectedStepId;
+  const selectedProgressionStep: ProgressionStep | undefined = selectedProgressionStepId
+    ? project.progression.steps.find((step) => step.id === selectedProgressionStepId)
     : undefined;
   const selectedChordStep: ChordStep | undefined =
     selectedProgressionStep?.kind === "chord" ? selectedProgressionStep : undefined;
@@ -1061,6 +1193,21 @@ export function App() {
     ...(currentTargetId ? { currentTargetId } : {}),
   } as const;
 
+  const routeSourceFunctionId = pathFunctionIds.at(-1);
+  const routeSourceEntry = routeSourceFunctionId
+    ? topologyEntryForFunction(project.activeModule, routeSourceFunctionId)
+    : undefined;
+  const routeSourceTargetId = routeSourceFunctionId
+    ? (routeSourceEntry?.targetId ??
+      routeSourceEntry?.identity.targetId ??
+      routeSourceEntry?.identity.targetFunctionId ??
+      semanticTargetForFunction(project.activeModule, routeSourceFunctionId))
+    : undefined;
+  const quickChordCandidates = createQuickChordCandidates(project, {
+    ...(routeSourceFunctionId ? { currentFunctionId: routeSourceFunctionId } : {}),
+    ...(routeSourceTargetId ? { currentTargetId: routeSourceTargetId } : {}),
+  });
+
   const contextualIds = new Set<string>();
   for (const candidate of [
     recommendations?.bestMatch,
@@ -1111,10 +1258,7 @@ export function App() {
     // In that case the real append transition starts at the committed progression
     // endpoint, not at the preview itself; otherwise a blocked X -> Y route could
     // be mistaken for the harmless Y -> Y identity transition.
-    const sourceFunctionId =
-      !branch && routeContext.currentFunctionId === functionId
-        ? pathFunctionIds.at(-1)
-        : routeContext.currentFunctionId;
+    const sourceFunctionId = branch ? routeContext.currentFunctionId : pathFunctionIds.at(-1);
     const sourceEntry = sourceFunctionId
       ? topologyEntryForFunction(project.activeModule, sourceFunctionId)
       : undefined;
@@ -1135,6 +1279,8 @@ export function App() {
       targetEntry?.targetId ?? targetEntry?.identity.targetId,
     );
     if (decision.status === "requires-confirmation") {
+      routeRestoreFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setPendingRouteWarning({
         functionId,
         decision,
@@ -1148,13 +1294,17 @@ export function App() {
     else addToProgression(functionId);
     return true;
   };
-  const auditionMatrixCard = (functionId: string) => {
+  const auditionMatrixCard = (
+    functionId: string,
+    previewProject: Project = store.project,
+    previousStepId?: string,
+  ) => {
     if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === "suspended") {
       void sharedAudioContextRef.current.resume();
     }
-    const currentProject = store.project;
+    const currentProject = previewProject;
     const isGuitar = currentProject.presentation.globalMatrixCardView === "guitar";
-    const previousContext = resolvePreviousHarmonicContext(currentProject);
+    const previousContext = resolvePreviousHarmonicContext(currentProject, previousStepId);
     const previewRealization = realizeMatrixCardPreview(
       currentProject,
       functionId,
@@ -1181,15 +1331,197 @@ export function App() {
     }
   };
 
+  const stopAlternativesPreview = () => {
+    previewAuditionControllerRef.current?.stop();
+    guitarPreviewAuditionControllerRef.current?.stop();
+  };
+
+  const closeAlternatives = () => {
+    const invoker = alternativesSession?.invoker;
+    stopAlternativesPreview();
+    setAlternativesSession(null);
+    if (invoker) {
+      const restoreFocus = () => {
+        if (document.contains(invoker)) invoker.focus();
+      };
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(restoreFocus);
+      else restoreFocus();
+    }
+  };
+
+  const openAlternativesForStep = (originStepId?: string) => {
+    const sourceProject = store.project;
+    const stepId = originStepId ?? sourceProject.progression.selectedStepId;
+    if (!stepId) {
+      setAlternativesStatus("Select a chord Step to explore alternatives after it.");
+      return;
+    }
+    const snapshot = createAlternativesTraySnapshot(sourceProject, stepId);
+    if (!snapshot) {
+      setAlternativesStatus("Alternatives require at least one chord Step as the origin.");
+      return;
+    }
+    setAlternativesStatus(null);
+    const invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    stopAlternativesPreview();
+    setAlternativesSession({
+      sourceProject,
+      snapshot,
+      invoker,
+      applyError: null,
+    });
+  };
+
+  const openAlternativesForRange = (stepIds: readonly string[]) => {
+    const originStepId = [...stepIds]
+      .reverse()
+      .find((stepId) =>
+        store.project.progression.steps.some((step) => step.id === stepId && step.kind === "chord"),
+      );
+    if (!originStepId) {
+      setAlternativesStatus("Explore alternatives needs a chord Step in the selected range.");
+      return;
+    }
+    openAlternativesForStep(originStepId);
+  };
+
+  const auditionAlternative = (candidate: AlternativesTrayCandidate) => {
+    const session = alternativesSession;
+    if (!session || !session.snapshot.candidates.some((item) => item.key === candidate.key)) return;
+    auditionMatrixCard(candidate.functionId, session.sourceProject, session.snapshot.originStepId);
+  };
+
+  const applyAlternative = (candidate: AlternativesTrayCandidate): string | undefined => {
+    const session = alternativesSession;
+    if (!session) return "The alternatives tray is no longer available.";
+    stopAlternativesPreview();
+
+    if (store.project !== session.sourceProject) {
+      const message = "This alternative is stale because the Project or target Step changed.";
+      setAlternativesSession((current) =>
+        current ? { ...current, applyError: message } : current,
+      );
+      return message;
+    }
+
+    const originStep = store.project.progression.steps.find(
+      (step) => step.id === session.snapshot.originStepId,
+    );
+    if (!originStep || originStep.kind !== "chord") {
+      const message = "This alternative is stale because the origin Step no longer exists.";
+      setAlternativesSession((current) =>
+        current ? { ...current, applyError: message } : current,
+      );
+      return message;
+    }
+
+    const candidateIsSnapshotMember = session.snapshot.candidates.some(
+      (item) => item.key === candidate.key,
+    );
+    if (!candidateIsSnapshotMember) {
+      const message = "This candidate is not part of the current alternatives snapshot.";
+      setAlternativesSession((current) =>
+        current ? { ...current, applyError: message } : current,
+      );
+      return message;
+    }
+
+    const sourceTargetId =
+      originStep.harmonicFunction.targetId ??
+      originStep.harmonicFunction.targetFunctionId ??
+      topologyEntryForFunction(project.activeModule, originStep.harmonicFunction.functionId)
+        ?.targetId ??
+      semanticTargetForFunction(project.activeModule, originStep.harmonicFunction.functionId);
+    const targetEntry = topologyEntryForFunction(project.activeModule, candidate.functionId);
+    const route = evaluateHarmonicRoute(
+      {
+        moduleId: project.activeModule,
+        currentFunctionId: originStep.harmonicFunction.functionId,
+        ...(sourceTargetId ? { currentTargetId: sourceTargetId } : {}),
+      },
+      candidate.functionId,
+      targetEntry?.targetId ?? targetEntry?.identity.targetId,
+    );
+    if (route.status === "requires-confirmation") {
+      const message = `Cannot apply ${candidate.functionId}: ${route.message}`;
+      setAlternativesSession((current) =>
+        current ? { ...current, applyError: message } : current,
+      );
+      return message;
+    }
+
+    try {
+      const newStep = createMatrixChordStep(
+        store.project,
+        candidate.functionId,
+        crypto.randomUUID(),
+        session.snapshot.moduleId,
+      );
+      const command: InsertStepsAfterCommand = {
+        type: "progression/insert-steps-after",
+        payload: {
+          afterStepId: session.snapshot.originStepId,
+          steps: [newStep],
+          nowIso: new Date().toISOString(),
+        },
+      };
+      store.dispatch(command, insertStepsAfter);
+      closeAlternatives();
+      return undefined;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `Could not apply ${candidate.functionId}: ${error.message}`
+          : "Could not apply this alternative. The Project was not changed.";
+      setAlternativesSession((current) =>
+        current ? { ...current, applyError: message } : current,
+      );
+      return message;
+    }
+  };
+
   const preview = (functionId: string) => {
     setSettingsFunctionId(null);
     setVoicingEditorOpen(false);
+    const replacementTarget = pianoRollMatrixReplacementTargetRef.current;
+    if (replacementTarget) {
+      setPianoRollMatrixReplacement({ stepId: replacementTarget, functionId });
+      store.selectMatrixPreview(functionId);
+      return;
+    }
     if (project.temporaryBranch) {
       if (!addWithRouteGuard(functionId, true)) return;
     } else {
       store.selectMatrixPreview(functionId);
     }
     auditionMatrixCard(functionId);
+  };
+  const previewQuickChord = (functionId: string) => {
+    setSettingsFunctionId(null);
+    setVoicingEditorOpen(false);
+    store.selectMatrixPreview(functionId);
+    auditionMatrixCard(functionId);
+  };
+  const openQuickChordPalette = () => {
+    quickChordPreviewBeforeOpenRef.current = store.matrixSession.previewFunctionId;
+    setQuickChordPaletteOpen(true);
+  };
+  const closeQuickChordPalette = (restorePreview = true) => {
+    if (restorePreview && quickChordPaletteOpen) {
+      const previous = quickChordPreviewBeforeOpenRef.current;
+      if (previous) store.selectMatrixPreview(previous);
+      else store.clearMatrixPreview();
+    }
+    quickChordPreviewBeforeOpenRef.current = undefined;
+    setQuickChordPaletteOpen(false);
+  };
+  const applyQuickChord = (functionId: string): boolean => {
+    const applied = addWithRouteGuard(functionId, Boolean(project.temporaryBranch));
+    if (applied) {
+      store.selectMatrixPreview(functionId);
+      closeQuickChordPalette(false);
+    }
+    return applied;
   };
   const add = (functionId: string) => {
     setSettingsFunctionId(null);
@@ -1208,7 +1540,9 @@ export function App() {
       auditionMatrixCard(pending.functionId);
     } else {
       addToProgression(pending.functionId);
+      store.selectMatrixPreview(pending.functionId);
     }
+    closeQuickChordPalette(false);
   };
   const cancelPendingRoute = () => {
     const pending = pendingRouteWarning;
@@ -1323,15 +1657,28 @@ export function App() {
     };
     store.dispatch(command, resetMatrixScope);
   };
-  const setProgressionSelection = (stepId?: string) => {
+  const closeProgressionStepEditors = () => {
     setSettingsFunctionId(null);
     setVoicingEditorOpen(false);
+  };
+  const setProgressionSelection = (stepId?: string) => {
+    closeProgressionStepEditors();
     if (store.project.progression.selectedStepId === stepId) return;
     const command: SelectStepCommand = {
       type: "progression/select-step",
       payload: { ...(stepId ? { stepId } : {}), nowIso: new Date().toISOString() },
     };
     store.dispatch(command, selectStep);
+  };
+  const focusSelectedStepInspector = () => {
+    const focus = () => {
+      const inspector = document.querySelector<HTMLElement>('[data-context="selected-step"]');
+      if (!inspector) return;
+      inspector.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      inspector.querySelector<HTMLElement>("button, input, select, textarea")?.focus();
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
+    else focus();
   };
   const clearMatrixSelection = useCallback(() => {
     const previousFunctionId = settingsFunctionId ?? store.matrixSession.previewFunctionId;
@@ -1623,6 +1970,10 @@ export function App() {
     store.dispatch(command, editStepPerformance);
   };
   const changeProgressionView = (view: ProgressionView) => {
+    if (view !== "piano-roll") {
+      setSelectedPianoNote(null);
+      setPianoRollInspectorRequest(null);
+    }
     if (view === "guitar" || view === "tablature") {
       void ensureGuitarProvider()
         .prepare()
@@ -1637,12 +1988,93 @@ export function App() {
     };
     store.dispatch(command, setProgressionView);
   };
-  const replaceProgressionStep = (stepId: string, functionId: string) => {
+  const replaceProgressionStep = (
+    stepId: string,
+    functionId: string,
+    moduleId?: HarmonicModuleId,
+  ) => {
     const command: ReplaceStepCommand = {
       type: "progression/replace-step",
-      payload: { stepId, functionId, nowIso: new Date().toISOString() },
+      payload: {
+        stepId,
+        functionId,
+        ...(moduleId ? { moduleId } : {}),
+        nowIso: new Date().toISOString(),
+      },
     };
     store.dispatch(command, replaceStep);
+  };
+  const replacePianoRollChord = (stepId: string, functionId: string) => {
+    const target = project.progression.steps.find((step) => step.id === stepId);
+    if (!target) return;
+    if (target.kind === "chord") {
+      const replacement = createMatrixChordStep(project, functionId, stepId);
+      if (
+        target.harmonicFunction.moduleId === replacement.harmonicFunction.moduleId &&
+        target.harmonicFunction.functionId === replacement.harmonicFunction.functionId &&
+        JSON.stringify(target.harmonicVariant) === JSON.stringify(replacement.harmonicVariant) &&
+        target.explicitSpellingOverrides === undefined
+      )
+        return;
+    }
+    const command: ReplaceSystemChordCommand = {
+      type: "piano-roll/replace-chord",
+      payload: { stepId, functionId, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, replaceSystemChord);
+    if (pianoRollMatrixReplacementTargetRef.current === stepId) {
+      pianoRollMatrixReplacementTargetRef.current = null;
+      setPianoRollMatrixReplacement(null);
+      store.clearMatrixPreview();
+    }
+  };
+  const setPianoRollRest = (stepId: string) => {
+    const target = project.progression.steps.find((step) => step.id === stepId);
+    if (!target || target.kind === "rest") return;
+    const command: SetSystemRestCommand = {
+      type: "piano-roll/set-rest",
+      payload: { stepId, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setSystemRest);
+  };
+  const setPianoRollStepDuration = (stepId: string, duration: MusicalDuration) => {
+    const target = project.progression.steps.find((step) => step.id === stepId);
+    if (
+      !target ||
+      (target.duration.beats.numerator === duration.beats.numerator &&
+        target.duration.beats.denominator === duration.beats.denominator)
+    )
+      return;
+    const command: SetSystemStepDurationCommand = {
+      type: "piano-roll/set-step-duration",
+      payload: { stepId, duration, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setSystemStepDuration);
+  };
+  const splitPianoRollStep = (stepId: string) => {
+    const command: SplitSystemChordCommand = {
+      type: "piano-roll/split-step",
+      payload: { stepId, newStepId: crypto.randomUUID(), nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, splitSystemStep);
+  };
+  const tiePianoRollSteps = (stepIds: readonly string[]) => {
+    const command: TieSystemChordsCommand = {
+      type: "piano-roll/tie-steps",
+      payload: { stepIds, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, tieSystemSteps);
+  };
+  const transferPianoRollBoundary = (
+    leftStepId: string,
+    boundary: Rational,
+    snapQuantum: Rational,
+  ) => {
+    const command: TransferSystemChordBoundaryCommand = {
+      type: "piano-roll/transfer-boundary",
+      payload: { leftStepId, boundary, snapQuantum, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, transferSystemChordBoundary);
   };
   const handleApplySubstitution = (stepId: string, substitution: ChordSubstitution) => {
     const targetStep = project.progression.steps.find((s) => s.id === stepId);
@@ -2083,7 +2515,7 @@ export function App() {
       id: newStepId,
       performance: snapshotStepPerformance(sourceStep.performance),
       ...(sourceStep.melody !== undefined
-        ? { melody: snapshotChordMelodyRecipe(sourceStep.melody) }
+        ? { melody: snapshotChordMelody(sourceStep.melody) }
         : {}),
       ...(sourceStep.explicitSpellingOverrides
         ? { explicitSpellingOverrides: Object.freeze({ ...sourceStep.explicitSpellingOverrides }) }
@@ -2144,6 +2576,42 @@ export function App() {
       instrumentOverride ?? null,
     );
     store.dispatch(command, applySetMelodyRecipe);
+  };
+  const setAuthoredMelodyForStep = (
+    stepId: string,
+    phrase: { readonly notes: readonly import("../domain/melody/types").AuthoredMelodyNote[] },
+    sourceRecipe?: ChordMelodyRecipe,
+  ) => {
+    const command = createSetAuthoredMelodyCommand(
+      stepId,
+      phrase,
+      new Date().toISOString(),
+      sourceRecipe,
+    );
+    store.dispatch(command, applyMelodyCommand);
+  };
+  const applyPianoRollMelodyEdits = (
+    edits: readonly AuthoredMelodyEdit[],
+    convertStepIds: readonly string[] = [],
+    expectedUpdatedAt?: string,
+  ) => {
+    try {
+      store.dispatch(
+        {
+          type: "melody/apply-authored-transaction",
+          payload: {
+            edits,
+            convertStepIds,
+            expectedUpdatedAt: expectedUpdatedAt ?? store.project.updatedAt,
+            nowIso: new Date().toISOString(),
+          },
+        },
+        applyMelodyCommand,
+      );
+      setDurationResizeStatus(null);
+    } catch (error) {
+      setDurationResizeStatus(error instanceof Error ? error.message : "Melody edit was rejected.");
+    }
   };
   const removeMelodyRecipeForStep = (stepId: string) => {
     const command = createRemoveMelodyRecipeCommand(stepId, new Date().toISOString());
@@ -2369,10 +2837,116 @@ export function App() {
         return {
           ...source,
           performance: snapshotStepPerformance(source.performance),
-          ...(source.melody ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+          ...(source.melody ? { melody: snapshotChordMelody(source.melody) } : {}),
         };
       });
     setCopiedSystemSteps(stepsToCopy);
+  };
+
+  const selectedRangeSteps = (stepIds: readonly string[]): ProgressionStep[] => {
+    const ids = new Set(stepIds);
+    return project.progression.steps.filter((step) => ids.has(step.id));
+  };
+
+  const cloneProgressionSteps = (steps: readonly ProgressionStep[]): ProgressionStep[] =>
+    steps.map((source) => {
+      const id = crypto.randomUUID();
+      if (source.kind === "rest") return Object.freeze({ ...source, id });
+      return Object.freeze({
+        ...source,
+        id,
+        performance: snapshotStepPerformance(source.performance),
+        ...(source.melody ? { melody: snapshotChordMelody(source.melody) } : {}),
+        ...(source.explicitSpellingOverrides
+          ? { explicitSpellingOverrides: Object.freeze({ ...source.explicitSpellingOverrides }) }
+          : {}),
+      });
+    });
+
+  const copyProgressionRange = (stepIds: readonly string[]) => {
+    setCopiedSystemSteps(
+      cloneProgressionSteps(selectedRangeSteps(stepIds)).map((step) => ({ ...step })),
+    );
+  };
+
+  const duplicateProgressionRange = (stepIds: readonly string[]) => {
+    const sourceSteps = selectedRangeSteps(stepIds);
+    const afterStepId = sourceSteps.at(-1)?.id;
+    if (!afterStepId || sourceSteps.length === 0) return;
+    const duplicated = cloneProgressionSteps(sourceSteps);
+    const command: InsertStepsAfterCommand = {
+      type: "progression/insert-steps-after",
+      payload: { afterStepId, steps: duplicated, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, insertStepsAfter);
+    const lastDuplicatedId = duplicated.at(-1)?.id;
+    if (lastDuplicatedId) selectProgressionStep(lastDuplicatedId);
+  };
+
+  const deleteProgressionRange = (stepIds: readonly string[]) => {
+    const ids = new Set(stepIds);
+    const firstIndex = project.progression.steps.findIndex((step) => ids.has(step.id));
+    if (firstIndex < 0) return;
+    const fallbackStep =
+      project.progression.steps.find((step, index) => index > firstIndex && !ids.has(step.id)) ??
+      project.progression.steps
+        .slice(0, firstIndex)
+        .reverse()
+        .find((step) => !ids.has(step.id));
+    const command: RemoveStepsCommand = {
+      type: "progression/remove-steps",
+      payload: { stepIds, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, removeSteps);
+    setProgressionSelection(fallbackStep?.id);
+  };
+
+  const resetPerformanceProgressionRange = (stepIds: readonly string[]) => {
+    const ids = new Set(stepIds);
+    const updates = project.progression.steps.flatMap((step) => {
+      if (step.kind !== "chord" || !ids.has(step.id)) return [];
+      return [
+        {
+          stepId: step.id,
+          patch: {
+            performance: {
+              articulation: DEFAULT_PIANO_PERFORMANCE.articulation,
+              register: DEFAULT_PIANO_PERFORMANCE.register,
+              voicingMode: DEFAULT_PIANO_PERFORMANCE.voicingMode,
+              bass: DEFAULT_PIANO_PERFORMANCE.bass,
+              masterVelocity: DEFAULT_PIANO_PERFORMANCE.masterVelocity,
+              perNoteVelocityOverrides: DEFAULT_PIANO_PERFORMANCE.perNoteVelocityOverrides,
+            },
+          },
+        },
+      ];
+    });
+    if (updates.length === 0) return;
+    const command: BatchPatchStepsCommand = {
+      type: "progression/batch-patch-steps",
+      payload: { updates, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, batchPatchSteps);
+  };
+
+  const playProgressionRange = (stepIds: readonly string[]) => {
+    const firstStepId = stepIds[0];
+    if (firstStepId) handlePlayFromHere(firstStepId);
+  };
+
+  const isLoopingProgressionRange = (stepIds: readonly string[]) =>
+    stepIds.length > 0 &&
+    loopState.enabled &&
+    loopState.mode === "range" &&
+    loopState.region?.startStepId === stepIds[0] &&
+    loopState.region?.endStepId === stepIds[stepIds.length - 1];
+
+  const toggleProgressionRangeLoop = (stepIds: readonly string[]) => {
+    const firstStepId = stepIds[0];
+    const lastStepId = stepIds.at(-1);
+    if (!firstStepId || !lastStepId) return;
+    if (isLoopingProgressionRange(stepIds)) handleSetLoopMode("disabled");
+    else handleSetLoopRange(firstStepId, lastStepId);
   };
 
   const pasteSystemAfter = (system: ScoreSystem) => {
@@ -2392,7 +2966,7 @@ export function App() {
         ...source,
         id,
         performance: snapshotStepPerformance(source.performance),
-        ...(source.melody ? { melody: snapshotChordMelodyRecipe(source.melody) } : {}),
+        ...(source.melody ? { melody: snapshotChordMelody(source.melody) } : {}),
       });
     });
 
@@ -2954,6 +3528,15 @@ export function App() {
     const harmonyProvider = getActiveHarmonyProvider();
     if (!harmonyProvider) return null;
     const melodyProvider = hasMelodyRecipe ? ensureMelodyProvider() : null;
+    if (
+      playbackControllerRef.current &&
+      playbackControllerProviderRef.current !== harmonyProvider &&
+      transportStore.getState().status === "stopped"
+    ) {
+      playbackControllerRef.current.stop();
+      playbackControllerRef.current = null;
+      playbackControllerProviderRef.current = null;
+    }
     if (!playbackControllerRef.current) {
       const clock = harmonyProvider.clock;
       const metronomeContext = audioProviderRef.current?.audioCtx ?? sharedAudioContextRef.current;
@@ -2970,6 +3553,7 @@ export function App() {
         },
         transportStore,
       });
+      playbackControllerProviderRef.current = harmonyProvider;
     }
     return playbackControllerRef.current;
   };
@@ -3095,10 +3679,11 @@ export function App() {
   ]);
 
   const handlePlay = () => {
+    clearPianoRollAuditionPlayhead();
     clearStepPreviewHighlights();
     previewAuditionControllerRef.current?.stop();
     melodyPreviewAuditionControllerRef.current?.stop();
-    setProgressionSelection();
+    closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
     controller.start({
@@ -3126,10 +3711,11 @@ export function App() {
   };
 
   const handlePlayFromHere = (stepId: string) => {
+    clearPianoRollAuditionPlayhead();
     clearStepPreviewHighlights();
     previewAuditionControllerRef.current?.stop();
     melodyPreviewAuditionControllerRef.current?.stop();
-    setProgressionSelection();
+    closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
     controller.playFromHere(stepId, {
@@ -3161,17 +3747,32 @@ export function App() {
   };
 
   const handleResume = () => {
-    setProgressionSelection();
+    closeProgressionStepEditors();
     playbackControllerRef.current?.resume();
   };
 
   const handleStop = () => {
+    clearPianoRollAuditionPlayhead();
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
     playbackControllerRef.current?.stop();
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const shortcutProtected = isAppShortcutProtectedTarget(e.target);
+      if (
+        !shortcutProtected &&
+        !e.repeat &&
+        !e.altKey &&
+        !e.defaultPrevented &&
+        (e.ctrlKey || e.metaKey) &&
+        e.key.toLowerCase() === "k"
+      ) {
+        e.preventDefault();
+        openQuickChordPalette();
+        return;
+      }
       if (e.key === "Escape" && !shortcutProtected && !e.repeat && !e.defaultPrevented) {
         if (
           isHelpOpen ||
@@ -3205,9 +3806,32 @@ export function App() {
         return;
       }
 
+      const preservesNativeTextUndo =
+        e.target instanceof Element &&
+        Boolean(
+          e.target.closest(
+            'textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], input:not([type="hidden"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])',
+          ),
+        );
+      const undoShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey;
+      const redoShortcut =
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.shiftKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y");
+      if ((undoShortcut || redoShortcut) && !preservesNativeTextUndo) {
+        if (getPianoRollGesture()) setPianoRollGesture(null);
+        const canApply = undoShortcut ? store.canUndo : store.canRedo;
+        if (canApply) {
+          e.preventDefault();
+          if (undoShortcut) store.undo();
+          else store.redo();
+        }
+        return;
+      }
+
       if (shortcutProtected) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        if (getPianoRollGesture()) setPianoRollGesture(null);
         if (store.canUndo) {
           e.preventDefault();
           store.undo();
@@ -3219,6 +3843,7 @@ export function App() {
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.shiftKey) ||
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y")
       ) {
+        if (getPianoRollGesture()) setPianoRollGesture(null);
         if (store.canRedo) {
           e.preventDefault();
           store.redo();
@@ -3257,13 +3882,16 @@ export function App() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Capture shortcuts before native controls such as select elements consume
+    // Ctrl/Cmd+Z for their own ephemeral value history.
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     clearMatrixSelection,
     handlePause,
     handlePlay,
     handleResume,
+    openQuickChordPalette,
     pendingSwitch,
     presetsPanelOpen,
     savePresetDialogOpen,
@@ -3407,21 +4035,21 @@ export function App() {
   const currentPitchMotionAll =
     hasMelodyAll &&
     melodyStepsAll.every((s) => {
-      const motion =
-        s.melody?.pitchMotion ??
-        (s.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
-      const firstMotion =
-        melodyStepsAll[0]?.melody?.pitchMotion ??
-        (melodyStepsAll[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern;
+      const motion = generatedMelodyRecipe(s.melody)?.pitchMotion;
+      const firstMotion = generatedMelodyRecipe(melodyStepsAll[0]?.melody)?.pitchMotion;
       return motion === firstMotion;
     })
-      ? (melodyStepsAll[0]?.melody?.pitchMotion ??
-        (melodyStepsAll[0]?.melody as unknown as { readonly pattern?: MelodyPitchMotion })?.pattern)
+      ? generatedMelodyRecipe(melodyStepsAll[0]?.melody)?.pitchMotion
       : undefined;
 
   const currentGridAll =
-    hasMelodyAll && melodyStepsAll.every((s) => s.melody?.grid === melodyStepsAll[0]?.melody?.grid)
-      ? melodyStepsAll[0]?.melody?.grid
+    hasMelodyAll &&
+    melodyStepsAll.every(
+      (s) =>
+        generatedMelodyRecipe(s.melody)?.grid ===
+        generatedMelodyRecipe(melodyStepsAll[0]?.melody)?.grid,
+    )
+      ? generatedMelodyRecipe(melodyStepsAll[0]?.melody)?.grid
       : undefined;
 
   const progressionMeasureLayout = createProgressionMeasureLayout(
@@ -3458,6 +4086,264 @@ export function App() {
     currentPlayingStep?.kind === "chord"
       ? currentPlayingStep.harmonicFunction.functionId
       : undefined;
+  const alternativesOriginIndex = alternativesSession
+    ? alternativesSession.sourceProject.progression.steps.findIndex(
+        (step) => step.id === alternativesSession.snapshot.originStepId,
+      )
+    : -1;
+  const alternativesOriginStep =
+    alternativesOriginIndex >= 0
+      ? alternativesSession?.sourceProject.progression.steps[alternativesOriginIndex]
+      : undefined;
+  const alternativesOriginLabel =
+    alternativesOriginStep?.kind === "chord"
+      ? `${alternativesOriginStep.harmonicFunction.functionId} · Step ${alternativesOriginIndex + 1}`
+      : "selected Step";
+
+  const auditionPianoRollRange = (startBeat: number, endBeat: number) => {
+    const current = store.project;
+    const tempo = current.globalTiming.tempoBpm;
+    if (endBeat <= startBeat) return;
+    clearPianoRollAuditionPlayhead();
+    const requestId = ++pianoRollAuditionRequestRef.current;
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
+    let playheadStarted = false;
+    const onScheduled = (playback: ScheduledPlayback, clock: AudioClock) => {
+      if (pianoRollAuditionRequestRef.current !== requestId || playheadStarted) return;
+      playheadStarted = true;
+      startPianoRollAuditionPlayhead(requestId, startBeat, endBeat, playback, clock);
+    };
+    const secondsPerBeat = 60 / tempo;
+    const mode = getHarmonicModule(current.activeModule).mode;
+    const context = {
+      tonic: current.tonic,
+      mode,
+      moduleId: current.activeModule,
+      spellingContext: { tonic: current.tonic, mode },
+    };
+    const harmonyAllowed =
+      !current.harmonyTrack.muted && (!current.melodyTrack.solo || current.harmonyTrack.solo);
+    const melodyAllowed =
+      !current.melodyTrack.muted && (!current.harmonyTrack.solo || current.melodyTrack.solo);
+    const isPianoTrack =
+      current.harmonyTrack.instrument === "piano" || current.harmonyTrack.instrument === "gm-000";
+    const isSoundFont = !isPianoTrack || current.harmonyTrack.pianoEngine === "soundfont";
+    const soundFontInstrument = isPianoTrack
+      ? (current.harmonyTrack.pianoSoundfontInstrument ?? "gm-000")
+      : current.harmonyTrack.instrument;
+    const harmony = harmonyAllowed
+      ? realizeProgressionAudioEvents({
+          steps: current.progression.steps,
+          tonic: current.tonic,
+          context,
+          tempoBpm: tempo,
+          groove: current.groove,
+        })
+          .filter((event) => {
+            const start = event.startSeconds / secondsPerBeat;
+            const end = start + event.durationSeconds / secondsPerBeat;
+            const step =
+              typeof event.stepIndex === "number"
+                ? current.progression.steps[event.stepIndex]
+                : undefined;
+            return start < endBeat && end > startBeat && (!step || !mutedStepIds.has(step.id));
+          })
+          .map((event) => {
+            const start = event.startSeconds / secondsPerBeat;
+            const end = start + event.durationSeconds / secondsPerBeat;
+            return {
+              ...event,
+              startSeconds: (Math.max(start, startBeat) - startBeat) * secondsPerBeat,
+              durationSeconds:
+                (Math.min(end, endBeat) - Math.max(start, startBeat)) * secondsPerBeat,
+              ...(isSoundFont ? { instrument: soundFontInstrument } : {}),
+            };
+          })
+      : [];
+    if (harmony.length) getPreviewAuditionController()?.audition(harmony, onScheduled);
+    if (melodyAllowed) {
+      const projection = realizeProgressionMelodyPerformance({
+        steps: current.progression.steps,
+        tonic: current.tonic,
+        context,
+        tempoBpm: tempo,
+        groove: current.groove,
+        melodyTrack: current.melodyTrack,
+      });
+      const events = projection.events
+        .filter((event) => {
+          const start = rationalToNumber(event.startBeats);
+          const end = start + rationalToNumber(event.durationBeats);
+          return start < endBeat && end > startBeat && !mutedStepIds.has(event.sourceStepId);
+        })
+        .map((event) => {
+          const start = rationalToNumber(event.startBeats);
+          const end = start + rationalToNumber(event.durationBeats);
+          const clippedStart = Math.max(start, startBeat);
+          const clippedEnd = Math.min(end, endBeat);
+          return {
+            ...event,
+            startSeconds: (clippedStart - startBeat) * secondsPerBeat,
+            durationSeconds: (clippedEnd - clippedStart) * secondsPerBeat,
+          };
+        });
+      if (events.length) {
+        const provider = ensureMelodyProvider();
+        const instruments = [...new Set(events.map((event) => event.instrument))];
+        void provider
+          .prepareForInstruments(instruments)
+          .then((result) => {
+            if (pianoRollAuditionRequestRef.current !== requestId) return;
+            if (!result.ready.length) return;
+            events
+              .filter((event) => result.ready.includes(event.instrument))
+              .forEach((event) =>
+                provider.setPreviewSettings(event.instrument, current.melodyTrack.volume),
+              );
+            getMelodyPreviewAuditionController()?.audition(
+              events.filter((event) => result.ready.includes(event.instrument)),
+              onScheduled,
+            );
+          })
+          .catch(() => undefined);
+      }
+    }
+  };
+
+  const auditionPianoRollMeasure = (
+    measure: import("../domain/timing/measureLayout").ProgressionMeasure,
+  ) =>
+    auditionPianoRollRange(
+      rationalToNumber(measure.startBeats),
+      rationalToNumber(measure.endBeats),
+    );
+
+  const auditionPianoRollChord = (stepId: string) => {
+    const current = store.project;
+    const audition = realizePianoRollChordAudition(current, stepId);
+    if (!audition) {
+      clearPianoRollAuditionPlayhead();
+      previewAuditionControllerRef.current?.stop();
+      melodyPreviewAuditionControllerRef.current?.stop();
+      return;
+    }
+    const { startBeat, endBeat } = audition;
+    clearPianoRollAuditionPlayhead();
+    previewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
+    const requestId = ++pianoRollAuditionRequestRef.current;
+    if (
+      endBeat <= startBeat ||
+      current.harmonyTrack.muted ||
+      (current.melodyTrack.solo && !current.harmonyTrack.solo) ||
+      mutedStepIds.has(stepId)
+    )
+      return;
+    let playheadStarted = false;
+    const onScheduled = (playback: ScheduledPlayback, clock: AudioClock) => {
+      if (pianoRollAuditionRequestRef.current !== requestId || playheadStarted) return;
+      playheadStarted = true;
+      startPianoRollAuditionPlayhead(requestId, startBeat, endBeat, playback, clock);
+    };
+    const isPianoTrack =
+      current.harmonyTrack.instrument === "piano" || current.harmonyTrack.instrument === "gm-000";
+    const instrument = isPianoTrack
+      ? (current.harmonyTrack.pianoSoundfontInstrument ?? "gm-000")
+      : current.harmonyTrack.instrument;
+    const events = audition.events.map((event) => ({
+      ...event,
+      ...(isPianoTrack && current.harmonyTrack.pianoEngine !== "soundfont" ? {} : { instrument }),
+    }));
+    if (!events.length) return;
+    if (
+      current.harmonyTrack.instrument === "piano" ||
+      current.harmonyTrack.instrument === "gm-000"
+    ) {
+      if (current.harmonyTrack.pianoEngine === "soundfont") {
+        void ensureHarmonySoundFontProvider()
+          .prepareForInstruments([instrument])
+          .then((result) => {
+            if (
+              pianoRollAuditionRequestRef.current !== requestId ||
+              !result.ready.includes(instrument)
+            )
+              return;
+            getPreviewAuditionController()?.audition(events, onScheduled);
+          })
+          .catch(() => undefined);
+        return;
+      }
+    }
+    getPreviewAuditionController()?.audition(events, onScheduled);
+  };
+
+  const auditionPianoRollSystem = (system: ScoreSystem) => {
+    const first = system.measures[0]?.measure;
+    const last = system.measures.at(-1)?.measure;
+    if (!first || !last) return;
+    const progressionEnd = project.progression.steps.reduce(
+      (total, step) => total + rationalToNumber(step.duration.beats),
+      0,
+    );
+    auditionPianoRollRange(
+      rationalToNumber(first.startBeats),
+      Math.min(rationalToNumber(last.endBeats), progressionEnd),
+    );
+  };
+
+  const auditionPianoRollNote = (stepId: string, eventKey: string) => {
+    const current = store.project;
+    clearPianoRollAuditionPlayhead();
+    melodyPreviewAuditionControllerRef.current?.stop();
+    if (current.melodyTrack.muted || current.harmonyTrack.solo || mutedStepIds.has(stepId)) return;
+    previewAuditionControllerRef.current?.stop();
+    const requestId = ++pianoRollAuditionRequestRef.current;
+    const mode = getHarmonicModule(current.activeModule).mode;
+    const projection = realizeProgressionMelodyPerformance({
+      steps: current.progression.steps,
+      tonic: current.tonic,
+      context: {
+        tonic: current.tonic,
+        mode,
+        moduleId: current.activeModule,
+        spellingContext: { tonic: current.tonic, mode },
+      },
+      tempoBpm: current.globalTiming.tempoBpm,
+      groove: current.groove,
+      melodyTrack: current.melodyTrack,
+    });
+    const event = projection.events.find(
+      (candidate) => candidate.sourceStepId === stepId && candidate.eventKey === eventKey,
+    );
+    if (!event) return;
+    const startBeat = rationalToNumber(event.startBeats);
+    let playheadStarted = false;
+    const onScheduled = (playback: ScheduledPlayback, clock: AudioClock) => {
+      if (pianoRollAuditionRequestRef.current !== requestId || playheadStarted) return;
+      playheadStarted = true;
+      startPianoRollAuditionPlayhead(
+        requestId,
+        startBeat,
+        startBeat + rationalToNumber(event.durationBeats),
+        playback,
+        clock,
+      );
+    };
+    const provider = ensureMelodyProvider();
+    void provider
+      .prepareForInstruments([event.instrument])
+      .then((result) => {
+        if (pianoRollAuditionRequestRef.current !== requestId) return;
+        if (!result.ready.includes(event.instrument)) return;
+        provider.setPreviewSettings(event.instrument, current.melodyTrack.volume);
+        getMelodyPreviewAuditionController()?.audition(
+          [{ ...event, startSeconds: 0 }],
+          onScheduled,
+        );
+      })
+      .catch(() => undefined);
+  };
 
   return (
     <StudioWorkspace
@@ -3571,6 +4457,27 @@ export function App() {
       }
       statusBar={
         <>
+          {alternativesStatus ? (
+            <span
+              className="app-status-message"
+              role="status"
+              aria-live="polite"
+              data-testid="alternatives-status"
+            >
+              {alternativesStatus}
+            </span>
+          ) : null}
+          {durationResizeStatus ? (
+            <span
+              id="duration-resize-status"
+              className="app-status-message"
+              role="status"
+              aria-live="polite"
+              data-testid="duration-resize-status"
+            >
+              {durationResizeStatus}
+            </span>
+          ) : null}
           {recommendations &&
           !recommendations.bestMatch &&
           recommendations.alternatives.length === 0 ? (
@@ -3616,6 +4523,7 @@ export function App() {
           />
         </>
       }
+      printable={<PrintableProgression project={project} />}
       matrix={
         <HarmonicMatrix
           project={project}
@@ -3636,6 +4544,9 @@ export function App() {
           onGenreFocusChange={changeGenreFocus}
           onOpenPresets={() => setPresetsPanelOpen(true)}
           onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
+          onOpenQuickChord={openQuickChordPalette}
+          onOpenAlternatives={() => openAlternativesForStep(selectedChordStep?.id)}
+          canOpenAlternatives={Boolean(selectedChordStep)}
         />
       }
       inspector={
@@ -3674,6 +4585,73 @@ export function App() {
             progressionView={project.presentation.progressionView}
           />
         </>
+      }
+      selectedStepQuickEdit={
+        selectedProgressionStep ? (
+          <>
+            {selectedChordStep ? (
+              <ProgressionQuickEdit
+                step={selectedChordStep}
+                tonic={project.tonic}
+                labelMode={labelHierarchyMode}
+                onReplaceChord={replaceProgressionStep}
+                onDurationChange={(stepId, duration) => changeStepDuration(stepId, duration)}
+                onPerformanceChange={(stepId, performance) =>
+                  editProgressionPerformance(stepId, performance)
+                }
+                onOpenInspector={focusSelectedStepInspector}
+              />
+            ) : null}
+            <SongSectionControls
+              stepId={selectedProgressionStep.id}
+              stepNumber={selectedStepIndex + 1}
+              sections={(project.progression.sections ?? []).filter(
+                (section) => section.startStepId === selectedProgressionStep.id,
+              )}
+              onCreate={(name) => {
+                const command: SetSongSectionsCommand = {
+                  type: "progression/set-sections",
+                  payload: {
+                    sections: [
+                      ...(project.progression.sections ?? []),
+                      {
+                        id: crypto.randomUUID(),
+                        name,
+                        startStepId: selectedProgressionStep.id,
+                      },
+                    ],
+                    nowIso: new Date().toISOString(),
+                  },
+                };
+                store.dispatch(command, setSongSections);
+              }}
+              onRename={(sectionId, name) => {
+                const command: SetSongSectionsCommand = {
+                  type: "progression/set-sections",
+                  payload: {
+                    sections: (project.progression.sections ?? []).map((section) =>
+                      section.id === sectionId ? { ...section, name } : section,
+                    ),
+                    nowIso: new Date().toISOString(),
+                  },
+                };
+                store.dispatch(command, setSongSections);
+              }}
+              onDelete={(sectionId) => {
+                const command: SetSongSectionsCommand = {
+                  type: "progression/set-sections",
+                  payload: {
+                    sections: (project.progression.sections ?? []).filter(
+                      (section) => section.id !== sectionId,
+                    ),
+                    nowIso: new Date().toISOString(),
+                  },
+                };
+                store.dispatch(command, setSongSections);
+              }}
+            />
+          </>
+        ) : undefined
       }
       selectedStepInspector={
         selectedChordStep ? (
@@ -3761,6 +4739,14 @@ export function App() {
         ) : (
           <ProgressionGlobalInspector
             project={project}
+            selectedPianoNote={selectedPianoNote}
+            onEditSelectedPianoNote={() => {
+              if (!selectedPianoNote) return;
+              setPianoRollInspectorRequest((current) => ({
+                ...selectedPianoNote,
+                requestId: (current?.requestId ?? 0) + 1,
+              }));
+            }}
             onBatchPerformanceChange={batchEditProgressionPerformance}
             onBatchDurationChange={batchSetProgressionDuration}
             onResetAll={resetAllProgressionPerformance}
@@ -3897,6 +4883,16 @@ export function App() {
             <div className="progression-heading-actions">
               <button
                 type="button"
+                className="btn-print-progression"
+                onClick={() => window.print()}
+                title="Open the system print dialog; choose Save as PDF to export"
+                data-testid="print-progression"
+              >
+                <span aria-hidden="true">⎙</span>
+                <span>Print / Save as PDF</span>
+              </button>
+              <button
+                type="button"
                 className="btn-modulation-trigger"
                 onClick={() => setIsModulationModalOpen(true)}
                 title="Modulation Master & Key Transitions"
@@ -3925,16 +4921,37 @@ export function App() {
                 onChangeView={changeProgressionView}
                 selectAriaLabel="Progression Card View"
                 testIdPrefix="progression-view"
+                availableViews={["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"]}
               />
+              <LabelHierarchyControl value={labelHierarchyMode} onChange={setLabelHierarchyMode} />
             </div>
           </div>
           <ProgressionTrack
             project={project}
+            selectedPianoNote={selectedPianoNote}
+            onSelectedPianoNoteChange={setSelectedPianoNote}
+            onSelectedPianoChordChange={(stepId) => {
+              setActivePianoRollChordStepId(stepId);
+              if (pianoRollMatrixReplacementTargetRef.current) {
+                pianoRollMatrixReplacementTargetRef.current = null;
+                setPianoRollMatrixReplacement(null);
+                store.clearMatrixPreview();
+              }
+            }}
+            pianoRollInspectorRequest={pianoRollInspectorRequest}
+            pianoRollAuditionPlayhead={pianoRollAuditionPlayhead}
+            onPianoRollAuditionFinished={finishPianoRollAuditionPlayhead}
+            onAuditionPianoRollMeasure={auditionPianoRollMeasure}
+            onAuditionPianoRollChord={auditionPianoRollChord}
+            onAuditionPianoRollNote={auditionPianoRollNote}
+            onAuditionPianoRollSystem={auditionPianoRollSystem}
             currentPlayingStepIndex={currentPlayingStepIndex}
             activeMelodyEventKey={
               transportState.activeMelodyEventKey ?? previewActiveMelodyEventKey
             }
-            activeEventStartedAt={transportState.activeEventStartedAt}
+            activeEventStartedAt={transportState.currentStepStartedAt}
+            playbackClockSnapshot={transportState.playbackClockSnapshot}
+            transportPlaying={transportState.status === "playing"}
             melodyAudioState={melodyAudioState}
             melodyAudioError={melodyAudioError}
             harmonyAudioState={
@@ -4000,25 +5017,64 @@ export function App() {
             onSelectStep={selectProgressionStep}
             onClearSelection={() => setProgressionSelection()}
             onEditPerformance={editProgressionPerformance}
+            onSetStepDuration={changeStepDuration}
+            onDurationResizeStatusChange={setDurationResizeStatus}
+            labelMode={labelHierarchyMode}
             onSetProgressionView={changeProgressionView}
             onRemove={removeProgressionStep}
             onDuplicateStep={duplicateProgressionStep}
             onInsertStepBefore={insertMatrixChordBefore}
             onInsertStepAfter={insertMatrixChordAfter}
             activeMatrixFunctionId={activePreviewId}
+            matrixReplacementFunctionId={matrixSession.previewFunctionId}
+            pianoRollMatrixReplacement={pianoRollMatrixReplacement}
             selectedMatrixChordName={selectedMatrixChordName}
             onReorder={reorderProgressionStep}
+            onPlayRange={playProgressionRange}
+            onToggleLoopRange={toggleProgressionRangeLoop}
+            isLoopRangeActive={isLoopingProgressionRange}
+            onCopyRange={copyProgressionRange}
+            onDuplicateRange={duplicateProgressionRange}
+            onDeleteRange={deleteProgressionRange}
+            onResetPerformanceRange={resetPerformanceProgressionRange}
+            onExploreRange={openAlternativesForRange}
             onAddRest={addRest}
+            onReplacePianoRollChord={replacePianoRollChord}
+            onSetPianoRollRest={setPianoRollRest}
+            onSetPianoRollStepDuration={setPianoRollStepDuration}
+            onSplitPianoRollStep={splitPianoRollStep}
+            onTiePianoRollSteps={tiePianoRollSteps}
+            onTransferPianoRollBoundary={transferPianoRollBoundary}
             onFocusMatrix={() => {
               const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
               matrix
                 ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
                 ?.focus();
             }}
+            onFocusMatrixChord={(stepId) => {
+              pianoRollMatrixReplacementTargetRef.current = stepId;
+              setPianoRollMatrixReplacement({ stepId, functionId: null });
+              store.clearMatrixPreview();
+              const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
+              matrix
+                ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
+                ?.focus();
+            }}
+            onCancelMatrixChordChoice={() => {
+              pianoRollMatrixReplacementTargetRef.current = null;
+              setPianoRollMatrixReplacement(null);
+              store.clearMatrixPreview();
+            }}
+            onFocusMatrixKey={() => {
+              const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
+              matrix?.querySelector<HTMLButtonElement>('[aria-label^="Set key "]')?.focus();
+            }}
             onFillGapWithRest={fillProgressionGapWithRest}
             onExtendFinalChord={extendFinalChordToBar}
             onRepeatFinalChord={repeatFinalChordToBar}
             onSetMelodyRecipe={setMelodyRecipeForStep}
+            onSetAuthoredMelody={setAuthoredMelodyForStep}
+            onApplyPianoRollMelodyEdits={applyPianoRollMelodyEdits}
             onRemoveMelodyRecipe={removeMelodyRecipeForStep}
             onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
             onMelodyTrackSettingsChange={changeMelodyTrackSettings}
@@ -4065,11 +5121,32 @@ export function App() {
       }
       overlays={
         <>
+          {alternativesSession ? (
+            <AlternativesTray
+              snapshot={alternativesSession.snapshot}
+              mode={project.presentation.expertiseMode}
+              originLabel={alternativesOriginLabel}
+              applyError={alternativesSession.applyError}
+              onAudition={auditionAlternative}
+              onApply={applyAlternative}
+              onClose={closeAlternatives}
+            />
+          ) : null}
+          {quickChordPaletteOpen ? (
+            <QuickChordPalette
+              candidates={quickChordCandidates}
+              onPreview={previewQuickChord}
+              onApply={applyQuickChord}
+              onClose={() => closeQuickChordPalette(true)}
+              isTopmost={!pendingRouteWarning}
+            />
+          ) : null}
           {pendingRouteWarning ? (
             <RouteWarningDialog
               decision={pendingRouteWarning.decision}
               onCancel={cancelPendingRoute}
               onConfirm={confirmPendingRoute}
+              restoreFocusRef={routeRestoreFocusRef}
             />
           ) : null}
           {pendingSwitch ? (

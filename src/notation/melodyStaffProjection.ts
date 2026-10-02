@@ -1,17 +1,11 @@
-import type { ProgressionStep } from "../domain/progression/step";
 import type { Project } from "../domain/project/project";
-import { realizeChordMelody, type MelodyEvent } from "../domain/melody/projection";
-import type { MelodyInstrument } from "../domain/melody/types";
-import {
-  getMelodyInstrument,
-  resolveEffectiveMelodyInstrument,
-} from "../domain/melody/instrumentCatalog";
+import type { MelodyEvent, MelodyInstrument } from "../domain/melody/types";
+import { getMelodyInstrument } from "../domain/melody/instrumentCatalog";
 import { getHarmonicModule } from "../domain/harmony/moduleRegistry";
 import {
   classifyHarmonicNoteRole,
   createHarmonicNoteRoleContext,
   type HarmonicNoteRole,
-  type HarmonicNoteRoleContext,
 } from "../domain/harmony/noteRoles";
 import { realizeChord } from "../domain/harmony/realization";
 import {
@@ -22,11 +16,10 @@ import {
   type Rational,
 } from "../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
-import {
-  realizeOrderedPianoProgression,
-  type OrderedPianoRealization,
-} from "../instruments/piano/progressionRealization";
+import { realizeOrderedPianoProgression } from "../instruments/piano/progressionRealization";
 import type { ExactPitch } from "../domain/harmony/pitch";
+import { createEffectiveMelodyTimeline } from "../domain/melody/effectiveTimeline";
+import { projectWrittenRhythm, type WrittenRhythmPart } from "./writtenRhythmProjection";
 
 export type MelodyStaffClef = "treble" | "bass";
 
@@ -54,6 +47,7 @@ export interface MelodyStaffNoteFragment {
   readonly instrument: MelodyInstrument;
   readonly clef: MelodyStaffClef;
   readonly harmonicRole: HarmonicNoteRole;
+  readonly writtenRhythm: readonly WrittenRhythmPart[];
 }
 
 export type MelodyRestSourceKind = "no-melody-chord" | "rest-step" | "virtual-gap";
@@ -66,6 +60,7 @@ export interface MelodyStaffRestFragment {
   readonly startBeats: Rational;
   readonly durationBeats: Rational;
   readonly startOffsetBeats: Rational;
+  readonly writtenRhythm: readonly WrittenRhythmPart[];
 }
 
 export type MelodyStaffEntry = MelodyStaffNoteFragment | MelodyStaffRestFragment;
@@ -139,94 +134,6 @@ function endOfSpan(span: TimelineSpan): Rational {
   return span.endBeats;
 }
 
-function createMelodyEvent(
-  sourceStepId: string,
-  event: MelodyEvent,
-  stepStart: Rational,
-  instrument: MelodyInstrument,
-  harmonicRole: HarmonicNoteRole,
-): MelodyTimelineEvent {
-  return Object.freeze({
-    ...event,
-    eventKey: `${sourceStepId}:${event.index}`,
-    startBeats: addRational(stepStart, event.startOffsetBeats),
-    instrument,
-    clef: melodyClefForInstrument(instrument),
-    harmonicRole,
-  });
-}
-
-function addStepSpan(
-  project: Project,
-  step: ProgressionStep,
-  stepStart: Rational,
-  realization: OrderedPianoRealization | null,
-  nextRealization: OrderedPianoRealization | null,
-  spans: TimelineSpan[],
-  events: MelodyTimelineEvent[],
-  restOrdinal: number,
-  trackInstrument: MelodyInstrument,
-): number {
-  const stepEnd = addRational(stepStart, step.duration.beats);
-  if (step.kind !== "chord" || step.melody === undefined) {
-    spans.push({
-      kind: "rest",
-      startBeats: stepStart,
-      endBeats: stepEnd,
-      ...(step.kind === "chord" ? { sourceStepId: step.id } : {}),
-      sourceKind: step.kind === "rest" ? "rest-step" : "no-melody-chord",
-      ordinal: restOrdinal,
-    });
-    return restOrdinal + 1;
-  }
-
-  if (!realization) throw new Error(`missing piano realization for chord step ${step.id}`);
-  const chord = realizeChord(step.harmonicFunction, project.tonic);
-  const currentPitches = [
-    ...realization.upperPitches,
-    ...(realization.bassPitch ? [realization.bassPitch] : []),
-  ];
-  const targetPitches = nextRealization
-    ? [
-        ...nextRealization.upperPitches,
-        ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
-      ]
-    : [];
-  const roleContext = createHarmonicNoteRoleContext({
-    tonic: project.tonic,
-    moduleId: project.activeModule,
-    rootPitchClass: chord.rootPitchClass,
-    chordPitches: currentPitches,
-    nextChordPitches: targetPitches,
-  });
-  const phrase = realizeChordMelody({
-    sourceStepId: step.id,
-    upperPitches: realization.upperPitches,
-    durationBeats: step.duration.beats,
-    recipe: step.melody,
-    targetPitches,
-  });
-  const instrument = resolveEffectiveMelodyInstrument(
-    step.melodyInstrumentOverride,
-    trackInstrument,
-  ).id;
-  phrase.events.forEach((event) => {
-    const harmonicRole = classifyHarmonicNoteRole(
-      ((event.pitch.midiNumber % 12) + 12) % 12,
-      roleContext,
-    );
-    const timelineEvent = createMelodyEvent(step.id, event, stepStart, instrument, harmonicRole);
-    events.push(timelineEvent);
-    spans.push({
-      kind: "note",
-      event: timelineEvent,
-      startBeats: timelineEvent.startBeats,
-      endBeats: addRational(timelineEvent.startBeats, timelineEvent.durationBeats),
-    });
-  });
-  return restOrdinal;
-}
-
 function splitTimelineSpan(
   span: TimelineSpan,
   barLength: Rational,
@@ -263,6 +170,7 @@ function splitTimelineSpan(
           instrument: event.instrument,
           clef: event.clef,
           harmonicRole: event.harmonicRole,
+          writtenRhythm: projectWrittenRhythm(durationBeats),
         }),
       );
     } else {
@@ -275,6 +183,7 @@ function splitTimelineSpan(
           startBeats: cursor,
           durationBeats,
           startOffsetBeats: subtractRational(cursor, measure.startBeats),
+          writtenRhythm: projectWrittenRhythm(durationBeats),
         }),
       );
     }
@@ -294,15 +203,20 @@ function buildMeasures(
   }));
   spans.forEach((span) => splitTimelineSpan(span, barLengthBeats, mutableMeasures));
   return Object.freeze(
-    layout.measures.map((measure, measureIndex) =>
-      Object.freeze({
+    layout.measures.map((measure, measureIndex) => {
+      const entries = mutableMeasures[measureIndex]!.entries.sort(
+        (a, b) =>
+          compareRational(a.startBeats, b.startBeats) ||
+          (a.kind === b.kind ? 0 : a.kind === "note" ? -1 : 1),
+      );
+      return Object.freeze({
         measureIndex: measure.measureIndex,
         number: measure.number,
         startBeats: measure.startBeats,
         endBeats: measure.endBeats,
-        entries: Object.freeze(mutableMeasures[measureIndex]!.entries),
-      }),
-    ),
+        entries: Object.freeze(entries),
+      });
+    }),
   );
 }
 
@@ -364,34 +278,109 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
     tonic: project.tonic,
     context,
   });
+  const effectiveEvents = createEffectiveMelodyTimeline(project);
+  const owners = new Map(project.progression.steps.map((step, stepIndex) => [step.id, stepIndex]));
+  const noteSpans = effectiveEvents
+    .map((event) => ({
+      startBeats: event.startBeats,
+      endBeats: addRational(event.startBeats, event.durationBeats),
+    }))
+    .sort((a, b) => compareRational(a.startBeats, b.startBeats));
+  const mergedNoteSpans: { startBeats: Rational; endBeats: Rational }[] = [];
+  noteSpans.forEach((span) => {
+    const previous = mergedNoteSpans.at(-1);
+    if (previous && compareRational(span.startBeats, previous.endBeats) <= 0) {
+      if (compareRational(span.endBeats, previous.endBeats) > 0) previous.endBeats = span.endBeats;
+    } else mergedNoteSpans.push({ ...span });
+  });
   let cursor = ZERO;
   let restOrdinal = 0;
-  project.progression.steps.forEach((step, stepIndex) => {
-    const eventStart = events.length;
-    restOrdinal = addStepSpan(
-      project,
-      step,
-      cursor,
-      orderedRealizations[stepIndex] ?? null,
-      orderedRealizations
-        .slice(stepIndex + 1)
-        .find((candidate): candidate is OrderedPianoRealization => candidate !== null) ?? null,
-      spans,
-      events,
-      restOrdinal,
-      instrument,
-    );
-    if (step.kind === "chord" && step.melody !== undefined) {
-      const stepEvents = events.slice(eventStart);
-      const stepInstrument = resolveEffectiveMelodyInstrument(
-        step.melodyInstrumentOverride,
-        instrument,
-      ).id;
-      const bucket = laneBuckets.get(stepInstrument);
-      if (bucket) bucket.events.push(...stepEvents);
-      else laneBuckets.set(stepInstrument, { firstStepIndex: stepIndex, events: [...stepEvents] });
+  project.progression.steps.forEach((step) => {
+    const stepStart = cursor;
+    const stepEnd = addRational(stepStart, step.duration.beats);
+    let silenceCursor = stepStart;
+    mergedNoteSpans.forEach((span) => {
+      if (
+        compareRational(span.endBeats, stepStart) <= 0 ||
+        compareRational(span.startBeats, stepEnd) >= 0
+      )
+        return;
+      const noteStart =
+        compareRational(span.startBeats, stepStart) < 0 ? stepStart : span.startBeats;
+      if (compareRational(silenceCursor, noteStart) < 0)
+        spans.push({
+          kind: "rest",
+          startBeats: silenceCursor,
+          endBeats: noteStart,
+          ...(step.kind === "chord" ? { sourceStepId: step.id } : {}),
+          sourceKind: step.kind === "rest" ? "rest-step" : "no-melody-chord",
+          ordinal: restOrdinal++,
+        });
+      if (compareRational(span.endBeats, silenceCursor) > 0)
+        silenceCursor = compareRational(span.endBeats, stepEnd) < 0 ? span.endBeats : stepEnd;
+    });
+    if (compareRational(silenceCursor, stepEnd) < 0) {
+      spans.push({
+        kind: "rest",
+        startBeats: silenceCursor,
+        endBeats: stepEnd,
+        ...(step.kind === "chord" ? { sourceStepId: step.id } : {}),
+        sourceKind: step.kind === "rest" ? "rest-step" : "no-melody-chord",
+        ordinal: restOrdinal++,
+      });
     }
-    cursor = addRational(cursor, step.duration.beats);
+    cursor = stepEnd;
+  });
+  effectiveEvents.forEach((event) => {
+    const ownerIndex = owners.get(event.sourceStepId)!;
+    const owner = project.progression.steps[ownerIndex]!;
+    const realization = orderedRealizations[ownerIndex];
+    const nextRealization = orderedRealizations.slice(ownerIndex + 1).find((item) => item !== null);
+    const chord =
+      owner.kind === "chord" ? realizeChord(owner.harmonicFunction, project.tonic) : undefined;
+    const roleContext = createHarmonicNoteRoleContext({
+      tonic: project.tonic,
+      moduleId: project.activeModule,
+      rootPitchClass: chord?.rootPitchClass ?? project.tonic,
+      chordPitches:
+        owner.kind === "chord" && realization
+          ? [...realization.upperPitches, ...(realization.bassPitch ? [realization.bassPitch] : [])]
+          : [],
+      nextChordPitches: nextRealization
+        ? [
+            ...nextRealization.upperPitches,
+            ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
+          ]
+        : [],
+    });
+    const role = classifyHarmonicNoteRole(((event.pitch.midiNumber % 12) + 12) % 12, roleContext);
+    const source: MelodyEvent = {
+      sourceStepId: event.sourceStepId,
+      index: event.eventIndex,
+      eventKey: event.eventKey,
+      pitch: event.pitch,
+      sourcePitchMidi: event.sourcePitchMidi,
+      startOffsetBeats: ZERO,
+      durationBeats: event.durationBeats,
+    };
+    const timelineEvent = Object.freeze({
+      ...source,
+      eventKey: event.eventKey,
+      startBeats: event.startBeats,
+      instrument: event.instrument,
+      clef: melodyClefForInstrument(event.instrument),
+      harmonicRole: role,
+    });
+    events.push(timelineEvent);
+    spans.push({
+      kind: "note",
+      event: timelineEvent,
+      startBeats: event.startBeats,
+      endBeats: addRational(event.startBeats, event.durationBeats),
+    });
+    const bucket = laneBuckets.get(event.instrument);
+    if (bucket) bucket.events.push(timelineEvent);
+    else laneBuckets.set(event.instrument, { firstStepIndex: ownerIndex, events: [timelineEvent] });
   });
   if (compareRational(layout.playbackDurationBeats, cursor) > 0) {
     spans.push({

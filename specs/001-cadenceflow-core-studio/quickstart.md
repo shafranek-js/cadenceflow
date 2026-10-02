@@ -105,8 +105,9 @@ including decode coverage.
 
 Engine ownership is covered by `tests/e2e/progression-global-inspector.spec.ts`: the global All Steps &
 Measures surface has no engine/tone selectors, `AudioEnginesInspector` contains them, and the lower
-`PianoAudioStatus` is read-only. Engine/tone settings are currently runtime/session-only; the portable and
-autosave codec does not claim to preserve them until the dedicated persistence roadmap task is implemented.
+`PianoAudioStatus` is read-only. Piano/Guitar engine and tone settings are persisted in schema v6 and
+included in the portable/autosave codec; the schema-v5-to-v6 migration and v6 round-trip tests cover
+their compatibility. Session Undo/Redo history remains runtime-only and is not serialized.
 
 ## Production build for GitHub Pages
 

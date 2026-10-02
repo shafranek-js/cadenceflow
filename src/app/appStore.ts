@@ -53,6 +53,7 @@ export class AppStore {
   ): void {
     const before = this.#project;
     const applied = handler(before, command);
+    if (applied.project === before) return;
     this.#project = applied.project;
     const recordHistory = command.type !== "progression/select-step";
     if (recordHistory) {

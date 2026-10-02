@@ -7,6 +7,7 @@ import {
 } from "../../domain/progression/branch";
 import type { Progression } from "../../domain/progression/progression";
 import type { Project } from "../../domain/project/project";
+import { normalizeSongSections } from "../../domain/progression/sections";
 import { createMatrixChordStep } from "./matrixCommands";
 import type { AppliedCommand, ProjectCommand } from ".";
 
@@ -30,7 +31,7 @@ function withBranch(
   const { temporaryBranch: _old, ...rest } = project;
   return Object.freeze({
     ...rest,
-    progression,
+    progression: normalizeSongSections(progression),
     updatedAt: nowIso,
     ...(branch ? { temporaryBranch: branch } : {}),
   });

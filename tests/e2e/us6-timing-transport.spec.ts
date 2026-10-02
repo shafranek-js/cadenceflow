@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
-import { ensureSelectedProgressionSettingsVisible } from "./test-helpers/progression-settings";
+import {
+  addRestToProgression,
+  ensureSelectedProgressionSettingsVisible,
+} from "./test-helpers/progression-settings";
 
 test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111)", () => {
   test.beforeEach(async ({ page }) => {
@@ -326,10 +329,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    // Add Rest step via + Rest button
-    const addRestBtn = page.getByRole("button", { name: "Add Rest to progression" });
-    await expect(addRestBtn).toBeVisible();
-    await addRestBtn.click();
+    await addRestToProgression(page);
 
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
@@ -344,8 +344,44 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const playBtn = page.getByRole("button", { name: "Play", exact: true });
     const stopBtn = page.getByRole("button", { name: "Stop", exact: true });
 
+    await page.evaluate(() => {
+      type ScheduleEvent = { readonly stepIndex?: number };
+      type ProviderPrototype = {
+        schedule: (events: readonly ScheduleEvent[], clock: unknown) => unknown;
+      };
+      type RestObservationWindow = {
+        __cadenceflow_audio__?: {
+          HqSamplePianoProvider?: { prototype: ProviderPrototype };
+        };
+        __cadenceflow_rest_schedule_step_indexes__?: number[];
+      };
+      const testWindow = window as unknown as RestObservationWindow;
+      const pianoPrototype = testWindow.__cadenceflow_audio__?.HqSamplePianoProvider?.prototype;
+      if (!pianoPrototype) throw new Error("HQ Piano test hook is unavailable");
+
+      const scheduledStepIndexes = (testWindow.__cadenceflow_rest_schedule_step_indexes__ = []);
+      const originalSchedule = pianoPrototype.schedule;
+      pianoPrototype.schedule = function (this: unknown, events, clock) {
+        scheduledStepIndexes.push(
+          ...events.flatMap((event) =>
+            typeof event.stepIndex === "number" ? [event.stepIndex] : [],
+          ),
+        );
+        return originalSchedule.call(this, events, clock);
+      };
+    });
+
     await playBtn.click();
     await expect(page.getByTestId("transport-status")).toContainText("Playing");
+    await expect(steps.nth(1)).toHaveAttribute("data-playing", "true");
+
+    const scheduledStepIndexes = await page.evaluate(
+      () =>
+        (window as unknown as { __cadenceflow_rest_schedule_step_indexes__?: number[] })
+          .__cadenceflow_rest_schedule_step_indexes__ ?? [],
+    );
+    expect(scheduledStepIndexes).toContain(0);
+    expect(scheduledStepIndexes).not.toContain(1);
 
     await stopBtn.click();
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");

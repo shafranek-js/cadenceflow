@@ -2,21 +2,13 @@ import type { AudioNoteEvent } from "./contracts";
 import { projectProgressionStepTimings } from "./eventRealizer";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { PitchClassIdentity } from "../domain/harmony/pitch";
-import { realizeChordMelody } from "../domain/melody/projection";
+import { createEffectiveMelodyTimeline } from "../domain/melody/effectiveTimeline";
 import { melodyGridDuration } from "../domain/melody/patterns";
-import { validateChordMelodyRecipe, type MelodyTrackSettings } from "../domain/melody/types";
-import { resolveEffectiveMelodyInstrument } from "../domain/melody/instrumentCatalog";
+import { projectSwingTiming, type TimedEvent } from "../domain/timing/swing";
+import { snapshotChordMelody, type MelodyTrackSettings } from "../domain/melody/types";
 import type { ProgressionStep } from "../domain/progression/step";
-import { projectSwingTiming, type GrooveSettings, type TimedEvent } from "../domain/timing/swing";
-import {
-  addRational,
-  compareRational,
-  rationalToNumber,
-  subtractRational,
-  type Rational,
-} from "../domain/timing/rational";
+import { addRational, compareRational, rationalToNumber, subtractRational, type Rational } from "../domain/timing/rational";
 import { resolveEffectiveNoteVelocity } from "../instruments/piano/dynamics";
-import { realizeOrderedPianoProgression } from "../instruments/piano/progressionRealization";
 
 export interface MelodyPerformanceEvent extends AudioNoteEvent {
   readonly channelRole: "melody";
@@ -40,13 +32,9 @@ export interface RealizeProgressionMelodyInput {
   readonly tonic: PitchClassIdentity;
   readonly context: HarmonicContext;
   readonly tempoBpm: number;
-  readonly groove?: GrooveSettings | undefined;
+  readonly groove?: import("../domain/timing/swing").GrooveSettings | undefined;
   readonly melodyTrack?: MelodyTrackSettings | undefined;
   readonly initialStartSeconds?: number | undefined;
-}
-
-function isStraightMelodyGrid(grid: Parameters<typeof melodyGridDuration>[0]): boolean {
-  return !grid.endsWith("-triplet");
 }
 
 function melodyEventComparator(a: MelodyPerformanceEvent, b: MelodyPerformanceEvent): number {
@@ -70,19 +58,25 @@ export function realizeProgressionMelodyPerformance(
   }
 
   const track = input.melodyTrack;
-  const trackInstrument = track?.instrument ?? "flute";
   const projected = projectProgressionStepTimings(
     input.steps,
     input.groove ?? { feel: "straight", swingAmount: 0 },
   );
-  const realizations = realizeOrderedPianoProgression({
-    steps: input.steps,
+  const effective = createEffectiveMelodyTimeline({
+    progression: { steps: input.steps },
     tonic: input.tonic,
-    context: input.context,
+    activeModule: input.context.moduleId,
+    melodyTrack: track ?? { instrument: "flute", muted: false, solo: false, volume: 100 },
   });
   const secondsPerBeat = 60 / input.tempoBpm;
   const initialStartSeconds = input.initialStartSeconds ?? 0;
   const events: MelodyPerformanceEvent[] = [];
+  const notesByStep = new Map<number, typeof effective[number][]>();
+  effective.forEach((note) => {
+    const notes = notesByStep.get(note.stepIndex) ?? [];
+    notes.push(note);
+    notesByStep.set(note.stepIndex, notes);
+  });
 
   if (track?.muted) {
     return Object.freeze({
@@ -91,74 +85,45 @@ export function realizeProgressionMelodyPerformance(
     });
   }
 
-  input.steps.forEach((step, stepIndex) => {
-    if (step.kind === "rest" || !step.melody) return;
-    const realization = realizations[stepIndex];
-    const timing = projected.timings.get(stepIndex);
-    if (!realization || !timing) {
-      throw new Error(`missing contextual melody realization for step ${step.id}`);
+  const progressionEnd = projected.totalDurationBeats;
+  effective.forEach((baseNote) => {
+    let note = baseNote;
+    const step = input.steps[note.stepIndex]!;
+    const timing = projected.timings.get(note.stepIndex);
+    if (!timing) throw new Error(`missing Step timing for Melody owner ${step.id}`);
+    const chordMelody = step.kind === "chord" && step.melody ? snapshotChordMelody(step.melody) : undefined;
+    const recipe = chordMelody?.mode === "generated" ? chordMelody.recipe : chordMelody?.mode === "authored" ? chordMelody.sourceRecipe : undefined;
+    if (recipe?.rhythm === "even" && (input.groove?.feel ?? "straight") === "swing" && !recipe.grid.endsWith("-triplet")) {
+      const sameStep = notesByStep.get(note.stepIndex) ?? [];
+      const timed: readonly TimedEvent[] = sameStep.map((item) => ({
+        startBeats: subtractRational(item.startBeats, timing.startBeats),
+        durationBeats: item.durationBeats,
+      }));
+      const swung = projectSwingTiming(timed, input.groove!, melodyGridDuration(recipe.grid));
+      const adjusted = swung[sameStep.indexOf(baseNote)];
+      if (adjusted) note = { ...baseNote, startBeats: addRational(timing.startBeats, adjusted.startBeats), durationBeats: adjusted.durationBeats };
     }
-
-    const recipe = validateChordMelodyRecipe(step.melody);
-    const nextRealization = realizations
-      .slice(stepIndex + 1)
-      .find((candidate) => candidate !== null);
-    const targetPitches = nextRealization
-      ? [
-          ...nextRealization.upperPitches,
-          ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
-        ]
-      : [];
-    const instrument = resolveEffectiveMelodyInstrument(
-      step.melodyInstrumentOverride,
-      trackInstrument,
-    ).id;
-    const phrase = realizeChordMelody({
-      sourceStepId: step.id,
-      upperPitches: realization.upperPitches,
-      durationBeats: timing.durationBeats,
-      recipe,
-      targetPitches,
-    });
-    const canSwing =
-      recipe.rhythm === "even" &&
-      (input.groove?.feel ?? "straight") === "swing" &&
-      isStraightMelodyGrid(recipe.grid);
-    const gridDuration = melodyGridDuration(recipe.grid);
-    const phraseTimedEvents: readonly TimedEvent[] = phrase.events.map((event) => ({
-      startBeats: event.startOffsetBeats,
-      durationBeats: event.durationBeats,
+    if (compareRational(note.startBeats, progressionEnd) >= 0) return;
+    const effectiveEnd = addRational(note.startBeats, note.durationBeats);
+    if (compareRational(effectiveEnd, progressionEnd) > 0) note = { ...note, durationBeats: subtractRational(progressionEnd, note.startBeats) };
+    const sourceVelocity = step.kind === "chord"
+      ? resolveEffectiveNoteVelocity(step.performance.masterVelocity, String(note.sourcePitchMidi), step.performance.perNoteVelocityOverrides)
+      : 100;
+    events.push(Object.freeze({
+      pitch: note.pitch.midiNumber,
+      startSeconds: initialStartSeconds + rationalToNumber(note.startBeats) * secondsPerBeat,
+      durationSeconds: rationalToNumber(note.durationBeats) * secondsPerBeat,
+      velocity: sourceVelocity,
+      channelRole: "melody" as const,
+      eventKey: note.eventKey,
+      sourceStepId: note.sourceStepId,
+      sourcePitchMidi: note.sourcePitchMidi,
+      eventIndex: note.eventIndex,
+      stepIndex: note.stepIndex,
+      startBeats: note.startBeats,
+      durationBeats: note.durationBeats,
+      instrument: note.instrument,
     }));
-    const phraseEvents: readonly TimedEvent[] = canSwing
-      ? projectSwingTiming(phraseTimedEvents, input.groove!, gridDuration)
-      : phraseTimedEvents;
-
-    phrase.events.forEach((sourceEvent, eventIndex) => {
-      const timedEvent = phraseEvents[eventIndex]!;
-      const startBeats = addRational(timing.startBeats, timedEvent.startBeats);
-      const sourceVelocity = resolveEffectiveNoteVelocity(
-        step.performance.masterVelocity,
-        String(sourceEvent.sourcePitchMidi),
-        step.performance.perNoteVelocityOverrides,
-      );
-      events.push(
-        Object.freeze({
-          pitch: sourceEvent.pitch.midiNumber,
-          startSeconds: initialStartSeconds + rationalToNumber(startBeats) * secondsPerBeat,
-          durationSeconds: rationalToNumber(timedEvent.durationBeats) * secondsPerBeat,
-          velocity: sourceVelocity,
-          channelRole: "melody" as const,
-          eventKey: `${step.id}:${sourceEvent.index}`,
-          sourceStepId: step.id,
-          sourcePitchMidi: sourceEvent.sourcePitchMidi,
-          eventIndex: sourceEvent.index,
-          stepIndex,
-          startBeats,
-          durationBeats: timedEvent.durationBeats,
-          instrument,
-        }),
-      );
-    });
   });
 
   events.sort(melodyEventComparator);
