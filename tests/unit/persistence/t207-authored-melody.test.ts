@@ -88,7 +88,7 @@ describe("T207 authored ChordMelody", () => {
       schemaVersion: 6,
       progression: { steps: [{ id: "s1", kind: "chord", melody: recipe }] },
     });
-    expect(result.schemaVersion).toBe(9);
+    expect(result.schemaVersion).toBe(10);
     expect((result.progression as { steps: Array<{ melody: unknown }> }).steps[0]?.melody).toEqual({
       mode: "generated",
       recipe,
@@ -109,7 +109,7 @@ describe("T207 authored ChordMelody", () => {
     });
     const decoded = decodePortableProject(encodePortableProject(project));
     const chord = decoded.progression.steps[0];
-    expect(decoded.schemaVersion).toBe(9);
+    expect(decoded.schemaVersion).toBe(10);
     expect(
       chord?.kind === "chord" && chord.melody?.mode === "authored"
         ? chord.melody.phrase.notes[0]

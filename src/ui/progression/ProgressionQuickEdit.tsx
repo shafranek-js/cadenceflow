@@ -18,8 +18,13 @@ import {
 } from "../../instruments/piano/dynamics";
 import type { MusicalDynamicLabel } from "../../instruments/contracts";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+} from "../../domain/progression/transposition";
 import type { LabelHierarchyMode } from "./labelHierarchy";
 import { ProgressionChordLabel } from "./ProgressionChordLabel";
+import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
 const INVERSION_OPTIONS: readonly { readonly value: InversionChoice; readonly label: string }[] =
   Object.freeze([
@@ -45,10 +50,7 @@ function durationId(duration: MusicalDuration): string {
 
 function currentChordLabel(step: ChordStep, tonic: PitchClassIdentity): string {
   const realization = realizeProgressionStepRealization(step, tonic);
-  const chord: ChordDefinition = {
-    ...realizeChord(step.harmonicFunction, tonic),
-    variant: step.harmonicVariant,
-  };
+  const chord: ChordDefinition = realizeProgressionStepChord(step, tonic);
   return formatChordSymbol(withEffectiveBass(chord, realization.bassPitch));
 }
 
@@ -142,6 +144,7 @@ export function ProgressionQuickEdit({
           chordLabel={chordLabel}
           className="progression-quick-edit-label"
         />
+        <StepTranspositionBadge semitones={stepTranspositionSemitones(step)} />
       </div>
       <label>
         <span>Chord label</span>

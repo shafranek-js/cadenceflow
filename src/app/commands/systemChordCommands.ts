@@ -7,6 +7,7 @@ import {
   type ChordMelodyRecipe,
 } from "../../domain/melody/types";
 import type { Project } from "../../domain/project/project";
+import { pitchToConcertFrame, pitchToSourceFrame } from "../../domain/progression/transposition";
 import type { Progression } from "../../domain/progression/progression";
 import type { TemporaryBranch } from "../../domain/progression/branch";
 import type { ChordStep, ProgressionStep, RestStep } from "../../domain/progression/step";
@@ -106,6 +107,7 @@ export class SystemChordCommandError extends RangeError {
 interface AbsoluteNote {
   readonly id: string;
   readonly pitch: AuthoredMelodyNote["pitch"];
+  readonly sourcePitchMidi?: number;
   readonly startBeats: Rational;
   readonly duration: Rational;
   readonly sourceStepId: string;
@@ -159,6 +161,7 @@ function materializedNotes(project: Project, stepId: string): readonly AbsoluteN
     .map((event) => ({
       id: event.eventKey,
       pitch: event.pitch,
+      sourcePitchMidi: event.sourcePitchMidi,
       startBeats: event.startBeats,
       duration: event.durationBeats,
       sourceStepId: stepId,
@@ -177,7 +180,8 @@ function authoredAbsoluteNotes(
     for (const note of phrase.notes) {
       notes.push({
         id: note.id,
-        pitch: note.pitch,
+        pitch: pitchToConcertFrame(note.pitch, step),
+        ...(note.sourcePitchMidi !== undefined ? { sourcePitchMidi: note.sourcePitchMidi } : {}),
         startBeats: addRational(start, note.onset),
         duration: note.duration,
         sourceStepId: step.id,
@@ -316,7 +320,10 @@ function reanchorMelody(
           used.add(id);
           return Object.freeze({
             id,
-            pitch: event.pitch,
+            pitch: pitchToSourceFrame(event.pitch, step),
+            ...(event.sourcePitchMidi !== undefined
+              ? { sourcePitchMidi: event.sourcePitchMidi }
+              : {}),
             onset: subtractRational(event.startBeats, ownerStart),
             duration: event.duration,
           });
@@ -540,7 +547,10 @@ export function setSystemRest(project: Project, command: SetSystemRestCommand): 
         ? snapshotAuthoredMelodyPhrase({
             notes: materializedNotes(project, target.id).map((note) => ({
               id: note.id,
-              pitch: note.pitch,
+              pitch: pitchToSourceFrame(note.pitch, target),
+              ...(note.sourcePitchMidi !== undefined
+                ? { sourcePitchMidi: note.sourcePitchMidi }
+                : {}),
               onset: subtractRational(
                 note.startBeats,
                 startsFor(project.progression.steps).get(target.id)!,
@@ -553,6 +563,7 @@ export function setSystemRest(project: Project, command: SetSystemRestCommand): 
   const rest: RestStep = Object.freeze({
     id: target.id,
     kind: "rest",
+    transpositionSemitones: target.transpositionSemitones ?? 0,
     duration: target.duration,
     ...(phrase ? { authoredMelody: phrase } : {}),
     ...(target.melodyInstrumentOverride

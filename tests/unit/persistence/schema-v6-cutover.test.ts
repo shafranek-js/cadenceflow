@@ -29,8 +29,8 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const migrated = decodePortableProject(JSON.stringify(raw));
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(9);
-    expect(migrated.schemaVersion).toBe(9);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(10);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.harmonyTrack).toMatchObject({
       pianoEngine: "hq-samples",
       guitarEngine: "hq-samples",
@@ -52,7 +52,7 @@ describe("T197 + T192 — schema v6 cutover", () => {
     expect(decodePortableProject(JSON.stringify(raw)).presentation.noteColorMode).toBe("standard");
   });
 
-  it("rejects an invalid noteColorMode in a current v7 document", () => {
+  it("rejects an invalid noteColorMode in the current document", () => {
     const raw = JSON.parse(encodePortableProject(createDefaultProject("v6-invalid-mode"))) as {
       presentation: Record<string, unknown>;
     };
@@ -80,7 +80,7 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const restored = decodePortableProject(encodePortableProject(configured));
 
-    expect(restored.schemaVersion).toBe(9);
+    expect(restored.schemaVersion).toBe(10);
     expect(restored.harmonyTrack).toEqual(configured.harmonyTrack);
     expect(restored.presentation.noteColorMode).toBe("harmonic-role");
   });

@@ -2,6 +2,10 @@ import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import type { ExactPitch, PitchClassIdentity } from "../../domain/harmony/pitch";
 import type { ProgressionStep } from "../../domain/progression/step";
+import {
+  stepTranspositionSemitones,
+  transposeExactPitch,
+} from "../../domain/progression/transposition";
 import { pianoProfile } from "./profile";
 
 export interface OrderedPianoRealization {
@@ -9,6 +13,8 @@ export interface OrderedPianoRealization {
   readonly stepId: string;
   readonly upperPitches: readonly ExactPitch[];
   readonly bassPitch?: ExactPitch | undefined;
+  readonly sourceUpperPitches: readonly ExactPitch[];
+  readonly sourceBassPitch?: ExactPitch | undefined;
 }
 
 export interface OrderedPianoRealizationInput {
@@ -42,11 +48,18 @@ export function realizeOrderedPianoProgression(
       ...(previousBassPitch ? { previousBassPitch } : {}),
     });
 
+    const semitones = stepTranspositionSemitones(step);
     const ordered = Object.freeze({
       stepIndex,
       stepId: step.id,
-      upperPitches: realization.pitches,
-      bassPitch: realization.bassPitch,
+      upperPitches: Object.freeze(
+        realization.pitches.map((pitch) => transposeExactPitch(pitch, semitones)),
+      ),
+      bassPitch: realization.bassPitch
+        ? transposeExactPitch(realization.bassPitch, semitones)
+        : undefined,
+      sourceUpperPitches: realization.pitches,
+      sourceBassPitch: realization.bassPitch,
     });
     // An explicit register is a Step-local performance override. It must change
     // this Step without turning its shifted realization into the voice-leading

@@ -36,7 +36,6 @@ async function historyAction(
 }
 
 async function exportProjectFilePath(page: import("@playwright/test").Page): Promise<string> {
-  await page.keyboard.press("Escape");
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("export-menu-toggle").click();
   await page.getByRole("menu", { name: "Export menu" }).getByTestId("project-export-btn").click();
@@ -46,15 +45,64 @@ async function exportProjectFilePath(page: import("@playwright/test").Page): Pro
   return path;
 }
 
+async function revealWithinStudioGrid(
+  target: import("@playwright/test").Locator,
+  inset = 8,
+): Promise<void> {
+  await target.evaluate((element, scrollInset) => {
+    const scroller = element.closest<HTMLElement>(".studio-grid");
+    if (!scroller) throw new Error("The Piano Roll target is outside the Studio scroll region");
+    const scrollport = scroller.getBoundingClientRect();
+    const visibleTop = scrollport.top + scroller.clientTop + scrollInset;
+    const visibleBottom = scrollport.top + scroller.clientTop + scroller.clientHeight - scrollInset;
+    const rect = element.getBoundingClientRect();
+    const delta =
+      rect.top < visibleTop
+        ? rect.top - visibleTop
+        : rect.bottom > visibleBottom
+          ? rect.bottom - visibleBottom
+          : 0;
+    if (delta !== 0) scroller.scrollBy({ top: delta, behavior: "instant" });
+  }, inset);
+}
+
+async function dismissSelectionHelp(page: import("@playwright/test").Page): Promise<void> {
+  const help = page.getByTestId("piano-roll-selection-help");
+  if (await help.isVisible())
+    await help.getByRole("button", { name: "Dismiss Piano Roll selection help" }).click();
+  await page.mouse.move(2, 2);
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  await expect(help).toHaveCount(0);
+}
+
 async function alignSystemHeader(page: import("@playwright/test").Page, index = 0): Promise<void> {
   const header = page.locator(".score-system-header").nth(index);
   await expect(header).toBeVisible();
   await header.evaluate((element) => {
-    const top = element.getBoundingClientRect().top + window.scrollY;
-    const appHeaderBottom =
-      document.querySelector<HTMLElement>(".app-header")?.getBoundingClientRect().bottom ?? 0;
-    window.scrollTo({ top: Math.max(0, top - appHeaderBottom - 8), behavior: "instant" });
+    const scroller = element.closest<HTMLElement>(".studio-grid");
+    if (!scroller) throw new Error("The System header is outside the Studio scroll region");
+    const scrollport = scroller.getBoundingClientRect();
+    const visibleTop = scrollport.top + scroller.clientTop;
+    scroller.scrollBy({
+      top: element.getBoundingClientRect().top - visibleTop,
+      behavior: "instant",
+    });
   });
+  await expect
+    .poll(() =>
+      header.evaluate((element) => {
+        const headerBox = element.getBoundingClientRect();
+        const scroller = element.closest<HTMLElement>(".studio-grid");
+        if (!scroller) return false;
+        const scrollport = scroller.getBoundingClientRect();
+        const visibleTop = scrollport.top + scroller.clientTop;
+        const visibleBottom = scrollport.top + scroller.clientTop + scroller.clientHeight;
+        return headerBox.top >= visibleTop - 1 && headerBox.bottom <= visibleBottom + 1;
+      }),
+    )
+    .toBe(true);
 }
 
 async function importVisualFixture(
@@ -81,24 +129,31 @@ async function expectVisibleMusicAndPanel(
   panel: import("@playwright/test").Locator,
   requireVisibleNotes = true,
 ): Promise<void> {
+  await dismissSelectionHelp(page);
   const state = await page.evaluate(() => {
     const header = document.querySelector<HTMLElement>(".score-system-header");
     const panelElement = document.querySelector<HTMLElement>(
       '[data-testid^="piano-roll-system-chord-panel-"], [data-testid^="piano-roll-system-note-panel-"]',
     );
     const grid = document.querySelector<HTMLElement>(".piano-roll-grid");
+    const studioScroller = document.querySelector<HTMLElement>(".studio-grid");
+    const studioScrollport = studioScroller?.getBoundingClientRect();
+    const studioTop = studioScrollport ? studioScrollport.top + studioScroller!.clientTop : 0;
+    const studioBottom = studioScroller ? studioTop + studioScroller.clientHeight : 0;
     const title =
       header?.querySelector<HTMLElement>('[data-testid^="score-system-audition-"]') ??
       header?.querySelector<HTMLElement>("strong");
-    const measureCount = title?.nextElementSibling as HTMLElement | null;
+    const measureCount = [...(header?.querySelectorAll<HTMLElement>("span") ?? [])].find(
+      (candidate) => /^\d+ measures?$/.test(candidate.textContent?.trim() ?? ""),
+    );
     const notes = [...document.querySelectorAll<HTMLElement>("button.piano-roll-note")];
     const visibleNotes = notes.filter((note) => {
       const rect = note.getBoundingClientRect();
       return (
         rect.width > 0 &&
         rect.height > 0 &&
-        rect.bottom > 0 &&
-        rect.top < window.innerHeight &&
+        rect.bottom > studioTop &&
+        rect.top < studioBottom &&
         rect.right > 0 &&
         rect.left < window.innerWidth
       );
@@ -110,8 +165,8 @@ async function expectVisibleMusicAndPanel(
       return (
         rect.width > 0 &&
         rect.height > 0 &&
-        rect.bottom > 0 &&
-        rect.top < window.innerHeight &&
+        rect.bottom > studioTop &&
+        rect.top < studioBottom &&
         rect.right > 0 &&
         rect.left < window.innerWidth
       );
@@ -119,21 +174,75 @@ async function expectVisibleMusicAndPanel(
     const controls = panelElement
       ? [...panelElement.querySelectorAll<HTMLElement>("button, select, input")]
       : [];
+    const overlaps = (first: DOMRect | undefined, second: DOMRect | undefined) =>
+      Boolean(
+        first &&
+        second &&
+        first.left < second.right - 0.5 &&
+        first.right > second.left + 0.5 &&
+        first.top < second.bottom - 0.5 &&
+        first.bottom > second.top + 0.5,
+      );
+    const titleBox = title?.getBoundingClientRect();
+    const measureBox = measureCount?.getBoundingClientRect();
+    const panelBox = panelElement?.getBoundingClientRect();
+    const controlsClipped = controls.filter((control) => {
+      const controlRect = control.getBoundingClientRect();
+      for (
+        let ancestor = control.parentElement;
+        ancestor && ancestor !== document.body;
+        ancestor = ancestor.parentElement
+      ) {
+        const style = getComputedStyle(ancestor);
+        const ancestorRect = ancestor.getBoundingClientRect();
+        if (
+          ["auto", "clip", "hidden", "scroll"].includes(style.overflowX) &&
+          (controlRect.left < ancestorRect.left || controlRect.right > ancestorRect.right)
+        )
+          return true;
+        if (
+          ["auto", "clip", "hidden", "scroll"].includes(style.overflowY) &&
+          (controlRect.top < ancestorRect.top || controlRect.bottom > ancestorRect.bottom)
+        )
+          return true;
+      }
+      return false;
+    }).length;
     return {
       header: header?.getBoundingClientRect().toJSON(),
-      panel: panelElement?.getBoundingClientRect().toJSON(),
+      panel: panelBox?.toJSON(),
       grid: grid?.getBoundingClientRect().toJSON(),
-      title: title?.getBoundingClientRect().toJSON(),
-      measureCount: measureCount?.getBoundingClientRect().toJSON(),
-      titleCenter: title
-        ? title.getBoundingClientRect().top + title.getBoundingClientRect().height / 2
-        : null,
-      measureCenter: measureCount
-        ? measureCount.getBoundingClientRect().top + measureCount.getBoundingClientRect().height / 2
-        : null,
-      panelCenter: panelElement
-        ? panelElement.getBoundingClientRect().top + panelElement.getBoundingClientRect().height / 2
-        : null,
+      title: titleBox?.toJSON(),
+      measureCount: measureBox?.toJSON(),
+      titleCenter: titleBox ? titleBox.top + titleBox.height / 2 : null,
+      measureCenter: measureBox ? measureBox.top + measureBox.height / 2 : null,
+      panelCenter: panelBox ? panelBox.top + panelBox.height / 2 : null,
+      studioTop,
+      studioBottom,
+      gridVisibleHeight: grid
+        ? Math.max(
+            0,
+            Math.min(grid.getBoundingClientRect().bottom, studioBottom) -
+              Math.max(grid.getBoundingClientRect().top, studioTop),
+          )
+        : 0,
+      gridBelowPanel: Boolean(
+        grid && panelBox && grid.getBoundingClientRect().top >= panelBox.bottom - 1,
+      ),
+      titlePanelOverlap: overlaps(titleBox, panelBox),
+      measurePanelOverlap: overlaps(measureBox, panelBox),
+      controlsOutsideViewport: controls.filter((control) => {
+        const rect = control.getBoundingClientRect();
+        return (
+          rect.width <= 0 ||
+          rect.height <= 0 ||
+          rect.left < 0 ||
+          rect.right > window.innerWidth ||
+          rect.top < studioTop ||
+          rect.bottom > studioBottom
+        );
+      }).length,
+      controlsClipped,
       visibleNotes: visibleNotes.length,
       visibleChords,
       missedControls: controls.flatMap((control) => {
@@ -152,11 +261,16 @@ async function expectVisibleMusicAndPanel(
             ]
           : [];
       }),
-      panelScrolls: Boolean(
-        panelElement &&
-        (panelElement.scrollWidth > panelElement.clientWidth ||
-          panelElement.scrollHeight > panelElement.clientHeight),
-      ),
+      panelScrollDimensions: panelElement
+        ? {
+            scrollWidth: panelElement.scrollWidth,
+            clientWidth: panelElement.clientWidth,
+            scrollHeight: panelElement.scrollHeight,
+            clientHeight: panelElement.clientHeight,
+            overflowX: getComputedStyle(panelElement).overflowX,
+            overflowY: getComputedStyle(panelElement).overflowY,
+          }
+        : null,
       headerScrolls: Boolean(header && header.scrollWidth > header.clientWidth),
       pageFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       zooms: [document.documentElement, document.body, header]
@@ -169,15 +283,30 @@ async function expectVisibleMusicAndPanel(
   expect(state.grid).toBeTruthy();
   expect(state.title).toBeTruthy();
   expect(state.measureCount).toBeTruthy();
-  expect(state.header!.top).toBeGreaterThanOrEqual(0);
-  expect(state.header!.bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
-  expect(state.grid!.top).toBeLessThan(page.viewportSize()!.height);
+  expect(state.header!.top).toBeGreaterThanOrEqual(state.studioTop - 1);
+  expect(state.header!.bottom).toBeLessThanOrEqual(state.studioBottom + 1);
+  expect(state.grid!.top).toBeLessThan(state.studioBottom);
+  expect(state.gridVisibleHeight).toBeGreaterThan(0);
+  expect(state.gridBelowPanel).toBe(true);
   if (requireVisibleNotes) expect(state.visibleNotes).toBeGreaterThan(0);
-  else expect(state.visibleChords).toBeGreaterThan(0);
-  expect(Math.abs(state.titleCenter! - state.measureCenter!)).toBeLessThan(1);
-  expect(Math.abs(state.titleCenter! - state.panelCenter!)).toBeLessThan(1);
-  expect(state.missedControls).toHaveLength(0);
-  expect(state.panelScrolls).toBe(false);
+  expect(state.titlePanelOverlap).toBe(false);
+  expect(state.measurePanelOverlap).toBe(false);
+  if (page.viewportSize()!.width >= 1280) {
+    expect(Math.abs(state.titleCenter! - state.measureCenter!)).toBeLessThan(1);
+    expect(Math.abs(state.titleCenter! - state.panelCenter!)).toBeLessThan(1);
+  } else {
+    expect(state.panel!.top).toBeGreaterThanOrEqual(
+      Math.max(state.title!.bottom, state.measureCount!.bottom) - 1,
+    );
+  }
+  expect(
+    state.missedControls,
+    `Chord and note panel controls remain hit-testable: ${JSON.stringify(state)}`,
+  ).toHaveLength(0);
+  expect(state.controlsOutsideViewport).toBe(0);
+  expect(state.controlsClipped).toBe(0);
+  expect(state.panelScrollDimensions?.overflowX).toBe("visible");
+  expect(state.panelScrollDimensions?.overflowY).toBe("visible");
   expect(state.headerScrolls).toBe(false);
   expect(state.pageFits).toBe(true);
   expect(state.zooms.every((zoom) => zoom === "1" || zoom === "normal")).toBe(true);
@@ -190,6 +319,13 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
   await page.setViewportSize({ width: 640, height: 900 });
   await openStudio(page);
   for (const functionId of ["I", "V", "vi", "IV"]) await addChord(page, functionId);
+  // Put two contiguous chords in one Measure so ArrowRight has a valid shared-boundary preview.
+  const progressionSteps = page.locator("[data-progression-step-select]");
+  await expect(progressionSteps).toHaveCount(4);
+  await progressionSteps.nth(0).click();
+  await page.getByTestId("quick-edit-duration").selectOption("2/1");
+  await progressionSteps.nth(1).click();
+  await page.getByTestId("quick-edit-duration").selectOption("2/1");
   await setLayoutMeasuresPerSystem(page, 4);
   await page.getByTestId("progression-view-btn-piano-roll").click();
   await page.getByLabel("Snap resolution").selectOption("1/8");
@@ -220,18 +356,38 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
           .getByRole("group", { name: "Pitch grid" })
           .getByRole("button", { name: gridMode, exact: true })
           .click();
+        await alignSystemHeader(page);
+        await dismissSelectionHelp(page);
         const geometry = await panel.evaluate((element) => {
           const header = element.closest<HTMLElement>(".score-system-header");
           if (!header) throw new Error("Chord panel is outside the System header");
           const title =
             header.querySelector<HTMLElement>('[data-testid^="score-system-audition-"]') ??
             header.querySelector<HTMLElement>("strong");
-          const measureCount = title?.nextElementSibling as HTMLElement | null;
+          const measureCount = [...header.querySelectorAll<HTMLElement>("span")].find((candidate) =>
+            /^\d+ measures?$/.test(candidate.textContent?.trim() ?? ""),
+          );
           const headerBox = header.getBoundingClientRect();
           const panelBox = element.getBoundingClientRect();
           const titleBox = title?.getBoundingClientRect();
           const measureBox = measureCount?.getBoundingClientRect();
           const controls = [...element.querySelectorAll<HTMLElement>("button, select, input")];
+          const studioScroller = document.querySelector<HTMLElement>(".studio-grid");
+          if (!studioScroller) throw new Error("The Studio scroll region is missing");
+          const studioRect = studioScroller.getBoundingClientRect();
+          const studioTop = studioRect.top + studioScroller.clientTop;
+          const studioBottom = studioTop + studioScroller.clientHeight;
+          const appHeaderBottom =
+            document.querySelector<HTMLElement>(".app-header")?.getBoundingClientRect().bottom ?? 0;
+          const overlaps = (first: DOMRect | undefined, second: DOMRect | undefined) =>
+            Boolean(
+              first &&
+              second &&
+              first.left < second.right - 0.5 &&
+              first.right > second.left + 0.5 &&
+              first.top < second.bottom - 0.5 &&
+              first.bottom > second.top + 0.5,
+            );
           return {
             header: {
               left: headerBox.left,
@@ -251,9 +407,47 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
               scrollHeight: element.scrollHeight,
               clientHeight: element.clientHeight,
             },
+            title: titleBox?.toJSON(),
+            measure: measureBox?.toJSON(),
             titleCenter: titleBox ? titleBox.top + titleBox.height / 2 : null,
             measureCenter: measureBox ? measureBox.top + measureBox.height / 2 : null,
+            appHeaderBottom,
+            studioTop,
+            studioBottom,
+            titlePanelOverlap: overlaps(titleBox, panelBox),
+            measurePanelOverlap: overlaps(measureBox, panelBox),
             controlCount: controls.length,
+            gridVisibleHeight: Math.max(
+              0,
+              Math.min(
+                document.querySelector<HTMLElement>(".piano-roll-grid")?.getBoundingClientRect()
+                  .bottom ?? 0,
+                studioBottom,
+              ) -
+                Math.max(
+                  document.querySelector<HTMLElement>(".piano-roll-grid")?.getBoundingClientRect()
+                    .top ?? studioBottom,
+                  studioTop,
+                  appHeaderBottom,
+                ),
+            ),
+            gridBelowPanel: Boolean(
+              document.querySelector<HTMLElement>(".piano-roll-grid") &&
+              document.querySelector<HTMLElement>(".piano-roll-grid")!.getBoundingClientRect()
+                .top >=
+                panelBox.bottom - 1,
+            ),
+            controlsOutsideViewport: controls.filter((control) => {
+              const rect = control.getBoundingClientRect();
+              return (
+                rect.width <= 0 ||
+                rect.height <= 0 ||
+                rect.left < 0 ||
+                rect.right > window.innerWidth ||
+                rect.top < studioTop ||
+                rect.bottom > studioBottom
+              );
+            }).length,
             missedTargets: controls.filter((control) => {
               const rect = control.getBoundingClientRect();
               const hit = document.elementFromPoint(
@@ -266,23 +460,40 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
               document.documentElement.scrollWidth <= document.documentElement.clientWidth,
           };
         });
+        expect(geometry.header.top).toBeGreaterThanOrEqual(geometry.appHeaderBottom - 1);
+        expect(geometry.header.bottom).toBeLessThanOrEqual(viewport.height + 1);
         expect(geometry.panel.top).toBeGreaterThanOrEqual(geometry.header.top - 1);
         expect(geometry.panel.bottom).toBeLessThanOrEqual(geometry.header.bottom + 1);
         expect(geometry.titleCenter).not.toBeNull();
         expect(geometry.measureCenter).not.toBeNull();
+        expect(geometry.titlePanelOverlap).toBe(false);
+        expect(geometry.measurePanelOverlap).toBe(false);
+        if (viewport.width >= 1280) {
+          expect(
+            Math.abs(
+              geometry.panel.top +
+                (geometry.panel.bottom - geometry.panel.top) / 2 -
+                geometry.titleCenter!,
+            ),
+          ).toBeLessThan(1);
+          expect(Math.abs(geometry.measureCenter! - geometry.titleCenter!)).toBeLessThan(1);
+        } else {
+          expect(geometry.panel.top).toBeGreaterThanOrEqual(
+            Math.max(geometry.title!.bottom, geometry.measure!.bottom) - 1,
+          );
+        }
         expect(
-          Math.abs(
-            geometry.panel.top +
-              (geometry.panel.bottom - geometry.panel.top) / 2 -
-              geometry.titleCenter!,
-          ),
-        ).toBeLessThan(1);
-        expect(Math.abs(geometry.measureCenter! - geometry.titleCenter!)).toBeLessThan(1);
+          geometry.gridVisibleHeight,
+          `A portion of the Piano Roll grid remains visible in the Studio scrollport at ${viewport.width}x${viewport.height}: ${JSON.stringify(geometry)}`,
+        ).toBeGreaterThan(0);
+        expect(geometry.gridBelowPanel).toBe(true);
         expect(geometry.panel.right).toBeLessThanOrEqual(geometry.header.right);
+        expect(geometry.panel.left).toBeGreaterThanOrEqual(geometry.header.left);
         expect(geometry.panel.scrollWidth).toBeLessThanOrEqual(geometry.panel.clientWidth);
         expect(geometry.panel.scrollHeight).toBeLessThanOrEqual(geometry.panel.clientHeight);
         expect(geometry.header.scrollWidth).toBeLessThanOrEqual(geometry.header.clientWidth);
         expect(geometry.controlCount).toBeGreaterThan(10);
+        expect(geometry.controlsOutsideViewport).toBe(0);
         expect(geometry.missedTargets).toBe(0);
         expect(geometry.pageWidthFits).toBe(true);
         await page.screenshot({
@@ -292,13 +503,18 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
     }
   }
   await page.setViewportSize({ width: 640, height: 900 });
+  await alignSystemHeader(page);
 
   const boundary = page.locator(
     `.piano-roll-chord-boundary-handle[data-boundary-step-id="${sourceStepId}"][data-boundary-edge="right"]`,
   );
   await expect(boundary).toBeVisible();
+  await boundary.scrollIntoViewIfNeeded();
   const originalBoundary = Number(await boundary.getAttribute("aria-valuenow"));
+  const boundaryMax = Number(await boundary.getAttribute("aria-valuemax"));
+  expect(originalBoundary).toBeLessThan(boundaryMax);
   await boundary.focus();
+  await expect(boundary).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
   expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeGreaterThan(originalBoundary);
@@ -319,6 +535,9 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
     .getByRole("region", { name: "Measure 2" })
     .locator(".piano-roll-grid");
   await expect(secondMeasureGrid).toBeAttached();
+  await alignSystemHeader(page);
+  await revealWithinStudioGrid(boundary, 20);
+  await revealWithinStudioGrid(secondMeasureGrid, 20);
   const secondGridBox = await secondMeasureGrid.boundingBox();
   const boundaryBox = await boundary.boundingBox();
   expect(secondGridBox).toBeTruthy();
@@ -331,10 +550,39 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
     x: secondGridBox!.x + secondGridBox!.width / 8,
     y: pointerStart.y,
   };
+  const resizeTargets = await page.evaluate(
+    ({ start, end, boundaryBounds, secondGridBounds }) => {
+      const hit = (point: typeof start) => document.elementFromPoint(point.x, point.y);
+      const source = hit(start);
+      const destination = hit(end);
+      const scroller = document.querySelector<HTMLElement>(".studio-grid");
+      return {
+        start,
+        end,
+        sourceHit: source ? `${source.tagName}.${(source as HTMLElement).className}` : null,
+        destinationHit: destination
+          ? `${destination.tagName}.${(destination as HTMLElement).className}`
+          : null,
+        boundaryBounds,
+        secondGridBounds,
+        studioScrollport: scroller?.getBoundingClientRect().toJSON() ?? null,
+        studioScrollTop: scroller?.scrollTop ?? null,
+      };
+    },
+    {
+      start: pointerStart,
+      end: pointerEnd,
+      boundaryBounds: boundaryBox,
+      secondGridBounds: secondGridBox,
+    },
+  );
   await page.mouse.move(pointerStart.x, pointerStart.y);
   await page.mouse.down();
   await page.mouse.move(pointerEnd.x, pointerEnd.y, { steps: 6 });
-  await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+  await expect(
+    page.getByTestId("duration-resize-status"),
+    `The boundary drag must stay active across Measures: ${JSON.stringify(resizeTargets)}`,
+  ).toContainText("Preview boundary");
   expect(Number(await boundary.getAttribute("aria-valuenow"))).toBeGreaterThan(originalBoundary);
   await page.keyboard.press("Escape");
   await page.mouse.up();
@@ -375,8 +623,8 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
   const decodedSplit = decodedExport.progression.steps[decodedSourceIndex + 1];
   expect(decodedSource?.kind).toBe("chord");
   expect(decodedSplit?.kind).toBe("chord");
-  expect(decodedSource?.duration.beats).toEqual({ numerator: 2, denominator: 1 });
-  expect(decodedSplit?.duration.beats).toEqual({ numerator: 2, denominator: 1 });
+  expect(decodedSource?.duration.beats).toEqual({ numerator: 1, denominator: 1 });
+  expect(decodedSplit?.duration.beats).toEqual({ numerator: 1, denominator: 1 });
   expect(decodedSplit?.id).not.toBe(sourceStepId);
   if (decodedSource?.kind === "chord" && decodedSplit?.kind === "chord") {
     expect(decodedSplit.harmonicFunction).toEqual(decodedSource.harmonicFunction);
@@ -464,6 +712,39 @@ test("music-visible NOTE, CHORD and hidden-selection captures fit normal viewpor
           .getByRole("button", { name: /Replace with degree 1/ })
           .evaluate((button) => getComputedStyle(button).backgroundColor);
         expect(degreeOneColor).toMatch(/^rgb\(/);
+        if (viewport.height === 360) {
+          expect(await chord.getAttribute("data-source-step-id")).toBe(firstStep.id);
+          await chord.scrollIntoViewIfNeeded();
+          await revealWithinStudioGrid(chord, 20);
+          const scrolledChord = await chord.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            const scroller = element.closest<HTMLElement>(".studio-grid");
+            if (!scroller) throw new Error("The chord is outside the Studio scroll region");
+            const scrollport = scroller.getBoundingClientRect();
+            const studioTop = scrollport.top + scroller.clientTop;
+            const studioBottom = studioTop + scroller.clientHeight;
+            const hit = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+            return {
+              bounds: rect.toJSON(),
+              sourceStepId: element.getAttribute("data-source-step-id"),
+              studioTop,
+              studioBottom,
+              hitChord: Boolean(hit && (hit === element || element.contains(hit))),
+            };
+          });
+          expect(scrolledChord.sourceStepId).toBe(firstStep.id);
+          expect(scrolledChord.bounds.top).toBeGreaterThanOrEqual(scrolledChord.studioTop);
+          expect(scrolledChord.bounds.bottom).toBeLessThanOrEqual(scrolledChord.studioBottom);
+          expect(scrolledChord.hitChord).toBe(true);
+          await page.screenshot({
+            path: `test-results/music-visible-chord-grid-${viewport.width}x${viewport.height}-${themeName.toLowerCase()}-${gridName.toLowerCase()}.png`,
+          });
+          await alignSystemHeader(page);
+          await expectVisibleMusicAndPanel(page, chordPanel, false);
+        }
         await note.click();
         const notePanel = page.getByTestId("piano-roll-system-note-panel-0");
         await expect(chordPanel).toHaveCount(0);
@@ -474,36 +755,33 @@ test("music-visible NOTE, CHORD and hidden-selection captures fit normal viewpor
           path: `test-results/music-visible-note-${viewport.width}x${viewport.height}-${themeName.toLowerCase()}-${gridName.toLowerCase()}.png`,
         });
         if (viewport.height === 360) {
-          await note.evaluate((element) => {
-            const noteTop = element.getBoundingClientRect().top + window.scrollY;
-            const appHeaderBottom =
-              document.querySelector<HTMLElement>(".app-header")?.getBoundingClientRect().bottom ??
-              0;
-            window.scrollTo({
-              top: Math.max(0, noteTop - appHeaderBottom - 20),
-              behavior: "instant",
-            });
-          });
+          await revealWithinStudioGrid(note, 20);
           const scrolledNote = await note.evaluate((element) => {
             const rect = element.getBoundingClientRect();
+            const scroller = element.closest<HTMLElement>(".studio-grid");
+            if (!scroller) throw new Error("The note is outside the Studio scroll region");
+            const scrollport = scroller.getBoundingClientRect();
+            const studioTop = scrollport.top + scroller.clientTop;
+            const studioBottom = studioTop + scroller.clientHeight;
             const hit = document.elementFromPoint(
               rect.left + rect.width / 2,
               rect.top + rect.height / 2,
             );
             return {
               bounds: rect.toJSON(),
+              sourceStepId: element.getAttribute("data-source-step-id"),
+              studioTop,
+              studioBottom,
               hitNote: Boolean(hit && (hit === element || element.contains(hit))),
               grid: element.closest(".piano-roll-grid")?.getBoundingClientRect().toJSON(),
-              appHeaderBottom:
-                document.querySelector<HTMLElement>(".app-header")?.getBoundingClientRect()
-                  .bottom ?? 0,
               pageFits:
                 document.documentElement.scrollWidth <= document.documentElement.clientWidth,
               zoom: getComputedStyle(document.documentElement).zoom,
             };
           });
-          expect(scrolledNote.bounds.top).toBeGreaterThanOrEqual(scrolledNote.appHeaderBottom);
-          expect(scrolledNote.bounds.bottom).toBeLessThan(360);
+          expect(scrolledNote.sourceStepId).toBe(firstStep.id);
+          expect(scrolledNote.bounds.top).toBeGreaterThanOrEqual(scrolledNote.studioTop);
+          expect(scrolledNote.bounds.bottom).toBeLessThanOrEqual(scrolledNote.studioBottom);
           expect(scrolledNote.hitNote).toBe(true);
           expect(scrolledNote.grid?.bottom).toBeGreaterThan(scrolledNote.bounds.top);
           expect(scrolledNote.pageFits).toBe(true);
@@ -512,6 +790,7 @@ test("music-visible NOTE, CHORD and hidden-selection captures fit normal viewpor
             path: `test-results/music-visible-note-grid-640x360-${themeName.toLowerCase()}-${gridName.toLowerCase()}.png`,
           });
           await alignSystemHeader(page);
+          await expectVisibleMusicAndPanel(page, notePanel, false);
         }
 
         const grid = page.getByRole("group", { name: "Melody grid, measure 1" });

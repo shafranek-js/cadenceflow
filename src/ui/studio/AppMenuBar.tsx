@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { CardViewId } from "../../domain/progression/step";
-import type { ProgressionView } from "../../domain/project/project";
+import type { GuitarChordColorMode, ProgressionView } from "../../domain/project/project";
 
 type AppMenuId = "export" | "edit" | "view" | "help";
 
@@ -39,6 +39,8 @@ export interface AppMenuBarProps {
   readonly onResolutionArrowsChange?: (enabled: boolean) => void;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
   readonly onGuitarChordOrientationChange?: (orientation: "vertical" | "horizontal") => void;
+  readonly guitarChordColorMode?: GuitarChordColorMode;
+  readonly onGuitarChordColorModeChange?: (mode: GuitarChordColorMode) => void;
   readonly sidePanelMode?: "fixed" | "autohide";
   readonly onSidePanelModeChange?: (mode: "fixed" | "autohide") => void;
   readonly onOpenModesExplorer?: () => void;
@@ -66,6 +68,8 @@ export function AppMenuBar({
   onResolutionArrowsChange,
   guitarChordOrientation = "vertical",
   onGuitarChordOrientationChange,
+  guitarChordColorMode = "chord-roles",
+  onGuitarChordColorModeChange,
   sidePanelMode = "fixed",
   onSidePanelModeChange,
   onOpenModesExplorer,
@@ -317,6 +321,27 @@ export function AppMenuBar({
               {suzukiColors ? <span aria-hidden="true">✓</span> : null}
             </button>
             <div className="app-menu-section-label">Guitar view</div>
+            {(
+              [
+                { id: "chord-roles", label: "Chord roles" },
+                { id: "fingering", label: "Fingering colors" },
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={guitarChordColorMode === mode.id}
+                data-testid={`guitar-chord-color-mode-${mode.id}`}
+                onClick={() => {
+                  onGuitarChordColorModeChange?.(mode.id);
+                  closeMenu("view");
+                }}
+              >
+                <span>{mode.label}</span>
+                {guitarChordColorMode === mode.id ? <span aria-hidden="true">✓</span> : null}
+              </button>
+            ))}
             <button
               type="button"
               role="menuitemcheckbox"

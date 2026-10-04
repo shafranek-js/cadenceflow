@@ -36,6 +36,7 @@ import {
   pitchForScaleDegree,
 } from "./keyboardComposition";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import { pitchToConcertFrame } from "../../domain/progression/transposition";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
@@ -192,7 +193,14 @@ export function MelodyEditorDialog({
     );
     setInstrumentOverride(step.melodyInstrumentOverride);
     setAuthoredMode(authoredOnly || step.melody?.mode === "authored");
-    setAuthoredNotes(step.melody?.mode === "authored" ? step.melody.phrase.notes : []);
+    setAuthoredNotes(
+      step.melody?.mode === "authored"
+        ? step.melody.phrase.notes.map((note) => ({
+            ...note,
+            pitch: pitchToConcertFrame(note.pitch, step),
+          }))
+        : [],
+    );
     setEditingNoteId(null);
     setSelectedNoteIds([]);
     setSelectionAnchorId(null);

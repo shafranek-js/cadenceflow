@@ -11,13 +11,15 @@ import {
 } from "../../domain/timing/measureLayout";
 import { formatMusicalDuration, musicalDuration } from "../../domain/timing/duration";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+} from "../../domain/progression/transposition";
 import { GuitarCardView } from "../guitar/GuitarCardView";
+import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
 function chordLabel(step: ChordStep, tonic: Project["tonic"]): string {
-  const chord = {
-    ...realizeChord(step.harmonicFunction, tonic),
-    variant: step.harmonicVariant,
-  };
+  const chord = realizeProgressionStepChord(step, tonic);
   return formatChordSymbol(
     withEffectiveBass(chord, realizeProgressionStepRealization(step, tonic).bassPitch),
   );
@@ -51,10 +53,7 @@ function renderChordBody(
       ? nextStep.harmonicFunction.functionId
       : undefined;
   const chord = withEffectiveBass(
-    {
-      ...realizeChord(fragment.step.harmonicFunction, project.tonic),
-      variant: fragment.step.harmonicVariant,
-    },
+    realizeProgressionStepChord(fragment.step, project.tonic),
     realizeProgressionStepRealization(fragment.step, project.tonic).bassPitch,
   );
 
@@ -64,6 +63,10 @@ function renderChordBody(
         {label}
       </span>
       <span className="printable-chord-function">{fragment.step.harmonicFunction.functionId}</span>
+      <StepTranspositionBadge
+        semitones={stepTranspositionSemitones(fragment.step)}
+        className="printable-transposition-indicator"
+      />
       <span className="printable-duration">{formatMusicalDuration(fragment.step.duration)}</span>
       {direction ? (
         <span

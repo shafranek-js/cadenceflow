@@ -47,6 +47,7 @@ async function exportPortableProject(
 async function downloadPortableProjectText(
   page: import("@playwright/test").Page,
   escapeFirst = true,
+  escapeAfter = true,
 ): Promise<string> {
   if (escapeFirst) await page.keyboard.press("Escape");
   const exportToggle = page.getByTestId("export-menu-toggle");
@@ -57,7 +58,9 @@ async function downloadPortableProjectText(
   await expect(exportMenu).toBeVisible();
   await exportMenu.getByTestId("project-export-btn").click();
   const download = await projectDownload;
-  await page.keyboard.press("Escape");
+  if (escapeAfter) await page.keyboard.press("Escape");
+  else if ((await exportToggle.getAttribute("aria-expanded")) === "true")
+    await exportToggle.click();
   const path = await download.path();
   if (!path) throw new Error("Could not read portable Project download");
   return readFile(path, "utf8");
@@ -66,8 +69,9 @@ async function downloadPortableProjectText(
 async function exportDecodedProject(
   page: import("@playwright/test").Page,
   escapeFirst = true,
+  escapeAfter = true,
 ): Promise<Project> {
-  return decodePortableProject(await downloadPortableProjectText(page, escapeFirst));
+  return decodePortableProject(await downloadPortableProjectText(page, escapeFirst, escapeAfter));
 }
 
 const SHARED_OWNER_NOTE_ID = "shared-local-note-id";
@@ -287,11 +291,22 @@ async function positionBelowAppHeader(
     .first()
     .evaluate((element) => {
       const appHeader = document.querySelector<HTMLElement>(".app-header");
-      if (!appHeader) throw new Error("App header is missing");
-      window.scrollBy({
-        top: element.getBoundingClientRect().top - appHeader.getBoundingClientRect().bottom - 8,
-        behavior: "instant",
-      });
+      const studioScroller = document.querySelector<HTMLElement>(".studio-grid");
+      const statusBar = document.querySelector<HTMLElement>(".app-status-bar");
+      if (!appHeader || !studioScroller || !statusBar)
+        throw new Error("The Studio header, scroll region or status bar is missing");
+
+      const elementBounds = element.getBoundingClientRect();
+      const studioBounds = studioScroller.getBoundingClientRect();
+      const safeTop = Math.max(studioBounds.top, appHeader.getBoundingClientRect().bottom) + 8;
+      const safeBottom = Math.min(studioBounds.bottom, statusBar.getBoundingClientRect().top) - 8;
+      const scrollDelta =
+        elementBounds.top < safeTop
+          ? elementBounds.top - safeTop
+          : elementBounds.bottom > safeBottom
+            ? elementBounds.bottom - safeBottom
+            : 0;
+      if (scrollDelta !== 0) studioScroller.scrollTop += scrollDelta;
     });
 }
 
@@ -476,15 +491,23 @@ test("System note panel edits selected notes and keeps empty-cell clicks transie
             .evaluate((element) => {
               const rect = element.getBoundingClientRect();
               const appHeader = document.querySelector<HTMLElement>(".app-header")!;
+              const studioScroller = document.querySelector<HTMLElement>(".studio-grid")!;
+              const statusBar = document.querySelector<HTMLElement>(".app-status-bar")!;
               return {
                 top: rect.top,
                 bottom: rect.bottom,
                 headerBottom: appHeader.getBoundingClientRect().bottom,
+                studioTop: studioScroller.getBoundingClientRect().top,
+                studioBottom: studioScroller.getBoundingClientRect().bottom,
+                statusBarTop: statusBar.getBoundingClientRect().top,
                 viewportHeight: window.innerHeight,
               };
             });
           expect(bounds.top).toBeGreaterThanOrEqual(bounds.headerBottom - 1);
-          expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
+          expect(bounds.top).toBeGreaterThanOrEqual(bounds.studioTop - 1);
+          expect(bounds.bottom).toBeLessThanOrEqual(bounds.studioBottom + 1);
+          expect(bounds.bottom).toBeLessThanOrEqual(bounds.statusBarTop + 1);
+          expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight + 1);
           await expect(systemPanel).toHaveCount(0);
           await page.screenshot({
             path: `test-results/system-note-panel-${viewport.width}x${viewport.height}-${themeName.toLowerCase()}-${gridMode.toLowerCase()}-cursor-${kind}-visible.png`,
@@ -568,39 +591,34 @@ test("System note panel edits selected notes and keeps empty-cell clicks transie
           await expect(systemPanel).toBeVisible();
           await expect(systemPanel.locator(":focus")).toHaveCount(1);
           await page.locator(".piano-roll-measure").first().scrollIntoViewIfNeeded();
+          await positionBelowAppHeader(page, ".score-system-header");
           await expect(page.locator(".piano-roll-grid").first()).toBeVisible();
-          await page.evaluate(() => {
-            const header = document.querySelector<HTMLElement>(".score-system-header")!;
-            const appHeader = document.querySelector<HTMLElement>(".app-header")!;
-            const grid = document.querySelector<HTMLElement>(".piano-roll-grid")!;
-            const result = {
-              appHeaderBottom: appHeader.getBoundingClientRect().bottom,
-              headerTop: header.getBoundingClientRect().top,
-              headerBottom: header.getBoundingClientRect().bottom,
-              gridTop: grid.getBoundingClientRect().top,
-            };
-            window.scrollBy({
-              top: result.headerTop - result.appHeaderBottom - 8,
-              behavior: "instant",
-            });
-            return result;
-          });
           const positioned = await page.evaluate(() => {
             const header = document.querySelector<HTMLElement>(".score-system-header")!;
             const appHeader = document.querySelector<HTMLElement>(".app-header")!;
+            const studioScroller = document.querySelector<HTMLElement>(".studio-grid")!;
+            const statusBar = document.querySelector<HTMLElement>(".app-status-bar")!;
             const grid = document.querySelector<HTMLElement>(".piano-roll-grid")!;
+            const studioBounds = studioScroller.getBoundingClientRect();
             const gridBounds = grid.getBoundingClientRect();
             return {
               appHeaderBottom: appHeader.getBoundingClientRect().bottom,
               headerTop: header.getBoundingClientRect().top,
               headerBottom: header.getBoundingClientRect().bottom,
+              studioTop: studioBounds.top,
+              studioBottom: studioBounds.bottom,
+              statusBarTop: statusBar.getBoundingClientRect().top,
               gridTop: gridBounds.top,
               gridBottom: gridBounds.bottom,
               viewportHeight: window.innerHeight,
             };
           });
           expect(positioned.headerTop).toBeGreaterThanOrEqual(positioned.appHeaderBottom - 1);
+          expect(positioned.headerTop).toBeGreaterThanOrEqual(positioned.studioTop - 1);
+          expect(positioned.headerBottom).toBeLessThanOrEqual(positioned.studioBottom + 1);
+          expect(positioned.headerBottom).toBeLessThanOrEqual(positioned.statusBarTop + 1);
           expect(positioned.gridTop).toBeGreaterThanOrEqual(positioned.headerBottom);
+          expect(positioned.gridTop).toBeGreaterThanOrEqual(positioned.studioTop - 1);
           expect(positioned.gridTop).toBeLessThan(positioned.viewportHeight);
           expect(positioned.gridBottom).toBeGreaterThan(positioned.gridTop);
           const panelBounds = await systemPanel.evaluate((panel) => {
@@ -1429,7 +1447,7 @@ test("System note panel edits owner-colliding notes without changing Rest polyph
   const panel = page.locator("[data-testid^='piano-roll-system-note-panel-']");
   await expect(panel).toHaveCount(1);
   await expect(panel).toBeVisible();
-  const baseline = await exportDecodedProject(page);
+  const baseline = await exportDecodedProject(page, false, false);
   expect(await undoIsEnabled(page)).toBe(false);
 
   const initialChordNote = noteFor(baseline, "step-1", SHARED_OWNER_NOTE_ID);
@@ -1583,7 +1601,7 @@ test("System note panel edits owner-colliding notes without changing Rest polyph
   expect(await audioStartCount(page)).toBe(audioStartsBeforePanelActions);
   await expect(firstSelectedNote).toHaveCount(0);
   await expect(restSelectedNote).toHaveCount(0);
-  const afterDelete = await exportDecodedProject(page);
+  const afterDelete = await exportDecodedProject(page, false, false);
   expectAuthoredNotesEqual(
     authoredNotesFor(afterDelete, "step-1"),
     authoredNotesFor(baseline, "step-1").filter((note) => note.id !== SHARED_OWNER_NOTE_ID),
@@ -1597,8 +1615,8 @@ test("System note panel edits owner-colliding notes without changing Rest polyph
   expect(stepFor(afterDelete, "step-3").kind).toBe("rest");
   expectProjectContextUnchanged(afterDelete, baseline);
   await historyAction(page, "Undo");
-  expect(await exportDecodedProject(page)).toEqual(baseline);
+  expect(await exportDecodedProject(page, false, false)).toEqual(baseline);
   await historyAction(page, "Redo");
-  expect(await exportDecodedProject(page)).toEqual(afterDelete);
+  expect(await exportDecodedProject(page, false, false)).toEqual(afterDelete);
   expect(await audioStartCount(page)).toBe(audioStartsBeforePanelActions);
 });

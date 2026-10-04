@@ -12,7 +12,7 @@ import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
 import type { StaffOctaveDirection } from "../staff/staffOctave";
 import type { MatrixCardTopologyEntry } from "../../domain/harmony/topology";
 import type { HarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
-import type { NoteColorMode } from "../../domain/project/project";
+import type { GuitarChordColorMode, NoteColorMode } from "../../domain/project/project";
 
 export function ChordCard({
   model,
@@ -26,6 +26,7 @@ export function ChordCard({
   noteColorMode = suzukiColors ? "suzuki" : "standard",
   roleContext,
   guitarChordOrientation = "vertical",
+  guitarChordColorMode = "chord-roles",
   resolutionTargetSymbol,
   isResolutionTarget,
   isGenreFocused = false,
@@ -53,6 +54,7 @@ export function ChordCard({
   readonly noteColorMode?: NoteColorMode;
   readonly roleContext?: HarmonicNoteRoleContext;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
+  readonly guitarChordColorMode?: GuitarChordColorMode;
   readonly resolutionTargetSymbol?: string | undefined;
   readonly isResolutionTarget?: boolean | undefined;
   readonly isGenreFocused?: boolean | undefined;
@@ -258,6 +260,7 @@ export function ChordCard({
                       chord={model.chord}
                       chordLabel={chordLabel}
                       orientation={guitarChordOrientation}
+                      colorMode={guitarChordColorMode}
                     />
                   ) : null}
                 </div>
@@ -278,6 +281,7 @@ export function ChordCard({
               chord={model.chord}
               chordLabel={chordLabel}
               orientation={guitarChordOrientation}
+              colorMode={guitarChordColorMode}
             />
           )}
         </button>

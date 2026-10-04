@@ -136,7 +136,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
     });
 
     it("rejects future schemaVersion with UnsupportedProjectVersionError", () => {
-      expect(() => migrateProjectData({ schemaVersion: 7 })).toThrow(
+      expect(() => migrateProjectData({ schemaVersion: 11 })).toThrow(
         UnsupportedProjectVersionError,
       );
       expect(() => migrateProjectData({ schemaVersion: 100 })).toThrow(
@@ -288,7 +288,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       // Loading returns exact previous valid project
       const loaded = await repo.loadProject(validProject.id);
-      expect(loaded?.schemaVersion).toBe(6);
+      expect(loaded?.schemaVersion).toBe(10);
       expect(loaded?.name).toBe(validProject.name);
 
       await db.delete();

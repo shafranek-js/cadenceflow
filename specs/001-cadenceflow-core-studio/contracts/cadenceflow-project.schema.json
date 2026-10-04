@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadenceflow.local/schema/project-v9.json",
-  "title": "CadenceFlow Project v9",
-  "$comment": "Schema v9 permits authored Melody on Rest Steps and persists the planned Piano Roll view preference. Authored timing is relative Rational; absolute timeline and progression-tail clipping are derived. Generated recipes remain chord-only.",
+  "$id": "https://cadenceflow.local/schema/project-v10.json",
+  "title": "CadenceFlow Project v10",
+  "$comment": "Schema v10 persists additive Step-local semitone transposition. Stored pitch compensation preserves concert MIDI 0..127 when inverse Step offsets cross the MIDI boundaries. Authored timing is relative Rational; absolute timeline and progression-tail clipping are derived. Generated recipes remain chord-only.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,7 @@
     "customPresets"
   ],
   "properties": {
-    "schemaVersion": { "const": 9 },
+    "schemaVersion": { "const": 10 },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -40,9 +40,10 @@
       "required": ["noteColorMode"],
       "properties": {
         "progressionView": { "enum": ["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"] },
-        "noteColorMode": { "enum": ["standard", "suzuki", "harmonic-role"] }
+        "noteColorMode": { "enum": ["standard", "suzuki", "harmonic-role"] },
+        "guitarChordColorMode": { "enum": ["chord-roles", "fingering"] }
       },
-      "$comment": "Presentation-only note color mode and existing view preferences."
+      "$comment": "Presentation-only note/guitar marker color modes and existing view preferences."
     },
     "defaults": { "type": "object" },
     "moduleTemplateStates": {
@@ -223,10 +224,35 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "kind": { "const": "chord" },
+        "transpositionSemitones": { "type": "integer", "minimum": -127, "maximum": 127 },
         "harmonicFunction": { "type": "object" },
         "harmonicVariant": { "type": "object" },
         "duration": { "$ref": "#/$defs/duration" },
-        "performance": { "type": "object" },
+        "performance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["articulation", "register", "voicingMode", "bass", "masterVelocity", "perNoteVelocityOverrides", "dynamicsViewPreference"],
+          "properties": {
+            "articulation": { "enum": ["block", "arp-up", "arp-down", "broken-chord", "humanized"] },
+            "register": { "enum": ["auto", -2, -1, 0, 1, 2] },
+            "voicingMode": { "enum": ["auto", "manual"] },
+            "inversion": { "enum": ["auto", 0, 1, 2, 3] },
+            "manualVoicing": { "type": "array", "items": { "$ref": "#/$defs/exactPitch" } },
+            "bass": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["choice", "octaveOffset"],
+              "properties": {
+                "choice": { "enum": ["auto", "root", "third", "fifth", "seventh", "custom"] },
+                "octaveOffset": { "enum": ["auto", -1, -2] },
+                "customPitch": { "$ref": "#/$defs/exactPitch" }
+              }
+            },
+            "masterVelocity": { "type": "integer", "minimum": 1, "maximum": 127 },
+            "perNoteVelocityOverrides": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 127 } },
+            "dynamicsViewPreference": { "enum": ["musical", "midi"] }
+          }
+        },
         "cardView": { "enum": ["harmonic", "piano", "staff"] },
         "explicitSpellingOverrides": { "type": "object" },
         "melody": { "$ref": "#/$defs/chordMelody" },
@@ -240,6 +266,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "kind": { "const": "rest" },
+        "transpositionSemitones": { "type": "integer", "minimum": -127, "maximum": 127 },
         "duration": { "$ref": "#/$defs/duration" },
         "authoredMelody": { "$ref": "#/$defs/authoredMelodyPhrase" },
         "melodyInstrumentOverride": { "$ref": "#/$defs/melodyInstrument" }
@@ -422,6 +449,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "pitch": { "$ref": "#/$defs/exactPitch" },
+        "sourcePitchMidi": { "type": "integer", "minimum": 0, "maximum": 127 },
         "onset": { "$ref": "#/$defs/rational" },
         "duration": { "allOf": [{ "$ref": "#/$defs/rational" }], "properties": { "numerator": { "type": "integer", "minimum": 1 } } }
       }
@@ -434,6 +462,13 @@
         "midiNumber": { "type": "integer", "minimum": 0, "maximum": 127 },
         "pitchClassIdentity": { "type": "integer", "minimum": 0, "maximum": 11 },
         "octave": { "type": "integer" },
+        "transpositionCompensationSemitones": { "type": "integer", "minimum": -127, "maximum": 127 },
+        "transpositionSpellingOverride": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["step", "alter"],
+          "properties": { "step": { "enum": ["C", "D", "E", "F", "G", "A", "B"] }, "alter": { "type": "integer" } }
+        },
         "spelling": {
           "type": "object",
           "additionalProperties": false,

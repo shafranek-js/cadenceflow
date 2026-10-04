@@ -6,7 +6,7 @@ import { createDefaultMelodyTrackSettings, validateChordMelodyRecipe } from "../
 import { validateMelodyInstrumentId } from "../melody/instrumentCatalog";
 import { createDefaultHarmonyTrackSettings } from "../harmony/track";
 
-export const CURRENT_PROJECT_SCHEMA_VERSION = 9;
+export const CURRENT_PROJECT_SCHEMA_VERSION = 10;
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(
@@ -52,31 +52,56 @@ export function migrateProjectData(data: unknown): Record<string, unknown> {
   }
 
   if (version === 1) {
-    return migrateV8ToV9(migrateV7ToV8(
+    return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(
       migrateV6ToV7(
         migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(record))))),
       ),
-    ));
+    )));
   }
 
   if (version === 2)
-    return migrateV8ToV9(migrateV7ToV8(
+    return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(
       migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(record))))),
-    ));
+    )));
 
   if (version === 3)
-    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(record))))));
+    return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(record)))))));
 
-  if (version === 4) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(record)))));
+  if (version === 4) return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(record))))));
 
-  if (version === 5) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(record))));
-  if (version === 6) return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(record)));
-  if (version === 7) return migrateV8ToV9(migrateV7ToV8(record));
-  if (version === 8) return migrateV8ToV9(record);
+  if (version === 5) return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(record)))));
+  if (version === 6) return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(record))));
+  if (version === 7) return migrateV9ToV10(migrateV8ToV9(migrateV7ToV8(record)));
+  if (version === 8) return migrateV9ToV10(migrateV8ToV9(record));
+  if (version === 9) return migrateV9ToV10(record);
 
   // A shallow root copy keeps current decoding pure while preserving every supported
   // current field exactly as supplied. Future migrations can be appended above.
   return { ...record };
+}
+
+function migrateV9ToV10(record: Record<string, unknown>): Record<string, unknown> {
+  const migrateContainer = (value: unknown): unknown => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const container = value as Record<string, unknown>;
+    if (!Array.isArray(container.steps)) return value;
+    return {
+      ...container,
+      steps: container.steps.map((raw) => {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+        const step = raw as Record<string, unknown>;
+        return { ...step, transpositionSemitones: 0 };
+      }),
+    };
+  };
+  return {
+    ...record,
+    schemaVersion: 10,
+    progression: migrateContainer(record.progression),
+    ...(record.temporaryBranch !== undefined
+      ? { temporaryBranch: migrateContainer(record.temporaryBranch) }
+      : {}),
+  };
 }
 
 function migrateV8ToV9(record: Record<string, unknown>): Record<string, unknown> {

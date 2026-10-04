@@ -5,6 +5,11 @@ import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
 import { resolveGuitarChordVoicing } from "../domain/instruments/guitar/voicings";
 import type { ChordStep, ProgressionStep } from "../domain/progression/step";
 import {
+  stepTranspositionSemitones,
+  transposeChordDefinition,
+  transposeExactPitch,
+} from "../domain/progression/transposition";
+import {
   addRational,
   compareRational,
   multiplyRational,
@@ -46,6 +51,8 @@ export interface PerformanceStepRealization {
   readonly stepId: string;
   readonly upperPitches: readonly ExactPitch[];
   readonly bassPitch?: ExactPitch | undefined;
+  readonly sourceUpperPitches: readonly ExactPitch[];
+  readonly sourceBassPitch?: ExactPitch | undefined;
 }
 
 export interface RealizedProgressionPerformance {
@@ -88,15 +95,23 @@ function millisecondsToBeats(milliseconds: number, tempoBpm: number): Rational {
   return numberToRational((milliseconds / 1000) * (tempoBpm / 60));
 }
 
-function sortPitches(pitches: readonly ExactPitch[], descending: boolean): readonly ExactPitch[] {
+function sortPitchPairs(
+  pitches: readonly ExactPitch[],
+  sourcePitches: readonly ExactPitch[],
+  descending: boolean,
+): readonly { readonly pitch: ExactPitch; readonly sourcePitch: ExactPitch }[] {
   return pitches
-    .map((pitch, index) => ({ pitch, index }))
+    .map((pitch, index) => {
+      const sourcePitch = sourcePitches[index];
+      if (!sourcePitch) throw new Error("Missing source-frame pitch for realized chord tone");
+      return { pitch, sourcePitch, index };
+    })
     .sort((a, b) =>
       descending
         ? b.pitch.midiNumber - a.pitch.midiNumber || a.index - b.index
         : a.pitch.midiNumber - b.pitch.midiNumber || a.index - b.index,
     )
-    .map(({ pitch }) => pitch);
+    .map(({ pitch, sourcePitch }) => ({ pitch, sourcePitch }));
 }
 
 export function projectProgressionStepTimings(
@@ -177,6 +192,7 @@ export function realizeProgressionPerformanceEvents(
     step: ChordStep,
     stepIndex: number,
     pitch: ExactPitch,
+    sourcePitch: ExactPitch,
     channelRole: PerformanceEventRole,
     startBeats: Rational,
     durationBeats: Rational,
@@ -189,7 +205,7 @@ export function realizeProgressionPerformanceEvents(
         pitch: pitch.midiNumber,
         velocity: resolveEffectiveNoteVelocity(
           step.performance.masterVelocity,
-          String(pitch.midiNumber),
+          String(sourcePitch.midiNumber),
           step.performance.perNoteVelocityOverrides,
         ),
         channelRole,
@@ -213,16 +229,28 @@ export function realizeProgressionPerformanceEvents(
         stepId: step.id,
         upperPitches: realization.upperPitches,
         bassPitch: realization.bassPitch,
+        sourceUpperPitches: realization.sourceUpperPitches,
+        sourceBassPitch: realization.sourceBassPitch,
       }),
     );
 
     const gatedDuration = multiplyRational(timing.durationBeats, PERFORMANCE_GATE_RATIO);
     if (realization.bassPitch) {
-      addEvent(step, stepIndex, realization.bassPitch, "bass", timing.startBeats, gatedDuration);
+      if (!realization.sourceBassPitch) throw new Error(`Missing source bass pitch for ${step.id}`);
+      addEvent(
+        step,
+        stepIndex,
+        realization.bassPitch,
+        realization.sourceBassPitch,
+        "bass",
+        timing.startBeats,
+        gatedDuration,
+      );
     }
 
     const addUpperAtOffset = (
       pitch: ExactPitch,
+      sourcePitch: ExactPitch,
       offsetBeats: Rational,
       durationRatio = PERFORMANCE_GATE_RATIO,
     ): void => {
@@ -231,6 +259,7 @@ export function realizeProgressionPerformanceEvents(
         step,
         stepIndex,
         pitch,
+        sourcePitch,
         "upper",
         addRational(timing.startBeats, offsetBeats),
         multiplyRational(remaining, durationRatio),
@@ -240,31 +269,39 @@ export function realizeProgressionPerformanceEvents(
     const upperPitches = realization.upperPitches;
     switch (step.performance.articulation) {
       case "block":
-        upperPitches.forEach((pitch) => addUpperAtOffset(pitch, ZERO));
+        upperPitches.forEach((pitch, index) => {
+          const sourcePitch = realization.sourceUpperPitches[index];
+          if (!sourcePitch) throw new Error(`Missing source upper pitch for ${step.id}`);
+          addUpperAtOffset(pitch, sourcePitch, ZERO);
+        });
         break;
       case "arp-up":
       case "arp-down": {
-        const ordered = sortPitches(upperPitches, step.performance.articulation === "arp-down");
+        const ordered = sortPitchPairs(
+          upperPitches,
+          realization.sourceUpperPitches,
+          step.performance.articulation === "arp-down",
+        );
         const noteCount = ordered.length;
         const spreadDelay =
           noteCount > 1
             ? multiplyRational(timing.durationBeats, rational(2, 5 * (noteCount - 1)))
             : ZERO;
         const stepDelay = minRational(spreadDelay, millisecondsToBeats(45, input.tempoBpm));
-        ordered.forEach((pitch, index) =>
-          addUpperAtOffset(pitch, multiplyRational(stepDelay, rational(index))),
+        ordered.forEach(({ pitch, sourcePitch }, index) =>
+          addUpperAtOffset(pitch, sourcePitch, multiplyRational(stepDelay, rational(index))),
         );
         break;
       }
       case "broken-chord": {
-        const ordered = sortPitches(upperPitches, false);
+        const ordered = sortPitchPairs(upperPitches, realization.sourceUpperPitches, false);
         const upperHalfStart = Math.ceil(ordered.length / 2);
         const halfDelay = minRational(
           multiplyRational(timing.durationBeats, rational(1, 4)),
           millisecondsToBeats(80, input.tempoBpm),
         );
-        ordered.forEach((pitch, index) =>
-          addUpperAtOffset(pitch, index >= upperHalfStart ? halfDelay : ZERO),
+        ordered.forEach(({ pitch, sourcePitch }, index) =>
+          addUpperAtOffset(pitch, sourcePitch, index >= upperHalfStart ? halfDelay : ZERO),
         );
         break;
       }
@@ -275,10 +312,12 @@ export function realizeProgressionPerformanceEvents(
           millisecondsToBeats(15, input.tempoBpm),
         );
         const maxJitterNumber = rationalToNumber(maxJitter);
-        upperPitches.forEach((pitch) => {
+        upperPitches.forEach((pitch, index) => {
+          const sourcePitch = realization.sourceUpperPitches[index];
+          if (!sourcePitch) throw new Error(`Missing source upper pitch for ${step.id}`);
           const jitter = numberToRational((random() - 0.5) * 2 * maxJitterNumber);
           const offset = compareRational(jitter, ZERO) > 0 ? jitter : ZERO;
-          addUpperAtOffset(pitch, offset, numberToRational(0.88 + random() * 0.08));
+          addUpperAtOffset(pitch, sourcePitch, offset, numberToRational(0.88 + random() * 0.08));
         });
         break;
       }
@@ -414,23 +453,27 @@ export function realizeGuitarStepAudioEvents(
   const isSeventh =
     input.chord.baseQuality === "dominant" || input.chord.variant?.seventh !== undefined;
   const isMajor7 = input.chord.variant?.seventh === "major7";
+  const transposition = input.step ? stepTranspositionSemitones(input.step) : 0;
+  const sourceChord = transposeChordDefinition(input.chord, -transposition);
   const guitarVoicing = resolveGuitarChordVoicing({
-    rootPitchClass: input.chord.rootPitchClass,
-    baseQuality: input.chord.baseQuality,
-    spelling: input.chord.spelling,
-    ...(input.chord.bassPitchClass !== undefined
-      ? { bassPitchClass: input.chord.bassPitchClass }
+    rootPitchClass: sourceChord.rootPitchClass,
+    baseQuality: sourceChord.baseQuality,
+    spelling: sourceChord.spelling,
+    ...(sourceChord.bassPitchClass !== undefined
+      ? { bassPitchClass: sourceChord.bassPitchClass }
       : {}),
     isSeventh,
     isMajor7,
   });
 
-  const pitches =
+  const sourceManualPitches =
     input.step?.performance?.voicingMode === "manual" &&
     input.step.performance.manualVoicing &&
     input.step.performance.manualVoicing.length > 0
       ? input.step.performance.manualVoicing
-      : guitarVoicing.pitches;
+      : undefined;
+  const sourcePitches = sourceManualPitches ?? guitarVoicing.pitches;
+  const pitches = sourcePitches.map((pitch) => transposeExactPitch(pitch, transposition));
 
   const durationBeats = input.durationBeats ?? input.step?.duration?.beats ?? rational(4, 1);
   const secondsPerBeat = 60 / input.tempoBpm;

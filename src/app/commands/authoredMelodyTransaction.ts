@@ -11,17 +11,25 @@ import {
   ZERO,
   type Rational,
 } from "../../domain/timing/rational";
-import type { ExactPitch } from "../../domain/harmony/pitch";
+import { assertMidiNumber, type ExactPitch } from "../../domain/harmony/pitch";
 import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
+import { pitchToConcertFrame, pitchToSourceFrame } from "../../domain/progression/transposition";
 
 export interface AbsoluteAuthoredNote {
   readonly id: string;
   readonly pitch: ExactPitch;
+  readonly sourcePitchMidi?: number;
   readonly startBeats: Rational;
   readonly durationBeats: Rational;
 }
 export type AuthoredMelodyEdit =
-  | { readonly type: "upsert"; readonly note: AbsoluteAuthoredNote; readonly sourceStepId?: string }
+  | {
+      readonly type: "upsert";
+      readonly note: AbsoluteAuthoredNote;
+      readonly sourceStepId?: string;
+      /** Source identity when a collision-safe transfer assigns a new destination ID. */
+      readonly sourceNoteId?: string;
+    }
   | { readonly type: "delete"; readonly noteId: string; readonly sourceStepId: string };
 export interface AuthoredMelodyTransactionPayload {
   readonly edits: readonly AuthoredMelodyEdit[];
@@ -65,6 +73,19 @@ function phraseFor(step: ProgressionStep): AuthoredMelodyPhrase | undefined {
   if (step.kind === "rest") return step.authoredMelody;
   if (step.melody?.mode === "authored") return step.melody.phrase;
   return undefined;
+}
+function sameExactPitch(left: ExactPitch, right: ExactPitch): boolean {
+  return (
+    left.midiNumber === right.midiNumber &&
+    left.pitchClassIdentity === right.pitchClassIdentity &&
+    left.octave === right.octave &&
+    left.spelling.step === right.spelling.step &&
+    left.spelling.alter === right.spelling.alter &&
+    (left.transpositionCompensationSemitones ?? 0) ===
+      (right.transpositionCompensationSemitones ?? 0) &&
+    left.transpositionSpellingOverride?.step === right.transpositionSpellingOverride?.step &&
+    left.transpositionSpellingOverride?.alter === right.transpositionSpellingOverride?.alter
+  );
 }
 function isRational(value: Rational): boolean {
   return (
@@ -151,6 +172,11 @@ export function applyAuthoredMelodyTransaction(
   const steps = project.progression.steps;
   const states = new Map<string, StepMelodyState>();
   const notesByStep = new Map<string, AuthoredMelodyNote[]>();
+  const originalSourceNotes = new Map<string, AuthoredMelodyNote>();
+  for (const step of steps) {
+    for (const note of phraseFor(step)?.notes ?? [])
+      originalSourceNotes.set(`${step.id}\u0000${note.id}`, note);
+  }
   const converting = new Set(command.payload.convertStepIds ?? []);
   const effective = createEffectiveMelodyTimeline(project);
   if (converting.size) {
@@ -169,6 +195,7 @@ export function applyAuthoredMelodyTransaction(
           .map((note) => ({
             id: crypto.randomUUID(),
             pitch: note.pitch,
+            sourcePitchMidi: note.sourcePitchMidi,
             onset: subtractRational(note.startBeats, start),
             duration: note.durationBeats,
           })),
@@ -186,11 +213,19 @@ export function applyAuthoredMelodyTransaction(
             .map((note) => ({
               id: note.eventKey,
               pitch: note.pitch,
+              sourcePitchMidi: note.sourcePitchMidi,
               onset: subtractRational(note.startBeats, start),
               duration: note.durationBeats,
             })),
         );
-      } else notesByStep.set(step.id, [...(phraseFor(step)?.notes ?? [])]);
+      } else
+        notesByStep.set(
+          step.id,
+          (phraseFor(step)?.notes ?? []).map((note) => ({
+            ...note,
+            pitch: pitchToConcertFrame(note.pitch, step),
+          })),
+        );
     }
     return notesByStep.get(step.id)!;
   };
@@ -250,11 +285,17 @@ export function applyAuthoredMelodyTransaction(
         "Authored notes require an ID, valid pitch, non-negative onset, and positive Rational duration.",
       );
     try {
+      assertMidiNumber(edit.note.pitch.midiNumber);
+      if (edit.note.pitch.transpositionCompensationSemitones !== undefined)
+        throw new RangeError("Concert edits cannot include source-frame compensation.");
       snapshotAuthoredMelodyPhrase({
         notes: [
           {
             id: edit.note.id,
             pitch: edit.note.pitch,
+            ...(edit.note.sourcePitchMidi !== undefined
+              ? { sourcePitchMidi: edit.note.sourcePitchMidi }
+              : {}),
             onset: ZERO,
             duration: edit.note.durationBeats,
           },
@@ -266,11 +307,13 @@ export function applyAuthoredMelodyTransaction(
         "Authored note pitch or exact duration is invalid.",
       );
     }
-    const source = edit.sourceStepId
-      ? locate(edit.note.id, edit.sourceStepId)
-      : steps.some((step) => phraseFor(step)?.notes.some((note) => note.id === edit.note.id))
-        ? locate(edit.note.id)
-        : undefined;
+    const sourceId = edit.sourceNoteId ?? edit.note.id;
+    const source =
+      edit.sourceStepId || edit.sourceNoteId
+        ? locate(sourceId, edit.sourceStepId)
+        : steps.some((step) => phraseFor(step)?.notes.some((note) => note.id === sourceId))
+          ? locate(sourceId)
+          : undefined;
     const noteEnd = addRational(edit.note.startBeats, edit.note.durationBeats);
     if (compareRational(edit.note.startBeats, end) >= 0 || compareRational(noteEnd, end) > 0)
       throw new AuthoredMelodyTransactionError(
@@ -294,15 +337,21 @@ export function applyAuthoredMelodyTransaction(
       );
     if (destination.kind === "chord" && destination.melody?.mode === "generated")
       loadNotes(destination);
+    let inheritedSourcePitchMidi = edit.note.sourcePitchMidi;
     if (source) {
       loadNotes(source);
       const sourceNotes = notesByStep.get(source.id)!;
-      const sourceIndex = sourceNotes.findIndex((note) => note.id === edit.note.id);
+      const sourceIndex = sourceNotes.findIndex((note) => note.id === sourceId);
       if (sourceIndex < 0)
         throw new AuthoredMelodyTransactionError(
           "unknown-note",
-          `Unknown authored note ${edit.note.id}`,
+          `Unknown authored note ${sourceId}`,
         );
+      const sourceNote = sourceNotes[sourceIndex]!;
+      if (inheritedSourcePitchMidi === undefined && sourceNote.sourcePitchMidi !== undefined) {
+        inheritedSourcePitchMidi =
+          sourceNote.sourcePitchMidi + (edit.note.pitch.midiNumber - sourceNote.pitch.midiNumber);
+      }
       sourceNotes.splice(sourceIndex, 1);
     }
     const destinationNotes = loadNotes(destination);
@@ -313,13 +362,21 @@ export function applyAuthoredMelodyTransaction(
         id = `${edit.note.id}~${destination.id}~${suffix++}`;
       } while (destinationNotes.some((note) => note.id === id));
     }
-    const sourceIdentity = `${source?.id ?? destination.id}\u0000${edit.note.id}`;
-    markEditedIdentity(source?.id ?? destination.id, edit.note.id);
+    const sourceIdentity = `${source?.id ?? destination.id}\u0000${source ? sourceId : edit.note.id}`;
+    markEditedIdentity(source?.id ?? destination.id, source ? sourceId : edit.note.id);
     const destinationIdentity = `${destination.id}\u0000${id}`;
     if (destinationIdentity !== sourceIdentity) markEditedIdentity(destination.id, id);
     const onset = subtractRational(edit.note.startBeats, starts.get(destination.id)!);
     destinationNotes.push(
-      Object.freeze({ id, pitch: edit.note.pitch, onset, duration: edit.note.durationBeats }),
+      Object.freeze({
+        id,
+        pitch: edit.note.pitch,
+        ...(inheritedSourcePitchMidi !== undefined
+          ? { sourcePitchMidi: inheritedSourcePitchMidi }
+          : {}),
+        onset,
+        duration: edit.note.durationBeats,
+      }),
     );
   }
   const touched = new Set(notesByStep.keys());
@@ -327,7 +384,12 @@ export function applyAuthoredMelodyTransaction(
     if (touched.has(step.id)) {
       const notes = notesByStep.get(step.id)!;
       const phrase = snapshotAuthoredMelodyPhrase({
-        notes,
+        notes: notes.map((note) => {
+          const original = originalSourceNotes.get(`${step.id}\u0000${note.id}`);
+          if (original && sameExactPitch(pitchToConcertFrame(original.pitch, step), note.pitch))
+            return { ...note, pitch: original.pitch };
+          return { ...note, pitch: pitchToSourceFrame(note.pitch, step) };
+        }),
         ...(phraseFor(step)?.sourceRecipe
           ? { sourceRecipe: phraseFor(step)!.sourceRecipe }
           : step.kind === "chord" && step.melody?.mode === "generated"

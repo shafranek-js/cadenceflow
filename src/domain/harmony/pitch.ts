@@ -11,6 +11,10 @@ export interface ExactPitch {
   readonly pitchClassIdentity: PitchClassIdentity;
   readonly octave: number;
   readonly spelling: PitchSpelling;
+  /** Source-frame compensation when inverse Step transposition falls outside MIDI 0..127. */
+  readonly transpositionCompensationSemitones?: number;
+  /** Concert-frame spelling retained when this source pitch is transposed by its owning Step. */
+  readonly transpositionSpellingOverride?: PitchSpelling;
 }
 
 export function normalizePitchClass(value: number): PitchClassIdentity {

@@ -4,6 +4,7 @@ import type { Project } from "../../domain/project/project";
 import type { MusicalDuration } from "../../domain/timing/duration";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import { realizeChord } from "../../domain/harmony/realization";
+import { realizeProgressionStepChord } from "../../domain/progression/transposition";
 import { defaultTonicSpelling, formatPitchSpelling } from "../../domain/harmony/spelling";
 
 import { formatChordSymbol } from "../../domain/harmony/chord";
@@ -60,7 +61,7 @@ export function getPresetRealizationSummary(
 
   if (realization.kind === "success") {
     const chordSymbols = realization.steps.map((step) =>
-      formatChordSymbol(realizeChord(step.harmonicFunction, project.tonic)),
+      formatChordSymbol(realizeProgressionStepChord(step, project.tonic)),
     );
     return {
       kind: "success",

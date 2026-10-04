@@ -99,10 +99,10 @@ test("v9 authored Rest continuation remains usable in every existing view and th
   await page.getByTestId("project-menu-toggle").click();
   await expect(page.getByRole("menu", { name: "Project actions" })).toHaveCount(0);
   await expect(
-    page.locator("[data-melody-event-key='rest-long-continuation']").first(),
+    page.locator("[data-piano-roll-event-key='rest-long-continuation']").first(),
   ).toBeVisible();
   const initialFragments = await page
-    .locator("[data-melody-event-key='rest-long-continuation']")
+    .locator("[data-piano-roll-event-key='rest-long-continuation']")
     .evaluateAll((elements) =>
       elements
         .filter((element) => {
@@ -117,30 +117,33 @@ test("v9 authored Rest continuation remains usable in every existing view and th
         })
         .map((element) => ({
           startsHere: !element.classList.contains("is-continuation"),
-          start: element.getAttribute("data-start-beats"),
-          duration: element.getAttribute("data-duration-beats"),
+          start: element.getAttribute("data-fragment-start-beats"),
+          duration: element.getAttribute("data-fragment-duration-beats"),
           sourceStep: element.getAttribute("data-source-step-id"),
         })),
     );
-  expect(initialFragments.length).toBeGreaterThan(1);
+  expect(initialFragments).toHaveLength(2);
   expect(initialFragments.filter((fragment) => fragment.startsHere)).toHaveLength(1);
   expect(initialFragments.every((fragment) => fragment.sourceStep === "rest-melody-owner")).toBe(
     true,
   );
-  expect(initialFragments.map((fragment) => fragment.start)).toEqual(["1/4", "2/1", "4/1"]);
-  expect(initialFragments.map((fragment) => fragment.duration)).toEqual(["7/4", "2/1", "2/1"]);
+  expect(initialFragments.map((fragment) => fragment.start)).toEqual(["1/4", "4/1"]);
+  expect(initialFragments.map((fragment) => fragment.duration)).toEqual(["15/4", "2/1"]);
   const totalEffectiveDuration = initialFragments.reduce((sum, fragment) => {
     const [numerator, denominator = "1"] = (fragment.duration ?? "0").split("/");
     return sum + Number(numerator) / Number(denominator);
   }, 0);
   expect(totalEffectiveDuration).toBeCloseTo(5.75, 6);
   const simultaneousFragments = page.locator(
-    "[data-melody-event-key='rest-overlapping-polyphony']",
+    "[data-piano-roll-event-key='rest-overlapping-polyphony']",
   );
   await expect(simultaneousFragments).toHaveCount(1);
-  await expect(simultaneousFragments.first()).toHaveAttribute("data-start-beats", "1/4");
-  await expect(simultaneousFragments.first()).toHaveAttribute("data-duration-beats", "1/1");
-  await expect(page.locator("[data-view='harmonic']").first()).toBeVisible();
+  await expect(simultaneousFragments.first()).toHaveAttribute("data-fragment-start-beats", "1/4");
+  await expect(simultaneousFragments.first()).toHaveAttribute(
+    "data-fragment-duration-beats",
+    "1/1",
+  );
+  await expect(page.getByTestId("piano-roll-harmony-grid-lines").first()).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("export-menu-toggle").click();
@@ -149,7 +152,7 @@ test("v9 authored Rest continuation remains usable in every existing view and th
   const downloadPath = await download.path();
   if (!downloadPath) throw new Error("Could not read exported Project");
   const roundTrip = JSON.parse(await readFile(downloadPath, "utf8"));
-  expect(roundTrip.schemaVersion).toBe(9);
+  expect(roundTrip.schemaVersion).toBe(10);
   expect(roundTrip.presentation.progressionView).toBe("piano-roll");
   expect(roundTrip.progression.steps[0].authoredMelody.notes[0].duration).toEqual({
     numerator: 6,

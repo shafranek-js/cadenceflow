@@ -17,6 +17,7 @@ import {
   Tuplet,
   Voice,
 } from "vexflow";
+import { GUITAR_FINGER_COLORS as GUITAR_FINGER_COLOR_PALETTE } from "../domain/instruments/guitar/fingerColors";
 import { musicalDuration, type MusicalDuration } from "../domain/timing/duration";
 import type { Meter } from "../domain/timing/meter";
 import {
@@ -326,10 +327,7 @@ export interface StaffSystemPosition extends StaffSequencePosition {
 export type TabFingeringStyle = "badge" | "dots" | "numbers";
 export const GUITAR_FINGER_COLORS: Record<number, string> = {
   0: "#9ca3af",
-  1: "#f7aa06",
-  2: "#c920ff",
-  3: "#00affe",
-  4: "#f56e50",
+  ...GUITAR_FINGER_COLOR_PALETTE,
 };
 export interface StaffSystemRenderOptions {
   readonly widthPx?: number;

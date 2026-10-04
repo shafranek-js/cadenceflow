@@ -1,6 +1,7 @@
 import { HqSamplePianoProvider } from "./hq-sample-piano/provider";
 import { LookAheadScheduler } from "./scheduler";
 import { PreviewAuditionController } from "./previewAudition";
+import { MelodySoundFontProvider } from "./soundfont/melodyProvider";
 
 /**
  * Diagnostic test hooks strictly guarded for DEV or automated test execution.
@@ -17,6 +18,7 @@ export function initAudioTestHooks(): void {
   ) {
     (window as unknown as { __cadenceflow_audio__?: unknown }).__cadenceflow_audio__ = {
       HqSamplePianoProvider,
+      MelodySoundFontProvider,
       LookAheadScheduler,
       PreviewAuditionController,
     };

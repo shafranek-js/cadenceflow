@@ -15,7 +15,7 @@ import {
 } from "./mapping";
 import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import { modeForModule } from "../../domain/harmony/functions";
-import { exactPitch, type ExactPitch } from "../../domain/harmony/pitch";
+import type { ExactPitch } from "../../domain/harmony/pitch";
 import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
 import {
   snapshotChordMelody,
@@ -31,6 +31,11 @@ import {
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
 import type { ChordStep, ProgressionStep, RestStep } from "../../domain/progression/step";
 import type { Project } from "../../domain/project/project";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+  transposeExactPitch,
+} from "../../domain/progression/transposition";
 import {
   addRational,
   compareRational,
@@ -275,6 +280,8 @@ type MelodyRawEvent = MelodyRawNoteEvent | MelodyRawRestEvent;
 interface ProjectedChord {
   readonly chord: ReturnType<typeof realizeHarmonyChord>;
   readonly pitches: readonly { readonly pitch: ExactPitch; readonly role: "upper" | "bass" }[];
+  readonly contextUpperPitches: readonly ExactPitch[];
+  readonly contextBassPitch?: ExactPitch | undefined;
   readonly harmony: MusicXmlHarmonyMapping;
   readonly dynamicLabel: "pp" | "p" | "mp" | "mf" | "f" | "ff";
   readonly sourceVelocity: number;
@@ -436,7 +443,7 @@ function pitchWithSavedSpelling(
   const overrides = step.explicitSpellingOverrides;
   const override =
     overrides?.[`${role}:${pitch.midiNumber}`] ?? overrides?.[String(pitch.midiNumber)];
-  return override ? exactPitch(pitch.midiNumber, override) : pitch;
+  return override ? Object.freeze({ ...pitch, spelling: Object.freeze({ ...override }) }) : pitch;
 }
 
 function musicXmlPitchForExactPitch(
@@ -466,15 +473,20 @@ function freezeProjectedPitches(
   realization: { readonly pitches: readonly ExactPitch[]; readonly bassPitch?: ExactPitch },
   step: ChordStep,
 ): readonly { readonly pitch: ExactPitch; readonly role: "upper" | "bass" }[] {
+  const toConcertPitch = (pitch: ExactPitch, role: "upper" | "bass") =>
+    transposeExactPitch(
+      pitchWithSavedSpelling(pitch, step, role),
+      stepTranspositionSemitones(step),
+    );
   const pitches: { readonly pitch: ExactPitch; readonly role: "upper" | "bass" }[] = [];
   if (realization.bassPitch) {
     pitches.push({
-      pitch: pitchWithSavedSpelling(realization.bassPitch, step, "bass"),
+      pitch: toConcertPitch(realization.bassPitch, "bass"),
       role: "bass",
     });
   }
   const uppers = [...realization.pitches]
-    .map((pitch) => pitchWithSavedSpelling(pitch, step, "upper"))
+    .map((pitch) => toConcertPitch(pitch, "upper"))
     .sort((a, b) => a.midiNumber - b.midiNumber);
   for (const pitch of uppers) pitches.push({ pitch, role: "upper" });
   return Object.freeze(pitches.map((item) => Object.freeze(item)));
@@ -488,11 +500,9 @@ function projectChord(
   previousBassPitch: ExactPitch | undefined,
   diagnostics: MusicXmlDiagnostic[],
 ): ProjectedChord {
-  const chord = realizeHarmonyChord(step.harmonicFunction, project.tonic);
-  const harmonyMapping = mapChordToMusicXmlHarmony(
-    { ...chord, variant: step.harmonicVariant },
-    step.id,
-  );
+  const sourceChord = realizeHarmonyChord(step.harmonicFunction, project.tonic);
+  const chord = realizeProgressionStepChord(step, project.tonic);
+  const harmonyMapping = mapChordToMusicXmlHarmony(chord, step.id);
   diagnostics.push(...harmonyMapping.diagnostics);
   if (harmonyMapping.status === "error" || !harmonyMapping.value) {
     throw new MusicXmlExportError(
@@ -526,17 +536,29 @@ function projectChord(
     );
   }
 
-  const realization = pianoProfile.realizeChord({
+  const outputRealization = pianoProfile.realizeChord({
     context,
-    chord: { ...chord, variant: step.harmonicVariant },
+    chord: { ...sourceChord, variant: step.harmonicVariant },
     performance: step.performance,
     ...(previousPitches ? { previousPitches } : {}),
     ...(previousBassPitch ? { previousBassPitch } : {}),
   });
+  const contextRealization =
+    step.performance.register === "auto"
+      ? outputRealization
+      : pianoProfile.realizeChord({
+          context,
+          chord: { ...sourceChord, variant: step.harmonicVariant },
+          performance: { ...step.performance, register: "auto" },
+          ...(previousPitches ? { previousPitches } : {}),
+          ...(previousBassPitch ? { previousBassPitch } : {}),
+        });
 
   return Object.freeze({
     chord,
-    pitches: freezeProjectedPitches(realization, step),
+    pitches: freezeProjectedPitches(outputRealization, step),
+    contextUpperPitches: contextRealization.pitches,
+    contextBassPitch: contextRealization.bassPitch,
     harmony: harmonyMapping.value,
     dynamicLabel: dynamicMapping.value.label,
     sourceVelocity: dynamicMapping.value.sourceVelocity,
@@ -1101,10 +1123,8 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
         diagnostics,
       );
       projectedChords.set(entry.stepIndex, projectedChord);
-      previousPitches = projectedChord.pitches
-        .filter((item) => item.role === "upper")
-        .map((item) => item.pitch);
-      previousBassPitch = projectedChord.pitches.find((item) => item.role === "bass")?.pitch;
+      previousPitches = projectedChord.contextUpperPitches;
+      previousBassPitch = projectedChord.contextBassPitch;
     }
 
     const fragments: { readonly start: Rational; readonly end: Rational }[] = [];

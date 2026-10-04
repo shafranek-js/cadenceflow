@@ -11,14 +11,23 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import type { MeasuresPerSystem, ProgressionView, Project } from "../../domain/project/project";
 import type { AudioProviderState } from "../../audio/contracts";
-import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
+import type {
+  ChordStep,
+  PianoArticulation,
+  RestStep,
+  StepPerformance,
+} from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import type { ExactPitch } from "../../domain/harmony/pitch";
-import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+} from "../../domain/progression/transposition";
 import {
   formatMusicalDuration,
   musicalDuration,
@@ -26,6 +35,7 @@ import {
 } from "../../domain/timing/duration";
 import {
   createProgressionMeasureLayout,
+  resolveExactMeasureStepRange,
   type ProgressionMeasureFragment,
   type ProgressionMeasureItem,
 } from "../../domain/timing/measureLayout";
@@ -46,6 +56,8 @@ import {
 } from "../../domain/harmony/reharmonization";
 import { ProgressionStepCard } from "./ProgressionStepCard";
 import { RangeSelectionToolbar } from "./RangeSelectionToolbar";
+import { isPianoRollSelectionHelpOpenTarget } from "../melody/pianoRollSelectionHelp";
+import { previewRangeTransposition } from "../../app/commands/rangeTranspositionCommands";
 import {
   EMPTY_RANGE_SELECTION,
   reduceRangeSelection,
@@ -54,11 +66,17 @@ import {
 import { ProgressionStepRemoveButton } from "./ProgressionStepRemoveButton";
 import { orderSongSections } from "../../domain/progression/sections";
 import type { SongSection } from "../../domain/progression/progression";
+import {
+  planMeasureDeletion,
+  planMeasureDuplication,
+  planMeasureInsertion,
+} from "../../domain/progression/measureDeletion";
 import { Icon } from "../common/Icon";
 import type { MeasureStaffChordItem, MeasureStaffItem } from "../staff/MeasureStaffView";
 import { ScoreSystemView } from "../staff/ScoreSystemView";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import { MelodyContextMenu, type MelodyMenuPosition } from "../melody/MelodyContextMenu";
+import { MeasureContextMenu, type MeasureMenuPosition } from "./MeasureContextMenu";
 import { MelodyEditorDialog } from "../melody/MelodyEditorDialog";
 import { InlineMelodyLane } from "../melody/InlineMelodyLane";
 import {
@@ -68,6 +86,19 @@ import {
   type PianoRollColorMode,
   type PianoRollInspectorRequest,
 } from "../melody/PianoRollView";
+import {
+  PianoRollMidiStepInput,
+  type MidiStepInsertResult,
+} from "../melody/PianoRollMidiStepInput";
+import {
+  INITIAL_MIDI_STEP_INPUT_SNAPSHOT,
+  MidiStepInputController,
+  advanceMidiCursor,
+  midiStepDuration,
+  type MidiNavigatorLike,
+  type MidiStepDurationId,
+  type MidiStepInputSnapshot,
+} from "../melody/midiStepInput";
 import { PianoRollSystemNotePanel } from "../melody/PianoRollSystemNotePanel";
 import { PianoRollSystemChordPanel } from "../melody/PianoRollSystemChordPanel";
 import {
@@ -80,7 +111,14 @@ import {
 } from "../melody/pianoRollPreferences";
 import type { AuthoredMelodyEdit } from "../../app/commands/authoredMelodyTransaction";
 import { createMelodyTimeline } from "../../notation/melodyStaffProjection";
+import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
+import { pianoRollNoteIdentity, planPianoRollPaste } from "../melody/pianoRollGroupSelection";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
+import {
+  getPianoRollClipboard,
+  setPianoRollClipboard,
+  type PianoRollClipboardNote,
+} from "../melody/pianoRollSession";
 import type {
   ChordMelodyRecipe,
   AuthoredMelodyPhrase,
@@ -89,6 +127,23 @@ import type {
   MelodyPitchMotion,
   MelodyTrackSettings,
 } from "../../domain/melody/types";
+
+type PianoRollSelectionScope =
+  | { readonly kind: "progression" }
+  | { readonly kind: "measure"; readonly measureIndex: number }
+  | { readonly kind: "system"; readonly systemIndex: number };
+
+export interface PianoRollSelectionKeyEvent {
+  readonly target: EventTarget | null;
+  readonly key: string;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly altKey: boolean;
+  readonly repeat: boolean;
+  readonly defaultPrevented: boolean;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
 import { canShiftPerformanceOctave } from "../staff/staffOctave";
 import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
@@ -253,8 +308,18 @@ export function ProgressionTrack({
   onSelectedPianoNoteChange,
   onSelectedPianoChordChange,
   pianoRollInspectorRequest,
+  pianoRollSelectionScopeResetVersion = 0,
+  pianoRollSelectionKeyDownRef,
+  pianoRollSelectAllActionRef,
+  onPianoRollSelectionScopeLabelChange,
   onSetAuthoredMelody,
   onApplyPianoRollMelodyEdits,
+  onInsertPianoRollMidiNote,
+  onAuditionPianoRollMidiNote,
+  onStopPianoRollMidiAudition,
+  midiSessionKey = 0,
+  midiStartupReady = true,
+  transportStatus = "stopped",
   onRemoveMelodyRecipe,
   activeMelodyEventKey,
   activeEventStartedAt,
@@ -291,6 +356,10 @@ export function ProgressionTrack({
   onSetMelodyGridSystem,
   onClearMelodySystem,
   onOpenProgressionMenu,
+  onDeleteMeasure,
+  onDuplicateMeasure,
+  onInsertMeasureAfter,
+  onLoopMeasure,
   onToggleSuzukiColors,
   onApplyPreset,
   onOpenPresets,
@@ -303,6 +372,7 @@ export function ProgressionTrack({
   onDuplicateRange,
   onDeleteRange,
   onResetPerformanceRange,
+  onTransposeRange,
   onExploreRange,
 }: {
   readonly project: Project;
@@ -373,6 +443,12 @@ export function ProgressionTrack({
   ) => void;
   readonly onSelectedPianoChordChange?: (stepId: string | null) => void;
   readonly pianoRollInspectorRequest?: PianoRollInspectorRequest | null | undefined;
+  readonly pianoRollSelectionScopeResetVersion?: number;
+  readonly pianoRollSelectionKeyDownRef?: {
+    current: ((event: PianoRollSelectionKeyEvent) => void) | null;
+  };
+  readonly pianoRollSelectAllActionRef?: { current: (() => void) | null };
+  readonly onPianoRollSelectionScopeLabelChange?: (label: string) => void;
   readonly onSetAuthoredMelody?: (
     stepId: string,
     phrase: AuthoredMelodyPhrase,
@@ -382,7 +458,18 @@ export function ProgressionTrack({
     edits: readonly AuthoredMelodyEdit[],
     convertStepIds?: readonly string[],
     expectedUpdatedAt?: string,
-  ) => void;
+    appendSteps?: readonly RestStep[],
+  ) => string | null | void;
+  readonly onInsertPianoRollMidiNote?: (
+    midiPitch: number,
+    startBeats: Rational,
+    durationBeats: Rational,
+  ) => MidiStepInsertResult;
+  readonly onAuditionPianoRollMidiNote?: (stepId: string, eventKey: string) => void;
+  readonly onStopPianoRollMidiAudition?: () => void;
+  readonly midiSessionKey?: number;
+  readonly midiStartupReady?: boolean;
+  readonly transportStatus?: "stopped" | "playing" | "paused";
   readonly onRemoveMelodyRecipe?: (stepId: string) => void;
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
   readonly onHarmonyTrackSettingsChange?: (patch: Partial<HarmonyTrackSettings>) => void;
@@ -428,6 +515,10 @@ export function ProgressionTrack({
   readonly onClearMelodySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onOpenProgressionMenu?:
     ((anchor: HTMLElement, position: { x: number; y: number }) => void) | undefined;
+  readonly onDeleteMeasure?: ((measureIndex: number) => string | undefined) | undefined;
+  readonly onDuplicateMeasure?: ((measureIndex: number) => string | undefined) | undefined;
+  readonly onInsertMeasureAfter?: ((measureIndex: number) => string | undefined) | undefined;
+  readonly onLoopMeasure?: ((measureIndex: number) => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
   readonly onApplyPreset?: ((preset: FunctionalPreset, mode: PresetApplyMode) => void) | undefined;
   readonly onOpenPresets?: (() => void) | undefined;
@@ -441,6 +532,8 @@ export function ProgressionTrack({
   readonly onDuplicateRange?: ((stepIds: readonly string[]) => void) | undefined;
   readonly onDeleteRange?: ((stepIds: readonly string[]) => void) | undefined;
   readonly onResetPerformanceRange?: ((stepIds: readonly string[]) => void) | undefined;
+  readonly onTransposeRange?:
+    ((stepIds: readonly string[], semitones: number) => string | undefined) | undefined;
   readonly onExploreRange?: ((stepIds: readonly string[]) => void) | undefined;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -482,11 +575,154 @@ export function ProgressionTrack({
   const [selectedPianoNoteIdentities, setSelectedPianoNoteIdentities] = useState<
     ReadonlySet<string>
   >(() => new Set());
+  const [pianoRollSelectionScope, setPianoRollSelectionScope] = useState<PianoRollSelectionScope>({
+    kind: "progression",
+  });
+  const pianoRollSelectionSessionRef = useRef(`${project.id}\u0000${midiSessionKey}`);
   const [pianoRollEmptyCursor, setPianoRollEmptyCursor] = useState<{
     readonly startBeats: Rational;
     readonly pitch: ExactPitch;
   } | null>(null);
-  const [activePianoRollSystemIndex, setActivePianoRollSystemIndex] = useState<number | null>(null);
+  const initialMidiCursor =
+    stepTimelineStarts(project.progression.steps).get(project.progression.selectedStepId ?? "") ??
+    rational(0);
+  const [midiInsertionCursor, setMidiInsertionCursorState] = useState<Rational>(initialMidiCursor);
+  const midiInsertionCursorRef = useRef(midiInsertionCursor);
+  const [midiStepDurationId, setMidiStepDurationId] = useState<MidiStepDurationId>("quarter");
+  const midiStepDurationIdRef = useRef<MidiStepDurationId>("quarter");
+  const [manualMidiPitch, setManualMidiPitch] = useState("60");
+  const manualMidiPitchRef = useRef("60");
+  const [midiAuditionEnabled, setMidiAuditionEnabled] = useState(true);
+  const midiAuditionEnabledRef = useRef(true);
+  const [midiStepInputSnapshot, setMidiStepInputSnapshot] = useState<MidiStepInputSnapshot>(
+    INITIAL_MIDI_STEP_INPUT_SNAPSHOT,
+  );
+  const [midiStepInsertStatus, setMidiStepInsertStatus] = useState<string | null>(null);
+  const midiStepInputControllerRef = useRef<MidiStepInputController | null>(null);
+  const midiStepInsertRef = useRef<(pitch: number) => MidiStepInsertResult>(() => ({
+    ok: false,
+    message: "MIDI step input is not ready.",
+  }));
+  const midiSessionIdentityRef = useRef(`${project.id}\u0000${midiSessionKey}`);
+  const updateMidiInsertionCursor = useCallback((cursor: Rational) => {
+    midiInsertionCursorRef.current = cursor;
+    setMidiInsertionCursorState(cursor);
+  }, []);
+  const midiActivationRef = useRef(false);
+  useLayoutEffect(() => {
+    midiActivationRef.current =
+      project.presentation.progressionView === "piano-roll" && transportStatus === "stopped";
+  });
+  const midiStopPreviewRef = useRef(onStopPianoRollMidiAudition);
+  useLayoutEffect(() => {
+    midiStopPreviewRef.current = onStopPianoRollMidiAudition;
+  });
+  useEffect(() => {
+    const controller = new MidiStepInputController(
+      (pitch) => {
+        midiStepInsertRef.current(pitch);
+      },
+      () => midiActivationRef.current,
+      () => midiStopPreviewRef.current?.(),
+    );
+    midiStepInputControllerRef.current = controller;
+    const unsubscribe = controller.subscribe(setMidiStepInputSnapshot);
+    return () => {
+      unsubscribe();
+      controller.dispose();
+      midiStepInputControllerRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!midiStepInputSnapshot.effectiveInputEnabled) midiStopPreviewRef.current?.();
+  }, [midiStepInputSnapshot.effectiveInputEnabled, midiStepInputSnapshot.selectedDeviceId]);
+  useEffect(() => {
+    if (!midiStartupReady) return;
+    void midiStepInputControllerRef.current?.connectStartup(
+      navigator as unknown as MidiNavigatorLike,
+    );
+  }, [midiStartupReady]);
+  useLayoutEffect(() => {
+    const identity = `${project.id}\u0000${midiSessionKey}`;
+    if (midiSessionIdentityRef.current === identity) return;
+    midiSessionIdentityRef.current = identity;
+    const selectedStart = stepTimelineStarts(project.progression.steps).get(
+      project.progression.selectedStepId ?? "",
+    );
+    updateMidiInsertionCursor(selectedStart ?? rational(0));
+    midiStepInputControllerRef.current?.invalidateSession();
+    onStopPianoRollMidiAudition?.();
+  }, [
+    midiSessionKey,
+    onStopPianoRollMidiAudition,
+    project.id,
+    project.progression,
+    updateMidiInsertionCursor,
+  ]);
+  useLayoutEffect(() => {
+    if (project.presentation.progressionView !== "piano-roll" || transportStatus !== "stopped") {
+      midiStepInputControllerRef.current?.disarm(
+        transportStatus === "stopped"
+          ? "Piano Roll is inactive. MIDI step input is disarmed."
+          : "Transport is not stopped. MIDI step input is disarmed.",
+      );
+      onStopPianoRollMidiAudition?.();
+    }
+  }, [onStopPianoRollMidiAudition, project.presentation.progressionView, transportStatus]);
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      midiStepInputControllerRef.current?.suspendFocus();
+      onStopPianoRollMidiAudition?.();
+    };
+    const handleWindowFocus = () => midiStepInputControllerRef.current?.resumeFocus();
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [onStopPianoRollMidiAudition]);
+  useEffect(() => {
+    const handleMidiInputKeyDown = (event: WindowEventMap["keydown"]) => {
+      const controller = midiStepInputControllerRef.current;
+      if (!controller) return;
+      if (
+        event.key === "Escape" &&
+        (controller.snapshot.armed ||
+          controller.pendingPermission ||
+          project.presentation.progressionView === "piano-roll")
+      ) {
+        controller.disarm("Escape pressed. MIDI step input is disarmed.");
+        onStopPianoRollMidiAudition?.();
+        return;
+      }
+      if (
+        event.key !== "Enter" ||
+        event.repeat ||
+        event.defaultPrevented ||
+        !controller.snapshot.effectiveInputEnabled ||
+        project.presentation.progressionView !== "piano-roll" ||
+        transportStatus !== "stopped" ||
+        !(event.target instanceof Element) ||
+        event.target.closest(".piano-roll-midi-step-input")
+      )
+        return;
+      if (event.target.closest(".piano-roll-grid")) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!manualMidiPitchRef.current.trim()) {
+          setMidiStepInsertStatus("Enter a MIDI pitch from 0 to 127.");
+          return;
+        }
+        midiStepInsertRef.current(Number(manualMidiPitchRef.current));
+      }
+    };
+    window.addEventListener("keydown", handleMidiInputKeyDown, true);
+    return () => window.removeEventListener("keydown", handleMidiInputKeyDown, true);
+  }, [onStopPianoRollMidiAudition, project.presentation.progressionView, transportStatus]);
+  const [activePianoRollSystemIndex, setActivePianoRollSystemIndex] = useState<number | null>(() =>
+    project.progression.steps.length ? 0 : null,
+  );
   const [pianoRollChordSelection, setPianoRollChordSelection] = useState<{
     readonly stepIds: readonly string[];
     readonly anchorStepId: string;
@@ -497,6 +733,7 @@ export function ProgressionTrack({
     if (project.presentation.progressionView === "piano-roll") return;
     setPianoRollEmptyCursor(null);
     setActivePianoRollSystemIndex(null);
+    setPianoRollSelectionScope({ kind: "progression" });
     setPianoRollChordSelection(null);
     setSelectedPianoNoteIdentities((current) => (current.size === 0 ? current : new Set()));
     if (selectedPianoNote) onSelectedPianoNoteChange?.(null);
@@ -516,6 +753,11 @@ export function ProgressionTrack({
   const [melodyMenu, setMelodyMenu] = useState<{
     readonly stepId: string;
     readonly position: MelodyMenuPosition;
+    readonly invoker: HTMLElement;
+  } | null>(null);
+  const [measureMenu, setMeasureMenu] = useState<{
+    readonly measureIndex: number;
+    readonly position: MeasureMenuPosition;
     readonly invoker: HTMLElement;
   } | null>(null);
   const [melodyEditorStepId, setMelodyEditorStepId] = useState<string | null>(null);
@@ -578,6 +820,102 @@ export function ProgressionTrack({
     project.progression.steps,
     project.globalTiming.meter,
   );
+  useEffect(() => {
+    if (project.presentation.progressionView === "piano-roll")
+      setPianoRollSelectionScope({ kind: "progression" });
+  }, [pianoRollSelectionScopeResetVersion, project.presentation.progressionView]);
+  useEffect(() => {
+    if (project.presentation.progressionView !== "piano-roll") return;
+    const measureCount = layout.measures.length;
+    const systemCount = Array.from(
+      trackRef.current?.querySelectorAll<HTMLElement>(".score-system[data-system-index]") ?? [],
+    ).length;
+    setActivePianoRollSystemIndex((current) =>
+      systemCount === 0 ? null : current === null || current >= systemCount ? 0 : current,
+    );
+    setPianoRollSelectionScope((current) => {
+      if (
+        (current.kind === "measure" &&
+          (current.measureIndex < 0 || current.measureIndex >= measureCount)) ||
+        (current.kind === "system" &&
+          (current.systemIndex < 0 || current.systemIndex >= systemCount))
+      )
+        return { kind: "progression" };
+      return current;
+    });
+  }, [
+    layout.measures.length,
+    project.presentation.measuresPerSystem,
+    project.presentation.progressionView,
+  ]);
+  useEffect(() => {
+    const sessionIdentity = `${project.id}\u0000${midiSessionKey}`;
+    if (pianoRollSelectionSessionRef.current === sessionIdentity) return;
+    pianoRollSelectionSessionRef.current = sessionIdentity;
+    setPianoRollSelectionScope({ kind: "progression" });
+    setActivePianoRollSystemIndex(project.progression.steps.length ? 0 : null);
+    setSelectedPianoNoteIdentities(new Set());
+    setPianoRollChordSelection(null);
+    setPianoRollEmptyCursor(null);
+    onSelectedPianoNoteChange?.(null);
+    onSelectedPianoChordChange?.(null);
+  }, [
+    midiSessionKey,
+    onSelectedPianoChordChange,
+    onSelectedPianoNoteChange,
+    pianoRollSelectionSessionRef,
+    project.id,
+    project.progression.steps.length,
+  ]);
+  const attemptMidiStepInsert = (pitch: number): MidiStepInsertResult => {
+    if (midiStepInputControllerRef.current?.snapshot.focusSuspended)
+      return {
+        ok: false,
+        message: "MIDI input is temporarily paused while the window is inactive.",
+      };
+    if (
+      project.presentation.progressionView !== "piano-roll" ||
+      transportStatus !== "stopped" ||
+      !onInsertPianoRollMidiNote
+    ) {
+      const message = "MIDI step input requires the Piano Roll with transport stopped.";
+      setMidiStepInsertStatus(message);
+      return { ok: false, message };
+    }
+    const duration = midiStepDuration(midiStepDurationIdRef.current).beats;
+    const start = midiInsertionCursorRef.current;
+    const result = onInsertPianoRollMidiNote(pitch, start, duration);
+    if (!result.ok) {
+      setMidiStepInsertStatus(result.message);
+      return result;
+    }
+    updateMidiInsertionCursor(advanceMidiCursor(start, duration));
+    setMidiStepInsertStatus(null);
+    if (midiAuditionEnabledRef.current)
+      onAuditionPianoRollMidiNote?.(result.stepId, result.eventKey);
+    return result;
+  };
+  useLayoutEffect(() => {
+    midiStepInsertRef.current = attemptMidiStepInsert;
+  });
+  const changeMidiStepDuration = (durationId: MidiStepDurationId) => {
+    midiStepDurationIdRef.current = durationId;
+    setMidiStepDurationId(durationId);
+  };
+  const changeManualMidiPitch = (pitch: string) => {
+    manualMidiPitchRef.current = pitch;
+    setManualMidiPitch(pitch);
+  };
+  const changeMidiAuditionEnabled = (enabled: boolean) => {
+    midiAuditionEnabledRef.current = enabled;
+    setMidiAuditionEnabled(enabled);
+    if (!enabled) onStopPianoRollMidiAudition?.();
+  };
+  const cursorMeasureIndex = Math.floor(
+    rationalToNumber(midiInsertionCursor) / rationalToNumber(layout.barLengthBeats),
+  );
+  const cursorMeasureStart = multiplyRational(layout.barLengthBeats, rational(cursorMeasureIndex));
+  const cursorBeat = subtractRational(midiInsertionCursor, cursorMeasureStart);
   const loopIndices = (() => {
     if (!loopState?.enabled || !loopState.region) return null;
     const start = project.progression.steps.findIndex(
@@ -594,6 +932,313 @@ export function ProgressionTrack({
     () => (hasMelodyRecipe ? createMelodyTimeline(project) : null),
     [hasMelodyRecipe, project],
   );
+  const effectivePianoRollNotes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
+
+  const getRenderedPianoRollMeasureIndices = (systemIndex?: number): number[] =>
+    Array.from(
+      trackRef.current?.querySelectorAll<HTMLElement>(
+        ".piano-roll-measure[data-measure-index][data-system-index]",
+      ) ?? [],
+    )
+      .filter(
+        (element) =>
+          systemIndex === undefined || Number(element.dataset.systemIndex) === systemIndex,
+      )
+      .map((element) => Number(element.dataset.measureIndex))
+      .filter((index) => Number.isInteger(index));
+
+  const selectPianoRollNotesInMeasures = (measureIndices: readonly number[]) => {
+    const measureWindows = measureIndices
+      .map((index) => layout.measures[index])
+      .filter((measure): measure is (typeof layout.measures)[number] => measure !== undefined);
+    const selected = new Map<
+      string,
+      { readonly sourceStepId: string; readonly eventKey: string }
+    >();
+    for (const note of effectivePianoRollNotes) {
+      const noteEnd = addRational(note.startBeats, note.durationBeats);
+      if (
+        measureWindows.some(
+          (window) =>
+            compareRational(note.startBeats, window.endBeats) < 0 &&
+            compareRational(noteEnd, window.startBeats) > 0,
+        )
+      )
+        selected.set(pianoRollNoteIdentity(note.sourceStepId, note.eventKey), {
+          sourceStepId: note.sourceStepId,
+          eventKey: note.eventKey,
+        });
+    }
+    const identities = [...selected.keys()];
+    setSelectedPianoNoteIdentities(new Set(identities));
+    setPianoRollChordSelection(null);
+    onSelectedPianoChordChange?.(null);
+    const first = selected.values().next().value as
+      { readonly sourceStepId: string; readonly eventKey: string } | undefined;
+    if (!first) {
+      onSelectedPianoNoteChange?.(null);
+      return;
+    }
+    onSelectedPianoNoteChange?.({ stepId: first.sourceStepId, eventKey: first.eventKey });
+  };
+
+  const selectAllPianoRollNotes = () =>
+    selectPianoRollNotesInMeasures(layout.measures.map((measure) => measure.measureIndex));
+
+  const handlePianoRollActiveMeasureChange = (measureIndex: number, systemIndex?: number) => {
+    setActivePianoRollSystemIndex(systemIndex ?? null);
+    setPianoRollSelectionScope({ kind: "measure", measureIndex });
+  };
+
+  const setPianoRollSystemScope = (systemIndex: number) => {
+    setActivePianoRollSystemIndex(systemIndex);
+    setPianoRollSelectionScope({ kind: "system", systemIndex });
+  };
+
+  const pianoRollSelectionScopeLabel =
+    pianoRollSelectionScope.kind === "progression"
+      ? "Progression"
+      : pianoRollSelectionScope.kind === "measure"
+        ? `Measure ${layout.measures[pianoRollSelectionScope.measureIndex]?.number ?? pianoRollSelectionScope.measureIndex + 1}`
+        : `System ${pianoRollSelectionScope.systemIndex + 1}`;
+  useEffect(() => {
+    onPianoRollSelectionScopeLabelChange?.(pianoRollSelectionScopeLabel);
+  }, [onPianoRollSelectionScopeLabelChange, pianoRollSelectionScopeLabel]);
+
+  const getSelectedEffectivePianoRollNotes = () =>
+    effectivePianoRollNotes.filter((note) =>
+      selectedPianoNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+    );
+
+  const getPianoRollClipboardForNotes = (
+    notes: readonly (typeof effectivePianoRollNotes)[number][],
+  ): readonly PianoRollClipboardNote[] => {
+    if (!notes.length) return [];
+    const earliest = notes.reduce(
+      (start, note) => (compareRational(note.startBeats, start) < 0 ? note.startBeats : start),
+      notes[0]!.startBeats,
+    );
+    return notes.map((note) => ({
+      pitch: note.pitch,
+      onset: subtractRational(note.startBeats, earliest),
+      duration: note.durationBeats,
+      instrument: note.instrument,
+    }));
+  };
+
+  const clearTransientPianoRollNoteSelection = () => {
+    setSelectedPianoNoteIdentities(new Set());
+    setPianoRollChordSelection(null);
+    onSelectedPianoNoteChange?.(null);
+    onSelectedPianoChordChange?.(null);
+  };
+
+  const deleteSelectedPianoRollNotes = (): string | null => {
+    const notes = getSelectedEffectivePianoRollNotes();
+    if (!notes.length) {
+      clearTransientPianoRollNoteSelection();
+      return null;
+    }
+    if (!onApplyPianoRollMelodyEdits) return "Melody editing is unavailable in this Piano Roll.";
+    const edits: AuthoredMelodyEdit[] = notes.map((note) => ({
+      type: "delete",
+      sourceStepId: note.sourceStepId,
+      noteId: note.eventKey,
+    }));
+    const error = onApplyPianoRollMelodyEdits(edits, [], project.updatedAt);
+    if (error) return error;
+    clearTransientPianoRollNoteSelection();
+    return null;
+  };
+
+  const commitPianoRollPasteAt = (anchor: Rational): string | null => {
+    const clipboard = getPianoRollClipboard();
+    if (!clipboard.length) return null;
+    if (!onApplyPianoRollMelodyEdits) return "Melody editing is unavailable in this Piano Roll.";
+    try {
+      const plan = planPianoRollPaste(project, clipboard, anchor);
+      const error = onApplyPianoRollMelodyEdits(
+        plan.edits,
+        [],
+        project.updatedAt,
+        plan.appendedSteps ?? [],
+      );
+      if (error) return error;
+      const identities = plan.selection.map((identity) =>
+        pianoRollNoteIdentity(identity.sourceStepId, identity.eventKey),
+      );
+      setSelectedPianoNoteIdentities(new Set(identities));
+      const first = plan.selection[0];
+      onSelectedPianoNoteChange?.(
+        first ? { stepId: first.sourceStepId, eventKey: first.eventKey } : null,
+      );
+      onSelectedPianoChordChange?.(null);
+      setPianoRollChordSelection(null);
+      setPianoRollEmptyCursor(null);
+      onDurationResizeStatusChange(null);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : "Piano Roll paste was rejected.";
+    }
+  };
+
+  const handlePianoRollKeyDownCapture = (event: PianoRollSelectionKeyEvent) => {
+    if (event.key === "Escape" && isPianoRollSelectionHelpOpenTarget(event.target)) return;
+    if (
+      project.presentation.progressionView !== "piano-roll" ||
+      isAppShortcutProtectedTarget(event.target)
+    )
+      return;
+    const target = event.target instanceof Element ? event.target : null;
+    const modifier = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (selectedPianoNoteIdentities.size > 0) clearTransientPianoRollNoteSelection();
+      if (rangeStepIds.length > 0) setRangeSelection(EMPTY_RANGE_SELECTION);
+      if (pianoRollChordSelection) {
+        setPianoRollChordSelection(null);
+        onSelectedPianoChordChange?.(null);
+      }
+      return;
+    }
+
+    if (
+      (event.key === "Delete" || event.key === "Backspace") &&
+      !event.repeat &&
+      selectedPianoNoteIdentities.size > 0
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      onDurationResizeStatusChange(deleteSelectedPianoRollNotes());
+      return;
+    }
+
+    if (modifier && key === "a") {
+      event.preventDefault();
+      event.stopPropagation();
+      const measureIndices =
+        pianoRollSelectionScope.kind === "progression"
+          ? layout.measures.map((measure) => measure.measureIndex)
+          : pianoRollSelectionScope.kind === "measure"
+            ? [pianoRollSelectionScope.measureIndex]
+            : getRenderedPianoRollMeasureIndices(pianoRollSelectionScope.systemIndex);
+      selectPianoRollNotesInMeasures(measureIndices);
+      return;
+    }
+
+    if (modifier && (key === "c" || key === "x") && selectedPianoNoteIdentities.size > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      const notes = getSelectedEffectivePianoRollNotes();
+      if (!notes.length) {
+        clearTransientPianoRollNoteSelection();
+        return;
+      }
+      const nextClipboard = getPianoRollClipboardForNotes(notes);
+      if (key === "c") {
+        setPianoRollClipboard(nextClipboard);
+        onDurationResizeStatusChange(null);
+        return;
+      }
+      const error = deleteSelectedPianoRollNotes();
+      if (error) {
+        onDurationResizeStatusChange(error);
+        return;
+      }
+      setPianoRollClipboard(nextClipboard);
+      onDurationResizeStatusChange(null);
+      return;
+    }
+
+    if (modifier && key === "d" && selectedPianoNoteIdentities.size > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      const notes = getSelectedEffectivePianoRollNotes();
+      if (!notes.length) {
+        clearTransientPianoRollNoteSelection();
+        return;
+      }
+      const nextClipboard = getPianoRollClipboardForNotes(notes);
+      const end = notes.reduce((latest, note) => {
+        const noteEnd = addRational(note.startBeats, note.durationBeats);
+        return compareRational(noteEnd, latest) > 0 ? noteEnd : latest;
+      }, notes[0]!.startBeats);
+      if (!onApplyPianoRollMelodyEdits) {
+        onDurationResizeStatusChange("Melody editing is unavailable in this Piano Roll.");
+        return;
+      }
+      try {
+        const plan = planPianoRollPaste(project, nextClipboard, end);
+        const error = onApplyPianoRollMelodyEdits(
+          plan.edits,
+          [],
+          project.updatedAt,
+          plan.appendedSteps ?? [],
+        );
+        if (error) {
+          onDurationResizeStatusChange(error);
+          return;
+        }
+        setPianoRollClipboard(nextClipboard);
+        const identities = plan.selection.map((identity) =>
+          pianoRollNoteIdentity(identity.sourceStepId, identity.eventKey),
+        );
+        setSelectedPianoNoteIdentities(new Set(identities));
+        const first = plan.selection[0];
+        onSelectedPianoNoteChange?.(
+          first ? { stepId: first.sourceStepId, eventKey: first.eventKey } : null,
+        );
+        onSelectedPianoChordChange?.(null);
+        setPianoRollChordSelection(null);
+        onDurationResizeStatusChange(null);
+      } catch (error) {
+        onDurationResizeStatusChange(
+          error instanceof Error ? error.message : "Piano Roll duplicate was rejected.",
+        );
+      }
+      return;
+    }
+
+    if (
+      modifier &&
+      key === "v" &&
+      !target?.closest(".piano-roll-grid, button.piano-roll-note") &&
+      getPianoRollClipboard().length > 0
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      const anchor = pianoRollEmptyCursor?.startBeats;
+      if (!anchor) {
+        onDurationResizeStatusChange("Click a target time in the Piano Roll before pasting notes.");
+        return;
+      }
+      onDurationResizeStatusChange(commitPianoRollPasteAt(anchor));
+    }
+  };
+
+  const latestPianoRollKeyDownHandlerRef = useRef<
+    ((event: PianoRollSelectionKeyEvent) => void) | null
+  >(null);
+  const latestPianoRollSelectAllHandlerRef = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    latestPianoRollKeyDownHandlerRef.current = handlePianoRollKeyDownCapture;
+    latestPianoRollSelectAllHandlerRef.current = selectAllPianoRollNotes;
+  });
+  useLayoutEffect(() => {
+    const keyDownRef = pianoRollSelectionKeyDownRef;
+    const selectAllRef = pianoRollSelectAllActionRef;
+    const keyDownHandler = (event: PianoRollSelectionKeyEvent) =>
+      latestPianoRollKeyDownHandlerRef.current?.(event);
+    const selectAllHandler = () => latestPianoRollSelectAllHandlerRef.current?.();
+    if (keyDownRef) keyDownRef.current = keyDownHandler;
+    if (selectAllRef) selectAllRef.current = selectAllHandler;
+    return () => {
+      if (keyDownRef?.current === keyDownHandler) keyDownRef.current = null;
+      if (selectAllRef?.current === selectAllHandler) selectAllRef.current = null;
+    };
+  }, [pianoRollSelectAllActionRef, pianoRollSelectionKeyDownRef]);
 
   useEffect(() => {
     setRangeSelection((current) =>
@@ -655,11 +1300,16 @@ export function ProgressionTrack({
     }));
   };
 
-  const updateRangeSelection = (stepId: string, extend: boolean, focus = true): void => {
+  const updateRangeSelection = (
+    stepId: string,
+    extend: boolean,
+    focus = true,
+    updateProjectSelection = true,
+  ): void => {
     setRangeSelection((current) =>
       reduceRangeSelection(current, { type: extend ? "extend" : "click", stepId }, orderedStepIds),
     );
-    onSelectStep(stepId);
+    if (updateProjectSelection) onSelectStep(stepId);
     if (focus) focusStepTarget(stepId);
   };
 
@@ -825,6 +1475,7 @@ export function ProgressionTrack({
   };
 
   const handleMarqueePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (project.presentation.progressionView === "piano-roll") return;
     if (event.button !== 0 || !isMarqueeBackground(event.target)) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -929,8 +1580,13 @@ export function ProgressionTrack({
       setDurationResizeDraft(null);
       focusDurationResizeTarget(trackRef.current, current.stepId);
     };
+    const handleWindowFocus = () => midiStepInputControllerRef.current?.resumeFocus();
     window.addEventListener("blur", handleWindowBlur);
-    return () => window.removeEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, []);
 
   const measureGeometryForPointer = (
@@ -1208,13 +1864,26 @@ export function ProgressionTrack({
       if (clientX < rect.left + 10) sourceScroller.scrollLeft -= 14;
       if (clientX > rect.right - 10) sourceScroller.scrollLeft += 14;
     }
-    if (clientY < 28) {
-      window.scrollBy({ top: -16, behavior: "instant" });
-      return draft.previewBoundary;
-    }
-    if (clientY > window.innerHeight - 28) {
-      window.scrollBy({ top: 16, behavior: "instant" });
-      return draft.previewBoundary;
+    const studioScroller = target.closest<HTMLElement>(".studio-grid");
+    const studioBounds = studioScroller?.getBoundingClientRect();
+    if (studioScroller && studioBounds) {
+      if (clientY < studioBounds.top + 28) {
+        studioScroller.scrollBy({ top: -16, behavior: "instant" });
+        return draft.previewBoundary;
+      }
+      if (clientY > studioBounds.bottom - 28) {
+        studioScroller.scrollBy({ top: 16, behavior: "instant" });
+        return draft.previewBoundary;
+      }
+    } else {
+      if (clientY < 28) {
+        window.scrollBy({ top: -16, behavior: "instant" });
+        return draft.previewBoundary;
+      }
+      if (clientY > window.innerHeight - 28) {
+        window.scrollBy({ top: 16, behavior: "instant" });
+        return draft.previewBoundary;
+      }
     }
     const pointerBeat = pianoRollBeatAtPointer(clientX, clientY, fallbackMeasure);
     const raw = addRational(pointerBeat, draft.grabOffset);
@@ -1460,8 +2129,13 @@ export function ProgressionTrack({
 
   useEffect(() => {
     const handleWindowBlur = () => cancelPianoRollBoundaryResize();
+    const handleWindowFocus = () => midiStepInputControllerRef.current?.resumeFocus();
     window.addEventListener("blur", handleWindowBlur);
-    return () => window.removeEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, [cancelPianoRollBoundaryResize]);
 
   useEffect(() => {
@@ -1730,6 +2404,57 @@ export function ProgressionTrack({
     openMelodyMenu(stepId, event.currentTarget, { x: rect.left, y: rect.bottom });
   };
 
+  const closeMeasureMenu = useCallback(() => setMeasureMenu(null), []);
+  const openMeasureMenu = useCallback(
+    (measureIndex: number, invoker: HTMLElement, position: MeasureMenuPosition) => {
+      if (!onDeleteMeasure) return;
+      setMeasureMenu({ measureIndex, invoker, position });
+    },
+    [onDeleteMeasure],
+  );
+  const openMeasureMenuFromEvent = (
+    measureIndex: number,
+    event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if ("clientX" in event) {
+      openMeasureMenu(measureIndex, event.currentTarget, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    openMeasureMenu(measureIndex, event.currentTarget, { x: rect.left, y: rect.bottom });
+  };
+  const handleMeasureDeleteFromButton = (measureIndex: number, invoker: HTMLElement) => {
+    const refusal = onDeleteMeasure?.(measureIndex);
+    if (refusal) {
+      const rect = invoker.getBoundingClientRect();
+      openMeasureMenu(measureIndex, invoker, { x: rect.left, y: rect.bottom });
+      return;
+    }
+    requestAnimationFrame(() => {
+      const find = (index: number) =>
+        trackRef.current?.querySelector<HTMLElement>(
+          `[data-measure-context-trigger][data-measure-index="${index}"]`,
+        ) ?? null;
+      (find(measureIndex) ?? find(measureIndex - 1) ?? trackRef.current)?.focus();
+    });
+  };
+  const measureMenuFocusFallback = useCallback(() => {
+    const measureIndex = measureMenu?.measureIndex;
+    if (measureIndex === undefined || !trackRef.current) return null;
+    const nextIndex = Math.min(measureIndex, layout.measures.length - 1);
+    const previousIndex = Math.max(0, Math.min(measureIndex - 1, layout.measures.length - 1));
+    const find = (index: number) =>
+      trackRef.current?.querySelector<HTMLElement>(
+        `[data-measure-context-trigger][data-measure-index="${index}"]`,
+      ) ?? null;
+    return find(nextIndex) ?? find(previousIndex) ?? trackRef.current;
+  }, [layout.measures.length, measureMenu?.measureIndex]);
+
   const openMelodyEditorFromLane = (stepId: string, anchor: HTMLButtonElement) => {
     const step = project.progression.steps.find(
       (candidate) => candidate.id === stepId && candidate.kind === "chord",
@@ -1763,11 +2488,10 @@ export function ProgressionTrack({
         };
       }
       const realization = realizeProgressionStepRealization(item.step, project.tonic);
-      const chord = realizeChord(item.step.harmonicFunction, project.tonic);
+      const chord = realizeProgressionStepChord(item.step, project.tonic);
       const effectiveChord = withEffectiveBass(
         {
           ...chord,
-          variant: item.step.harmonicVariant,
         },
         realization.bassPitch,
       );
@@ -1776,6 +2500,11 @@ export function ProgressionTrack({
         item.step.harmonicFunction.functionId,
         formatChordSymbol(effectiveChord),
       );
+      const transpositionSemitones = stepTranspositionSemitones(item.step);
+      const transpositionLabel =
+        transpositionSemitones === 0
+          ? ""
+          : ` · local transposition ${transpositionSemitones > 0 ? "+" : ""}${transpositionSemitones} semitones`;
       const isInvertedBass =
         realization.bassPitch !== undefined &&
         realization.bassPitch.pitchClassIdentity !== chord.rootPitchClass;
@@ -1783,7 +2512,7 @@ export function ProgressionTrack({
         key: `${item.step.id}-${item.fragmentIndex}`,
         kind: "chord",
         stepId: item.step.id,
-        label,
+        label: `${label}${transpositionLabel}`,
         pitches: realization.pitches,
         ...((project.presentation.showBassInStaff ||
           project.presentation.progressionView === "tablature" ||
@@ -1839,6 +2568,7 @@ export function ProgressionTrack({
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (isAppShortcutProtectedTarget(event.target) || event.key !== "Escape") return;
+    if (project.presentation.progressionView === "piano-roll") return;
     if (!selectedStepId || !onClearSelection) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1849,9 +2579,13 @@ export function ProgressionTrack({
     const target = event.target;
     if (!(target instanceof Element)) return;
     const clickedInteractive = target.closest(
-      ".progression-step-card, .progression-rest-card, .progression-step-continuation, .progression-measure-header, .progression-measure-gap, .progression-view-control, .progression-gap-hint, button, select, input, textarea, label",
+      ".progression-step-card, .progression-rest-card, .progression-step-continuation, .progression-measure-header, .progression-measure-gap, .progression-view-control, .progression-gap-hint, .piano-roll-grid, .piano-roll-measure-header, .score-system-header, button, select, input, textarea, label",
     );
     if (clickedInteractive) return;
+    if (project.presentation.progressionView === "piano-roll") {
+      setPianoRollSelectionScope({ kind: "progression" });
+      return;
+    }
     if (event.currentTarget.classList.contains("progression-step-cards")) {
       event.stopPropagation();
     }
@@ -2035,6 +2769,7 @@ export function ProgressionTrack({
             .slice(index + 1)
             .find((candidate): candidate is ChordStep => candidate.kind === "chord")}
           guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
+          guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
           onRemove={() => removeStepAndRestoreFocus(step.id)}
@@ -2118,9 +2853,12 @@ export function ProgressionTrack({
           measure={measure}
           {...(systemIndex !== undefined ? { systemIndex } : {})}
           selectedChordStepIds={pianoRollChordStepIdSet}
+          onSelectMeasureNotes={() => selectPianoRollNotesInMeasures([measure.measureIndex])}
+          selectionScopeLabel={pianoRollSelectionScopeLabel}
           renderBoundaryResizeHandle={renderPianoRollBoundaryResizeHandle}
           boundaryResizePreview={pianoRollBoundaryResizeDraft?.previewBoundary ?? null}
           onHarmonySelected={(stepId, displaySystemIndex, additive) => {
+            updateRangeSelection(stepId, additive, false, false);
             const anchorStepId =
               additive && pianoRollChordSelection ? pianoRollChordSelection.anchorStepId : stepId;
             const anchorIndex = orderedStepIds.indexOf(anchorStepId);
@@ -2146,15 +2884,20 @@ export function ProgressionTrack({
           guidesEnabled={pianoRollGuidesEnabled}
           inspectorRequest={pianoRollInspectorRequest}
           emptyCursor={pianoRollEmptyCursor}
+          midiCursor={midiInsertionCursor}
           onEmptyCellCursor={(cursor) => {
             setPianoRollEmptyCursor(cursor);
-            setActivePianoRollSystemIndex(null);
+            updateMidiInsertionCursor(cursor.startBeats);
             setPianoRollChordSelection(null);
             setSelectedPianoNoteIdentities(new Set());
             onSelectedPianoNoteChange?.(null);
             onSelectedPianoChordChange?.(null);
           }}
           {...(onAuditionPianoRollMeasure ? { onAuditionMeasure: onAuditionPianoRollMeasure } : {})}
+          onOpenMeasureMenu={(measureIndex, invoker, position) =>
+            openMeasureMenu(measureIndex, invoker, position)
+          }
+          onDeleteMeasureFromButton={handleMeasureDeleteFromButton}
           {...(onAuditionPianoRollChord ? { onAuditionChord: onAuditionPianoRollChord } : {})}
           {...(onSetMelodyRecipe
             ? {
@@ -2178,17 +2921,25 @@ export function ProgressionTrack({
           }
           selectedNoteIdentities={selectedPianoNoteIdentities}
           onNoteSelectionChange={(stepId, eventKey, additive) => {
-            const identity = JSON.stringify([stepId, eventKey]);
+            const identity = pianoRollNoteIdentity(stepId, eventKey);
             setSelectedPianoNoteIdentities((previous) =>
               additive ? new Set([...previous, identity]) : new Set([identity]),
             );
           }}
+          onReplaceNoteSelection={(identities) =>
+            setSelectedPianoNoteIdentities(
+              new Set(
+                identities.map((identity) =>
+                  pianoRollNoteIdentity(identity.sourceStepId, identity.eventKey),
+                ),
+              ),
+            )
+          }
+          onActiveMeasureChange={handlePianoRollActiveMeasureChange}
           onClearNoteSelection={() => {
             setSelectedPianoNoteIdentities(new Set());
-            setActivePianoRollSystemIndex(null);
             onSelectedPianoNoteChange?.(null);
             onSelectedPianoChordChange?.(null);
-            setPianoRollEmptyCursor(null);
           }}
           playingStepId={
             currentPlayingStepIndex == null
@@ -2201,10 +2952,24 @@ export function ProgressionTrack({
           onSelectStep={onSelectStep}
           onNoteSelect={(stepId, eventKey, systemIndex) => {
             setPianoRollEmptyCursor(null);
-            setActivePianoRollSystemIndex(systemIndex ?? null);
+            const button = Array.from(
+              trackRef.current?.querySelectorAll<HTMLButtonElement>("button.piano-roll-note") ?? [],
+            ).find(
+              (candidate) =>
+                candidate.dataset.sourceStepId === stepId &&
+                candidate.dataset.pianoRollEventKey === eventKey,
+            );
+            const measureElement = button?.closest<HTMLElement>(".piano-roll-measure");
+            const measureIndex = Number(measureElement?.dataset.measureIndex);
+            const ownerSystemIndex = Number(measureElement?.dataset.systemIndex);
+            if (Number.isInteger(measureIndex)) {
+              setPianoRollSelectionScope({ kind: "measure", measureIndex });
+            }
+            setActivePianoRollSystemIndex(
+              Number.isInteger(ownerSystemIndex) ? ownerSystemIndex : (systemIndex ?? null),
+            );
             setPianoRollChordSelection(null);
             onSelectedPianoChordChange?.(null);
-            onClearSelection?.();
             onSelectedPianoNoteChange?.({ stepId, eventKey });
           }}
           zoom={pianoRollZoom}
@@ -2231,6 +2996,8 @@ export function ProgressionTrack({
       (item) =>
         item.kind !== "gap" && (rangeStepIdSet.has(item.stepId) || item.stepId === selectedStepId),
     );
+    const deletion = onDeleteMeasure ? planMeasureDeletion(project, measure.measureIndex) : null;
+    const deleteDisabledReason = deletion && "reason" in deletion ? deletion.reason : null;
     return (
       <section
         key={measure.measureIndex}
@@ -2244,7 +3011,16 @@ export function ProgressionTrack({
           minWidth: 0,
         }}
       >
-        <header className="score-system-measure-header progression-measure-header">
+        <header
+          className="score-system-measure-header progression-measure-header"
+          tabIndex={0}
+          aria-haspopup="menu"
+          onContextMenu={(event) => openMeasureMenuFromEvent(measure.measureIndex, event)}
+          onKeyDown={(event) => {
+            if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))
+              openMeasureMenuFromEvent(measure.measureIndex, event);
+          }}
+        >
           <strong>Measure {measure.number}</strong>
           <span>
             {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
@@ -2252,6 +3028,46 @@ export function ProgressionTrack({
           <span aria-label={`Grouping ${project.globalTiming.meter.grouping.join(" plus ")}`}>
             {project.globalTiming.meter.grouping.join("+")}
           </span>
+          {project.presentation.progressionView !== "staff" &&
+          project.presentation.progressionView !== "tablature" ? (
+            <>
+              <button
+                type="button"
+                className="measure-context-trigger"
+                data-measure-context-trigger
+                data-measure-index={measure.measureIndex}
+                aria-label={`Measure ${measure.number} commands`}
+                aria-haspopup="menu"
+                title={`Measure ${measure.number} commands`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  openMeasureMenu(measure.measureIndex, event.currentTarget, {
+                    x: rect.left,
+                    y: rect.bottom,
+                  });
+                }}
+              >
+                ⋯
+              </button>
+              {onDeleteMeasure ? (
+                <button
+                  type="button"
+                  className="measure-close-trigger"
+                  data-measure-close-trigger
+                  data-measure-index={measure.measureIndex}
+                  aria-label={`Delete Measure ${measure.number}`}
+                  title={deleteDisabledReason ?? `Delete Measure ${measure.number}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleMeasureDeleteFromButton(measure.measureIndex, event.currentTarget);
+                  }}
+                >
+                  <Icon name="close" />
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </header>
         <div
           className="progression-measure-timeline-scroll"
@@ -2320,7 +3136,10 @@ export function ProgressionTrack({
       className="progression-track"
       data-audition-end-beat={pianoRollAuditionPlayhead?.endBeat}
       onClickCapture={handleSelectionClickCapture}
-      onKeyDownCapture={handleRangeKeyDownCapture}
+      onKeyDownCapture={(event) => {
+        handlePianoRollKeyDownCapture(event);
+        if (!event.defaultPrevented) handleRangeKeyDownCapture(event);
+      }}
       onPointerDown={handleMarqueePointerDown}
       onPointerMove={handleMarqueePointerMove}
       onPointerUp={finishMarquee}
@@ -2329,6 +3148,55 @@ export function ProgressionTrack({
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
     >
+      <MidiSettingsPortal snapshot={midiStepInputSnapshot}>
+        <PianoRollMidiStepInput
+          snapshot={midiStepInputSnapshot}
+          cursor={midiInsertionCursor}
+          cursorEnd={layout.authoredDurationBeats}
+          cursorMeasure={cursorMeasureIndex + 1}
+          cursorBeat={cursorBeat}
+          durationId={midiStepDurationId}
+          manualPitch={manualMidiPitch}
+          active={project.presentation.progressionView === "piano-roll"}
+          transportStatus={transportStatus}
+          auditionEnabled={midiAuditionEnabled}
+          insertStatus={midiStepInsertStatus}
+          onConnect={() => {
+            setMidiStepInsertStatus(null);
+            const targetNavigator =
+              typeof navigator === "undefined" ? {} : (navigator as unknown as MidiNavigatorLike);
+            void midiStepInputControllerRef.current?.connect(targetNavigator);
+          }}
+          onDisconnect={() => {
+            midiStepInputControllerRef.current?.disconnect();
+            setMidiStepInsertStatus(null);
+            onStopPianoRollMidiAudition?.();
+          }}
+          onDeviceSelect={(deviceId) => {
+            midiStepInputControllerRef.current?.selectDevice(deviceId);
+            setMidiStepInsertStatus(null);
+            onStopPianoRollMidiAudition?.();
+          }}
+          onArm={() => {
+            const armed = midiStepInputControllerRef.current?.arm() ?? false;
+            setMidiStepInsertStatus(
+              armed ? null : "Connect and select a MIDI input before arming step input.",
+            );
+          }}
+          onDisarm={() => {
+            midiStepInputControllerRef.current?.disarm();
+            onStopPianoRollMidiAudition?.();
+          }}
+          onDurationChange={changeMidiStepDuration}
+          onManualPitchChange={changeManualMidiPitch}
+          onManualInsert={attemptMidiStepInsert}
+          onCursorChange={(cursor) => {
+            updateMidiInsertionCursor(cursor);
+            setMidiStepInsertStatus(null);
+          }}
+          onAuditionChange={changeMidiAuditionEnabled}
+        />
+      </MidiSettingsPortal>
       {rangeStepIds.length > 0 ? (
         <RangeSelectionToolbar
           selectedCount={rangeStepIds.length}
@@ -2345,6 +3213,14 @@ export function ProgressionTrack({
             setRangeSelection(EMPTY_RANGE_SELECTION);
           }}
           onResetPerformance={() => onResetPerformanceRange?.(rangeStepIds)}
+          previewTransposition={(semitones) =>
+            previewRangeTransposition(project, rangeStepIds, semitones)
+          }
+          onApplyTransposition={(semitones) => {
+            if (!onTransposeRange) return "Range transposition is unavailable.";
+            onTransposeRange(rangeStepIds, semitones);
+            return undefined;
+          }}
           onExplore={() => onExploreRange?.(rangeStepIds)}
         />
       ) : null}
@@ -2403,20 +3279,23 @@ export function ProgressionTrack({
         ) : null}
         {project.progression.steps.length > 0 ? (
           project.presentation.progressionView === "piano-roll" ? (
-            <PianoRollToolbar
-              gridMode={pianoRollGridMode}
-              onGridModeChange={setPianoRollGridMode}
-              zoom={pianoRollZoom}
-              onZoomChange={setPianoRollZoom}
-              snap={pianoRollSnap}
-              onSnapChange={setPianoRollSnap}
-              pitchRange={pianoRollPitchRange}
-              onPitchRangeChange={setPianoRollPitchRange}
-              colorMode={pianoRollColorMode}
-              onColorModeChange={setPianoRollColorMode}
-              guidesEnabled={pianoRollGuidesEnabled}
-              onGuidesEnabledChange={setPianoRollGuidesEnabled}
-            />
+            <>
+              <PianoRollToolbar
+                gridMode={pianoRollGridMode}
+                onGridModeChange={setPianoRollGridMode}
+                zoom={pianoRollZoom}
+                onZoomChange={setPianoRollZoom}
+                snap={pianoRollSnap}
+                onSnapChange={setPianoRollSnap}
+                pitchRange={pianoRollPitchRange}
+                onPitchRangeChange={setPianoRollPitchRange}
+                colorMode={pianoRollColorMode}
+                onColorModeChange={setPianoRollColorMode}
+                guidesEnabled={pianoRollGuidesEnabled}
+                onGuidesEnabledChange={setPianoRollGuidesEnabled}
+                selectionScopeLabel={pianoRollSelectionScopeLabel}
+              />
+            </>
           ) : null
         ) : null}
         {project.progression.steps.length > 0 ? (
@@ -2425,6 +3304,9 @@ export function ProgressionTrack({
             layout={layout}
             melodyTimeline={melodyTimeline}
             measuresPerSystem={project.presentation.measuresPerSystem}
+            {...(project.presentation.progressionView === "piano-roll"
+              ? { pianoRollMeasureMinimumWidthPx: Math.max(150, (250 * pianoRollZoom) / 100) }
+              : {})}
             selectedStepId={selectedStepId}
             rangeSelectedStepIds={rangeStepIdSet}
             playingStepId={currentPlayingStepId}
@@ -2435,6 +3317,14 @@ export function ProgressionTrack({
             onEditPerformance={onEditPerformance}
             onReorder={onReorder}
             renderMeasureContent={renderMeasureContent}
+            {...(project.presentation.progressionView === "piano-roll"
+              ? {
+                  onSelectPianoRollSystemNotes: (system: ScoreSystem) =>
+                    selectPianoRollNotesInMeasures(
+                      getRenderedPianoRollMeasureIndices(system.index),
+                    ),
+                }
+              : {})}
             {...(project.presentation.progressionView === "piano-roll"
               ? {
                   renderSystemPitchScale: (system: ScoreSystem) => (
@@ -2500,6 +3390,10 @@ export function ProgressionTrack({
                 }
               : {})}
             renderDurationResizeHandle={renderDurationResizeHandleForStaffItem}
+            onOpenMeasureMenu={(measureIndex, invoker, position) =>
+              openMeasureMenu(measureIndex, invoker, position)
+            }
+            onDeleteMeasureFromButton={handleMeasureDeleteFromButton}
             {...(onSetMelodyRecipe ? { onOpenMelodyMenu: openMelodyMenu } : {})}
             {...(onFocusMatrix ? { onFocusMatrix: focusMatrixForGap } : {})}
             {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
@@ -2514,6 +3408,12 @@ export function ProgressionTrack({
             {...(onPlayFromSystem ? { onPlayFromSystem } : {})}
             {...(project.presentation.progressionView === "piano-roll" && onAuditionPianoRollSystem
               ? { onAuditionSystem: onAuditionPianoRollSystem }
+              : {})}
+            {...(project.presentation.progressionView === "piano-roll"
+              ? { onSetPianoRollSystemScope: setPianoRollSystemScope }
+              : {})}
+            {...(project.presentation.progressionView === "piano-roll"
+              ? { pianoRollSelectionScopeLabel }
               : {})}
             {...(onToggleLoopSystem ? { onToggleLoopSystem } : {})}
             {...(onToggleMuteSystem ? { onToggleMuteSystem } : {})}
@@ -2536,6 +3436,52 @@ export function ProgressionTrack({
           />
         ) : null}
       </div>
+      {measureMenu
+        ? (() => {
+            const measure = layout.measures[measureMenu.measureIndex];
+            if (!measure) return null;
+            const deletion = planMeasureDeletion(project, measureMenu.measureIndex);
+            const deleteDisabledReason = "reason" in deletion ? deletion.reason : null;
+            const insertion = planMeasureInsertion(project, measureMenu.measureIndex);
+            const insertDisabledReason = "reason" in insertion ? insertion.reason : null;
+            const duplication = onDuplicateMeasure
+              ? planMeasureDuplication(project, measureMenu.measureIndex)
+              : { reason: "Measure duplication is unavailable." };
+            const duplicateDisabledReason = "reason" in duplication ? duplication.reason : null;
+            const exactLoopRange = resolveExactMeasureStepRange(
+              project.progression.steps,
+              project.globalTiming.meter,
+              measure.measureIndex,
+            );
+            const loopDisabledReason =
+              onLoopMeasure && !exactLoopRange
+                ? "This Measure crosses a Step boundary, so its exact duration cannot be looped."
+                : null;
+            const canPlayMeasure = project.presentation.progressionView === "piano-roll";
+            return (
+              <MeasureContextMenu
+                measureNumber={measure.number}
+                position={measureMenu.position}
+                invoker={measureMenu.invoker}
+                focusFallback={measureMenuFocusFallback}
+                deleteDisabledReason={deleteDisabledReason}
+                insertDisabledReason={insertDisabledReason}
+                duplicateDisabledReason={duplicateDisabledReason}
+                loopDisabledReason={loopDisabledReason}
+                onPlay={
+                  canPlayMeasure && onAuditionPianoRollMeasure
+                    ? () => onAuditionPianoRollMeasure(measure)
+                    : undefined
+                }
+                onLoop={onLoopMeasure ? () => onLoopMeasure(measure.measureIndex) : undefined}
+                onInsertAfter={() => onInsertMeasureAfter?.(measure.measureIndex)}
+                onDuplicate={() => onDuplicateMeasure?.(measure.measureIndex)}
+                onDelete={() => onDeleteMeasure?.(measure.measureIndex)}
+                onClose={closeMeasureMenu}
+              />
+            );
+          })()
+        : null}
       {melodyMenu
         ? (() => {
             const step = project.progression.steps.find(
@@ -2724,5 +3670,34 @@ export function ProgressionTrack({
           })()
         : null}
     </div>
+  );
+}
+function MidiSettingsPortal({
+  snapshot,
+  children,
+}: {
+  snapshot: MidiStepInputSnapshot;
+  children: import("react").ReactNode;
+}) {
+  const panel = document.getElementById("midi-settings-content");
+  const status = document.getElementById("midi-status-content");
+  const device = snapshot.inputs.find((input) => input.id === snapshot.selectedDeviceId)?.name;
+  const [lastDevice, setLastDevice] = useState(device);
+  useEffect(() => {
+    if (device) setLastDevice(device);
+  }, [device]);
+  const text = `${device ?? lastDevice ?? "MIDI"} - ${snapshot.status} - ${snapshot.focusSuspended ? "temporarily paused (window inactive)" : snapshot.armed ? "Armed" : "Disarmed"}`;
+  return (
+    <>
+      {panel ? createPortal(children, panel) : null}
+      {status
+        ? createPortal(
+            <span role="status" aria-live="polite" title={`${text}. ${snapshot.message}`}>
+              {text}
+            </span>,
+            status,
+          )
+        : null}
+    </>
   );
 }

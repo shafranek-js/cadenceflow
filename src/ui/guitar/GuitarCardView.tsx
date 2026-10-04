@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import {
@@ -8,6 +9,12 @@ import { getInPositionScaleTones } from "../../domain/instruments/guitar/scaleTo
 import { GuitarFretboard } from "./GuitarFretboard";
 import type { LabelHierarchyMode } from "../progression/labelHierarchy";
 import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
+import type { GuitarChordColorMode } from "../../domain/project/project";
+import {
+  GUITAR_FINGER_COLORS,
+  GUITAR_FINGER_NAMES,
+  type GuitarFingerNumber,
+} from "../../domain/instruments/guitar/fingerColors";
 
 export interface GuitarCardViewProps {
   readonly chord: ChordDefinition;
@@ -17,6 +24,7 @@ export interface GuitarCardViewProps {
   readonly scalePitchClasses?: readonly PitchClassIdentity[];
   readonly showScaleTones?: boolean;
   readonly orientation?: "vertical" | "horizontal";
+  readonly colorMode?: GuitarChordColorMode;
 }
 
 export function GuitarCardView({
@@ -27,6 +35,7 @@ export function GuitarCardView({
   scalePitchClasses,
   showScaleTones = false,
   orientation = "vertical",
+  colorMode = "chord-roles",
 }: GuitarCardViewProps) {
   const isSeventh = chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
   const isMajor7 = chord.variant?.seventh === "major7";
@@ -57,6 +66,7 @@ export function GuitarCardView({
       data-base-fret={voicing.baseFret}
       data-frets={fretStringSummary}
       data-orientation={orientation}
+      data-color-mode={colorMode}
     >
       <div className="mini-guitar-heading">
         {labelMode && functionLabel ? (
@@ -81,10 +91,37 @@ export function GuitarCardView({
           showScaleTones={showScaleTones}
           showFingerings={true}
           orientation={orientation}
+          colorMode={colorMode}
           width={isHorizontal ? 172 : 124}
           height={isHorizontal ? 116 : 142}
         />
       </div>
+      {colorMode === "fingering" ? <GuitarFingeringLegend /> : null}
+    </div>
+  );
+}
+
+function GuitarFingeringLegend() {
+  const fingers: readonly GuitarFingerNumber[] = [1, 2, 3, 4];
+  return (
+    <div className="guitar-fingering-legend" role="group" aria-label="Guitar finger color legend">
+      {fingers.map((finger) => (
+        <span
+          key={finger}
+          className={`guitar-finger-legend-item finger-${finger}`}
+          role="img"
+          aria-label={`Finger ${finger}, ${GUITAR_FINGER_NAMES[finger].en}`}
+        >
+          <span
+            className="guitar-finger-legend-dot"
+            aria-hidden="true"
+            style={{ "--guitar-finger-color": GUITAR_FINGER_COLORS[finger] } as CSSProperties}
+          >
+            {finger}
+          </span>
+          <span aria-hidden="true">{GUITAR_FINGER_NAMES[finger].en}</span>
+        </span>
+      ))}
     </div>
   );
 }

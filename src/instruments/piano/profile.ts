@@ -1,5 +1,9 @@
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import type { ChordStep } from "../../domain/progression/step";
+import {
+  stepTranspositionSemitones,
+  transposeExactPitch,
+} from "../../domain/progression/transposition";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { realizeChord as realizeHarmonyChord } from "../../domain/harmony/realization";
 import {
@@ -123,7 +127,7 @@ export const pianoProfile: InstrumentProfile = Object.freeze({
   },
 });
 
-export function realizeProgressionStepRealization(
+export function realizeProgressionStepSourceRealization(
   step: ChordStep,
   tonic: PitchClassIdentity,
   context?: import("../../domain/harmony/modules/types").HarmonicContext,
@@ -145,6 +149,23 @@ export function realizeProgressionStepRealization(
       variant: step.harmonicVariant,
     },
     performance: step.performance,
+  });
+}
+
+export function realizeProgressionStepRealization(
+  step: ChordStep,
+  tonic: PitchClassIdentity,
+  context?: import("../../domain/harmony/modules/types").HarmonicContext,
+): InstrumentRealization {
+  const realization = realizeProgressionStepSourceRealization(step, tonic, context);
+  const semitones = stepTranspositionSemitones(step);
+  return Object.freeze({
+    pitches: Object.freeze(
+      realization.pitches.map((pitch) => transposeExactPitch(pitch, semitones)),
+    ),
+    ...(realization.bassPitch
+      ? { bassPitch: transposeExactPitch(realization.bassPitch, semitones) }
+      : {}),
   });
 }
 

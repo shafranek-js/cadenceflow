@@ -103,7 +103,7 @@ describe("T209 Song Sections", () => {
       },
     };
     const restored = decodePortableProject(JSON.stringify(v7));
-    expect(restored.schemaVersion).toBe(9);
+    expect(restored.schemaVersion).toBe(10);
     expect(restored.progression.sections).toEqual([]);
     expect(restored.progression.steps[0]).toMatchObject({ kind: "chord", melody: authored });
     expect(restored.temporaryBranch?.id).toBe("branch");

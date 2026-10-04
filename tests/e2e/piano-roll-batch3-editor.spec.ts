@@ -304,7 +304,9 @@ test("Piano Roll directly edits generated notes and preserves transactional edit
   const dblclickTarget = await page.evaluate(
     () => (window as Window & { __pianoRollDblClick?: string }).__pianoRollDblClick,
   );
-  expect(dblclickTarget).toContain("piano-roll-row");
+  // Empty grid cells resolve to the grid container because rows are positioned
+  // children and do not cover the full interactive surface.
+  expect(dblclickTarget).toContain("piano-roll-grid");
   const transactionStatus = page.getByTestId("duration-resize-status");
   if (await transactionStatus.isVisible()) {
     throw new Error(
@@ -356,6 +358,12 @@ test("Piano Roll directly edits generated notes and preserves transactional edit
     page.locator("button.piano-roll-note[data-generated='false'][aria-pressed='true']"),
   ).toHaveCount(2);
   await page.keyboard.press("Control+c");
+  const pasteGrid = page.locator(".piano-roll-measure[data-measure-index='1'] .piano-roll-grid");
+  await pasteGrid.scrollIntoViewIfNeeded();
+  const pasteBox = await pasteGrid.boundingBox();
+  if (!pasteBox) throw new Error("The clipboard paste target is not visible");
+  await page.mouse.click(pasteBox.x + pasteBox.width / 2, pasteBox.y + pasteBox.height / 2);
+  await pasteGrid.focus();
   await page.keyboard.press("Control+v");
   await expect(allAuthored).toHaveCount(allAuthoredCount + 2);
   await historyAction(page, "Undo");
@@ -646,12 +654,21 @@ test("Piano Roll note audition playhead crosses system boundaries and clears at 
   );
   await expect(authored.first()).toBeVisible();
   await authored.first().click({ force: true });
-  const editSelected = page.getByTestId("piano-roll-edit-selected-note");
-  await expect(editSelected).toBeVisible();
-  await editSelected.click();
+  // The chord Step remains selected in the inspector, so open the note editor
+  // through the note's supported keyboard action instead of the global header.
+  await authored.first().press("e");
   const inspector = page.getByRole("region", { name: "Piano Roll Inspector" });
-  await inspector.getByLabel("Inspector duration numerator").fill("10");
-  await inspector.getByLabel("Inspector duration numerator").press("Enter");
+  const durationNumerator = inspector.getByLabel("Inspector duration numerator");
+  await durationNumerator.fill("10");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(durationNumerator).toBeFocused();
+  await expect(durationNumerator).toHaveValue("10");
+  await durationNumerator.press("Enter");
   const materialized = page.locator(
     `button.piano-roll-note[data-source-step-id='${firstStepId}'][data-generated='false']`,
   );
@@ -985,9 +1002,9 @@ for (const gridMode of ["Degrees", "Chromatic"] as const) {
       const expectedPitchAtPointer = expectedPitchFromFrozenC4Geometry(
         { min: originalMin, max: originalMax },
         gridMode,
-        gridBox.y,
-        gridBox.height,
-        units,
+        resetGridBox.y,
+        resetGridBox.height,
+        resetUnits,
         commitY,
       );
       await page.mouse.move(

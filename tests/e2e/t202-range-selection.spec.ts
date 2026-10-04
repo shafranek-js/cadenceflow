@@ -67,7 +67,7 @@ test.describe("T202 range selection", () => {
     await page.getByTestId("range-toolbar-performance").click();
     await expect(page.getByTestId("range-toolbar-performance-reset")).toBeVisible();
     await page.getByTestId("range-toolbar-performance-reset").click();
-    await expect(page.getByTestId("range-toolbar-transpose")).toBeDisabled();
+    await expect(page.getByTestId("range-toolbar-transpose")).toBeEnabled();
     await page.getByTestId("range-toolbar-duplicate").click();
     await expect(page.getByTestId("progression-step")).toHaveCount(8);
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
@@ -169,7 +169,7 @@ test.describe("T202 range selection", () => {
     await expect(page.getByTestId("range-selection-toolbar")).toBeVisible();
     await expect(page.getByTestId("range-selection-toolbar")).toContainText("4 selected");
     await expect(page.getByTestId("range-toolbar-delete")).toBeVisible();
-    await expect(page.getByTestId("range-toolbar-transpose")).toBeDisabled();
+    await expect(page.getByTestId("range-toolbar-transpose")).toBeEnabled();
   });
 
   test("keeps Rest and stable IDs selected across Staff and Tablature views", async ({ page }) => {

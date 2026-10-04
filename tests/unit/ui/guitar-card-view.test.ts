@@ -6,10 +6,19 @@ import { describe, expect, it } from "vitest";
 import { GuitarCardView } from "../../../src/ui/guitar/GuitarCardView";
 import { GuitarFretboard } from "../../../src/ui/guitar/GuitarFretboard";
 import { resolveGuitarChordVoicing } from "../../../src/domain/instruments/guitar/voicings";
+import { GUITAR_FINGER_COLORS } from "../../../src/domain/instruments/guitar/fingerColors";
 import { ChordCard } from "../../../src/ui/chord-card/ChordCard";
 import type { ChordDefinition } from "../../../src/domain/harmony/chord";
 
 const el = React.createElement;
+
+function rgb(hex: string): string {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16));
+  return `rgb(${channels?.join(", ") ?? ""})`;
+}
 
 function mount(element: React.ReactElement) {
   const container = document.createElement("div");
@@ -132,11 +141,13 @@ describe("GuitarCardView & GuitarFretboard", () => {
       expect(openMarkers).toHaveLength(3);
       expect(openMarkers.filter((marker) => marker.classList.contains("is-root"))).toHaveLength(2);
       expect(
-        openMarkers.find((marker) => marker.getAttribute("aria-label") === "String 6 open root"),
+        openMarkers.find((marker) =>
+          marker.getAttribute("aria-label")?.startsWith("String 6 open, chord root"),
+        ),
       ).toBeDefined();
       expect(
         openMarkers
-          .find((marker) => marker.getAttribute("aria-label") === "String 2 open")
+          .find((marker) => marker.getAttribute("aria-label")?.startsWith("String 2 open"))
           ?.classList.contains("is-root"),
       ).toBe(false);
 
@@ -158,6 +169,144 @@ describe("GuitarCardView & GuitarFretboard", () => {
     expect(scaleDots.length).toBeGreaterThan(0);
 
     mounted.unmount();
+  });
+
+  it.each(["vertical", "horizontal"] as const)(
+    "uses each known finger color and keeps its number visible in %s orientation",
+    (orientation) => {
+      const voicing = resolveGuitarChordVoicing({
+        rootPitchClass: 0,
+        baseQuality: "dominant",
+        spelling: { symbol: "C7", root: { step: "C", alter: 0 } },
+        isSeventh: true,
+      });
+      const originalVoicing = JSON.stringify(voicing);
+      const mounted = mount(
+        el(GuitarFretboard, {
+          voicing,
+          orientation,
+          colorMode: "fingering",
+          showFingerings: false,
+        }),
+      );
+      const svg = mounted.container.querySelector("svg");
+      expect(svg?.getAttribute("data-color-mode")).toBe("fingering");
+      expect(svg?.getAttribute("aria-label")).toContain(
+        "fingers 1 Index, 2 Middle, 3 Ring, and 4 Pinky",
+      );
+      expect(svg?.getAttribute("aria-label")).toContain("finger 1 (Index)");
+
+      const fingeringMarkers = Array.from(
+        mounted.container.querySelectorAll<SVGCircleElement>(".guitar-dot-finger"),
+      );
+      const fingers = fingeringMarkers
+        .map((marker) => marker.getAttribute("data-finger"))
+        .filter((finger): finger is string => finger !== null)
+        .sort();
+      expect(fingers).toEqual(["1", "2", "3", "4"]);
+      expect(
+        fingeringMarkers
+          .map((marker) => ({
+            finger: marker.getAttribute("data-finger"),
+            color: marker.style.fill,
+          }))
+          .sort((a, b) => Number(a.finger) - Number(b.finger)),
+      ).toEqual(
+        ([1, 2, 3, 4] as const).map((finger) => ({
+          finger: String(finger),
+          color: rgb(GUITAR_FINGER_COLORS[finger]),
+        })),
+      );
+      expect(
+        mounted.container.querySelectorAll(".guitar-dot-finger-text.is-fingering-color"),
+      ).toHaveLength(4);
+      expect(JSON.stringify(voicing)).toBe(originalVoicing);
+
+      mounted.unmount();
+    },
+  );
+
+  it.each(["vertical", "horizontal"] as const)(
+    "shows open roots as neutral in fingering mode and retains the role-mode red outline in %s orientation",
+    (orientation) => {
+      const voicing = resolveGuitarChordVoicing({
+        rootPitchClass: 4,
+        baseQuality: "major",
+        spelling: { symbol: "E", root: { step: "E", alter: 0 } },
+      });
+      const mounted = mount(el(GuitarFretboard, { voicing, orientation, colorMode: "fingering" }));
+      const openRoots = Array.from(
+        mounted.container.querySelectorAll<SVGCircleElement>(".guitar-string-marker.is-open"),
+      ).filter((marker) => marker.getAttribute("aria-label")?.includes("chord root"));
+      expect(openRoots).toHaveLength(2);
+      expect(openRoots.every((marker) => marker.classList.contains("is-neutral"))).toBe(true);
+      expect(openRoots.every((marker) => !marker.classList.contains("is-root"))).toBe(true);
+      expect(openRoots[0]?.getAttribute("aria-label")).toContain("no fretting finger");
+      mounted.unmount();
+    },
+  );
+
+  it("keeps unsupported or missing fingering neutral without inventing a finger number", () => {
+    const voicing = resolveGuitarChordVoicing({
+      rootPitchClass: 0,
+      baseQuality: "dominant",
+      spelling: { symbol: "C7", root: { step: "C", alter: 0 } },
+      isSeventh: true,
+    });
+    let frettedIndex = 0;
+    const voicingWithUnknownFinger = {
+      ...voicing,
+      items: voicing.items.map((item) => {
+        if (item.fret <= 0) return item;
+        frettedIndex += 1;
+        if (frettedIndex === 1) return { ...item, finger: 7 };
+        if (frettedIndex === 2) return { ...item, finger: undefined };
+        return item;
+      }),
+    };
+    const suppliedVoicingSnapshot = JSON.stringify(voicingWithUnknownFinger);
+    const mounted = mount(
+      el(GuitarFretboard, {
+        voicing: voicingWithUnknownFinger,
+        orientation: "horizontal",
+        colorMode: "fingering",
+      }),
+    );
+    expect(mounted.container.querySelectorAll(".guitar-dot-finger.is-finger-unknown")).toHaveLength(
+      2,
+    );
+    expect(mounted.container.querySelectorAll(".guitar-dot-finger-text")).toHaveLength(2);
+    expect(mounted.container.querySelector("svg")?.getAttribute("aria-label")).toContain(
+      "fingering unavailable",
+    );
+    expect(JSON.stringify(voicingWithUnknownFinger)).toBe(suppliedVoicingSnapshot);
+    mounted.unmount();
+  });
+
+  it("keeps role colors as the default and renders the compact accessible fingering legend only in fingering mode", () => {
+    const roles = mount(el(GuitarCardView, { chord: mockCChord, chordLabel: "C" }));
+    const roleCard = roles.container.querySelector<HTMLElement>(".mini-guitar-card-visual");
+    const roleSvg = roles.container.querySelector("svg");
+    expect(roleSvg?.getAttribute("data-color-mode")).toBe("chord-roles");
+    expect(roles.container.querySelector(".guitar-fingering-legend")).toBeNull();
+    expect(roles.container.querySelector(".guitar-dot-root")).not.toBeNull();
+    roles.unmount();
+
+    const fingering = mount(
+      el(GuitarCardView, { chord: mockCChord, chordLabel: "C", colorMode: "fingering" }),
+    );
+    const fingeringCard = fingering.container.querySelector<HTMLElement>(
+      ".mini-guitar-card-visual",
+    );
+    expect(fingeringCard?.getAttribute("data-frets")).toBe(roleCard?.getAttribute("data-frets"));
+    expect(fingeringCard?.getAttribute("data-base-fret")).toBe(
+      roleCard?.getAttribute("data-base-fret"),
+    );
+    const legend = fingering.container.querySelector<HTMLElement>(".guitar-fingering-legend");
+    expect(legend?.getAttribute("aria-label")).toBe("Guitar finger color legend");
+    expect(legend?.textContent).toContain("Index");
+    expect(legend?.textContent).toContain("Pinky");
+    fingering.unmount();
   });
 
   it("renders exact string-aligned fret numbers at bottom under each string in vertical mode", () => {

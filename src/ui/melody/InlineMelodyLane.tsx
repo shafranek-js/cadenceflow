@@ -1,6 +1,6 @@
 import type { CSSProperties, MouseEvent } from "react";
 import { formatChordSymbol } from "../../domain/harmony/chord";
-import { realizeChord } from "../../domain/harmony/realization";
+import { realizeProgressionStepChord } from "../../domain/progression/transposition";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import type { Project } from "../../domain/project/project";
 import type { ProgressionMeasure } from "../../domain/timing/measureLayout";
@@ -35,10 +35,7 @@ function sourceChordLabel(project: Project, stepId: string): string {
     (candidate) => candidate.id === stepId && candidate.kind === "chord",
   );
   if (!step || step.kind !== "chord") return stepId;
-  return formatChordSymbol({
-    ...realizeChord(step.harmonicFunction, project.tonic),
-    variant: step.harmonicVariant,
-  });
+  return formatChordSymbol(realizeProgressionStepChord(step, project.tonic));
 }
 
 function laneForMeasure(

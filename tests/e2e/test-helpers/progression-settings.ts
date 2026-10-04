@@ -40,7 +40,7 @@ export async function ensureSelectedProgressionSettingsVisible(page: Page): Prom
 /** Sets measures per system via the My Progression header context menu. */
 export async function setLayoutMeasuresPerSystem(
   page: Page,
-  count: 1 | 2 | 3 | 4 | "auto",
+  count: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | "auto",
 ): Promise<void> {
   const heading = page.getByTestId("progression-heading");
   await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });

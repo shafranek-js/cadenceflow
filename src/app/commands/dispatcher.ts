@@ -59,6 +59,7 @@ import {
   setResolutionArrows,
   setGenreFocus,
   setGuitarChordOrientation,
+  setGuitarChordColorMode,
   setSidePanelMode,
   type SetThemeCommand,
   type SetExpertiseModeCommand,
@@ -70,12 +71,18 @@ import {
   type SetResolutionArrowsCommand,
   type SetGenreFocusCommand,
   type SetGuitarChordOrientationCommand,
+  type SetGuitarChordColorModeCommand,
   type SetSidePanelModeCommand,
 } from "./presentationCommands";
 import { restoreMelodyState, type RestoreMelodyStateCommand } from "./melodyCommands";
 import { restoreHarmonyState, type RestoreHarmonyStateCommand } from "./harmonyCommands";
 import { setSongSections, type SetSongSectionsCommand } from "./sectionCommands";
-import { applyAuthoredMelodyTransaction, restoreAuthoredMelodyTransaction, type AuthoredMelodyTransactionCommand, type RestoreAuthoredMelodyCommand } from "./authoredMelodyTransaction";
+import {
+  applyAuthoredMelodyTransaction,
+  restoreAuthoredMelodyTransaction,
+  type AuthoredMelodyTransactionCommand,
+  type RestoreAuthoredMelodyCommand,
+} from "./authoredMelodyTransaction";
 
 export function applyInverseCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -143,14 +150,18 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
     case "presentation/set-guitar-chord-orientation":
       return setGuitarChordOrientation(project, command as SetGuitarChordOrientationCommand)
         .project;
+    case "presentation/set-guitar-chord-color-mode":
+      return setGuitarChordColorMode(project, command as SetGuitarChordColorModeCommand).project;
     case "presentation/set-side-panel-mode":
       return setSidePanelMode(project, command as SetSidePanelModeCommand).project;
     case "melody/restore-state":
       return restoreMelodyState(project, command as RestoreMelodyStateCommand).project;
     case "melody/restore-authored-transaction":
-      return restoreAuthoredMelodyTransaction(project, command as RestoreAuthoredMelodyCommand).project;
+      return restoreAuthoredMelodyTransaction(project, command as RestoreAuthoredMelodyCommand)
+        .project;
     case "melody/apply-authored-transaction":
-      return applyAuthoredMelodyTransaction(project, command as AuthoredMelodyTransactionCommand).project;
+      return applyAuthoredMelodyTransaction(project, command as AuthoredMelodyTransactionCommand)
+        .project;
     case "harmony/restore-state":
       return restoreHarmonyState(project, command as RestoreHarmonyStateCommand).project;
     default:

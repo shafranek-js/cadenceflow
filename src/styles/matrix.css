@@ -725,5 +725,7 @@
 
   .matrix-spatial-board {
     overscroll-behavior-x: contain;
+    /* Reserve no desktop scrollbar gutter so the last narrow-screen card fits when scrolled. */
+    scrollbar-gutter: auto;
   }
 }

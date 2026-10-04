@@ -1,6 +1,7 @@
 import type {
   MeasuresPerSystem,
   NoteColorMode,
+  GuitarChordColorMode,
   PresentationMode,
   ProgressionView,
   Project,
@@ -289,6 +290,36 @@ export function setGuitarChordOrientation(
     inverse: {
       type: "presentation/set-guitar-chord-orientation",
       payload: { orientation: previous, nowIso: command.payload.nowIso },
+    },
+  };
+}
+
+export interface SetGuitarChordColorModePayload {
+  readonly mode: GuitarChordColorMode;
+  readonly nowIso: string;
+}
+
+export type SetGuitarChordColorModeCommand = ProjectCommand<SetGuitarChordColorModePayload> & {
+  readonly type: "presentation/set-guitar-chord-color-mode";
+};
+
+export function setGuitarChordColorMode(
+  project: Project,
+  command: SetGuitarChordColorModeCommand,
+): AppliedCommand {
+  const previous = project.presentation.guitarChordColorMode ?? "chord-roles";
+  return {
+    project: Object.freeze({
+      ...project,
+      updatedAt: command.payload.nowIso,
+      presentation: Object.freeze({
+        ...project.presentation,
+        guitarChordColorMode: command.payload.mode,
+      }),
+    }),
+    inverse: {
+      type: "presentation/set-guitar-chord-color-mode",
+      payload: { mode: previous, nowIso: command.payload.nowIso },
     },
   };
 }

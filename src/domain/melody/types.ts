@@ -42,6 +42,8 @@ export interface ChordMelodyRecipe {
 export interface AuthoredMelodyNote {
   readonly id: string;
   readonly pitch: ExactPitch;
+  /** Optional pre-recipe source pitch retained when generated notes are materialized. */
+  readonly sourcePitchMidi?: number;
   readonly onset: Rational;
   readonly duration: Rational;
 }
@@ -82,20 +84,40 @@ export function snapshotAuthoredMelodyPhrase(value: unknown): AuthoredMelodyPhra
   const notes = value.notes.map((raw) => {
     if (
       !isRecord(raw) ||
-      Object.keys(raw).some((key) => !["id", "pitch", "onset", "duration"].includes(key)) ||
+      Object.keys(raw).some(
+        (key) => !["id", "pitch", "sourcePitchMidi", "onset", "duration"].includes(key),
+      ) ||
       typeof raw.id !== "string" ||
       raw.id.trim() === "" ||
       ids.has(raw.id) ||
+      (raw.sourcePitchMidi !== undefined &&
+        (!Number.isInteger(raw.sourcePitchMidi) ||
+          (raw.sourcePitchMidi as number) < 0 ||
+          (raw.sourcePitchMidi as number) > 127)) ||
       !isRecord(raw.pitch) ||
       Object.keys(raw.pitch).some(
-        (key) => !["midiNumber", "pitchClassIdentity", "octave", "spelling"].includes(key),
+        (key) =>
+          ![
+            "midiNumber",
+            "pitchClassIdentity",
+            "octave",
+            "spelling",
+            "transpositionCompensationSemitones",
+            "transpositionSpellingOverride",
+          ].includes(key),
       ) ||
       !Number.isInteger(raw.pitch.midiNumber) ||
       (raw.pitch.midiNumber as number) < 0 ||
       (raw.pitch.midiNumber as number) > 127 ||
       !Number.isInteger(raw.pitch.pitchClassIdentity) ||
       !Number.isInteger(raw.pitch.octave) ||
+      (raw.pitch.transpositionCompensationSemitones !== undefined &&
+        (!Number.isInteger(raw.pitch.transpositionCompensationSemitones) ||
+          (raw.pitch.transpositionCompensationSemitones as number) < -127 ||
+          (raw.pitch.transpositionCompensationSemitones as number) > 127)) ||
       !isPitchSpelling(raw.pitch.spelling) ||
+      (raw.pitch.transpositionSpellingOverride !== undefined &&
+        !isPitchSpelling(raw.pitch.transpositionSpellingOverride)) ||
       !isRecord(raw.onset) ||
       Object.keys(raw.onset).some((key) => !["numerator", "denominator"].includes(key)) ||
       !Number.isInteger(raw.onset.numerator) ||
@@ -111,21 +133,41 @@ export function snapshotAuthoredMelodyPhrase(value: unknown): AuthoredMelodyPhra
     )
       throw new MelodyValidationError("Invalid authored Melody note", "invalid-recipe");
     ids.add(raw.id);
-    const pitch = exactPitch(raw.pitch.midiNumber as number, {
+    const anchorPitch = exactPitch(raw.pitch.midiNumber as number, {
       step: raw.pitch.spelling.step as ExactPitch["spelling"]["step"],
       alter: raw.pitch.spelling.alter as number,
     });
     if (
-      raw.pitch.pitchClassIdentity !== pitch.pitchClassIdentity ||
-      raw.pitch.octave !== pitch.octave
+      raw.pitch.pitchClassIdentity !== anchorPitch.pitchClassIdentity ||
+      raw.pitch.octave !== anchorPitch.octave
     )
       throw new MelodyValidationError(
         "Authored pitch identity does not match MIDI pitch",
         "invalid-pitch",
       );
+    const pitch: ExactPitch = Object.freeze({
+      ...anchorPitch,
+      ...(raw.pitch.transpositionCompensationSemitones === undefined
+        ? {}
+        : {
+            transpositionCompensationSemitones: raw.pitch
+              .transpositionCompensationSemitones as number,
+          }),
+      ...(raw.pitch.transpositionSpellingOverride === undefined
+        ? {}
+        : {
+            transpositionSpellingOverride: Object.freeze({
+              step: (raw.pitch.transpositionSpellingOverride as ExactPitch["spelling"]).step,
+              alter: (raw.pitch.transpositionSpellingOverride as ExactPitch["spelling"]).alter,
+            }),
+          }),
+    });
     return Object.freeze({
       id: raw.id,
       pitch,
+      ...(raw.sourcePitchMidi !== undefined
+        ? { sourcePitchMidi: raw.sourcePitchMidi as number }
+        : {}),
       onset: Object.freeze({
         numerator: raw.onset.numerator as number,
         denominator: raw.onset.denominator as number,

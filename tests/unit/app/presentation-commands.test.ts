@@ -9,6 +9,7 @@ import {
   setGenreFocus,
   setTheme,
   setGuitarChordOrientation,
+  setGuitarChordColorMode,
   setSidePanelMode,
   type SetExpertiseModeCommand,
   type SetStaffBassVisibilityCommand,
@@ -17,6 +18,7 @@ import {
   type SetGenreFocusCommand,
   type SetThemeCommand,
   type SetGuitarChordOrientationCommand,
+  type SetGuitarChordColorModeCommand,
   type SetSidePanelModeCommand,
 } from "../../../src/app/commands/presentationCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
@@ -204,6 +206,34 @@ describe("US10 presentation commands", () => {
     const inverseResult = setGuitarChordOrientation(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
     expect(undone.presentation.guitarChordOrientation).toBe("vertical");
+  });
+
+  it("changes only the project guitar marker color preference and supports undo/redo", () => {
+    const initial = createDefaultProject("presentation-guitar-color", "Guitar Colors");
+    const store = new AppStore(initial);
+    const initialProgression = initial.progression;
+    const initialHarmonyTrack = initial.harmonyTrack;
+    const initialMelodyTrack = initial.melodyTrack;
+    const command: SetGuitarChordColorModeCommand = {
+      type: "presentation/set-guitar-chord-color-mode",
+      payload: { mode: "fingering", nowIso },
+    };
+
+    expect(initial.presentation.guitarChordColorMode).toBe("chord-roles");
+    store.dispatch(command, setGuitarChordColorMode);
+    expect(store.project.presentation.guitarChordColorMode).toBe("fingering");
+    expect(store.project.progression).toBe(initialProgression);
+    expect(store.project.harmonyTrack).toBe(initialHarmonyTrack);
+    expect(store.project.melodyTrack).toBe(initialMelodyTrack);
+
+    expect(store.undo()).toBe(true);
+    expect(store.project.presentation.guitarChordColorMode).toBe("chord-roles");
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.guitarChordColorMode).toBe("fingering");
+
+    const inverseResult = setGuitarChordColorMode(initial, command);
+    const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
+    expect(undone.presentation.guitarChordColorMode).toBe("chord-roles");
   });
 
   it("toggles side panel mode between fixed and autohide with undo/redo and inverse", () => {

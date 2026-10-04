@@ -33,6 +33,8 @@ export interface StepPerformance {
 export interface ChordStep {
   readonly id: string;
   readonly kind: "chord";
+  /** Additive concert-pitch offset; persisted schema v10 defaults this to zero. */
+  readonly transpositionSemitones?: number;
   readonly harmonicFunction: HarmonicFunctionIdentity;
   readonly harmonicVariant: HarmonicVariant;
   readonly explicitSpellingOverrides?: Readonly<Record<string, PitchSpelling>>;
@@ -48,6 +50,8 @@ export interface ChordStep {
 export interface RestStep {
   readonly id: string;
   readonly kind: "rest";
+  /** Additive concert-pitch offset for authored Melody; persisted schema v10 defaults this to zero. */
+  readonly transpositionSemitones?: number;
   readonly duration: MusicalDuration;
   /** Authored Melody is independent of Harmony; a Rest excludes only chord generation. */
   readonly authoredMelody?: AuthoredMelodyPhrase;

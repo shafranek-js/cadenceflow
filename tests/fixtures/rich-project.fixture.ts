@@ -201,6 +201,7 @@ export function createRichProjectFixture(): Project {
       measuresPerSystem: "auto",
       showBassInStaff: false,
       noteColorMode: "standard",
+      guitarChordColorMode: "chord-roles",
       resolutionArrows: true,
       genreFocus: "all",
     }),

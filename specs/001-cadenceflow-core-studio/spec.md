@@ -1315,9 +1315,35 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   authored-note editing is introduced only by the subsequent authored-Melody task.
 - **FR-255**: Song Sections are canonical records with `id`, `name`, and `startStepId`; the initial model
   represents named boundaries only and excludes repeat graphs and arrangement instances.
-- **FR-256**: Web MIDI input is step input: a selected duration applies to each incoming Note On, which
-  inserts one quantized note and advances the insertion cursor. Note Off is ignored. Real-time MIDI
-  recording is out of scope.
+- **FR-256**: Piano Roll Web MIDI step input MUST put all controls in one dedicated **Midi Settings**
+  responsive sidebar with an accessible settings entry, keyboard close and focus return. The main
+  music toolbar MUST have no permanent MIDI controls. The existing status bar announces the actual
+  device name, connection and Armed/Disarmed/temporarily paused/error state without stealing focus.
+  When permission queries are supported, already granted access automatically connects, selects
+  the prior available or stable first connected input, and arms only with Piano Roll active and
+  transport stopped. Prompt/denied permission requires explicit **Connect MIDI** using
+  `requestMIDIAccess({sysex:false})`; automatic startup MUST NOT prompt. Real hotplug may auto-arm;
+  ordinary renders, note updatedAt and repeated device notifications MUST NOT rearm manual/safety OFF.
+  Separate armed intent, effective input and focus suspension. Window blur suspends effective input,
+  ignores background Note On without replay and cancels previews/late preparation. Focus resumes
+  only for preserved intent in the same Project session, same connected device, active Piano Roll
+  and stopped transport. Escape/manual OFF clears intent even during suspension. Playback/pause,
+  view/session replacement and device disconnect permanently disarm; within-window focus does not.
+  Each positive Note On on any channel inserts one exact authored note and one Undo at the shared
+  absolute insertion cursor, then advances by exact duration without resnapping. Process bursts
+  synchronously against authoritative store.project. Ignore Note Off, velocity zero, CC/pitch bend
+  and malformed input; never store velocity or coerce pitch 0..127 to scale degrees. Offer all 15
+  ordinary/dotted/triplet whole/half/quarter/eighth/sixteenth durations, default quarter, independent
+  of Snap. Initial cursor is selected Step start; empty-grid click snaps explicitly; exact fraction
+  controls are available. Cursor is independent of selection/playback/UndoRedo. Armed Enter and
+  manual pitch plus Insert note share insertion; unarmed Enter retains existing behavior. Existing
+  Melody and generated recipe/effective notes/IDs/ownership/instruments are preserved through the
+  atomic authoredMelodyTransaction, including exact UndoRedo and authored Rest. Cross-Step/bar/System
+  notes are valid within composition end; overflow rejects the whole note without mutation/history/
+  cursor advancement or automatic bars/truncation. Configuration/cursor are transient, outside v9.
+  Sidebar-only **Sound on input**, default ON, previews only a successfully committed note for 250 ms
+  using current Melody instrument/volume; session/disarm/pause/change cancels late completions. No
+  harmony or existing-note reattacks, chord aggregation, real-time recording or adjacent T214 redesign.
 - **FR-257**: Signal may contribute selectively adapted MIT-licensed interaction gestures through an
   adapter. Any adapted code MUST carry provenance comments and the repository MUST include
   `THIRD_PARTY_NOTICES.md`; do not import Signal domain/store/audio/history models. AI, real-time MIDI
@@ -1342,6 +1368,19 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - **FR-261**: Release acceptance MUST verify offline asset availability and notices, current and
   migrated project round-trips, print layout at A4 and representative long progressions, focused
   and full regression results, production build, and any unresolved licensing or test failures.
+- **FR-262**: Every displayed Measure heading MUST expose the commands for that exact Measure by
+  pointer context menu, ContextMenu/Shift+F10 and a discoverable accessible menu button. Deleting a
+  Measure removes its authored time interval and Harmony, shifts later music earlier by that exact
+  interval, and retains all musical content outside it. Crossing Steps and authored/generated
+  effective Melody MUST be clipped, split, rebased and reassigned with exact Rational timing;
+  generated Melody context changes MUST NOT silently rewrite retained notes. Preserve stable Step
+  ownership where it survives, instruments, recipes, section boundaries, selection, loops, and exact
+  one-entry Undo/Redo. An empty progression and an incomplete final Measure are valid. Active branch
+  constraints and any model case that cannot preserve content MUST be explained and leave the
+  Project/history unchanged. Measure targets are independent of the selected Step and consistent in
+  Harmonic, Piano, Staff, Guitar, Tablature and Piano Roll views. Context menus MUST close on Escape
+  or outside click, return focus to their invoking heading/button, clamp to the viewport, and remain
+  usable in light/dark themes at 640×360, 1280×720 and 1920×1080.
   A failure may be documented and triaged, but the release gate MUST NOT be marked complete while
   a required check is failing or its disposition is undecided.
 
@@ -1600,7 +1639,7 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - **SC-037**: Alternatives and quick-command candidates are deterministic for fixed project inputs, expose rationale, and cannot mutate the Project before Apply.
 - **SC-038**: Generated and authored Melody resolve through one effective-phrase contract; authored note IDs, exact pitch, and Rational onset/duration survive v7 save/load and Undo/Redo, while schema v6 remains compatible.
 - **SC-039**: Song Sections preserve stable IDs, names, and valid start-Step boundaries through v8 migration and round-trip; no repeat graph or arrangement-instance semantics are implied.
-- **SC-040**: Web MIDI step input inserts one quantized note on each Note On using the selected duration and advances the insertion cursor; Note Off is ignored. Device/permission/error states are accessible, and real-time recording is not required.
+- **SC-040**: Normal-scale captures verify Midi Settings open/closed, all three viewports, both themes and pitch grids, no header/music overlap, keyboard focus return, exact cursor controls and actual-name status bar with full title/polite announcements. Mocked Web MIDI verifies granted startup automatic connection/selection/arming without prompts, delayed-query/access OFF cancellation, blur input rejection and safe focus resume, manual/safety OFF during suspension without revival, explicit permission with `sysex:false`, unsupported/denied/no-device/multiple-device states, device selection/disconnect, and Note On filtering across channels. One accepted Note On inserts one exact-pitch authored note and one Undo entry at the absolute cursor, then advances by the chosen ordinary/dotted/triplet Rational duration without grid re-quantization; Note Off/velocity-zero/CC/pitchbend insert nothing. Manual MIDI `0` and `127`, grid Snap placement, cross-Step/bar/System insertion, generated Melody materialization and exact Undo/Redo pass. Overflow and stale/late callbacks preserve Project/history/cursor and do not audition. Arming, 250 ms audio preview, cancellation, and preservation of unarmed Enter behavior are verified. Physical MIDI hardware availability is reported separately from mocked-browser coverage.
 - **SC-041**: With one selected visible Matrix chord, one `+` or keypad Add press adds exactly one
   Step and one history entry, matching Ctrl+click and Undo/Redo; held-key repetition, editable
   focus, dialogs, and no-selection states add zero Steps. Existing route guards remain effective.
@@ -1609,6 +1648,14 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   clipping; grayscale remains understandable, and opening/printing produces zero Project/history
   mutations. Release evidence records the exact status of offline assets, schema compatibility,
   regression tests, build, and licensing disposition.
+- **SC-043**: Measure context actions always target the displayed Measure rather than selected Step,
+  open by pointer and keyboard, and close with focus return. Deleting first, middle, last, and partial
+  final Measures removes exactly their authored interval, shifts subsequent Steps and sections,
+  preserves Harmony and effective authored/generated Melody outside the interval (including notes
+  crossing both boundaries and same note IDs in different owners), instruments and recipes where
+  applicable, and produces exact single-entry Undo/Redo. Empty progression, loop/selection
+  reanchoring, active branch explanations, all five Progression views and Piano Roll, viewport
+  clamping at three sizes in both themes, and portable save/load/history behavior are verified.
 
 ## Assumptions
 

@@ -2,6 +2,11 @@ import { useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import guitarHandImg from "./assets/guitar-hand-fretting.png";
 import { Icon } from "../common/Icon";
+import {
+  GUITAR_FINGER_COLORS,
+  GUITAR_FINGER_NAMES,
+  type GuitarFingerNumber,
+} from "../../domain/instruments/guitar/fingerColors";
 
 export type TabFingeringStyle = "badge" | "dots" | "numbers";
 
@@ -11,20 +16,7 @@ export interface GuitarHandLegendModalProps {
   readonly onSetFingeringStyle: (style: TabFingeringStyle) => void;
 }
 
-interface FingerMeta {
-  readonly number: 1 | 2 | 3 | 4;
-  readonly nameRu: string;
-  readonly nameEn: string;
-  readonly color: string;
-  readonly bgClass: string;
-}
-
-const FINGERS: readonly FingerMeta[] = [
-  { number: 1, nameRu: "Указательный", nameEn: "Index", color: "#f7aa06", bgClass: "dot-1" },
-  { number: 2, nameRu: "Средний", nameEn: "Middle", color: "#c920ff", bgClass: "dot-2" },
-  { number: 3, nameRu: "Безымянный", nameEn: "Ring", color: "#00affe", bgClass: "dot-3" },
-  { number: 4, nameRu: "Мизинец", nameEn: "Pinky", color: "#f56e50", bgClass: "dot-4" },
-];
+const FINGERS: readonly GuitarFingerNumber[] = [1, 2, 3, 4];
 
 export function GuitarHandLegendModal({
   onClose,
@@ -61,9 +53,7 @@ export function GuitarHandLegendModal({
             <h2 id="hand-legend-title" className="hand-legend-title">
               🖐 Аппликатура левой руки
             </h2>
-            <p className="hand-legend-subtitle">
-              Цветовая схема пальцев на грифе и табулатуре
-            </p>
+            <p className="hand-legend-subtitle">Цветовая схема пальцев на грифе и табулатуре</p>
           </div>
           <button
             type="button"
@@ -77,7 +67,10 @@ export function GuitarHandLegendModal({
 
         <div className="hand-legend-content">
           {/* Left Column: Hand Illustration */}
-          <div className="hand-legend-graphic" aria-label="Схема левой руки с цветовой разметкой пальцев">
+          <div
+            className="hand-legend-graphic"
+            aria-label="Схема левой руки с цветовой разметкой пальцев"
+          >
             <img
               src={guitarHandImg}
               alt="Схема левой руки с нумерацией пальцев: T — большой палец, 1 — указательный, 2 — средний, 3 — безымянный, 4 — мизинец"
@@ -95,16 +88,16 @@ export function GuitarHandLegendModal({
 
             <ul className="hand-legend-finger-list">
               {FINGERS.map((finger) => (
-                <li key={finger.number} className="hand-legend-finger-item">
+                <li key={finger} className="hand-legend-finger-item">
                   <span
-                    className={`hand-legend-pill ${finger.bgClass}`}
-                    style={{ "--finger-color": finger.color } as CSSProperties}
+                    className={`hand-legend-pill dot-${finger}`}
+                    style={{ "--finger-color": GUITAR_FINGER_COLORS[finger] } as CSSProperties}
                   >
-                    {finger.number}
+                    {finger}
                   </span>
                   <div className="hand-legend-finger-names">
-                    <strong>{finger.nameRu}</strong>
-                    <span>{finger.nameEn}</span>
+                    <strong>{GUITAR_FINGER_NAMES[finger].ru}</strong>
+                    <span>{GUITAR_FINGER_NAMES[finger].en}</span>
                   </div>
                 </li>
               ))}

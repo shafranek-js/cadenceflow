@@ -1,13 +1,20 @@
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
-import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
-import type { NoteColorMode, ProgressionView } from "../../domain/project/project";
+import type {
+  GuitarChordColorMode,
+  NoteColorMode,
+  ProgressionView,
+} from "../../domain/project/project";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+} from "../../domain/progression/transposition";
 import { formatMusicalDuration } from "../../domain/timing/duration";
 import { createHarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
 import { PianoCardView } from "../piano/PianoCardView";
@@ -22,6 +29,7 @@ import {
 } from "../staff/staffOctave";
 import type { LabelHierarchyMode } from "./labelHierarchy";
 import { ProgressionChordLabel } from "./ProgressionChordLabel";
+import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
 export function ProgressionStepCard({
   step,
@@ -39,6 +47,7 @@ export function ProgressionStepCard({
   activeModule = "progressions",
   nextStep,
   guitarChordOrientation = "vertical",
+  guitarChordColorMode = "chord-roles",
   onSelect,
   onPerformanceChange,
   onRemove,
@@ -61,6 +70,7 @@ export function ProgressionStepCard({
   readonly activeModule?: HarmonicModuleId;
   readonly nextStep?: ChordStep | undefined;
   readonly guitarChordOrientation?: "vertical" | "horizontal";
+  readonly guitarChordColorMode?: GuitarChordColorMode;
   readonly onSelect: () => void;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onRemove: () => void;
@@ -70,10 +80,7 @@ export function ProgressionStepCard({
   ) => void;
 }) {
   const realization = realizeProgressionStepRealization(step, tonic);
-  const baseChord = {
-    ...realizeChord(step.harmonicFunction, tonic),
-    variant: step.harmonicVariant,
-  };
+  const baseChord = realizeProgressionStepChord(step, tonic);
   // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
   const pianoPitches = realization.pitches;
   const displayedChord = withEffectiveBass(baseChord, realization.bassPitch);
@@ -233,6 +240,7 @@ export function ProgressionStepCard({
                   ? { labelMode, functionLabel: step.harmonicFunction.functionId }
                   : {})}
                 orientation={guitarChordOrientation}
+                colorMode={guitarChordColorMode}
               />
             ) : null}
             {view === "tablature" ? (
@@ -262,6 +270,9 @@ export function ProgressionStepCard({
               </span>
             ) : null}
           </span>
+          <StepTranspositionBadge
+            semitones={step.kind === "chord" ? stepTranspositionSemitones(step) : 0}
+          />
         </button>
       )}
     </article>

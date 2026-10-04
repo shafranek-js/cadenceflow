@@ -1,9 +1,9 @@
 import type { ProgressionStep } from "./step";
 import type { PitchClassIdentity } from "../harmony/pitch";
 import type { DerivedMode } from "../harmony/functions";
-import { realizeChord } from "../harmony/realization";
 import { normalizePitchClass, exactPitch } from "../harmony/pitch";
 import { defaultTonicSpelling } from "../harmony/spelling";
+import { pitchToSourceFrame, realizeProgressionStepChord } from "./transposition";
 import type { StepPatch } from "../../app/commands/progressionCommands";
 import type { BassChoice } from "./step";
 
@@ -163,7 +163,7 @@ export function optimizeProgressionVoiceLeading(
             bass: {
               ...step.performance.bass,
               choice: "custom",
-              customPitch: pedalPitch,
+              customPitch: pitchToSourceFrame(pedalPitch, step),
             },
           },
         },
@@ -189,7 +189,7 @@ export function optimizeProgressionVoiceLeading(
             bass: {
               ...step.performance.bass,
               choice: "custom",
-              customPitch: pedalPitch,
+              customPitch: pitchToSourceFrame(pedalPitch, step),
             },
           },
         },
@@ -206,7 +206,7 @@ export function optimizeProgressionVoiceLeading(
 
   for (let i = 0; i < chordSteps.length; i++) {
     const step = chordSteps[i]!;
-    const chord = realizeChord(step.harmonicFunction, tonic);
+    const chord = realizeProgressionStepChord(step, tonic);
     const candidates = getBassCandidates(
       chord.rootPitchClass,
       chord.baseQuality,

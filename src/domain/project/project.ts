@@ -18,8 +18,10 @@ import {
 
 export type PresentationMode = "beginner" | "composer" | "expert";
 export type ThemeMode = "dark" | "light";
-export type ProgressionView = "harmonic" | "piano" | "staff" | "guitar" | "tablature" | "piano-roll";
+export type ProgressionView =
+  "harmonic" | "piano" | "staff" | "guitar" | "tablature" | "piano-roll";
 export type NoteColorMode = "standard" | "suzuki" | "harmonic-role";
+export type GuitarChordColorMode = "chord-roles" | "fingering";
 export type MeasuresPerSystem = "auto" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface PresentationState {
@@ -40,6 +42,8 @@ export interface PresentationState {
   readonly genreFocus?: GenreFocusId;
   /** Orientation of guitar chord diagrams: vertical (standard) or horizontal (90 deg CCW). */
   readonly guitarChordOrientation?: "vertical" | "horizontal";
+  /** Marker color presentation shared by Matrix and My Progression Guitar diagrams. */
+  readonly guitarChordColorMode?: GuitarChordColorMode;
   /** Right side panels layout: fixed permanent column or auto-hiding smooth sliding drawer. */
   readonly sidePanelMode?: "fixed" | "autohide";
 }

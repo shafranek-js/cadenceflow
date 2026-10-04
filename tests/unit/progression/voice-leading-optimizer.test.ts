@@ -4,6 +4,7 @@ import type { ChordStep, StepPerformance } from "../../../src/domain/progression
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
+import { pitchToConcertFrame } from "../../../src/domain/progression/transposition";
 
 function createPerformance(): StepPerformance {
   return {
@@ -17,10 +18,16 @@ function createPerformance(): StepPerformance {
   };
 }
 
-function makeChord(id: string, functionId: string, seventh?: "minor7" | "major7"): ChordStep {
+function makeChord(
+  id: string,
+  functionId: string,
+  seventh?: "minor7" | "major7",
+  transpositionSemitones = 0,
+): ChordStep {
   return {
     id,
     kind: "chord",
+    ...(transpositionSemitones === 0 ? {} : { transpositionSemitones }),
     harmonicFunction: { moduleId: "progressions", functionId },
     harmonicVariant: seventh ? { ...EMPTY_HARMONIC_VARIANT, seventh } : EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(4, 4)),
@@ -81,6 +88,25 @@ describe("Voice Leading & Bassline Optimizer", () => {
     }
   });
 
+  it("keeps tonic pedal sounding in concert pitch across different owner offsets", () => {
+    const steps = [
+      makeChord("step-1", "I", undefined, 2),
+      makeChord("step-2", "IV", undefined, -3),
+    ];
+    const res = optimizeProgressionVoiceLeading(steps, 0, "major", "pedal-tonic");
+
+    expect(
+      res.updates.map((update, index) => {
+        const step = steps[index]!;
+        const stored = update.patch.performance?.bass?.customPitch;
+        return stored ? pitchToConcertFrame(stored, step).midiNumber : undefined;
+      }),
+    ).toEqual([36, 36]);
+    expect(
+      res.updates.map((update) => update.patch.performance?.bass?.customPitch?.midiNumber),
+    ).toEqual([34, 39]);
+  });
+
   it("applies dominant pedal point under pedal-dominant strategy", () => {
     const steps = [
       makeChord("step-1", "I"),
@@ -94,6 +120,32 @@ describe("Voice Leading & Bassline Optimizer", () => {
       expect(update.patch.performance?.bass?.choice).toBe("custom");
       expect(update.patch.performance?.bass?.customPitch?.midiNumber % 12).toBe(7); // G
     }
+  });
+
+  it("keeps dominant pedal sounding in concert pitch across different owner offsets", () => {
+    const steps = [makeChord("step-1", "I", undefined, -2), makeChord("step-2", "V", undefined, 4)];
+    const res = optimizeProgressionVoiceLeading(steps, 0, "major", "pedal-dominant");
+
+    expect(
+      res.updates.map((update, index) => {
+        const step = steps[index]!;
+        const stored = update.patch.performance?.bass?.customPitch;
+        return stored ? pitchToConcertFrame(stored, step).midiNumber : undefined;
+      }),
+    ).toEqual([43, 43]);
+    expect(
+      res.updates.map((update) => update.patch.performance?.bass?.customPitch?.midiNumber),
+    ).toEqual([45, 39]);
+  });
+
+  it("chooses smooth-all bass candidates from each Step's concert chord", () => {
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "V", undefined, 5)];
+    const res = optimizeProgressionVoiceLeading(steps, 0, "major", "smooth-all");
+
+    expect(res.updates.map((update) => update.patch.performance?.bass?.choice)).toEqual([
+      "root",
+      "root",
+    ]);
   });
 
   it("produces a smooth stepwise bassline for canonical C -> G -> Am -> F under smooth-all", () => {

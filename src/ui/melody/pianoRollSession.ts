@@ -1,4 +1,5 @@
 import type { ExactPitch } from "../../domain/harmony/pitch";
+import type { EffectiveMelodyNote } from "../../domain/melody/effectiveTimeline";
 import type { Rational } from "../../domain/timing/rational";
 
 export interface PianoRollGestureDraft {
@@ -11,6 +12,7 @@ export interface PianoRollGestureDraft {
   readonly horizontalIntent: boolean;
   readonly verticalIntent: boolean;
   readonly baseline: string;
+  readonly rejectionMessage?: string;
   readonly sourceStepId: string;
   readonly mode: "move" | "resize-left" | "resize-right";
   readonly grabOffset: Rational;
@@ -26,11 +28,29 @@ export interface PianoRollGestureDraft {
     readonly startBeats: Rational;
     readonly durationBeats: Rational;
   };
+  /** Owner-scoped preview set for an atomic multi-note move. */
+  readonly groupNotes?: readonly {
+    readonly sourceStepId: string;
+    readonly eventKey: string;
+    readonly originalNote: {
+      readonly id: string;
+      readonly pitch: ExactPitch;
+      readonly startBeats: Rational;
+      readonly durationBeats: Rational;
+    };
+    readonly note: {
+      readonly id: string;
+      readonly pitch: ExactPitch;
+      readonly startBeats: Rational;
+      readonly durationBeats: Rational;
+    };
+  }[];
 }
 export interface PianoRollClipboardNote {
   readonly pitch: ExactPitch;
   readonly onset: Rational;
   readonly duration: Rational;
+  readonly instrument: EffectiveMelodyNote["instrument"];
 }
 
 let gesture: PianoRollGestureDraft | null = null;

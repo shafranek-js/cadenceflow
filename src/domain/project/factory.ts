@@ -53,6 +53,7 @@ export function createDefaultProject(
       resolutionArrows: true,
       genreFocus: "all",
       guitarChordOrientation: "vertical",
+      guitarChordColorMode: "chord-roles",
       sidePanelMode: "fixed",
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,

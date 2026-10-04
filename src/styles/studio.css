@@ -944,6 +944,10 @@
   stroke: #f43f5e;
 }
 
+.guitar-string-marker.is-open.is-neutral {
+  stroke: #94a3b8;
+}
+
 .guitar-barre {
   fill: color-mix(in srgb, var(--primary, #38bdf8) 75%, transparent);
   stroke: var(--primary, #38bdf8);
@@ -972,7 +976,72 @@
   pointer-events: none;
 }
 
-.guitar-fret-dot-group.is-root .guitar-dot-finger-text {
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger[data-finger="1"] {
+  fill: var(--guitar-finger-1, #f7aa06);
+}
+
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger[data-finger="2"] {
+  fill: var(--guitar-finger-2, #c920ff);
+}
+
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger[data-finger="3"] {
+  fill: var(--guitar-finger-3, #00affe);
+}
+
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger[data-finger="4"] {
+  fill: var(--guitar-finger-4, #f56e50);
+}
+
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger {
+  stroke: #1f2937;
+  stroke-width: 1.2px;
+}
+
+.guitar-fretboard-svg[data-color-mode="fingering"] .guitar-dot-finger.is-finger-unknown {
+  fill: #94a3b8;
+}
+
+.guitar-dot-finger-text.is-fingering-color {
+  fill: #111827;
+}
+
+.guitar-fingering-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 6px;
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.guitar-finger-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.guitar-finger-legend-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #1f2937;
+  border-radius: 50%;
+  background: var(--guitar-finger-color, #94a3b8);
+  color: #111827;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.guitar-fretboard-svg[data-color-mode="chord-roles"]
+  .guitar-fret-dot-group.is-root
+  .guitar-dot-finger-text {
   fill: #ffffff;
 }
 
@@ -993,6 +1062,12 @@
 
 .mini-guitar-card-visual.is-horizontal {
   width: min(100%, 180px);
+}
+
+.chord-card .mini-guitar-card-visual.is-horizontal .mini-guitar-fretboard-wrap svg {
+  width: 100%;
+  max-width: 172px;
+  height: auto;
 }
 
 .mini-guitar-frets-tab {
@@ -1461,9 +1536,12 @@
 }
 .progression-heading-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
   margin-left: auto;
 }
 
@@ -3596,6 +3674,20 @@ summary:focus-visible,
   white-space: nowrap;
 }
 
+.step-transposition-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.35rem;
+  padding: 0.08rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--accent, #5d9cec) 55%, transparent);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .progression-chord-label-primary,
 .progression-chord-label-secondary {
   min-width: 0;
@@ -4786,8 +4878,19 @@ body {
 }
 
 .app-shell {
-  padding: 0 var(--studio-gutter) var(--space-3);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0 var(--studio-gutter);
   overflow-x: clip;
+}
+
+.app-shell > .studio-grid {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .app-header {
@@ -5008,6 +5111,10 @@ body {
   z-index: 60;
   display: grid;
   min-width: 220px;
+  max-height: calc(100vh - 4rem);
+  max-height: calc(100dvh - 4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   gap: 2px;
   padding: 6px;
   border: 1px solid var(--border-strong);
@@ -5066,7 +5173,7 @@ body {
   align-items: center;
   min-width: 0;
   min-height: 34px;
-  margin-top: var(--space-4);
+  margin-top: 0;
   padding: 5px var(--space-3);
   border-top: 1px solid var(--border);
   background: var(--surface-1);
@@ -7783,5 +7890,44 @@ summary:focus-visible,
   .chord-card-focus-details {
     animation: none;
     transition: none;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 400px) {
+  .app-header {
+    gap: 4px;
+    padding-top: 4px;
+    padding-bottom: 3px;
+  }
+
+  .app-header-controls {
+    gap: 4px;
+  }
+
+  .app-header-project-area {
+    gap: 3px;
+  }
+
+  .app-header-actions {
+    gap: 4px;
+  }
+
+  .app-header-controls button,
+  .app-header-controls select,
+  .app-header > button {
+    min-height: 26px;
+  }
+
+  .presentation-control {
+    padding-block: 0;
+  }
+
+  .project-tab,
+  .project-tab-close {
+    min-height: 28px;
+  }
+
+  .matrix-spatial-board .chord-card:has(.mini-guitar-card-visual) {
+    padding-block: 3px;
   }
 }

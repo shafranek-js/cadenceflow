@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -30,15 +31,20 @@ import {
 } from "../../domain/timing/rational";
 import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
 import { formatChordSymbol } from "../../domain/harmony/chord";
-import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { type LabelHierarchyMode } from "../progression/labelHierarchy";
+import { Icon } from "../common/Icon";
 import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
+import { StepTranspositionBadge } from "../progression/StepTranspositionBadge";
 import {
   createHarmonicNoteRoleContext,
   classifyHarmonicNoteRole,
 } from "../../domain/harmony/noteRoles";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepChord,
+  stepTranspositionSemitones,
+} from "../../domain/progression/transposition";
 import { getSuzukiNoteColor, getSuzukiNoteStroke } from "../../notation/suzukiColors";
 import { modeForModule } from "../../domain/harmony/functions";
 import {
@@ -50,9 +56,19 @@ import {
   projectPianoRollScaleChordToneGuide,
   pianoRollMoveStart,
   pianoRollResolvedGestureIntent,
+  pianoRollSnapBeats,
   pianoRollSnapOffsets,
   projectPianoRollNoteFragment,
 } from "./pianoRollProjection";
+import { snapMidiCursor } from "./midiStepInput";
+import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
+import { PianoRollSelectionAction } from "./PianoRollSelectionAction";
+import {
+  pianoRollNoteIdentity,
+  pianoRollRectanglesIntersect,
+  planPianoRollGroupMoveByDelta,
+  planPianoRollPaste,
+} from "./pianoRollGroupSelection";
 import {
   getPianoRollClipboard,
   getPianoRollGesture,
@@ -101,6 +117,30 @@ function paletteStyle(degrees: readonly number[]): CSSProperties {
 }
 function pianoRollTimelineFraction(clientX: number, rect: DOMRect): number {
   return Math.max(0, Math.min(0.999999, (clientX - rect.left) / Math.max(1, rect.width)));
+}
+
+function visibleNoteRect(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const visible = {
+    left: Math.max(0, rect.left),
+    right: Math.min(window.innerWidth, rect.right),
+    top: Math.max(0, rect.top),
+    bottom: Math.min(window.innerHeight, rect.bottom),
+  };
+  for (let ancestor = element.parentElement; ancestor && ancestor !== document.body;) {
+    const style = window.getComputedStyle(ancestor);
+    const clipRect = ancestor.getBoundingClientRect();
+    if (style.overflowX !== "visible") {
+      visible.left = Math.max(visible.left, clipRect.left);
+      visible.right = Math.min(visible.right, clipRect.right);
+    }
+    if (style.overflowY !== "visible") {
+      visible.top = Math.max(visible.top, clipRect.top);
+      visible.bottom = Math.min(visible.bottom, clipRect.bottom);
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return visible.right > visible.left && visible.bottom > visible.top ? visible : null;
 }
 
 function formatPitchScaleLabel(
@@ -246,6 +286,7 @@ export interface PianoRollToolbarProps {
   readonly onColorModeChange: (mode: PianoRollColorMode) => void;
   readonly guidesEnabled: boolean;
   readonly onGuidesEnabledChange: (enabled: boolean) => void;
+  readonly selectionScopeLabel?: string;
 }
 
 function PianoRollPlayhead({
@@ -327,6 +368,7 @@ export function PianoRollToolbar({
   onColorModeChange,
   guidesEnabled,
   onGuidesEnabledChange,
+  selectionScopeLabel = "Progression",
 }: PianoRollToolbarProps) {
   return (
     <div
@@ -421,6 +463,9 @@ export function PianoRollToolbar({
       >
         Guides
       </button>
+      <span className="piano-roll-selection-scope" data-testid="piano-roll-selection-scope">
+        Ctrl/Cmd+A: {selectionScopeLabel}
+      </span>
     </div>
   );
 }
@@ -435,7 +480,11 @@ export function PianoRollMeasure({
   selectedNoteKey,
   selectedNoteIdentities,
   onNoteSelectionChange,
+  onReplaceNoteSelection,
   onClearNoteSelection,
+  onActiveMeasureChange,
+  onSelectMeasureNotes,
+  selectionScopeLabel,
   playingStepId,
   activeEventStartedAt,
   transportPlaying,
@@ -453,6 +502,8 @@ export function PianoRollMeasure({
   onPitchExpansionChange,
   onApplyMelodyEdits,
   onAuditionMeasure,
+  onOpenMeasureMenu,
+  onDeleteMeasureFromButton,
   onAuditionChord,
   onOpenMelodyMenu,
   onAuditionNote,
@@ -462,6 +513,7 @@ export function PianoRollMeasure({
   guidesEnabled,
   inspectorRequest,
   emptyCursor,
+  midiCursor,
   onEmptyCellCursor,
 }: {
   readonly project: Project;
@@ -473,7 +525,13 @@ export function PianoRollMeasure({
   readonly selectedNoteKey?: string | undefined;
   readonly selectedNoteIdentities: ReadonlySet<string>;
   readonly onNoteSelectionChange: (stepId: string, eventKey: string, additive: boolean) => void;
+  readonly onReplaceNoteSelection?: (
+    identities: readonly { readonly sourceStepId: string; readonly eventKey: string }[],
+  ) => void;
   readonly onClearNoteSelection: () => void;
+  readonly onActiveMeasureChange?: (measureIndex: number, systemIndex?: number) => void;
+  readonly onSelectMeasureNotes: () => void;
+  readonly selectionScopeLabel: string;
   readonly playingStepId?: string | null;
   readonly activeEventStartedAt?: number | null | undefined;
   readonly transportPlaying?: boolean | undefined;
@@ -501,9 +559,16 @@ export function PianoRollMeasure({
     edits: readonly AuthoredMelodyEdit[],
     convertStepIds?: readonly string[],
     expectedUpdatedAt?: string,
-  ) => void;
+    appendSteps?: readonly import("../../domain/progression/step").RestStep[],
+  ) => string | null | void;
   readonly onSetMelodyRecipe?: (stepId: string, recipe: ChordMelodyRecipe) => void;
   readonly onAuditionMeasure?: (measure: ProgressionMeasure) => void;
+  readonly onOpenMeasureMenu?: (
+    measureIndex: number,
+    invoker: HTMLElement,
+    position: { readonly x: number; readonly y: number },
+  ) => void;
+  readonly onDeleteMeasureFromButton?: (measureIndex: number, invoker: HTMLElement) => void;
   readonly onAuditionChord?: (stepId: string) => void;
   readonly onOpenMelodyMenu?: (
     stepId: string,
@@ -527,6 +592,7 @@ export function PianoRollMeasure({
     readonly pitch: ExactPitch;
   }) => void;
   readonly emptyCursor?: { readonly startBeats: Rational; readonly pitch: ExactPitch } | null;
+  readonly midiCursor?: Rational | null;
 }) {
   const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
   const gridOffsets = useMemo(
@@ -538,16 +604,30 @@ export function PianoRollMeasure({
     getPianoRollGesture,
     () => null,
   );
-  const renderNotes = notes.map((note) =>
-    noteGesture?.sourceStepId === note.sourceStepId && noteGesture.note.id === note.eventKey
+  const groupPreviews = new Map(
+    noteGesture?.groupNotes?.map((entry) => [
+      pianoRollNoteIdentity(entry.sourceStepId, entry.eventKey),
+      entry.note,
+    ]) ?? [],
+  );
+  const renderNotes = notes.map((note) => {
+    const preview = groupPreviews.get(pianoRollNoteIdentity(note.sourceStepId, note.eventKey));
+    if (preview)
+      return {
+        ...note,
+        pitch: preview.pitch,
+        startBeats: preview.startBeats,
+        durationBeats: preview.durationBeats,
+      };
+    return noteGesture?.sourceStepId === note.sourceStepId && noteGesture.note.id === note.eventKey
       ? {
           ...note,
           pitch: noteGesture.note.pitch,
           startBeats: noteGesture.note.startBeats,
           durationBeats: noteGesture.note.durationBeats,
         }
-      : note,
-  );
+      : note;
+  });
   const visibleNotes = renderNotes.flatMap((note) => {
     const fragment = projectPianoRollNoteFragment(note, measure, layout.barLengthBeats);
     return fragment ? [{ ...note, fragment }] : [];
@@ -599,8 +679,22 @@ export function PianoRollMeasure({
     y1: number;
     x2: number;
     y2: number;
+    additive: boolean;
+    baseline: string;
   } | null>(null);
-  const marqueeStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const marqueeRef = useRef<typeof marquee>(null);
+  const updateMarquee = useCallback((value: typeof marquee) => {
+    marqueeRef.current = value;
+    setMarquee(value);
+  }, []);
+  const marqueeStart = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    additive: boolean;
+    baseline: string;
+  } | null>(null);
+  const ignoreNextEmptyGridClick = useRef(false);
   const pendingNoteGesture = useRef<{
     pointerId: number;
     x: number;
@@ -614,11 +708,45 @@ export function PianoRollMeasure({
     grabOffset: Rational;
     originalEnd: Rational;
     note: { id: string; pitch: ExactPitch; startBeats: Rational; durationBeats: Rational };
+    groupNotes?: NonNullable<ReturnType<typeof getPianoRollGesture>>["groupNotes"];
   } | null>(null);
+  const gestureProjectId = useRef(project.id);
+  useEffect(() => {
+    const cancelTransientGestures = () => {
+      pendingNoteGesture.current = null;
+      marqueeStart.current = null;
+      ignoreNextEmptyGridClick.current = false;
+      updateMarquee(null);
+      setPianoRollGesture(null);
+    };
+    window.addEventListener("blur", cancelTransientGestures);
+    return () => window.removeEventListener("blur", cancelTransientGestures);
+  }, [updateMarquee]);
+  useEffect(() => {
+    const gesture = getPianoRollGesture();
+    if (
+      gestureProjectId.current !== project.id ||
+      (gesture && gesture.baseline !== project.updatedAt)
+    ) {
+      gestureProjectId.current = project.id;
+      pendingNoteGesture.current = null;
+      marqueeStart.current = null;
+      ignoreNextEmptyGridClick.current = false;
+      updateMarquee(null);
+      setPianoRollGesture(null);
+    }
+  }, [project.id, project.updatedAt, updateMarquee]);
+  useEffect(
+    () => () => {
+      if (getPianoRollGesture()) setPianoRollGesture(null);
+      pendingNoteGesture.current = null;
+      marqueeStart.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     if (!noteGesture && pitchExpansion > 0) onPitchExpansionChange?.(0);
   }, [noteGesture, onPitchExpansionChange, pitchExpansion]);
-  const suppressPointerAudition = useRef(false);
   const [inspectorDraft, setInspectorDraft] = useState<{
     pitch: string;
     onsetN: string;
@@ -672,23 +800,44 @@ export function PianoRollMeasure({
     };
     return values[snap] ?? rational(1, 2);
   };
-  const deleteSelection = () => {
-    const edits: AuthoredMelodyEdit[] = [...selectedNoteIdentities].map((identity) => {
-      const [sourceStepId, noteId] = JSON.parse(identity) as [string, string];
-      return { type: "delete", sourceStepId, noteId };
-    });
-    const authoredEdits = edits;
-    if (authoredEdits.length) {
-      const first = JSON.parse([...selectedNoteIdentities][0]!) as [string, string];
+  const deleteSelection = (fallbackIdentity?: { sourceStepId: string; eventKey: string }) => {
+    const selectedNotes = notes.filter((note) =>
+      selectedNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+    );
+    const notesToDelete =
+      selectedNotes.length || !fallbackIdentity
+        ? selectedNotes
+        : notes.filter(
+            (note) =>
+              note.sourceStepId === fallbackIdentity.sourceStepId &&
+              note.eventKey === fallbackIdentity.eventKey,
+          );
+    const edits: AuthoredMelodyEdit[] = notesToDelete.map((note) => ({
+      type: "delete",
+      sourceStepId: note.sourceStepId,
+      noteId: note.eventKey,
+    }));
+    if (edits.length) {
+      const first = notesToDelete[0]!;
       const buttons = Array.from(
         document.querySelectorAll<HTMLButtonElement>("button.piano-roll-note:not(:disabled)"),
       );
       const oldIndex = buttons.findIndex(
         (button) =>
-          button.dataset.sourceStepId === first[0] && button.dataset.pianoRollEventKey === first[1],
+          button.dataset.sourceStepId === first.sourceStepId &&
+          button.dataset.pianoRollEventKey === first.eventKey,
       );
-      onApplyMelodyEdits?.(authoredEdits, [], project.updatedAt);
+      if (!onApplyMelodyEdits) {
+        setEditorMessage("Melody editing is unavailable in this Piano Roll.");
+        return;
+      }
+      const error = onApplyMelodyEdits(edits, [], project.updatedAt);
+      if (error) {
+        setEditorMessage(error);
+        return;
+      }
       onClearNoteSelection();
+      setEditorMessage(null);
       requestAnimationFrame(() => {
         const current = Array.from(
           document.querySelectorAll<HTMLButtonElement>("button.piano-roll-note:not(:disabled)"),
@@ -714,79 +863,139 @@ export function PianoRollMeasure({
         pitch: note.pitch,
         onset: subtractRational(note.startBeats, start),
         duration: note.durationBeats,
+        instrument: note.instrument,
       })),
     );
     if (!duplicate) return;
-    pasteSelection();
+    const end = selectedNotes.reduce((latest, note) => {
+      const noteEnd = addRational(note.startBeats, note.durationBeats);
+      return compareRational(noteEnd, latest) > 0 ? noteEnd : latest;
+    }, rational(0));
+    pasteSelection(end);
   };
-  const pasteSelection = () => {
+  const pasteSelection = (anchorOverride?: Rational) => {
     const clipboard = getPianoRollClipboard();
     if (!clipboard.length) return;
-    const anchor = notes
-      .filter((note) =>
-        selectedNoteIdentities.has(JSON.stringify([note.sourceStepId, note.eventKey])),
-      )
-      .reduce(
-        (end, note) =>
-          compareRational(addRational(note.startBeats, note.durationBeats), end) > 0
-            ? addRational(note.startBeats, note.durationBeats)
-            : end,
-        rational(0),
-      );
-    const edits: AuthoredMelodyEdit[] = clipboard.map((note) => ({
-      type: "upsert",
-      note: {
-        id: crypto.randomUUID(),
-        pitch: note.pitch,
-        startBeats: addRational(anchor, note.onset),
-        durationBeats: note.duration,
-      },
-    }));
     try {
-      onApplyMelodyEdits?.(edits);
+      const anchor =
+        anchorOverride ??
+        emptyCursor?.startBeats ??
+        (keyboardGridFocused ? keyboardCellStart : null);
+      if (!anchor) throw new Error("Click a target time in the Piano Roll before pasting notes.");
+      if (!onApplyMelodyEdits) throw new Error("Melody editing is unavailable in this Piano Roll.");
+      const plan = planPianoRollPaste(project, clipboard, anchor);
+      const error = onApplyMelodyEdits(plan.edits, [], project.updatedAt, plan.appendedSteps);
+      if (error) throw new Error(error);
+      onReplaceNoteSelection?.(plan.selection);
+      const active = plan.selection[0];
+      if (active) onNoteSelect(active.sourceStepId, active.eventKey, systemIndex);
       setEditorMessage(null);
     } catch (error) {
       setEditorMessage(error instanceof Error ? error.message : "Paste was rejected.");
     }
   };
+  const moveGroupByKeyboard = (
+    activeNote: (typeof notes)[number],
+    deltaPitch: number,
+    deltaStart: Rational,
+  ): boolean => {
+    const identity = pianoRollNoteIdentity(activeNote.sourceStepId, activeNote.eventKey);
+    if (!selectedNoteIdentities.has(identity) || selectedNoteIdentities.size < 2) return false;
+    const selected = notes.filter((note) =>
+      selectedNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+    );
+    if (selected.length !== selectedNoteIdentities.size) {
+      setEditorMessage("A selected note is no longer available. Select the current notes again.");
+      return true;
+    }
+    try {
+      if (!onApplyMelodyEdits) throw new Error("Melody editing is unavailable in this Piano Roll.");
+      const plan = planPianoRollGroupMoveByDelta(project, selected, deltaPitch, deltaStart);
+      const error = onApplyMelodyEdits(plan.edits, [], project.updatedAt);
+      if (error) throw new Error(error);
+      onReplaceNoteSelection?.(plan.selection);
+      const activeIndex = selected.findIndex(
+        (note) =>
+          note.sourceStepId === activeNote.sourceStepId && note.eventKey === activeNote.eventKey,
+      );
+      const movedActive = plan.selection[activeIndex];
+      if (movedActive) onNoteSelect(movedActive.sourceStepId, movedActive.eventKey, systemIndex);
+      setEditorMessage(null);
+    } catch (error) {
+      setEditorMessage(error instanceof Error ? error.message : "The group move was rejected.");
+    }
+    return true;
+  };
   const beginMarquee = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
     if (
-      event.target !== event.currentTarget &&
-      !(event.target as HTMLElement).closest(".piano-roll-row")
+      target.closest("button, input, select, textarea, .piano-roll-note") ||
+      (target !== event.currentTarget && !event.currentTarget.contains(target))
     )
       return;
-    marqueeStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+    marqueeStart.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      additive: event.shiftKey,
+      baseline: project.updatedAt,
+    };
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is optional on older browser implementations.
+    }
   };
   const finishMarquee = (event: PointerEvent<HTMLDivElement>, commit: boolean) => {
+    const start = marqueeStart.current;
+    const currentMarquee = marqueeRef.current;
     marqueeStart.current = null;
-    if (!marquee || marquee.pointerId !== event.pointerId) return;
-    if (commit) {
+    updateMarquee(null);
+    if (!currentMarquee || currentMarquee.pointerId !== event.pointerId || !start) return;
+    if (
+      commit &&
+      currentMarquee.baseline === project.updatedAt &&
+      start.baseline === project.updatedAt
+    ) {
       const bounds = {
-        left: Math.min(marquee.x1, event.clientX),
-        right: Math.max(marquee.x1, event.clientX),
-        top: Math.min(marquee.y1, event.clientY),
-        bottom: Math.max(marquee.y1, event.clientY),
+        left: Math.min(currentMarquee.x1, event.clientX),
+        right: Math.max(currentMarquee.x1, event.clientX),
+        top: Math.min(currentMarquee.y1, event.clientY),
+        bottom: Math.max(currentMarquee.y1, event.clientY),
       };
-      const hits = Array.from(
-        event.currentTarget.querySelectorAll<HTMLButtonElement>("button.piano-roll-note"),
-      ).filter((button) => {
-        const rect = button.getBoundingClientRect();
-        return (
-          rect.right >= bounds.left &&
-          rect.left <= bounds.right &&
-          rect.bottom >= bounds.top &&
-          rect.top <= bounds.bottom
+      const hitByIdentity = new Map<
+        string,
+        { sourceStepId: string; eventKey: string; systemIndex?: number }
+      >();
+      for (const button of Array.from(
+        document.querySelectorAll<HTMLButtonElement>("button.piano-roll-note"),
+      )) {
+        const sourceStepId = button.dataset.sourceStepId;
+        const eventKey = button.dataset.pianoRollEventKey;
+        const rect = visibleNoteRect(button);
+        if (!sourceStepId || !eventKey || !rect || !pianoRollRectanglesIntersect(rect, bounds))
+          continue;
+        const identity = pianoRollNoteIdentity(sourceStepId, eventKey);
+        const noteMeasure = button.closest<HTMLElement>(".piano-roll-measure");
+        const parsedSystemIndex = Number(noteMeasure?.dataset.systemIndex);
+        hitByIdentity.set(identity, {
+          sourceStepId,
+          eventKey,
+          ...(Number.isInteger(parsedSystemIndex) ? { systemIndex: parsedSystemIndex } : {}),
+        });
+      }
+      const hits = [...hitByIdentity.values()];
+      if (hits.length) {
+        hits.forEach((hit, index) =>
+          onNoteSelectionChange(hit.sourceStepId, hit.eventKey, start.additive || index > 0),
         );
-      });
-      hits.forEach((button, index) =>
-        onNoteSelectionChange(
-          button.dataset.sourceStepId!,
-          button.dataset.pianoRollEventKey!,
-          index > 0,
-        ),
-      );
+        onNoteSelect(hits[0]!.sourceStepId, hits[0]!.eventKey, hits[0]!.systemIndex);
+      } else if (!start.additive) onClearNoteSelection();
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 4)
+        ignoreNextEmptyGridClick.current = true;
     }
-    setMarquee(null);
   };
   const createAt = (event: MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -935,9 +1144,12 @@ export function PianoRollMeasure({
   useEffect(() => {
     if (!inspectorPosition || !focusInspectorOnOpen.current) return;
     const frame = requestAnimationFrame(() => {
-      inspectorElementRef.current
-        ?.querySelector<HTMLInputElement>('[aria-label="Inspector pitch MIDI"]')
-        ?.focus();
+      const inspectorElement = inspectorElementRef.current;
+      if (!inspectorElement?.contains(document.activeElement)) {
+        inspectorElement
+          ?.querySelector<HTMLInputElement>('[aria-label="Inspector pitch MIDI"]')
+          ?.focus();
+      }
       focusInspectorOnOpen.current = false;
     });
     return () => cancelAnimationFrame(frame);
@@ -1072,6 +1284,7 @@ export function PianoRollMeasure({
     event: PointerEvent<HTMLButtonElement>,
     note: (typeof notes)[number],
   ) => {
+    onActiveMeasureChange?.(measure.measureIndex, systemIndex);
     const rect = event.currentTarget.getBoundingClientRect();
     const hitWidth = pianoRollResizeHitWidth(rect.width);
     const mode =
@@ -1095,6 +1308,32 @@ export function PianoRollMeasure({
         96,
       ),
     );
+    const identity = pianoRollNoteIdentity(note.sourceStepId, note.eventKey);
+    const groupNotes =
+      mode === "move" && selectedNoteIdentities.has(identity) && selectedNoteIdentities.size > 1
+        ? notes
+            .filter((candidate) =>
+              selectedNoteIdentities.has(
+                pianoRollNoteIdentity(candidate.sourceStepId, candidate.eventKey),
+              ),
+            )
+            .map((candidate) => ({
+              sourceStepId: candidate.sourceStepId,
+              eventKey: candidate.eventKey,
+              originalNote: {
+                id: candidate.eventKey,
+                pitch: candidate.pitch,
+                startBeats: candidate.startBeats,
+                durationBeats: candidate.durationBeats,
+              },
+              note: {
+                id: candidate.eventKey,
+                pitch: candidate.pitch,
+                startBeats: candidate.startBeats,
+                durationBeats: candidate.durationBeats,
+              },
+            }))
+        : undefined;
     pendingNoteGesture.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -1113,7 +1352,20 @@ export function PianoRollMeasure({
         startBeats: note.startBeats,
         durationBeats: note.durationBeats,
       },
+      ...(groupNotes ? { groupNotes } : {}),
     };
+  };
+  const scrollWorkspaceAtPointerEdge = (currentTarget: HTMLElement, clientY: number) => {
+    const studioScroller = currentTarget.closest<HTMLElement>(".studio-grid");
+    if (studioScroller) {
+      const bounds = studioScroller.getBoundingClientRect();
+      if (clientY < bounds.top + 28) studioScroller.scrollBy({ top: -16, behavior: "instant" });
+      else if (clientY > bounds.bottom - 28)
+        studioScroller.scrollBy({ top: 16, behavior: "instant" });
+      return;
+    }
+    if (clientY < 28) window.scrollBy({ top: -16, behavior: "instant" });
+    else if (clientY > window.innerHeight - 28) window.scrollBy({ top: 16, behavior: "instant" });
   };
   const updateNoteGesture = (event: PointerEvent<HTMLElement>) => {
     const activeGesture = getPianoRollGesture();
@@ -1137,14 +1389,16 @@ export function PianoRollMeasure({
       if (event.clientX < sourceRect.left + 10) sourceScroller.scrollLeft -= 14;
       if (event.clientX > sourceRect.right - 10) sourceScroller.scrollLeft += 14;
     }
+    const studioBounds = event.currentTarget
+      .closest<HTMLElement>(".studio-grid")
+      ?.getBoundingClientRect();
     const autoScrollingVertically =
       (!locatedGrid || locatedGrid === sourceGrid) &&
-      (event.clientY < 28 || event.clientY > window.innerHeight - 28);
+      (studioBounds
+        ? event.clientY < studioBounds.top + 28 || event.clientY > studioBounds.bottom - 28
+        : event.clientY < 28 || event.clientY > window.innerHeight - 28);
     if (autoScrollingVertically) {
-      const viewportEdge = 28;
-      if (event.clientY < viewportEdge) window.scrollBy({ top: -16, behavior: "instant" });
-      if (event.clientY > window.innerHeight - viewportEdge)
-        window.scrollBy({ top: 16, behavior: "instant" });
+      scrollWorkspaceAtPointerEdge(event.currentTarget, event.clientY);
       return;
     }
     const grid = locatedGrid ?? sourceGrid;
@@ -1204,7 +1458,14 @@ export function PianoRollMeasure({
         : activeGesture.mode === "resize-left"
           ? activeGesture.originalEnd
           : addRational(start, activeGesture.note.durationBeats);
-    if (compareRational(start, rational(0)) < 0 || compareRational(end, start) <= 0) return;
+    if (compareRational(start, rational(0)) < 0 || compareRational(end, start) <= 0) {
+      if (activeGesture.groupNotes)
+        setPianoRollGesture({
+          ...activeGesture,
+          rejectionMessage: "The group move must keep every note inside the current progression.",
+        });
+      return;
+    }
     const expansionOffset =
       (pitchExpansion - activeGesture.initialPitchExpansion) * pitchGeometry.unitsPerOctave;
     const requestedPitch = Math.max(
@@ -1221,11 +1482,46 @@ export function PianoRollMeasure({
         requiredPianoRollPitchExpansion(requestedPitch, basePitchBounds, pitchExpansion),
       );
     }
+    const groupDeltaPitch =
+      activeGesture.mode === "move" && verticalIntent && !autoScrollingVertically
+        ? requestedPitch - activeGesture.originalNote.pitch.midiNumber
+        : 0;
+    const groupDeltaStart =
+      activeGesture.mode === "move" && horizontalIntent
+        ? subtractRational(start, activeGesture.originalNote.startBeats)
+        : rational(0);
+    const invalidGroupPitch = activeGesture.groupNotes?.some(
+      (entry) =>
+        entry.originalNote.pitch.midiNumber + groupDeltaPitch < 0 ||
+        entry.originalNote.pitch.midiNumber + groupDeltaPitch > 127,
+    );
+    if (invalidGroupPitch) {
+      setPianoRollGesture({
+        ...activeGesture,
+        rejectionMessage: "The group edit would move a note outside MIDI pitches 0–127.",
+      });
+      setEditorMessage("The group edit would move a note outside MIDI pitches 0–127.");
+      return;
+    }
+    const groupNotes = activeGesture.groupNotes?.map((entry) => ({
+      ...entry,
+      note: {
+        ...entry.originalNote,
+        pitch: pitchSpelling(entry.originalNote.pitch.midiNumber + groupDeltaPitch),
+        startBeats: addRational(entry.originalNote.startBeats, groupDeltaStart),
+      },
+    }));
+    const activeGroupNote = groupNotes?.find(
+      (entry) =>
+        entry.sourceStepId === activeGesture.sourceStepId &&
+        entry.eventKey === activeGesture.note.id,
+    );
+    const { rejectionMessage: _previousRejection, ...gestureWithoutRejection } = activeGesture;
     setPianoRollGesture({
-      ...activeGesture,
+      ...gestureWithoutRejection,
       horizontalIntent,
       verticalIntent,
-      note: {
+      note: activeGroupNote?.note ?? {
         ...activeGesture.note,
         pitch:
           activeGesture.mode === "move" && !autoScrollingVertically
@@ -1234,6 +1530,7 @@ export function PianoRollMeasure({
         startBeats: start,
         durationBeats: subtractRational(end, start),
       },
+      ...(groupNotes ? { groupNotes } : {}),
     });
     const scroller = grid.closest<HTMLElement>(".score-system-scroll");
     if (scroller && event.clientX > rect.right - 12) scroller.scrollLeft += 12;
@@ -1242,6 +1539,11 @@ export function PianoRollMeasure({
   const finishNoteGesture = (event: PointerEvent<HTMLElement>, cancel: boolean) => {
     const activeGesture = getPianoRollGesture();
     if (!activeGesture || activeGesture.pointerId !== event.pointerId) return;
+    if (!cancel && activeGesture.rejectionMessage) {
+      setEditorMessage(activeGesture.rejectionMessage);
+      setPianoRollGesture(null);
+      return;
+    }
     const finalIntent = pianoRollResolvedGestureIntent(
       activeGesture.horizontalIntent
         ? "horizontal"
@@ -1264,37 +1566,80 @@ export function PianoRollMeasure({
       compareRational(committedNote.startBeats, activeGesture.originalNote.startBeats) !== 0 ||
       compareRational(committedNote.durationBeats, activeGesture.originalNote.durationBeats) !== 0;
     if (!cancel && changed && activeGesture.baseline === project.updatedAt) {
-      let cursor = rational(0);
-      let destination = project.progression.steps[0];
-      for (const step of project.progression.steps) {
-        const next = addRational(cursor, step.duration.beats);
-        if (compareRational(committedNote.startBeats, next) < 0) {
-          destination = step;
-          break;
+      try {
+        if (activeGesture.mode === "move") {
+          const identities = activeGesture.groupNotes?.map((entry) =>
+            pianoRollNoteIdentity(entry.sourceStepId, entry.eventKey),
+          ) ?? [pianoRollNoteIdentity(activeGesture.sourceStepId, activeGesture.note.id)];
+          const selected = notes.filter((note) =>
+            identities.includes(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+          );
+          if (selected.length !== identities.length)
+            throw new Error("A selected note changed before the group move could commit.");
+          const plan = planPianoRollGroupMoveByDelta(
+            project,
+            selected,
+            committedNote.pitch.midiNumber - activeGesture.originalNote.pitch.midiNumber,
+            subtractRational(committedNote.startBeats, activeGesture.originalNote.startBeats),
+          );
+          if (!onApplyMelodyEdits)
+            throw new Error("Melody editing is unavailable in this Piano Roll.");
+          const error = onApplyMelodyEdits(plan.edits, [], activeGesture.baseline);
+          if (error) throw new Error(error);
+          onReplaceNoteSelection?.(plan.selection);
+          const active = plan.selection[0];
+          if (active) onNoteSelect?.(active.sourceStepId, active.eventKey, systemIndex);
+          setEditorMessage(null);
+        } else {
+          const error = onApplyMelodyEdits?.(
+            [
+              {
+                type: "upsert",
+                sourceStepId: activeGesture.sourceStepId,
+                note: committedNote,
+              },
+            ],
+            [],
+            activeGesture.baseline,
+          );
+          if (error) throw new Error(error);
+          let cursor = rational(0);
+          let destination = project.progression.steps[0];
+          for (const step of project.progression.steps) {
+            const next = addRational(cursor, step.duration.beats);
+            if (compareRational(committedNote.startBeats, next) < 0) {
+              destination = step;
+              break;
+            }
+            cursor = next;
+          }
+          if (destination) {
+            const existingIds =
+              destination.kind === "rest"
+                ? (destination.authoredMelody?.notes.map((note) => note.id) ?? [])
+                : destination.melody?.mode === "authored"
+                  ? destination.melody.phrase.notes.map((note) => note.id)
+                  : notes
+                      .filter((note) => note.sourceStepId === destination!.id)
+                      .map((note) => note.eventKey);
+            let destinationNoteId = activeGesture.note.id;
+            if (
+              destination.id !== activeGesture.sourceStepId &&
+              existingIds.includes(destinationNoteId)
+            ) {
+              let suffix = 1;
+              do {
+                destinationNoteId = `${activeGesture.note.id}~${destination.id}~${suffix++}`;
+              } while (existingIds.includes(destinationNoteId));
+            }
+            const selection = [{ sourceStepId: destination.id, eventKey: destinationNoteId }];
+            onReplaceNoteSelection?.(selection);
+            onNoteSelect?.(destination.id, destinationNoteId, systemIndex);
+          }
+          setEditorMessage(null);
         }
-        cursor = next;
-      }
-      const destinationMelody =
-        destination?.kind === "rest"
-          ? destination.authoredMelody
-          : destination?.melody?.mode === "authored"
-            ? destination.melody.phrase
-            : undefined;
-      let destinationNoteId = activeGesture.note.id;
-      if (destinationMelody?.notes.some((note) => note.id === destinationNoteId)) {
-        let suffix = 1;
-        do {
-          destinationNoteId = `${activeGesture.note.id}~${destination?.id ?? "step"}~${suffix++}`;
-        } while (destinationMelody.notes.some((note) => note.id === destinationNoteId));
-      }
-      onApplyMelodyEdits?.(
-        [{ type: "upsert", sourceStepId: activeGesture.sourceStepId, note: committedNote }],
-        [],
-        activeGesture.baseline,
-      );
-      if (destination) {
-        onNoteSelectionChange(destination.id, destinationNoteId, false);
-        onNoteSelect?.(destination.id, destinationNoteId);
+      } catch (error) {
+        setEditorMessage(error instanceof Error ? error.message : "Melody edit was rejected.");
       }
     }
     setPianoRollGesture(null);
@@ -1303,6 +1648,7 @@ export function PianoRollMeasure({
     <section
       className="piano-roll-measure"
       data-measure-index={measure.measureIndex}
+      data-system-index={systemIndex}
       data-testid="piano-roll-measure"
       aria-label={`Measure ${measure.number}`}
       style={{
@@ -1310,19 +1656,112 @@ export function PianoRollMeasure({
         minWidth: `${Math.max(150, (250 * zoom) / 100)}px`,
       }}
     >
-      <header className="piano-roll-measure-header">
+      <header
+        className="piano-roll-measure-header"
+        tabIndex={0}
+        aria-label={`Measure ${measure.number}. Set Ctrl+A selection scope to this Measure.`}
+        aria-haspopup="menu"
+        onFocus={(event) => {
+          if (event.target === event.currentTarget)
+            onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+        }}
+        onClick={(event) => {
+          const target = event.target;
+          if (
+            target === event.currentTarget ||
+            (target instanceof Element && !target.closest("button"))
+          )
+            onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+        }}
+        onKeyDown={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            (event.key === "Enter" || event.key === " ")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+            return;
+          }
+          if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rect = event.currentTarget.getBoundingClientRect();
+            onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+              x: rect.left,
+              y: rect.bottom,
+            });
+          }
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+            x: event.clientX,
+            y: event.clientY,
+          });
+        }}
+      >
         <button
           type="button"
           className="piano-roll-audition-measure"
           data-testid="piano-roll-audition-measure"
           aria-label={`Play Measure ${measure.number}`}
-          onClick={() => onAuditionMeasure?.(measure)}
+          onFocus={() => onActiveMeasureChange?.(measure.measureIndex, systemIndex)}
+          onClick={() => {
+            onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+            onAuditionMeasure?.(measure);
+          }}
         >
           Measure {measure.number}
         </button>
         <span>
           {project.globalTiming.meter.numerator}/{project.globalTiming.meter.denominator}
         </span>
+        <PianoRollSelectionAction
+          accessibleName={`Select effective Melody notes in Measure ${measure.number}`}
+          title={`Select Melody notes in Measure ${measure.number}`}
+          testId={`piano-roll-select-measure-notes-${measure.measureIndex}`}
+          selectionScopeLabel={selectionScopeLabel}
+          onSelect={onSelectMeasureNotes}
+        >
+          Select
+        </PianoRollSelectionAction>
+        <button
+          type="button"
+          className="measure-context-trigger"
+          data-measure-context-trigger
+          data-measure-index={measure.measureIndex}
+          aria-label={`Measure ${measure.number} commands`}
+          aria-haspopup="menu"
+          title={`Measure ${measure.number} commands`}
+          onClick={(event) => {
+            event.stopPropagation();
+            const rect = event.currentTarget.getBoundingClientRect();
+            onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+              x: rect.left,
+              y: rect.bottom,
+            });
+          }}
+        >
+          ⋯
+        </button>
+        {onDeleteMeasureFromButton ? (
+          <button
+            type="button"
+            className="measure-close-trigger"
+            data-measure-close-trigger
+            data-measure-index={measure.measureIndex}
+            aria-label={`Delete Measure ${measure.number}`}
+            title={`Delete Measure ${measure.number}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteMeasureFromButton(measure.measureIndex, event.currentTarget);
+            }}
+          >
+            <Icon name="close" />
+          </button>
+        ) : null}
       </header>
       <div className="piano-roll-section-lane" role="group" aria-label="Song sections">
         <div className="piano-roll-section-timeline">
@@ -1363,14 +1802,20 @@ export function PianoRollMeasure({
         }}
         tabIndex={0}
         onClick={(event) => {
+          if (ignoreNextEmptyGridClick.current) {
+            ignoreNextEmptyGridClick.current = false;
+            return;
+          }
+          onActiveMeasureChange?.(measure.measureIndex, systemIndex);
           if ((event.target as HTMLElement).closest("button.piano-roll-note")) return;
           const rect = event.currentTarget.getBoundingClientRect();
           if (!rect.width || !rect.height) return;
           const x = pianoRollTimelineFraction(event.clientX, rect);
-          const startBeats = addRational(
+          const rawStartBeats = addRational(
             measure.startBeats,
             rational(Math.round(x * rationalToNumber(layout.barLengthBeats) * 96), 96),
           );
+          const startBeats = snapMidiCursor(rawStartBeats, pianoRollSnapBeats(snap));
           const y = Math.max(0, Math.min(0.999999, (event.clientY - rect.top) / rect.height));
           onEmptyCellCursor?.({
             startBeats,
@@ -1378,6 +1823,7 @@ export function PianoRollMeasure({
           });
         }}
         onFocusCapture={(event) => {
+          onActiveMeasureChange?.(measure.measureIndex, systemIndex);
           if (event.target !== event.currentTarget) return;
           setKeyboardGridFocused(true);
           setKeyboardStartBeats(activeStepStart);
@@ -1422,7 +1868,10 @@ export function PianoRollMeasure({
             pending?.pointerId === event.pointerId &&
             Math.hypot(event.clientX - pending.x, event.clientY - pending.y) >= 4
           ) {
-            suppressPointerAudition.current = true;
+            pointerSelectedNoteIdentity.current = pianoRollNoteIdentity(
+              pending.sourceStepId,
+              pending.note.id,
+            );
             pendingNoteGesture.current = null;
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -1443,28 +1892,49 @@ export function PianoRollMeasure({
               originalEnd: pending.originalEnd,
               originalNote: pending.note,
               note: pending.note,
+              ...(pending.groupNotes ? { groupNotes: pending.groupNotes } : {}),
             });
             updateNoteGesture(event);
           }
           if (noteGesture?.pointerId === event.pointerId) updateNoteGesture(event);
           const start = marqueeStart.current;
+          if (start?.pointerId === event.pointerId && start.baseline !== project.updatedAt) {
+            marqueeStart.current = null;
+            updateMarquee(null);
+            return;
+          }
           if (
             start?.pointerId === event.pointerId &&
             Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 4
           ) {
-            setMarquee({
+            updateMarquee({
               pointerId: start.pointerId,
               x1: start.x,
               y1: start.y,
               x2: event.clientX,
               y2: event.clientY,
+              additive: start.additive,
+              baseline: start.baseline,
             });
+            ignoreNextEmptyGridClick.current = true;
           }
-          if (marquee?.pointerId === event.pointerId)
-            setMarquee({ ...marquee, x2: event.clientX, y2: event.clientY });
+          const activeMarquee = marqueeRef.current;
+          if (activeMarquee?.pointerId === event.pointerId)
+            updateMarquee({ ...activeMarquee, x2: event.clientX, y2: event.clientY });
+          if (activeMarquee?.pointerId === event.pointerId) {
+            scrollWorkspaceAtPointerEdge(event.currentTarget, event.clientY);
+            const scroller = event.currentTarget.closest<HTMLElement>(".score-system-scroll");
+            if (scroller) {
+              const scrollerRect = scroller.getBoundingClientRect();
+              if (event.clientX < scrollerRect.left + 14) scroller.scrollLeft -= 14;
+              else if (event.clientX > scrollerRect.right - 14) scroller.scrollLeft += 14;
+            }
+          }
         }}
         onPointerUp={(event) => {
           setHoveredNoteEdge(null);
+          if (getPianoRollGesture()?.pointerId === event.pointerId)
+            ignoreNextEmptyGridClick.current = true;
           const pointerTarget = (event.target as HTMLElement).closest<HTMLButtonElement>(
             "button.piano-roll-note",
           );
@@ -1473,7 +1943,7 @@ export function PianoRollMeasure({
             const sourceStepId = pointerTarget.dataset.sourceStepId;
             const eventKey = pointerTarget.dataset.pianoRollEventKey;
             if (sourceStepId && eventKey) {
-              const identity = JSON.stringify([sourceStepId, eventKey]);
+              const identity = pianoRollNoteIdentity(sourceStepId, eventKey);
               pointerSelectedNoteIdentity.current = identity;
               onNoteSelectionChange(sourceStepId, eventKey, event.shiftKey);
               onNoteSelect(sourceStepId, eventKey, systemIndex);
@@ -1497,14 +1967,52 @@ export function PianoRollMeasure({
           if (activeGesture?.pointerId === event.pointerId) finishNoteGesture(event, true);
           if (pendingNoteGesture.current?.pointerId === event.pointerId)
             pendingNoteGesture.current = null;
+          if (marqueeStart.current?.pointerId === event.pointerId) finishMarquee(event, false);
         }}
         onPointerLeave={() => {
           if (!getPianoRollGesture()) setHoveredNoteEdge(null);
         }}
         onKeyDown={(event) => {
+          if (isAppShortcutProtectedTarget(event.target)) return;
           if (event.key === "Escape") {
+            if (noteGesture || pendingNoteGesture.current || marqueeStart.current)
+              ignoreNextEmptyGridClick.current = true;
+            pendingNoteGesture.current = null;
             if (noteGesture) setPianoRollGesture(null);
-            setMarquee(null);
+            else onClearNoteSelection();
+            updateMarquee(null);
+            marqueeStart.current = null;
+            setInspectorOpen(false);
+            return;
+          }
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+            event.preventDefault();
+            if (!notes.length) {
+              onClearNoteSelection();
+              return;
+            }
+            onReplaceNoteSelection?.(
+              notes.map((note) => ({
+                sourceStepId: note.sourceStepId,
+                eventKey: note.eventKey,
+              })),
+            );
+            const first = notes[0]!;
+            const firstButton = Array.from(
+              document.querySelectorAll<HTMLButtonElement>("button.piano-roll-note"),
+            ).find(
+              (button) =>
+                button.dataset.sourceStepId === first.sourceStepId &&
+                button.dataset.pianoRollEventKey === first.eventKey,
+            );
+            const ownerSystem = Number(
+              firstButton?.closest<HTMLElement>(".piano-roll-measure")?.dataset.systemIndex,
+            );
+            onNoteSelect(
+              first.sourceStepId,
+              first.eventKey,
+              Number.isInteger(ownerSystem) ? ownerSystem : systemIndex,
+            );
             return;
           }
           if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
@@ -1584,7 +2092,12 @@ export function PianoRollMeasure({
           }
           if (event.key === "Delete" || event.key === "Backspace") {
             event.preventDefault();
-            deleteSelection();
+            const focusedNote = (event.target as HTMLElement).closest<HTMLButtonElement>(
+              "button.piano-roll-note",
+            );
+            const sourceStepId = focusedNote?.dataset.sourceStepId;
+            const eventKey = focusedNote?.dataset.pianoRollEventKey;
+            deleteSelection(sourceStepId && eventKey ? { sourceStepId, eventKey } : undefined);
           }
         }}
       >
@@ -1693,6 +2206,19 @@ export function PianoRollMeasure({
           );
         })}
         <div className="piano-roll-note-layer" data-testid="piano-roll-note-layer">
+          {midiCursor &&
+          compareRational(midiCursor, measure.startBeats) >= 0 &&
+          compareRational(midiCursor, measure.endBeats) < 0 ? (
+            <i
+              className="piano-roll-midi-insertion-cursor"
+              aria-hidden="true"
+              data-testid="piano-roll-midi-cursor"
+              data-start-beats={`${midiCursor.numerator}/${midiCursor.denominator}`}
+              style={{
+                left: `${(rationalToNumber(subtractRational(midiCursor, measure.startBeats)) / rationalToNumber(layout.barLengthBeats)) * 100}%`,
+              }}
+            />
+          ) : null}
           {emptyCursor &&
           compareRational(emptyCursor.startBeats, measure.startBeats) >= 0 &&
           compareRational(emptyCursor.startBeats, measure.endBeats) < 0 ? (
@@ -1776,7 +2302,7 @@ export function PianoRollMeasure({
                     createHarmonicNoteRoleContext({
                       tonic: project.tonic,
                       moduleId: project.activeModule,
-                      rootPitchClass: realizeChord(step.harmonicFunction, project.tonic)
+                      rootPitchClass: realizeProgressionStepChord(step, project.tonic)
                         .rootPitchClass,
                       chordPitches: realizeProgressionStepRealization(step, project.tonic).pitches,
                       ...(nextStep?.kind === "chord"
@@ -1869,23 +2395,27 @@ export function PianoRollMeasure({
                   aria-pressed={selectedNoteIdentities.has(noteIdentity) || isSelectedNote}
                   aria-disabled={false}
                   onPointerDown={(event) => {
-                    suppressPointerAudition.current = false;
+                    pointerSelectedNoteIdentity.current = null;
                     startNoteGesture(event, note);
                   }}
                   onClick={(event) => {
                     setInspectorOpen(false);
-                    const identity = JSON.stringify([note.sourceStepId, note.eventKey]);
+                    const identity = pianoRollNoteIdentity(note.sourceStepId, note.eventKey);
+                    const measureIndex = Number(
+                      event.currentTarget.closest<HTMLElement>(".piano-roll-measure")?.dataset
+                        .measureIndex,
+                    );
+                    if (Number.isInteger(measureIndex))
+                      onActiveMeasureChange?.(measureIndex, systemIndex);
                     if (pointerSelectedNoteIdentity.current === identity) {
                       pointerSelectedNoteIdentity.current = null;
+                      if (!event.shiftKey && event.detail > 0)
+                        onAuditionNote?.(note.sourceStepId, note.eventKey);
                     } else {
                       onNoteSelectionChange(note.sourceStepId, note.eventKey, event.shiftKey);
                       onNoteSelect(note.sourceStepId, note.eventKey, systemIndex);
                     }
                     setFocusPitch(note.pitch.midiNumber);
-                    const suppressAudition = event.detail > 0 && suppressPointerAudition.current;
-                    if (event.detail > 0) suppressPointerAudition.current = false;
-                    if (!event.shiftKey && event.detail > 0 && !suppressAudition)
-                      onAuditionNote?.(note.sourceStepId, note.eventKey);
                   }}
                   onKeyDown={(event) => {
                     if (event.key.toLowerCase() === "e" && !event.ctrlKey && !event.metaKey) {
@@ -1903,6 +2433,18 @@ export function PianoRollMeasure({
                       (event.altKey || event.shiftKey);
                     if (verticalArrow || horizontalEdit) {
                       event.preventDefault();
+                      const keyboardDeltaPitch = verticalArrow
+                        ? event.key === "ArrowUp"
+                          ? 1
+                          : -1
+                        : 0;
+                      const keyboardDeltaStart = horizontalEdit
+                        ? multiplyRational(
+                            durationForSnap(),
+                            rational(event.key === "ArrowRight" ? 1 : -1),
+                          )
+                        : rational(0);
+                      if (moveGroupByKeyboard(note, keyboardDeltaPitch, keyboardDeltaStart)) return;
                       let pitch = note.pitch.midiNumber;
                       let startBeats = note.startBeats;
                       if (verticalArrow) {
@@ -2031,7 +2573,7 @@ export function PianoRollMeasure({
           const step = item.step;
           const chordRootPitchClass =
             step.kind === "chord"
-              ? realizeChord(step.harmonicFunction, project.tonic).rootPitchClass
+              ? realizeProgressionStepChord(step, project.tonic).rootPitchClass
               : null;
           const chordPaletteDegrees =
             chordRootPitchClass !== null
@@ -2041,10 +2583,7 @@ export function PianoRollMeasure({
             step.kind === "chord"
               ? formatChordSymbol(
                   withEffectiveBass(
-                    {
-                      ...realizeChord(step.harmonicFunction, project.tonic),
-                      variant: step.harmonicVariant,
-                    },
+                    realizeProgressionStepChord(step, project.tonic),
                     realizeProgressionStepRealization(step, project.tonic).bassPitch,
                   ),
                 )
@@ -2108,6 +2647,9 @@ export function PianoRollMeasure({
                       functionLabel={functionName}
                       chordLabel={chord}
                     />
+                    {step.kind === "chord" ? (
+                      <StepTranspositionBadge semitones={stepTranspositionSemitones(step)} />
+                    ) : null}
                   </>
                 ) : (
                   <strong>Rest · no harmony</strong>
@@ -2291,6 +2833,11 @@ export function PianoRollMeasure({
           </ul>
           {editorMessage ? <p role="status">{editorMessage}</p> : null}
         </aside>
+      ) : null}
+      {editorMessage && !inspectorOpen ? (
+        <p className="piano-roll-edit-status" role="status">
+          {editorMessage}
+        </p>
       ) : null}
       {marquee ? (
         <div

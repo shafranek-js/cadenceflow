@@ -3,6 +3,7 @@ import type {
   MatrixCardTemplateState,
   ModuleTemplateState,
   NoteColorMode,
+  GuitarChordColorMode,
   PresentationState,
   ProgressionView,
   Project,
@@ -20,6 +21,7 @@ import type {
   StepPerformance,
 } from "../domain/progression/step";
 import { snapshotStepPerformance } from "../domain/progression/step";
+import { assertStepTranspositionSemitones } from "../domain/progression/transposition";
 import { orderSongSections, validateSongSections } from "../domain/progression/sections";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
 import type { HarmonicVariant } from "../domain/harmony/chord";
@@ -229,6 +231,9 @@ function encodeChordMelody(value: ChordMelody): Record<string, unknown> {
           notes: melody.phrase.notes.map((note) => ({
             id: note.id,
             pitch: note.pitch,
+            ...(note.sourcePitchMidi !== undefined
+              ? { sourcePitchMidi: note.sourcePitchMidi }
+              : {}),
             onset: note.onset,
             duration: note.duration,
           })),
@@ -358,6 +363,7 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
     return {
       id: step.id,
       kind: "rest",
+      transpositionSemitones: assertStepTranspositionSemitones(step.transpositionSemitones ?? 0),
       duration: encodeDuration(step.duration),
       ...(step.authoredMelody !== undefined
         ? { authoredMelody: snapshotAuthoredMelodyPhrase(step.authoredMelody) }
@@ -370,6 +376,7 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
   return {
     id: step.id,
     kind: "chord",
+    transpositionSemitones: assertStepTranspositionSemitones(step.transpositionSemitones ?? 0),
     harmonicFunction: step.harmonicFunction,
     harmonicVariant: step.harmonicVariant,
     duration: encodeDuration(step.duration),
@@ -384,10 +391,14 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
 
 function decodeStep(raw: Record<string, unknown>): ProgressionStep {
   const duration = decodeDuration(raw["duration"] as WireDuration);
+  const transpositionSemitones = assertStepTranspositionSemitones(
+    Number(raw["transpositionSemitones"] ?? 0),
+  );
   if (raw["kind"] === "rest") {
     const rest: RestStep = Object.freeze({
       id: String(raw["id"]),
       kind: "rest",
+      ...(transpositionSemitones !== 0 ? { transpositionSemitones } : {}),
       duration,
       ...(raw["authoredMelody"] !== undefined
         ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) }
@@ -401,6 +412,7 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
   const chord: ChordStep = Object.freeze({
     id: String(raw["id"]),
     kind: "chord",
+    ...(transpositionSemitones !== 0 ? { transpositionSemitones } : {}),
     harmonicFunction: raw["harmonicFunction"] as HarmonicFunctionIdentity,
     harmonicVariant: raw["harmonicVariant"] as HarmonicVariant,
     duration,
@@ -539,6 +551,7 @@ export function encodePortableProject(project: Project): string {
       measuresPerSystem: project.presentation.measuresPerSystem,
       showBassInStaff: project.presentation.showBassInStaff,
       noteColorMode: project.presentation.noteColorMode,
+      guitarChordColorMode: project.presentation.guitarChordColorMode ?? "chord-roles",
       resolutionArrows: project.presentation.resolutionArrows !== false,
       genreFocus: project.presentation.genreFocus ?? "all",
       ...(project.presentation.guitarChordOrientation !== undefined
@@ -802,6 +815,10 @@ export function decodePortableProject(jsonString: string): Project {
           presentation["noteColorMode"] === "harmonic-role"
             ? (presentation["noteColorMode"] as NoteColorMode)
             : "standard",
+        guitarChordColorMode:
+          presentation["guitarChordColorMode"] === "fingering"
+            ? (presentation["guitarChordColorMode"] as GuitarChordColorMode)
+            : "chord-roles",
         resolutionArrows: presentation["resolutionArrows"] !== false,
         genreFocus:
           typeof presentation["genreFocus"] === "string"

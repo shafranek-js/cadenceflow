@@ -317,13 +317,33 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
   });
 
   describe("8. Schema Version & Migration Contract", () => {
-    it("accepts and round-trips the current schemaVersion 9", () => {
+    it("accepts and round-trips the current schemaVersion 10", () => {
       const original = createRichProjectFixture();
       expect(original.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
 
       const jsonText = encodePortableProject(original);
       const restored = decodePortableProject(jsonText);
-      expect(restored.schemaVersion).toBe(9);
+      expect(restored.schemaVersion).toBe(10);
+    });
+
+    it("round-trips project-scoped guitar marker colors and defaults older v10 data to chord roles", () => {
+      const original = createRichProjectFixture();
+      const fingeringProject = {
+        ...original,
+        presentation: Object.freeze({
+          ...original.presentation,
+          guitarChordColorMode: "fingering" as const,
+        }),
+      };
+      const restored = decodePortableProject(encodePortableProject(fingeringProject));
+      expect(restored.presentation.guitarChordColorMode).toBe("fingering");
+
+      const legacyWire = JSON.parse(encodePortableProject(original)) as {
+        presentation: Record<string, unknown>;
+      };
+      delete legacyWire.presentation["guitarChordColorMode"];
+      const legacyRestored = decodePortableProject(JSON.stringify(legacyWire));
+      expect(legacyRestored.presentation.guitarChordColorMode).toBe("chord-roles");
     });
 
     it("rejects unsupported future schemaVersion explicitly with UnsupportedProjectVersionError", () => {
@@ -339,7 +359,7 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
     it("distinguishes future version rejection from malformed JSON syntax errors", () => {
       const original = createRichProjectFixture();
       const rawObj = JSON.parse(encodePortableProject(original));
-      rawObj.schemaVersion = 10; // Future version
+      rawObj.schemaVersion = 11; // Future version
 
       expect(() => decodePortableProject(JSON.stringify(rawObj))).toThrow(
         UnsupportedProjectVersionError,

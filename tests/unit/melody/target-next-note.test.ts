@@ -32,6 +32,7 @@ describe("Target Notes melody realization", () => {
     expect(phrase.events[1]!.pitch.midiNumber).toBe(62);
     expect(Object.keys(phrase.events[1]!).sort()).toEqual([
       "durationBeats",
+      "eventKey",
       "index",
       "pitch",
       "sourcePitchMidi",

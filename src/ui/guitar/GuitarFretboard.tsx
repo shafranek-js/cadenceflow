@@ -1,4 +1,10 @@
 import type { GuitarChordVoicing, GuitarFretItem } from "../../domain/instruments/guitar/voicings";
+import {
+  GUITAR_FINGER_COLORS,
+  GUITAR_FINGER_NAMES,
+  isGuitarFingerNumber,
+} from "../../domain/instruments/guitar/fingerColors";
+import type { GuitarChordColorMode } from "../../domain/project/project";
 
 export interface GuitarFretboardProps {
   readonly voicing: GuitarChordVoicing;
@@ -9,6 +15,96 @@ export interface GuitarFretboardProps {
   readonly width?: number | string;
   readonly height?: number | string;
   readonly orientation?: "vertical" | "horizontal";
+  readonly colorMode?: GuitarChordColorMode;
+}
+
+function markerLabel(item: GuitarFretItem, colorMode: GuitarChordColorMode): string {
+  const role = item.role === "root" ? "chord root" : "chord tone";
+  const finger = isGuitarFingerNumber(item.finger)
+    ? `finger ${item.finger} (${GUITAR_FINGER_NAMES[item.finger].en})`
+    : colorMode === "fingering"
+      ? "fingering unavailable"
+      : undefined;
+  return `String ${item.stringNumber}, fret ${item.fret}, ${role}${finger ? `, ${finger}` : ""}`;
+}
+
+function diagramLabel(
+  voicing: GuitarChordVoicing,
+  orientation: "vertical" | "horizontal",
+  colorMode: GuitarChordColorMode,
+): string {
+  const modeDescription =
+    colorMode === "fingering"
+      ? "Fingering colors; visible numbers identify fingers 1 Index, 2 Middle, 3 Ring, and 4 Pinky."
+      : "Chord-role colors; red marks the chord root and blue marks other chord tones.";
+  const markers = voicing.items
+    .filter((item) => item.fret > 0)
+    .map((item) => markerLabel(item, colorMode));
+  const openStrings = voicing.items
+    .filter((item) => item.fret === 0)
+    .map(
+      (item) =>
+        `String ${item.stringNumber} open${item.role === "root" ? ", chord root" : ", chord tone"}; no fretting finger`,
+    );
+  return `${voicing.chordSymbol}, ${orientation} guitar chord diagram, starting at fret ${voicing.baseFret}. ${modeDescription} ${[...markers, ...openStrings].join("; ")}`;
+}
+
+function GuitarFretMarker({
+  item,
+  cx,
+  cy,
+  colorMode,
+  showFingerings,
+}: {
+  readonly item: GuitarFretItem;
+  readonly cx: number;
+  readonly cy: number;
+  readonly colorMode: GuitarChordColorMode;
+  readonly showFingerings: boolean;
+}) {
+  const isRoot = item.role === "root";
+  const fingerNumber = isGuitarFingerNumber(item.finger) ? item.finger : undefined;
+  const hasFinger = fingerNumber !== undefined;
+  const useFingerColor = colorMode === "fingering";
+  const markerClass = useFingerColor
+    ? `guitar-fret-dot guitar-dot-finger${hasFinger ? "" : " is-finger-unknown"}`
+    : `guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`;
+  const groupClass = [
+    "guitar-fret-dot-group",
+    isRoot ? "is-root" : "is-chord-tone",
+    ...(useFingerColor ? [hasFinger ? `is-finger-${fingerNumber}` : "is-finger-unknown"] : []),
+  ].join(" ");
+
+  return (
+    <g
+      className={groupClass}
+      data-guitar-role={item.role}
+      data-finger={fingerNumber}
+      aria-label={markerLabel(item, colorMode)}
+    >
+      <circle
+        cx={cx}
+        cy={cy}
+        r="5.5"
+        className={markerClass}
+        data-finger={fingerNumber}
+        style={
+          useFingerColor && fingerNumber ? { fill: GUITAR_FINGER_COLORS[fingerNumber] } : undefined
+        }
+      />
+      {hasFinger && (showFingerings || useFingerColor) ? (
+        <text
+          x={cx}
+          y={cy + 3}
+          className={`guitar-dot-finger-text${useFingerColor ? " is-fingering-color" : ""}`}
+          textAnchor="middle"
+          aria-hidden="true"
+        >
+          {fingerNumber}
+        </text>
+      ) : null}
+    </g>
+  );
 }
 
 const VERT_STRING_X = [20, 36, 52, 68, 84, 100] as const; // stringIndex 0 (low E) to 5 (high E)
@@ -29,10 +125,12 @@ export function GuitarFretboard({
   width,
   height,
   orientation = "vertical",
+  colorMode = "chord-roles",
 }: GuitarFretboardProps) {
   const fretSpan = Math.max(4, voicing.fretSpan);
   const isNut = voicing.baseFret === 1;
   const isHorizontal = orientation === "horizontal";
+  const accessibleLabel = diagramLabel(voicing, orientation, colorMode);
 
   if (isHorizontal) {
     const fretboardRight = HORIZ_X_NUT + fretSpan * HORIZ_FRET_WIDTH;
@@ -49,9 +147,10 @@ export function GuitarFretboard({
         width={svgWidth}
         height={svgHeight}
         role="img"
-        aria-label={`${voicing.chordSymbol} horizontal guitar chord diagram starting at fret ${voicing.baseFret}`}
+        aria-label={accessibleLabel}
         data-testid="guitar-fretboard-svg"
         data-orientation="horizontal"
+        data-color-mode={colorMode}
       >
         {/* Background container for neck */}
         <rect
@@ -141,8 +240,8 @@ export function GuitarFretboard({
                 cx={x}
                 cy={y}
                 r="3.5"
-                className={`guitar-string-marker is-open${isRoot ? " is-root" : ""}`}
-                aria-label={`String ${6 - stringIdx} open${isRoot ? " root" : ""}`}
+                className={`guitar-string-marker is-open${isRoot && colorMode === "chord-roles" ? " is-root" : colorMode === "fingering" ? " is-neutral" : ""}`}
+                aria-label={`String ${6 - stringIdx} open${isRoot ? ", chord root" : ", chord tone"}; no fretting finger`}
               />
             );
           }
@@ -191,30 +290,20 @@ export function GuitarFretboard({
         {/* Fretted Chord Notes (finger dots) */}
         {voicing.items
           .filter((item) => item.fret > 0)
-          .map((item, idx) => {
+          .map((item) => {
             const relFret = item.fret - voicing.baseFret + 1;
             if (relFret < 1 || relFret > fretSpan) return null;
             const cx = HORIZ_X_NUT + (relFret - 0.5) * HORIZ_FRET_WIDTH;
             const cy = HORIZ_STRING_Y[item.stringIndex]!;
-            const isRoot = item.role === "root";
-
             return (
-              <g
-                key={`dot-${idx}`}
-                className={`guitar-fret-dot-group ${isRoot ? "is-root" : "is-chord-tone"}`}
-              >
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r="5.5"
-                  className={`guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`}
-                />
-                {showFingerings && item.finger ? (
-                  <text x={cx} y={cy + 3} className="guitar-dot-finger-text" textAnchor="middle">
-                    {item.finger}
-                  </text>
-                ) : null}
-              </g>
+              <GuitarFretMarker
+                key={`dot-${item.stringIndex}`}
+                item={item}
+                cx={cx}
+                cy={cy}
+                colorMode={colorMode}
+                showFingerings={showFingerings}
+              />
             );
           })}
 
@@ -253,9 +342,10 @@ export function GuitarFretboard({
       width={svgWidth}
       height={svgHeight}
       role="img"
-      aria-label={`${voicing.chordSymbol} guitar chord diagram starting at fret ${voicing.baseFret}`}
+      aria-label={accessibleLabel}
       data-testid="guitar-fretboard-svg"
       data-orientation="vertical"
+      data-color-mode={colorMode}
     >
       {/* Background container */}
       <rect
@@ -347,8 +437,8 @@ export function GuitarFretboard({
               cx={x}
               cy={y}
               r="3.5"
-              className={`guitar-string-marker is-open${isRoot ? " is-root" : ""}`}
-              aria-label={`String ${6 - stringIdx} open${isRoot ? " root" : ""}`}
+              className={`guitar-string-marker is-open${isRoot && colorMode === "chord-roles" ? " is-root" : colorMode === "fingering" ? " is-neutral" : ""}`}
+              aria-label={`String ${6 - stringIdx} open${isRoot ? ", chord root" : ", chord tone"}; no fretting finger`}
             />
           );
         }
@@ -397,30 +487,20 @@ export function GuitarFretboard({
       {/* Fretted Chord Notes (finger dots) */}
       {voicing.items
         .filter((item) => item.fret > 0)
-        .map((item, idx) => {
+        .map((item) => {
           const relFret = item.fret - voicing.baseFret + 1;
           if (relFret < 1 || relFret > fretSpan) return null;
           const cx = VERT_STRING_X[item.stringIndex]!;
           const cy = VERT_Y_TOP + (relFret - 0.5) * VERT_FRET_HEIGHT;
-          const isRoot = item.role === "root";
-
           return (
-            <g
-              key={`dot-${idx}`}
-              className={`guitar-fret-dot-group ${isRoot ? "is-root" : "is-chord-tone"}`}
-            >
-              <circle
-                cx={cx}
-                cy={cy}
-                r="5.5"
-                className={`guitar-fret-dot ${isRoot ? "guitar-dot-root" : "guitar-dot-chord"}`}
-              />
-              {showFingerings && item.finger ? (
-                <text x={cx} y={cy + 3} className="guitar-dot-finger-text" textAnchor="middle">
-                  {item.finger}
-                </text>
-              ) : null}
-            </g>
+            <GuitarFretMarker
+              key={`dot-${item.stringIndex}`}
+              item={item}
+              cx={cx}
+              cy={cy}
+              colorMode={colorMode}
+              showFingerings={showFingerings}
+            />
           );
         })}
 

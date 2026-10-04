@@ -57,6 +57,11 @@ export interface ProgressionMeasureLayout {
   readonly measures: readonly ProgressionMeasure[];
 }
 
+export interface ExactMeasureStepRange {
+  readonly startStepId: string;
+  readonly endStepId: string;
+}
+
 interface MutableMeasure {
   measureIndex: number;
   number: number;
@@ -218,4 +223,44 @@ export function createProgressionMeasureLayout(
     trailingSilenceBeats,
     measures: Object.freeze(frozenMeasures),
   });
+}
+
+/**
+ * Resolves a Measure to a Step-scoped loop only when both Measure boundaries
+ * coincide with authored Step boundaries. Loop ranges are Step-scoped, so a
+ * Measure that cuts through a Step cannot be represented without looping extra
+ * time.
+ */
+export function resolveExactMeasureStepRange(
+  steps: readonly ProgressionStep[],
+  meter: Meter,
+  measureIndex: number,
+): ExactMeasureStepRange | null {
+  const layout = createProgressionMeasureLayout(steps, meter);
+  const measure = layout.measures[measureIndex];
+  if (!measure) return null;
+  const end =
+    compareRational(measure.endBeats, layout.authoredDurationBeats) > 0
+      ? layout.authoredDurationBeats
+      : measure.endBeats;
+
+  let cursor = ZERO;
+  let startStepId: string | undefined;
+  let endStepId: string | undefined;
+  let startIndex = -1;
+  let endIndex = -1;
+  steps.forEach((step, index) => {
+    if (compareRational(cursor, measure.startBeats) === 0) {
+      startStepId = step.id;
+      startIndex = index;
+    }
+    cursor = addRational(cursor, step.duration.beats);
+    if (compareRational(cursor, end) === 0) {
+      endStepId = step.id;
+      endIndex = index;
+    }
+  });
+
+  if (!startStepId || !endStepId || startIndex < 0 || endIndex < startIndex) return null;
+  return Object.freeze({ startStepId, endStepId });
 }

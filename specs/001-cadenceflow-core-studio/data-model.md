@@ -32,7 +32,7 @@ Project
 - customPresets: CustomPreset[]
 ```
 
-The current portable contract is schema v9. Schema v5 added the optional Step-local Melody instrument
+The current portable contract is schema v10. Schema v5 added the optional Step-local Melody instrument
 override while preserving global Melody Track inheritance. The atomic v5-to-v6 migration adds persisted
 Piano/Guitar engines and SoundFont tones together with `noteColorMode`; it also supplies defaults for
 fields absent from v5 projects. Schema v1–v4 projects migrate sequentially through v5.
@@ -40,7 +40,10 @@ The v6-to-v7 migration wraps existing Melody recipes as generated Melody without
 authored notes are persisted only after an explicit edit. The v7-to-v8 migration adds an empty canonical
 `progression.sections` array. The v8-to-v9 migration preserves legacy Chord Melody recipes/phrases and adds
 Rest-owned authored Melody support plus the persisted `piano-roll` view identifier; it does not materialize
-generated notes or add a separate timeline/history.
+generated notes or add a separate timeline/history. The v9-to-v10 migration adds a zero-default
+`transpositionSemitones` to saved and temporary-branch Steps; nonzero values alter that Step's concert output
+while retaining its source-frame pitches and harmonic function. `ExactPitch.transpositionCompensationSemitones`
+keeps source anchors within MIDI 0..127 when inverse conversion of a legal concert note crosses a MIDI edge.
 
 ### HarmonyTrackSettings
 
@@ -177,6 +180,7 @@ ChordStep | RestStep
 ChordStep
 - id: UUID
 - kind: "chord"
+- transpositionSemitones?: integer -127..127 (concert offset; defaults to zero)
 - harmonicFunction: HarmonicFunctionIdentity
 - harmonicVariant: HarmonicVariant
 - explicitSpellingOverrides?: ...
@@ -263,6 +267,7 @@ presentation-only and MUST NOT enter Project persistence, Undo/Redo, playback, M
 RestStep
 - id: UUID
 - kind: "rest"
+- transpositionSemitones?: integer -127..127 (authored Melody concert offset; defaults to zero)
 - duration: MusicalDuration
 - authoredMelody?: AuthoredMelodyPhrase
 - melodyInstrumentOverride?: MelodyInstrumentId
@@ -270,7 +275,7 @@ RestStep
 
 Rest does not become harmonic recommendation context; the previous sounding harmonic event remains the harmonic predecessor. Authored Melody belongs to the Step containing its onset, including a Rest. Generated Melody remains Chord-only.
 
-### AuthoredMelodyPhrase (schema v9)
+### AuthoredMelodyPhrase (schema v10)
 
 ```text
 AuthoredMelodyPhrase
@@ -280,6 +285,7 @@ AuthoredMelodyPhrase
 AuthoredMelodyNote
 - id: stable note ID unique within its owner phrase
 - pitch: ExactPitch
+- sourcePitchMidi?: source-frame pitch retained when a generated phrase is materialized
 - onset: non-negative Rational relative to owner Step start
 - duration: positive Rational, unchanged by progression shortening
 ```
@@ -326,6 +332,8 @@ ExactPitch
 - pitchClassIdentity
 - octave
 - spelling: { step, alter }
+- transpositionCompensationSemitones?: -127..127 (source-frame inverse compensation only)
+- transpositionSpellingOverride?: { step, alter } (concert-frame spelling retained for its owner Step offset)
 ```
 
 Pitch identity and spelling are separate so `F#` vs `Gb` is preserved in Staff/MusicXML without changing sounding pitch.
@@ -471,6 +479,7 @@ PresentationState
 - measuresPerSystem: auto | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 - showBassInStaff: boolean
 - noteColorMode: standard | suzuki | harmonic-role
+- guitarChordColorMode?: chord-roles | fingering (project-wide for Matrix and My Progression Guitar diagrams)
 - ...other existing presentation-only settings
 ```
 

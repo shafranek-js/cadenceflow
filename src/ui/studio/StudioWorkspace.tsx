@@ -53,6 +53,36 @@ export function StudioWorkspace({
   sidePanelMode = "fixed",
   onSidePanelModeChange,
 }: StudioWorkspaceProps) {
+  const [midiSettingsOpen, setMidiSettingsOpen] = useState(false);
+  const midiSettingsEntryRef = useRef<HTMLButtonElement>(null);
+  const midiPanelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (midiSettingsOpen) {
+      const panel = midiPanelRef.current;
+      if (!panel) return;
+      const headerHeight =
+        document.querySelector(".app-header")?.getBoundingClientRect().height ?? 0;
+      panel.style.setProperty("--midi-header-height", `${headerHeight}px`);
+      panel.focus({ preventScroll: true });
+      window.scrollBy({ top: panel.getBoundingClientRect().top - headerHeight - 12 });
+    }
+  }, [midiSettingsOpen]);
+  useEffect(() => {
+    const headerElement = document.querySelector(".app-header");
+    if (!headerElement || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      midiPanelRef.current?.style.setProperty(
+        "--midi-header-height",
+        `${headerElement.getBoundingClientRect().height}px`,
+      );
+    });
+    observer.observe(headerElement);
+    return () => observer.disconnect();
+  }, []);
+  const closeMidiSettings = () => {
+    setMidiSettingsOpen(false);
+    midiSettingsEntryRef.current?.focus({ preventScroll: true });
+  };
   const hasSelectedStep = Boolean(selectedStepQuickEdit || selectedStepInspector);
   const progressionStripRef = useRef<HTMLElement>(null);
   const staffAnchorRef = useRef<StaffAnchor | null>(null);
@@ -134,7 +164,7 @@ export function StudioWorkspace({
     };
   }, [sidePanelMode, cancelLeaveTimer, scheduleLeave]);
 
-  const isCollapsed = sidePanelMode === "autohide" && !isHovered;
+  const isCollapsed = sidePanelMode === "autohide" && !isHovered && !midiSettingsOpen;
 
   useLayoutEffect(() => {
     if (!hasSelectedStep) {
@@ -284,6 +314,15 @@ export function StudioWorkspace({
     <main className="app-shell" aria-label="CadenceFlow Studio">
       <header className="app-header" aria-label="Project and application controls">
         {header}
+        <button
+          ref={midiSettingsEntryRef}
+          type="button"
+          aria-expanded={midiSettingsOpen}
+          aria-controls="midi-settings-panel"
+          onClick={() => (midiSettingsOpen ? closeMidiSettings() : setMidiSettingsOpen(true))}
+        >
+          Midi Settings
+        </button>
       </header>
       <section className="studio-transport" aria-label="Transport">
         {transport}
@@ -352,9 +391,32 @@ export function StudioWorkspace({
         >
           {progression}
         </section>
+        <aside
+          id="midi-settings-panel"
+          ref={midiPanelRef}
+          hidden={!midiSettingsOpen}
+          className="selected-step-stack midi-settings-sidebar"
+          aria-label="Midi Settings"
+          tabIndex={-1}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closeMidiSettings();
+            }
+          }}
+        >
+          <div className="inspector-dock-header">
+            <h2>Midi Settings</h2>
+            <button type="button" aria-label="Close Midi Settings" onClick={closeMidiSettings}>
+              Close
+            </button>
+          </div>
+          <div id="midi-settings-content" />
+        </aside>
         {hasSelectedStep ? (
           <aside
             ref={selectedStepStackRef}
+            hidden={midiSettingsOpen}
             className="selected-step-stack"
             aria-label="Selected step"
             tabIndex={-1}
@@ -393,6 +455,7 @@ export function StudioWorkspace({
       {overlays}
       <footer className="app-status-bar" role="contentinfo" aria-label="Status bar">
         {statusBar}
+        <span id="midi-status-content" className="midi-status-compact" />
       </footer>
       {printable}
     </main>

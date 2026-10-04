@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ProgressionStep } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
-import { realizeChord } from "../../domain/harmony/realization";
+import { realizeProgressionStepChord } from "../../domain/progression/transposition";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import type { ChordSubstitution } from "../../domain/harmony/reharmonization";
 
@@ -42,10 +42,7 @@ export interface MelodyContextMenuProps {
 
 function sourceLabel(step: ProgressionStep, tonic: PitchClassIdentity): string {
   if (step.kind === "rest") return "Rest";
-  return formatChordSymbol({
-    ...realizeChord(step.harmonicFunction, tonic),
-    variant: step.harmonicVariant,
-  });
+  return formatChordSymbol(realizeProgressionStepChord(step, tonic));
 }
 
 export function MelodyContextMenu({

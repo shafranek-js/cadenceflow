@@ -17,6 +17,7 @@ import {
 } from "../domain/timing/rational";
 import { createProgressionMeasureLayout } from "../domain/timing/measureLayout";
 import { realizeOrderedPianoProgression } from "../instruments/piano/progressionRealization";
+import { realizeProgressionStepChord } from "../domain/progression/transposition";
 import type { ExactPitch } from "../domain/harmony/pitch";
 import { createEffectiveMelodyTimeline } from "../domain/melody/effectiveTimeline";
 import { projectWrittenRhythm, type WrittenRhythmPart } from "./writtenRhythmProjection";
@@ -347,7 +348,7 @@ export function createMelodyTimeline(project: Project): MelodyTimeline {
     const realization = orderedRealizations[ownerIndex];
     const nextRealization = orderedRealizations.slice(ownerIndex + 1).find((item) => item !== null);
     const chord =
-      owner.kind === "chord" ? realizeChord(owner.harmonicFunction, project.tonic) : undefined;
+      owner.kind === "chord" ? realizeProgressionStepChord(owner, project.tonic) : undefined;
     const roleContext = createHarmonicNoteRoleContext({
       tonic: project.tonic,
       moduleId: project.activeModule,

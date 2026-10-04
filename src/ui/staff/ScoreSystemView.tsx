@@ -11,9 +11,9 @@ import type { ExactPitch } from "../../domain/harmony/pitch";
 import type { ChordStep, PianoArticulation, StepPerformance } from "../../domain/progression/step";
 import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { formatChordSymbol } from "../../domain/harmony/chord";
-import { realizeChord } from "../../domain/harmony/realization";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import { realizeProgressionStepChord } from "../../domain/progression/transposition";
 import {
   pitchToGuitarTabPosition,
   resolveGuitarTabEntry,
@@ -56,6 +56,7 @@ import type {
   MelodyTimeline,
 } from "../../notation/melodyStaffProjection";
 import { Icon } from "../common/Icon";
+import { PianoRollSelectionAction } from "../melody/PianoRollSelectionAction";
 import type { MelodyMenuPosition } from "../melody/MelodyContextMenu";
 import { melodyInstrumentLabel } from "../melody/labels";
 import type { MeasureStaffChordItem, MeasureStaffItem } from "./MeasureStaffView";
@@ -66,6 +67,8 @@ import { GuitarHandLegendModal, type TabFingeringStyle } from "../guitar/GuitarH
 const DEFAULT_SCORE_WIDTH_PX = 960;
 const SCORE_STAFF_HEIGHT_PX = 160;
 const SCORE_STAFF_GAP_PX = 18;
+const PIANO_ROLL_PITCH_GUTTER_WIDTH_PX = 34;
+const SCORE_SYSTEM_VIEW_BORDER_WIDTH_PX = 2;
 const BASE_SCORE_LABEL_BAND_PX = 32;
 const SONG_SECTION_MARKER_ROW_PX = 24;
 const MELODY_NOTE_ANNOTATION_ROW_GAP_PX = 31;
@@ -98,10 +101,7 @@ function sourceChordLabel(project: Project, stepId: string): string {
     (candidate) => candidate.id === stepId && candidate.kind === "chord",
   );
   if (!step || step.kind !== "chord") return stepId;
-  const chord = {
-    ...realizeChord(step.harmonicFunction, project.tonic),
-    variant: step.harmonicVariant,
-  };
+  const chord = realizeProgressionStepChord(step, project.tonic);
   return formatChordSymbol(
     withEffectiveBass(chord, realizeProgressionStepRealization(step, project.tonic).bassPitch),
   );
@@ -137,10 +137,7 @@ function harmonySequenceEntry(
       (candidate) => candidate.id === item.stepId && candidate.kind === "chord",
     );
     if (step && step.kind === "chord") {
-      const chord = {
-        ...realizeChord(step.harmonicFunction, project.tonic),
-        variant: step.harmonicVariant,
-      };
+      const chord = realizeProgressionStepChord(step, project.tonic);
       const tabEntry = resolveGuitarTabEntry(withEffectiveBass(chord, item.bassPitch), item.label);
       tabPositions = tabEntry.strings
         .filter((s) => s.fret >= 0)
@@ -440,6 +437,9 @@ interface ScoreSystemCanvasProps {
   readonly layout: ProgressionMeasureLayout;
   readonly system: ScoreSystem;
   readonly displayWidthPx: number;
+  readonly pianoRollMeasureCapacity?: number | undefined;
+  readonly pianoRollMeasureMinimumWidthPx?: number | undefined;
+  readonly pianoRollMusicViewportWidthPx?: number | undefined;
   readonly melodyTimeline: MelodyTimeline | null;
   readonly measureItems: Readonly<Record<number, readonly MeasureStaffItem[]>>;
   readonly selectedStepId: string | undefined;
@@ -455,6 +455,12 @@ interface ScoreSystemCanvasProps {
     anchor: HTMLElement,
     position: MelodyMenuPosition,
   ) => void;
+  readonly onOpenMeasureMenu?: (
+    measureIndex: number,
+    anchor: HTMLElement,
+    position: { readonly x: number; readonly y: number },
+  ) => void;
+  readonly onDeleteMeasureFromButton?: (measureIndex: number, invoker: HTMLElement) => void;
   readonly onFocusMatrix?: (measureNumber: number) => void;
   readonly onFillGapWithRest?: () => void;
   readonly onExtendFinalChord?: () => void;
@@ -468,6 +474,9 @@ interface ScoreSystemCanvasProps {
   readonly canPasteSystem?: boolean | undefined;
   readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onAuditionSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onSetPianoRollSystemScope?: ((systemIndex: number) => void) | undefined;
+  readonly onSelectPianoRollSystemNotes?: ((system: ScoreSystem) => void) | undefined;
+  readonly pianoRollSelectionScopeLabel?: string | undefined;
   readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
@@ -508,6 +517,9 @@ function ScoreSystemCanvas({
   layout,
   system,
   displayWidthPx,
+  pianoRollMeasureCapacity,
+  pianoRollMeasureMinimumWidthPx,
+  pianoRollMusicViewportWidthPx,
   melodyTimeline,
   measureItems,
   selectedStepId,
@@ -519,6 +531,8 @@ function ScoreSystemCanvas({
   onEditPerformance,
   onReorder,
   onOpenMelodyMenu,
+  onOpenMeasureMenu,
+  onDeleteMeasureFromButton,
   onFocusMatrix,
   onFillGapWithRest,
   onExtendFinalChord,
@@ -532,6 +546,9 @@ function ScoreSystemCanvas({
   canPasteSystem = false,
   onPlayFromSystem,
   onAuditionSystem,
+  onSetPianoRollSystemScope,
+  onSelectPianoRollSystemNotes,
+  pianoRollSelectionScopeLabel = "Progression",
   onToggleLoopSystem,
   onToggleMuteSystem,
   onToggleSoloSystem,
@@ -560,6 +577,20 @@ function ScoreSystemCanvas({
   renderSystemChordPanel,
   renderDurationResizeHandle,
 }: ScoreSystemCanvasProps) {
+  const hasPianoRollMeasureSlots =
+    pianoRollMeasureCapacity !== undefined &&
+    pianoRollMeasureMinimumWidthPx !== undefined &&
+    pianoRollMusicViewportWidthPx !== undefined;
+  const pianoRollSystemWidthPx = hasPianoRollMeasureSlots
+    ? Math.max(
+        pianoRollMusicViewportWidthPx,
+        pianoRollMeasureCapacity * pianoRollMeasureMinimumWidthPx,
+      )
+    : 0;
+  const systemHorizontallyScrollable = hasPianoRollMeasureSlots
+    ? pianoRollSystemWidthPx > pianoRollMusicViewportWidthPx + 0.5
+    : system.horizontallyScrollable;
+
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [localShowFingering, setLocalShowFingering] = useState(true);
   const effectiveShowFingering = showFingering ?? localShowFingering;
@@ -742,8 +773,7 @@ function ScoreSystemCanvas({
           );
           if (step && step.kind === "chord") {
             const chord = {
-              ...realizeChord(step.harmonicFunction, project.tonic),
-              variant: step.harmonicVariant,
+              ...realizeProgressionStepChord(step, project.tonic),
             };
             const bassPc = item.bassPitch?.pitchClassIdentity;
             const tabEntry = resolveGuitarTabEntry(chord, item.label, bassPc);
@@ -1083,7 +1113,7 @@ function ScoreSystemCanvas({
         data-testid="progression-score-system"
         data-system-index={system.index}
         data-measure-count={system.measures.length}
-        data-horizontally-scrollable={system.horizontallyScrollable ? "true" : undefined}
+        data-horizontally-scrollable={systemHorizontallyScrollable ? "true" : undefined}
         data-is-muted={isMuted ? "true" : undefined}
         data-is-solo={isSolo ? "true" : undefined}
         data-is-looping={isLooping ? "true" : undefined}
@@ -1093,6 +1123,40 @@ function ScoreSystemCanvas({
           className="score-system-header"
           data-testid="score-system-header"
           data-system-index={system.index}
+          tabIndex={project.presentation.progressionView === "piano-roll" ? 0 : undefined}
+          aria-label={
+            project.presentation.progressionView === "piano-roll"
+              ? `Set Ctrl+A selection scope to System ${system.index + 1}`
+              : undefined
+          }
+          aria-keyshortcuts={
+            project.presentation.progressionView === "piano-roll" ? "Enter Space" : undefined
+          }
+          onFocus={(event) => {
+            if (
+              project.presentation.progressionView === "piano-roll" &&
+              event.target === event.currentTarget
+            )
+              onSetPianoRollSystemScope?.(system.index);
+          }}
+          onClick={(event) => {
+            if (
+              project.presentation.progressionView === "piano-roll" &&
+              event.target === event.currentTarget
+            )
+              onSetPianoRollSystemScope?.(system.index);
+          }}
+          onKeyDown={(event) => {
+            if (
+              project.presentation.progressionView !== "piano-roll" ||
+              event.target !== event.currentTarget ||
+              (event.key !== "Enter" && event.key !== " ")
+            )
+              return;
+            event.preventDefault();
+            event.stopPropagation();
+            onSetPianoRollSystemScope?.(system.index);
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1107,12 +1171,110 @@ function ScoreSystemCanvas({
               type="button"
               data-testid={`score-system-audition-${system.index}`}
               aria-label={`Play System ${system.index + 1}`}
-              onClick={() => onAuditionSystem(system)}
+              onFocus={() => onSetPianoRollSystemScope?.(system.index)}
+              onClick={() => {
+                onSetPianoRollSystemScope?.(system.index);
+                onAuditionSystem(system);
+              }}
             >{`System ${system.index + 1}`}</button>
           ) : (
             <strong>{`System ${system.index + 1}`}</strong>
           )}
+          {project.presentation.progressionView === "piano-roll" && onSetPianoRollSystemScope ? (
+            <button
+              type="button"
+              className="piano-roll-system-scope-button"
+              data-testid={`piano-roll-system-scope-${system.index}`}
+              aria-label={`Set Ctrl+A scope to System ${system.index + 1}`}
+              onFocus={() => onSetPianoRollSystemScope(system.index)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSetPianoRollSystemScope(system.index);
+              }}
+            >
+              Scope
+            </button>
+          ) : null}
+          {project.presentation.progressionView === "piano-roll" &&
+          onSelectPianoRollSystemNotes ? (
+            <PianoRollSelectionAction
+              accessibleName={`Select effective Melody notes in System ${system.index + 1}`}
+              title={`Select Melody notes in System ${system.index + 1}`}
+              testId={`piano-roll-select-system-notes-${system.index}`}
+              selectionScopeLabel={pianoRollSelectionScopeLabel}
+              onSelect={() => onSelectPianoRollSystemNotes(system)}
+            >
+              Select
+            </PianoRollSelectionAction>
+          ) : null}
           <span>{`${system.measures.length} measure${system.measures.length === 1 ? "" : "s"}`}</span>
+          {project.presentation.progressionView === "staff" ||
+          project.presentation.progressionView === "tablature" ? (
+            <div
+              className="score-system-measure-menu-triggers"
+              role="group"
+              aria-label={`Measure commands in System ${system.index + 1}`}
+            >
+              {system.measures.map(({ measure }) => (
+                <div key={measure.measureIndex} className="score-system-measure-actions">
+                  <button
+                    type="button"
+                    className="score-system-measure-menu-trigger"
+                    data-measure-context-trigger
+                    data-measure-index={measure.measureIndex}
+                    aria-label={`Measure ${measure.number} commands`}
+                    aria-haspopup="menu"
+                    title={`Measure ${measure.number} commands`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+                        x: rect.left,
+                        y: rect.bottom,
+                      });
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey))
+                        return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
+                        x: rect.left,
+                        y: rect.bottom,
+                      });
+                    }}
+                  >
+                    Measure {measure.number} <span aria-hidden="true">⋯</span>
+                  </button>
+                  {onDeleteMeasureFromButton ? (
+                    <button
+                      type="button"
+                      className="measure-close-trigger"
+                      data-measure-close-trigger
+                      data-measure-index={measure.measureIndex}
+                      aria-label={`Delete Measure ${measure.number}`}
+                      title={`Delete Measure ${measure.number}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteMeasureFromButton(measure.measureIndex, event.currentTarget);
+                      }}
+                    >
+                      <Icon name="close" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
           {renderSystemChordPanel?.(system) ?? renderSystemNotePanel?.(system)}
           {isMuted ? (
             <span
@@ -1190,7 +1352,7 @@ function ScoreSystemCanvas({
               ) : null}
             </>
           ) : null}
-          {system.horizontallyScrollable ? <span>Dense measure scrolls locally</span> : null}
+          {systemHorizontallyScrollable ? <span>Dense measure scrolls locally</span> : null}
           {onDeleteSystem ? (
             <button
               type="button"
@@ -1219,7 +1381,7 @@ function ScoreSystemCanvas({
             className="score-system-scroll"
             style={{
               maxWidth: "100%",
-              overflowX: system.horizontallyScrollable ? "auto" : "hidden",
+              overflowX: systemHorizontallyScrollable ? "auto" : "hidden",
               overflowY: "hidden",
             }}
           >
@@ -1623,12 +1785,27 @@ function ScoreSystemCanvas({
               </div>
             ) : (
               <div
-                className="score-system-measures-row"
+                className={`score-system-measures-row${
+                  hasPianoRollMeasureSlots ? " piano-roll-system-measures-row" : ""
+                }`}
                 data-testid="score-system-measures-row"
                 data-system-index={system.index}
                 style={{
-                  width: system.horizontallyScrollable ? `${displayWidthPx}px` : "100%",
-                  minWidth: system.horizontallyScrollable ? `${displayWidthPx}px` : "100%",
+                  width: hasPianoRollMeasureSlots
+                    ? `${pianoRollSystemWidthPx}px`
+                    : system.horizontallyScrollable
+                      ? `${displayWidthPx}px`
+                      : "100%",
+                  minWidth: hasPianoRollMeasureSlots
+                    ? `${pianoRollSystemWidthPx}px`
+                    : system.horizontallyScrollable
+                      ? `${displayWidthPx}px`
+                      : "100%",
+                  ...(hasPianoRollMeasureSlots
+                    ? {
+                        gridTemplateColumns: `repeat(${pianoRollMeasureCapacity}, minmax(${pianoRollMeasureMinimumWidthPx}px, 1fr))`,
+                      }
+                    : {}),
                 }}
               >
                 {system.measures.map((sm) =>
@@ -1707,6 +1884,7 @@ export interface ScoreSystemViewProps {
   readonly layout: ProgressionMeasureLayout;
   readonly melodyTimeline: MelodyTimeline | null;
   readonly measuresPerSystem: Project["presentation"]["measuresPerSystem"];
+  readonly pianoRollMeasureMinimumWidthPx?: number | undefined;
   readonly selectedStepId: string | undefined;
   readonly rangeSelectedStepIds?: ReadonlySet<string> | undefined;
   readonly playingStepId: string | undefined;
@@ -1721,6 +1899,12 @@ export interface ScoreSystemViewProps {
     anchor: HTMLElement,
     position: MelodyMenuPosition,
   ) => void;
+  readonly onOpenMeasureMenu?: (
+    measureIndex: number,
+    anchor: HTMLElement,
+    position: { readonly x: number; readonly y: number },
+  ) => void;
+  readonly onDeleteMeasureFromButton?: (measureIndex: number, invoker: HTMLElement) => void;
   readonly onFocusMatrix?: (measureNumber: number) => void;
   readonly onFillGapWithRest?: () => void;
   readonly onExtendFinalChord?: () => void;
@@ -1733,6 +1917,9 @@ export interface ScoreSystemViewProps {
   readonly canPasteSystem?: boolean | undefined;
   readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onAuditionSystem?: ((system: ScoreSystem) => void) | undefined;
+  readonly onSetPianoRollSystemScope?: ((systemIndex: number) => void) | undefined;
+  readonly onSelectPianoRollSystemNotes?: ((system: ScoreSystem) => void) | undefined;
+  readonly pianoRollSelectionScopeLabel?: string | undefined;
   readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
@@ -1770,6 +1957,7 @@ export function ScoreSystemView({
   layout,
   melodyTimeline,
   measuresPerSystem,
+  pianoRollMeasureMinimumWidthPx,
   selectedStepId,
   rangeSelectedStepIds,
   playingStepId,
@@ -1780,6 +1968,8 @@ export function ScoreSystemView({
   onEditPerformance,
   onReorder,
   onOpenMelodyMenu,
+  onOpenMeasureMenu,
+  onDeleteMeasureFromButton,
   onFocusMatrix,
   onFillGapWithRest,
   onExtendFinalChord,
@@ -1792,6 +1982,9 @@ export function ScoreSystemView({
   canPasteSystem,
   onPlayFromSystem,
   onAuditionSystem,
+  onSetPianoRollSystemScope,
+  onSelectPianoRollSystemNotes,
+  pianoRollSelectionScopeLabel,
   onToggleLoopSystem,
   onToggleMuteSystem,
   onToggleSoloSystem,
@@ -1933,6 +2126,18 @@ export function ScoreSystemView({
                 layout={layout}
                 system={system}
                 displayWidthPx={displayWidthPx}
+                {...(renderSystemPitchScale
+                  ? {
+                      pianoRollMeasureCapacity: projection.maximumMeasuresPerSystem,
+                      pianoRollMeasureMinimumWidthPx: pianoRollMeasureMinimumWidthPx ?? 250,
+                      pianoRollMusicViewportWidthPx: Math.max(
+                        0,
+                        projection.availableWidthPx -
+                          PIANO_ROLL_PITCH_GUTTER_WIDTH_PX -
+                          SCORE_SYSTEM_VIEW_BORDER_WIDTH_PX,
+                      ),
+                    }
+                  : {})}
                 melodyTimeline={melodyTimeline}
                 measureItems={measureItems}
                 selectedStepId={selectedStepId}
@@ -1944,6 +2149,8 @@ export function ScoreSystemView({
                 onEditPerformance={onEditPerformance}
                 onReorder={onReorder}
                 {...(onOpenMelodyMenu ? { onOpenMelodyMenu } : {})}
+                {...(onOpenMeasureMenu ? { onOpenMeasureMenu } : {})}
+                {...(onDeleteMeasureFromButton ? { onDeleteMeasureFromButton } : {})}
                 {...(onFocusMatrix ? { onFocusMatrix } : {})}
                 {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
                 {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
@@ -1957,6 +2164,9 @@ export function ScoreSystemView({
                 canPasteSystem={canPasteSystem}
                 onPlayFromSystem={onPlayFromSystem}
                 onAuditionSystem={onAuditionSystem}
+                onSetPianoRollSystemScope={onSetPianoRollSystemScope}
+                onSelectPianoRollSystemNotes={onSelectPianoRollSystemNotes}
+                pianoRollSelectionScopeLabel={pianoRollSelectionScopeLabel}
                 onToggleLoopSystem={onToggleLoopSystem}
                 onToggleMuteSystem={onToggleMuteSystem}
                 onToggleSoloSystem={onToggleSoloSystem}

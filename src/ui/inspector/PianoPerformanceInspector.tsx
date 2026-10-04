@@ -32,7 +32,11 @@ import {
   musicalDynamicToVelocity,
   velocityToMusicalDynamic,
 } from "../../instruments/piano/dynamics";
-import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
+import {
+  realizeProgressionStepRealization,
+  realizeProgressionStepSourceRealization,
+} from "../../instruments/piano/profile";
+import { pitchToConcertFrame, pitchToSourceFrame } from "../../domain/progression/transposition";
 import { RegisterControl } from "./RegisterControl";
 import { ArticulationControl } from "./ArticulationControl";
 import { StepActions } from "../progression/StepActions";
@@ -243,6 +247,7 @@ export function PianoPerformanceInspector({
 
   // Realize current full chord step (upper voices + bass voice) within actual harmonic context
   const realization = realizeProgressionStepRealization(step, tonic, context);
+  const sourceRealization = realizeProgressionStepSourceRealization(step, tonic, context);
 
   const handleVoicingModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const mode = e.target.value as "auto" | "manual";
@@ -258,7 +263,9 @@ export function PianoPerformanceInspector({
 
   const handleBassChoiceChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const choice = e.target.value as BassChoice;
-    const defaultCustom = perf.bass.customPitch ?? exactPitch(36, { step: "C", alter: 0 }); // C2 (MIDI 36)
+    const defaultCustom =
+      perf.bass.customPitch ??
+      pitchToSourceFrame(exactPitch(36, { step: "C", alter: 0 }), step); // concert C2
     onPerformanceChange({
       bass: {
         ...perf.bass,
@@ -289,7 +296,7 @@ export function PianoPerformanceInspector({
     setCustomBassError(null);
     const pc = midiToPitchClass(rawMidi);
     const spelling = PC_TO_DEFAULT_SPELLING[pc] ?? { step: "C", alter: 0 };
-    const nextPitch = exactPitch(rawMidi, spelling);
+    const nextPitch = pitchToSourceFrame(exactPitch(rawMidi, spelling), step);
     onPerformanceChange({
       bass: {
         ...perf.bass,
@@ -315,10 +322,10 @@ export function PianoPerformanceInspector({
   const handleApplyPreset = (presetId: DynamicsPresetId) => {
     const overrides = applyDynamicsPreset(
       presetId,
-      realization.pitches,
+      sourceRealization.pitches,
       perf.masterVelocity,
       undefined,
-      realization.bassPitch,
+      sourceRealization.bassPitch,
     );
     onPerformanceChange({ perNoteVelocityOverrides: overrides });
   };
@@ -352,24 +359,28 @@ export function PianoPerformanceInspector({
 
   if (realization.bassPitch) {
     const b = realization.bassPitch;
+    const sourceBass = sourceRealization.bassPitch;
+    if (!sourceBass) throw new Error(`Missing source bass pitch for Step ${step.id}`);
     const alterStr = b.spelling.alter === 1 ? "#" : b.spelling.alter === -1 ? "b" : "";
     notesToDisplay.push({
-      noteKey: String(b.midiNumber),
+      noteKey: String(sourceBass.midiNumber),
       label: `Bass: ${b.spelling.step}${alterStr}${b.octave}`,
       role: "bass",
       pitch: b,
     });
   }
 
-  for (const p of realization.pitches) {
+  realization.pitches.forEach((p, index) => {
+    const sourcePitch = sourceRealization.pitches[index];
+    if (!sourcePitch) throw new Error(`Missing source upper pitch for Step ${step.id}`);
     const alterStr = p.spelling.alter === 1 ? "#" : p.spelling.alter === -1 ? "b" : "";
     notesToDisplay.push({
-      noteKey: String(p.midiNumber),
+      noteKey: String(sourcePitch.midiNumber),
       label: `${p.spelling.step}${alterStr}${p.octave}`,
       role: "upper",
       pitch: p,
     });
-  }
+  });
 
   const {
     order: sectionOrder,
@@ -831,19 +842,23 @@ export function PianoPerformanceInspector({
                       type="number"
                       min={PIANO_RANGE_MIN_MIDI}
                       max={PIANO_RANGE_MAX_MIDI}
-                      value={perf.bass.customPitch?.midiNumber ?? 36}
+                      value={
+                        perf.bass.customPitch
+                          ? pitchToConcertFrame(perf.bass.customPitch, step).midiNumber
+                          : 36
+                      }
                       onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
                       aria-label="Custom Bass MIDI Number"
                     />
                     {perf.bass.customPitch && (
                       <span className="custom-bass-readout">
-                        Pitch: {perf.bass.customPitch.spelling.step}
-                        {perf.bass.customPitch.spelling.alter === 1
+                        Pitch: {pitchToConcertFrame(perf.bass.customPitch, step).spelling.step}
+                        {pitchToConcertFrame(perf.bass.customPitch, step).spelling.alter === 1
                           ? "#"
-                          : perf.bass.customPitch.spelling.alter === -1
+                          : pitchToConcertFrame(perf.bass.customPitch, step).spelling.alter === -1
                             ? "b"
                             : ""}
-                        {perf.bass.customPitch.octave}
+                        {pitchToConcertFrame(perf.bass.customPitch, step).octave}
                       </span>
                     )}
                     {customBassError && (

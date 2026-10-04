@@ -15,6 +15,7 @@ import { resolveEffectiveMelodyInstrument } from "./instrumentCatalog";
 import { resolveEffectiveMelodyPhrase } from "./projection";
 import { snapshotAuthoredMelodyPhrase, snapshotChordMelody } from "./types";
 import { exactPitch, type ExactPitch } from "../harmony/pitch";
+import { pitchToConcertFrame, stepTranspositionSemitones } from "../progression/transposition";
 
 export interface EffectiveMelodyNote {
   readonly sourceStepId: string;
@@ -30,7 +31,7 @@ export interface EffectiveMelodyNote {
 }
 
 function applySavedMelodySpelling(pitch: ExactPitch, step: ProgressionStep): ExactPitch {
-  if (step.kind !== "chord") return pitch;
+  if (step.kind !== "chord" || stepTranspositionSemitones(step) !== 0) return pitch;
   const override =
     step.explicitSpellingOverrides?.[`upper:${pitch.midiNumber}`] ??
     step.explicitSpellingOverrides?.[String(pitch.midiNumber)];
@@ -87,8 +88,10 @@ export function createEffectiveMelodyTimeline(
         eventKey: note.id,
         eventIndex,
         eventCount: authored.notes.length,
-        pitch: note.pitch,
-        sourcePitchMidi: note.pitch.midiNumber,
+        pitch: pitchToConcertFrame(note.pitch, step),
+        sourcePitchMidi:
+          note.sourcePitchMidi ??
+          note.pitch.midiNumber + (note.pitch.transpositionCompensationSemitones ?? 0),
         onset: note.onset,
         duration: note.duration,
       }));
@@ -99,8 +102,10 @@ export function createEffectiveMelodyTimeline(
           eventKey: note.id,
           eventIndex,
           eventCount: chordMelody.phrase.notes.length,
-          pitch: note.pitch,
-          sourcePitchMidi: note.pitch.midiNumber,
+          pitch: pitchToConcertFrame(note.pitch, step),
+          sourcePitchMidi:
+            note.sourcePitchMidi ??
+            note.pitch.midiNumber + (note.pitch.transpositionCompensationSemitones ?? 0),
           onset: note.onset,
           duration: note.duration,
         }));
@@ -138,7 +143,7 @@ export function createEffectiveMelodyTimeline(
           eventIndex: event.index,
           eventCount: phrase.events.length,
           pitch: event.pitch,
-          sourcePitchMidi: event.sourcePitchMidi,
+          sourcePitchMidi: event.sourcePitchMidi - stepTranspositionSemitones(step),
           onset: event.startOffsetBeats,
           duration: event.durationBeats,
         }));
