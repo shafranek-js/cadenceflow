@@ -41,4 +41,9 @@ Root actually viewed all 12 own normal-scale selection captures: 640×360, 1280�
 
 HEAD remains f801562794b39ff3d039b56e0010829aff9a1b2b; index is empty. All tracked/untracked work is preserved. Protected chord-portable diff remains 62 additions/0 deletions. No stage, commit, push, deployment, cleanup, Actions change or ZIP occurred. This report is new; historical accepted group/MIDI reports remain unchanged. Physical MIDI and actual audio output, other browser engines and a full release suite remain unverified.
 
-The next sequential task is T213; T214 follows only after its independent acceptance.
+The next sequential task at the time of this acceptance was T213; T214 was to follow its acceptance.
+
+### Subsequent acceptance status — 2026-10-04
+
+T213 and T214 were both independently accepted on 2026-10-04; see their respective acceptance records.
+The remaining release gates are maintained in the [current release handoff](release-gate-handoff-2026-10-04.md).

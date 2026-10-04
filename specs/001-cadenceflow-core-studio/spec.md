@@ -1297,6 +1297,9 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   serialized in `MelodyEvent`.
 - **FR-247**: Chord-linked Melody supports a generated/authored union. Generated content retains its
   recipe; authored content stores stable note IDs, exact pitch, and Rational onset and duration.
+  Accepted Piano Roll editing can modify selected notes from generated Melody; the first committed
+  edit materializes the effective phrase atomically while retaining its recipe, and Undo restores
+  generated content.
 - **FR-248**: Composition UX 1.1 provides a label hierarchy and compact quick edit, direct duration
   resizing, range selection, a deterministic Alternatives tray, a Quick Chord/Command Palette, and a
   guided start.
@@ -1368,6 +1371,9 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - **FR-261**: Release acceptance MUST verify offline asset availability and notices, current and
   migrated project round-trips, print layout at A4 and representative long progressions, focused
   and full regression results, production build, and any unresolved licensing or test failures.
+  The current release-gate disposition is tracked in
+  [the 2026-10-04 release handoff](release-gate-handoff-2026-10-04.md); feature checkboxes alone do
+  not complete this gate.
 - **FR-262**: Every displayed Measure heading MUST expose the commands for that exact Measure by
   pointer context menu, ContextMenu/Shift+F10 and a discoverable accessible menu button. Deleting a
   Measure removes its authored time interval and Harmony, shifts later music earlier by that exact
@@ -1446,7 +1452,8 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - Practice curriculum and scored exercises.
 - Dedicated Analyze workspace.
 - Improvisation trainer/scoring.
-- Live MIDI capture/controller workflow.
+- Real-time MIDI recording/capture and configurable controller mappings. The FR-256 Web MIDI step
+  input workflow is already implemented and independently accepted; it is not real-time recording.
 - Full saved-progression catalog/library beyond project and Custom Preset persistence.
 - Larger genre/harmony-mode selector systems beyond the current Scales & Modes Explorer.
 - Additional tonal/modal systems beyond Major and Tonal Minor.
@@ -1458,7 +1465,6 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - Tempo maps/tempo automation inside progression.
 - Meter maps/time-signature changes inside progression.
 - Persistent cross-session Undo history / full project version history.
-- Manual piano-roll editing of individual generated melody notes.
 - Multiple independent Melody Tracks or arbitrary per-step melody layering beyond the single v1 track.
 - Mobile-first UI.
 - Cloud sync, accounts, collaboration, and sharing services.
@@ -1466,6 +1472,9 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
 - User-facing import/management of arbitrary external SF2/SF3/SFZ sound banks; the v1 audio architecture
   is prepared for alternate providers, but the launch experience uses the bundled HQ Piano, Guitar, and
   FluidR3_GM-derived local providers.
+
+The future list records scope only; each implementation still requires its own explicit authorization
+and task plan.
 
 ### Key Entities
 

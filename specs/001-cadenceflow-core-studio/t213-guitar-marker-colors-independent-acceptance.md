@@ -13,3 +13,7 @@ Root verification on the final checkout:
 Root reran T213/T214 with output retention (6/6 passed), then actually viewed progression screenshots at 640×360, 1280×720 and 1920×1080 in both themes, plus the narrow fully visible legend scroll state. The ordinary narrow vertical capture requires scrolling to see the entire legend; the supplemental state demonstrates access. Root retained images and diagnostics under `C:/Users/pavel/.codex/visualizations/2026/10/02/01a0fd4f-d564-7612-8b29-bc59c92804cc/retained-review/`. Developer bottom-of-page captures alone were insufficient for this review.
 
 This is feature acceptance, not full-release acceptance. The T214 handoff records an obsolete window-scroll assertion in the protected portable chord suite and an unchanged T201 duration-adapter assertion; neither is represented as passing here. The shared dirty checkout remains preserved, index empty, protected portable chord diff 62 additions/0 deletions. No commit, push, deployment or cleanup.
+
+### Follow-up status — 2026-10-04
+
+The protected portable autoscroll assertion was subsequently updated to measure `.studio-grid.scrollTop`; its full 27-test file passed on repeat. The T201 endpoint conflict remains unresolved. See the [current release handoff](release-gate-handoff-2026-10-04.md) for fresh results and the single remaining-gates list. This update does not extend this feature acceptance into full-release acceptance.

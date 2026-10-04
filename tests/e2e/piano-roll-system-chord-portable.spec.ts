@@ -1493,6 +1493,68 @@ test("left edge can shrink into a leading-measure Rest and expand back to the ba
   await expectUndoRedoBytes(page, beforeReExpansion, restoredText);
 });
 
+test("restores a second-measure chord's left edge in a two-step progression", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openStudio(page);
+  const fixture = withFirstMeasureRest(
+    createPianoRollSystemChordFixture("two-measure-leading-rest-resize"),
+  );
+  const [firstMeasureRest, secondMeasureChord] = fixture.progression.steps;
+  if (
+    !firstMeasureRest ||
+    firstMeasureRest.kind !== "rest" ||
+    !secondMeasureChord ||
+    secondMeasureChord.kind !== "chord"
+  )
+    throw new Error("The fixture needs a leading Rest followed by a chord");
+  const { loopRegion: _loopRegion, ...progressionWithoutLoop } = fixture.progression;
+  const { temporaryBranch: _temporaryBranch, ...fixtureWithoutBranch } = fixture;
+  const twoMeasureProject: Project = Object.freeze({
+    ...fixtureWithoutBranch,
+    progression: Object.freeze({
+      ...progressionWithoutLoop,
+      steps: Object.freeze([firstMeasureRest, secondMeasureChord]),
+      selectedStepId: secondMeasureChord.id,
+      sections: Object.freeze([
+        Object.freeze({ id: "opening", name: "Opening", startStepId: firstMeasureRest.id }),
+      ]),
+    }),
+  });
+  await importProject(page, twoMeasureProject);
+  await page.getByLabel("Snap resolution").selectOption("1/4");
+  const before = await exportProjectText(page);
+  const initial = decodePortableProject(before);
+  expect(initial.progression.steps).toHaveLength(2);
+  expect(step(initial, firstMeasureRest.id).duration.beats).toEqual(rational(4));
+  expect(stepStart(initial, secondMeasureChord.id)).toEqual(rational(4));
+  expect(step(initial, secondMeasureChord.id).duration.beats).toEqual(rational(4));
+
+  await page.locator(`.piano-roll-chord[data-source-step-id="${secondMeasureChord.id}"]`).click();
+  const leftHandle = page.locator(
+    `.piano-roll-chord-boundary-handle[data-boundary-step-id="${secondMeasureChord.id}"][data-boundary-edge="left"]`,
+  );
+  await expect(leftHandle).toBeVisible();
+  expect(await dragBoundaryToBeat(page, leftHandle, 2, 5)).toBeCloseTo(5, 6);
+  const shrunkText = await exportProjectText(page);
+  const shrunk = decodePortableProject(shrunkText);
+  expect(step(shrunk, firstMeasureRest.id).duration.beats).toEqual(rational(5));
+  expect(step(shrunk, secondMeasureChord.id).duration.beats).toEqual(rational(3));
+  expect(stepStart(shrunk, secondMeasureChord.id)).toEqual(rational(5));
+  expect(sumDuration(shrunk)).toEqual(rational(8));
+  await expectUndoRedoBytes(page, before, shrunkText);
+
+  await expect(leftHandle).toBeVisible();
+  expect(Number(await leftHandle.getAttribute("aria-valuemin"))).toBeCloseTo(4, 6);
+  expect(await dragBoundaryToBeat(page, leftHandle, 2, 4)).toBeCloseTo(4, 6);
+  const restoredText = await exportProjectText(page);
+  const restored = decodePortableProject(restoredText);
+  expect(step(restored, firstMeasureRest.id).duration.beats).toEqual(rational(4));
+  expect(step(restored, secondMeasureChord.id).duration.beats).toEqual(rational(4));
+  expect(stepStart(restored, secondMeasureChord.id)).toEqual(rational(4));
+  expect(sumDuration(restored)).toEqual(rational(8));
+  await expectUndoRedoBytes(page, shrunkText, restoredText);
+});
+
 test("first and final chord edges create leading and trailing Rest gaps", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openStudio(page);
@@ -1949,16 +2011,47 @@ test("boundary drag autoscrolls across Systems and pointer cancellation preserve
   const box = await boundary.boundingBox();
   if (!box) throw new Error("Boundary handle has no visible bounds");
   const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  const startingScroll = await page.evaluate(() => window.scrollY);
+  const scrollMetrics = await page.evaluate(() => {
+    const studio = document.querySelector<HTMLElement>(".studio-grid");
+    const header = document.querySelector<HTMLElement>(".app-header");
+    const footer = document.querySelector<HTMLElement>(".app-status-bar");
+    if (!studio || !header || !footer) {
+      throw new Error("The Studio scroll region, app header, and status bar must be present");
+    }
+    const bounds = studio.getBoundingClientRect();
+    return {
+      scrollTop: studio.scrollTop,
+      scrollHeight: studio.scrollHeight,
+      clientHeight: studio.clientHeight,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      headerBottom: header.getBoundingClientRect().bottom,
+      footerTop: footer.getBoundingClientRect().top,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  const studioScroller = page.locator(".studio-grid");
+  const scrollTargetY = Math.min(
+    scrollMetrics.bottom - 8,
+    scrollMetrics.footerTop - 8,
+    scrollMetrics.viewportHeight - 8,
+  );
+  expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
+  expect(start.y).toBeGreaterThan(scrollMetrics.headerBottom);
+  expect(start.y).toBeLessThan(scrollMetrics.bottom);
+  expect(scrollTargetY).toBeGreaterThan(scrollMetrics.bottom - 28);
+  expect(scrollTargetY).toBeLessThan(scrollMetrics.footerTop);
+  const startingScroll = scrollMetrics.scrollTop;
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   for (let index = 0; index < 8; index += 1) {
-    await page.mouse.move(start.x, page.viewportSize()!.height - 8);
+    await page.mouse.move(start.x, scrollTargetY);
     await page.waitForTimeout(40);
   }
   await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
-  const endingScroll = await page.evaluate(() => window.scrollY);
-  expect(endingScroll).toBeGreaterThan(startingScroll);
+  await expect
+    .poll(() => studioScroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(startingScroll);
   await boundary.evaluate((element) =>
     element.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerId: 1 })),
   );

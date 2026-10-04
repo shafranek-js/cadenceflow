@@ -65,9 +65,13 @@ Handoff includes actual baseline/delta, architecture/provenance, changed files, 
 - [x] Prerequisite Batch 3 independently accepted 2026-10-01.
 - [x] System note panel implementation and scoped developer handoff complete 2026-10-02. The prior independent review withheld acceptance because Rest-owner and simultaneous polyphony data were not asserted through portable exports; this follow-up adds those assertions and fresh evidence.
 - [x] System note panel independently accepted 2026-10-02 after fresh build, 6 focused unit files/37 tests, NOTE Chromium 3/3 and preserved direct-edit/keyboard-create Chromium 2/2; scoped formatting/diff checks passed, ESLint 0 errors/9 existing Hook warnings. Independent review checked runtime-decoded portable owner-collision/Rest/polyphony/history assertions and actual normal-scale 640/1280/1920 viewport captures in both grids/global themes. Full release regression was not run.
-- [ ] Later separate System chord-panel batch may start only after the preceding acceptance.
+- [x] Later System CHORD panel separately authorized and independently accepted 2026-10-02; see [its plan and acceptance record](piano-roll-system-chord-panel-plan.md).
+- [x] The separately approved Staff/Guitar display-fix plan was independently accepted 2026-10-02; see [the Staff/Guitar plan](staff-guitar-display-fix-plan.md).
+- [ ] Full release regression remains open; see [the current release handoff](release-gate-handoff-2026-10-04.md).
 
 ### Developer handoff evidence (2026-10-02)
+
+The dated handoff below records the implementation state at that time. Its pending acceptance statements are superseded by the accepted statuses above; the original verification evidence is retained.
 
 #### Baseline and implementation
 

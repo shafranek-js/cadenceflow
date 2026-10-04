@@ -4,6 +4,8 @@
 
 Batch 3 and the separate System NOTE panel are independently accepted. Implement this CHORD batch in the same developer thread, then await independent acceptance before starting the separately approved Staff/Guitar display fix. Keep the monitor active until that final Staff/Guitar acceptance. Preserve all unrelated tracked/untracked dirty work and the accepted Piano Roll behavior. No duplicate/parallel implementation, full suite, staging, commit, push, deploy, adjacent tasks or per-System voice leading.
 
+Current status update (2026-10-04): NOTE and CHORD acceptance and the separately approved Staff/Guitar acceptance are complete. Their scoped acceptance does not close the full release gate; see [the current release handoff](release-gate-handoff-2026-10-04.md).
+
 This combined plan includes the latest direct user amendments. Contextual panels fit without ANY panel/header scrolling, superseding earlier nowrap/internal-scroll requirements. Shared-boundary drag transfers duration between adjacent Steps, superseding earlier ripple drag. Split and Tie are authorized, superseding their earlier exclusion. Duration presets retain ripple behavior distinct from shared-boundary drag. Removing Harmony means Rest at unchanged duration, never deleting a Step or measure.
 
 ## Contextual controls and selection
@@ -66,12 +68,17 @@ Handoff must provide actual baseline/delta/architecture/provenance, requirement�
 
 The user asked to think about adding empty measures. Proposed separate command: add one current-meter exact-duration Rest with empty authored Melody, existing command infrastructure, one Undo. This is a concrete proposal for the user; implementation is not authorized in this batch.
 
+Status update (2026-10-04): Measure insertion/close and Duplicate Measure were later separately authorized and independently accepted; see [Measure insertion acceptance](measure-insert-after-and-close-independent-acceptance.md) and [Duplicate Measure acceptance](duplicate-measure-independent-acceptance.md). The proposal above is retained as historical context, not current authorization.
+
 ## Status
 
 - [x] Batch 3 and System NOTE independently accepted.
 - [x] CHORD implementation and developer handoff.
 - [x] Independent CHORD acceptance.
 - [x] Separate Staff/Guitar batch dispatched only after CHORD acceptance.
+- [x] Separate Staff/Guitar batch independently accepted 2026-10-02; see [its acceptance record](staff-guitar-display-fix-plan.md).
+- [x] Measure insertion/close and Duplicate Measure have separate scoped acceptance records; see links above.
+- [ ] Full release regression remains open; see [the current release handoff](release-gate-handoff-2026-10-04.md).
 
 ## Developer handoff — 2026-10-02
 
@@ -110,5 +117,7 @@ The System NOTE/CHORD controls render as inline children of the existing `score-
 - Visual review — inspected normal-scale screenshot output: 640×360 CHORD controls+Harmony and separately scrolled actual-note/grid screenshots for both themes and both pitch grids; representative 1280×720 and 1920×1080 CHORD/NOTE/hidden states; actual System continuation and active-playhead captures. At 1920×1080 the screenshot shows four measures on System 1 with its CHORD controls on the same header row. The 640×360 note captures preserve the real grid row height and use ordinary scrolling, with no CSS zoom.
 
 ### Handoff boundary
+
+The following boundary statement records the 2026-10-02 developer handoff state and is superseded by the independent acceptance documented above.
 
 This is a developer handoff, not independent CHORD acceptance. The full repository suite and Firefox were not run. The independent CHORD acceptance box remains unchecked; the separately approved Staff/Guitar batch remains undispatched until that acceptance. Other dirty files were preserved, and no staging, commit, push, deploy, or adjacent batch work was performed.
