@@ -78,7 +78,7 @@ function duplicateFixture(options: {
     presentation: Object.freeze({
       ...project.presentation,
       theme: options.theme ?? "light",
-      progressionView: options.view ?? "piano",
+      progressionView: options.view ?? "tablature",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -188,7 +188,7 @@ test("keyboard context-menu activation duplicates the focused Measure and return
   const expected = planMeasureDuplication(project, 1);
   if ("reason" in expected) throw new Error(expected.reason);
   await openStudio(page, project);
-  const header = page.locator(".progression-measure-header").nth(1);
+  const header = page.locator("[data-measure-context-trigger][data-measure-index]").nth(1);
   await header.focus();
   await page.keyboard.press("Shift+F10");
   const menu = page.getByRole("menu", { name: "Measure 2 commands" });
@@ -201,12 +201,12 @@ test("keyboard context-menu activation duplicates the focused Measure and return
   expect((await exportPortableProject(page)).progression).toEqual(expected.progression);
 });
 
-test("the shared menu exposes duplication in Harmonic, Piano, Guitar, Tablature, Staff, and Piano Roll", async ({
+test("the shared menu exposes duplication in Tablature, Staff, and Piano Roll", async ({
   page,
 }) => {
   const project = duplicateFixture({ id: "duplicate-all-views" });
   await openStudio(page, project);
-  for (const view of ["piano", "guitar", "tablature", "staff", "piano-roll"] as const) {
+  for (const view of ["tablature", "staff", "piano-roll"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     const trigger = page.locator('[data-measure-context-trigger][data-measure-index="1"]');
     await expect(trigger).toBeVisible();

@@ -9,7 +9,7 @@ import {
 } from "../../src/persistence/portableProject";
 import { createPianoRollSystemChordFixture } from "../fixtures/piano-roll-system-chord.fixture";
 
-const VIEWS = ["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"] as const;
+const VIEWS = ["staff", "tablature", "piano-roll"] as const;
 const SCREENSHOT_DIRECTORY = join(
   process.cwd(),
   "artifacts",

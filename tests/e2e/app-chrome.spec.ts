@@ -38,8 +38,8 @@ test.describe("Application chrome", () => {
       .click({ modifiers: ["Control"] });
     await page.getByTestId("view-menu-toggle").click();
     const reopenedViewMenu = page.getByRole("menu", { name: "View menu" });
-    await reopenedViewMenu.getByTestId("progression-card-view-piano").click();
-    await expect(page.getByLabel("Progression Card View")).toHaveValue("piano");
+    await reopenedViewMenu.getByTestId("progression-card-view-tablature").click();
+    await expect(page.getByLabel("Progression Card View")).toHaveValue("tablature");
 
     await page.getByRole("button", { name: "Project", exact: true }).click();
     const projectMenu = page.getByRole("menu", { name: "Project actions" });

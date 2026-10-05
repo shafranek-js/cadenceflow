@@ -12,9 +12,7 @@ const MATRIX_CARD_VIEWS: readonly { id: CardViewId; label: string }[] = [
 ];
 
 const PROGRESSION_VIEWS: readonly { id: ProgressionView; label: string }[] = [
-  { id: "piano", label: "Piano" },
   { id: "staff", label: "Staff" },
-  { id: "guitar", label: "Guitar" },
   { id: "tablature", label: "Tablature" },
   { id: "piano-roll", label: "Piano Roll" },
 ];

@@ -199,7 +199,7 @@ test.describe("US10 Batch 4 — global UI system", () => {
   }, testInfo) => {
     await waitForStudio(page);
     await addSteps(page, 3);
-    await page.getByLabel("Progression Card View").selectOption("piano");
+    await page.getByLabel("Progression Card View").selectOption("tablature");
     await expect(page.getByLabel("Note color mode")).toBeVisible();
     const measurements: Array<Record<string, unknown>> = [];
     const theme = page.getByRole("group", { name: "Theme" });

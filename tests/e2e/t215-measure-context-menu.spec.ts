@@ -33,7 +33,7 @@ function createMeasureFixture(options: {
     presentation: Object.freeze({
       ...source.presentation,
       theme: options.theme ?? "dark",
-      progressionView: options.view ?? "piano",
+      progressionView: options.view ?? "tablature",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -65,7 +65,7 @@ function createActiveBranchFixture(theme: "dark" | "light" = "dark"): Project {
     presentation: Object.freeze({
       ...source.presentation,
       theme,
-      progressionView: "piano" as const,
+      progressionView: "tablature" as const,
       measuresPerSystem: 2,
     }),
   });
@@ -179,7 +179,7 @@ async function openStudio(page: Page, project: Project): Promise<void> {
     mimeType: "application/json",
     buffer: Buffer.from(encodePortableProject(project), "utf8"),
   });
-  await expect(page.getByTestId("progression-view-btn-piano")).toBeVisible();
+  await expect(page.getByTestId("progression-view-btn-tablature")).toBeVisible();
   await expect(
     page.getByTestId(`progression-view-btn-${project.presentation.progressionView}`),
   ).toHaveAttribute("aria-pressed", "true");
@@ -228,7 +228,9 @@ test("measure header actions target the displayed Measure and preserve one-step 
   page,
 }) => {
   await openStudio(page, createMeasureFixture({ id: "t215-target-and-history" }));
-  const secondMeasureHeader = page.locator(".progression-measure-header").nth(1);
+  const secondMeasureHeader = page
+    .locator("[data-measure-context-trigger][data-measure-index]")
+    .nth(1);
 
   await secondMeasureHeader.click({ button: "right" });
   const menu = page.getByRole("menu", { name: "Measure 2 commands" });
@@ -249,16 +251,13 @@ test("measure header actions target the displayed Measure and preserve one-step 
   );
   await secondMeasureTrigger.click();
   await expect(menu).toBeVisible();
-  await page.getByTestId("progression-view-btn-piano").click();
+  await page.getByTestId("progression-view-btn-staff").click();
   await expect(menu).toHaveCount(0);
   await expect(secondMeasureTrigger).toBeFocused();
 
   await openMeasureMenu(page, 1);
   await menu.getByRole("menuitem", { name: "Loop Measure 2" }).click();
-  const stepTwo = page.locator(
-    '[data-progression-step-drag][data-step-id="step-2"] [data-testid="progression-step"]',
-  );
-  await expect(stepTwo).toHaveAttribute("data-in-loop", "true");
+  await expect(page.getByLabel("Loop start step").first()).toHaveValue("step-2");
 
   await openMeasureMenu(page, 1);
   await menu.getByRole("menuitem", { name: "Delete Measure 2" }).click();
@@ -269,18 +268,15 @@ test("measure header actions target the displayed Measure and preserve one-step 
   await expect(page.locator('[data-progression-step-select][data-step-id="step-2"]')).toHaveCount(
     0,
   );
-  const stepThreeRest = page.locator(
-    '[data-progression-step-drag][data-step-id="step-3"] .progression-rest-card',
-  );
-  await expect(stepThreeRest).toHaveAttribute("data-in-loop", "true");
+  await expect(page.getByLabel("Loop start step").first()).toHaveValue("step-3");
   expect(await historyActionEnabled(page, "Undo")).toBe(true);
 
   await historyAction(page, "Undo");
   await expect(page.locator("[data-measure-context-trigger]")).toHaveCount(5);
-  await expect(stepTwo).toHaveAttribute("data-in-loop", "true");
+  await expect(page.getByLabel("Loop start step").first()).toHaveValue("step-2");
   await historyAction(page, "Redo");
   await expect(page.locator("[data-measure-context-trigger]")).toHaveCount(4);
-  await expect(stepThreeRest).toHaveAttribute("data-in-loop", "true");
+  await expect(page.getByLabel("Loop start step").first()).toHaveValue("step-3");
 });
 
 test("measure menu is available from Harmonic, Piano, Guitar, Piano Roll, Staff, and Tablature views", async ({
@@ -288,7 +284,7 @@ test("measure menu is available from Harmonic, Piano, Guitar, Piano Roll, Staff,
 }) => {
   await openStudio(page, createMeasureFixture({ id: "t215-views" }));
 
-  for (const view of ["piano", "guitar", "piano-roll", "staff", "tablature"] as const) {
+  for (const view of ["piano-roll", "staff", "tablature"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     const trigger = page.locator('[data-measure-context-trigger][data-measure-index="1"]');
     await expect(trigger).toBeVisible();
@@ -297,7 +293,10 @@ test("measure menu is available from Harmonic, Piano, Guitar, Piano Roll, Staff,
     } else if (view === "staff" || view === "tablature") {
       await trigger.click({ button: "right" });
     } else {
-      await page.locator(".progression-measure-header").nth(1).click({ button: "right" });
+      await page
+        .locator("[data-measure-context-trigger][data-measure-index]")
+        .nth(1)
+        .click({ button: "right" });
     }
     const menu = page.getByRole("menu", { name: "Measure 2 commands" });
     await expect(menu).toBeVisible();

@@ -5429,7 +5429,7 @@ export function App() {
                 onChangeView={changeProgressionView}
                 selectAriaLabel="Progression Card View"
                 testIdPrefix="progression-view"
-                availableViews={["piano", "staff", "guitar", "tablature", "piano-roll"]}
+                availableViews={["staff", "tablature", "piano-roll"]}
               />
               <LabelHierarchyControl value={labelHierarchyMode} onChange={setLabelHierarchyMode} />
             </div>

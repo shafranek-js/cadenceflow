@@ -1,3 +1,4 @@
+import { realizeProgressionStepRealization } from "../../src/instruments/piano/profile";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import type { Project } from "../../src/domain/project/project";
@@ -418,6 +419,24 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
         .locator(".piano-roll-card-content")
         .evaluate((element) => getComputedStyle(element).transform);
       expect(shortScale).not.toBe("none");
+      await expect
+        .poll(() =>
+          page.locator(".score-system-measures-row").evaluateAll((systems) =>
+            systems.every((system) =>
+              ["piano", "guitar"].every((kind) => {
+                const rows = Array.from(
+                  system.querySelectorAll(`[data-testid="piano-roll-${kind}-cards"]`),
+                ).map((row) => row.getBoundingClientRect());
+                return rows.every(
+                  (row) =>
+                    Math.abs(row.top - rows[0]!.top) < 1 &&
+                    Math.abs(row.bottom - rows[0]!.bottom) < 1,
+                );
+              }),
+            ),
+          ),
+        )
+        .toBe(true);
       await page.screenshot({
         path: `artifacts/validation/piano-roll-chord-cards/${viewport.width}x${viewport.height}-${theme.toLowerCase()}.png`,
       });
@@ -442,7 +461,7 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
   await expect(page.locator(".piano-roll-instrument-card")).toHaveCount(0);
 });
 
-test("embedded chord cards match Piano and Guitar views for inversion and transposition", async ({
+test("embedded chord cards retain inversion and transposition while Matrix instrument views remain available", async ({
   page,
 }) => {
   await openStudio(page);
@@ -471,22 +490,24 @@ test("embedded chord cards match Piano and Guitar views for inversion and transp
   const guitar = page.locator(".piano-roll-card-row .mini-guitar-card-visual").first();
   const frets = await guitar.getAttribute("data-frets");
   const symbol = await guitar.getAttribute("data-chord-symbol");
-  await page.getByTestId("progression-view-btn-piano").click();
-  expect(
-    await page
-      .locator(".progression-step-card")
-      .first()
-      .locator('.mini-key[data-active="true"]')
-      .evaluateAll((keys) => keys.map((key) => key.getAttribute("data-midi"))),
-  ).toEqual(pianoSnapshot);
-  await page.getByTestId("progression-view-btn-guitar").click();
-  const standardGuitar = page.locator(".progression-step-card .mini-guitar-card-visual").first();
-  await expect(standardGuitar).toHaveAttribute("data-frets", frets!);
-  await expect(standardGuitar).toHaveAttribute("data-chord-symbol", symbol!);
-  await page.getByTestId("progression-view-btn-piano-roll").click();
-  await expect(
-    page.getByRole("button", { name: "Show piano", exact: true }).first(),
-  ).toHaveAttribute("aria-pressed", "true");
+  expect(pianoSnapshot.sort((a, b) => Number(a) - Number(b))).toEqual(
+    realizeProgressionStepRealization(step, fixture.tonic)
+      .pitches.concat(
+        realizeProgressionStepRealization(step, fixture.tonic).bassPitch
+          ? [realizeProgressionStepRealization(step, fixture.tonic).bassPitch!]
+          : [],
+      )
+      .map((pitch) => String(pitch.midiNumber))
+      .sort((a, b) => Number(a) - Number(b)),
+  );
+  expect(frets).toBeTruthy();
+  expect(symbol).toContain("/");
+  await page.getByTestId("view-menu-toggle").click();
+  await page.getByTestId("matrix-card-view-guitar").click();
+  await expect(page.locator(".matrix-panel .mini-guitar-card-visual").first()).toBeVisible();
+  await page.getByTestId("view-menu-toggle").click();
+  await page.getByTestId("matrix-card-view-piano").click();
+  await expect(page.locator(".matrix-panel .mini-piano-card-visual").first()).toBeVisible();
 });
 
 test("Piano Roll chord controls stay on the System row and edit through undoable actions", async ({
@@ -494,7 +515,7 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
 }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await openStudio(page);
-  await page.getByTestId("progression-view-btn-piano").click();
+  await page.getByTestId("progression-view-btn-tablature").click();
   for (const functionId of ["I", "V", "vi", "IV"]) await addChord(page, functionId);
   // Put two contiguous chords in one Measure so ArrowRight has a valid shared-boundary preview.
   const progressionSteps = page.locator("[data-progression-step-select]");

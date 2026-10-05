@@ -1705,6 +1705,7 @@ button.piano-roll-note > span {
   position: relative;
   display: flex;
   min-height: 42px;
+  height: var(--piano-roll-harmony-row-height, auto);
   border-top: 3px solid var(--score-border);
   background: var(--score-paper);
 }
@@ -2189,12 +2190,20 @@ button.piano-roll-note > span {
   width: 100%;
   background: var(--score-paper);
 }
+.piano-roll-card-row[data-testid="piano-roll-piano-cards"] {
+  min-height: var(--piano-roll-piano-row-height, 0px);
+}
+.piano-roll-card-row[data-testid="piano-roll-guitar-cards"] {
+  min-height: var(--piano-roll-guitar-row-height, 0px);
+}
 .piano-roll-instrument-card,
 .piano-roll-card-empty {
   min-width: 0;
   border: 1px solid var(--score-rule);
 }
 .piano-roll-instrument-card {
+  display: flex;
+  align-items: flex-start;
   padding: 4px 0;
   overflow: hidden;
   border-radius: 0;
@@ -2247,6 +2256,10 @@ button.piano-roll-note > span {
 }
 .score-system .piano-roll-card-content .mini-piano-card-visual {
   width: 232px;
+}
+.piano-roll-card-content .mini-piano-chord-name,
+.piano-roll-card-content .mini-guitar-chord-name {
+  display: none;
 }
 .piano-roll-chord.is-hookpad-palette.is-rest,
 .piano-roll-chord.is-hookpad-palette.is-gap {

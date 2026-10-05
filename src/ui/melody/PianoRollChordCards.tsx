@@ -13,7 +13,40 @@ import type { LabelHierarchyMode } from "../progression/labelHierarchy";
 
 import type { ChordCardVisibility } from "./chordCardPreferences";
 
-function ScaledCard({ children }: { readonly children: ReactNode }) {
+const systemCardHeights = new WeakMap<
+  HTMLElement,
+  Map<HTMLElement, { kind: string; height: number }>
+>();
+
+function updateSystemRowHeight(system: HTMLElement, kind: string) {
+  const cards = systemCardHeights.get(system);
+  const height = Math.max(
+    0,
+    ...Array.from(cards?.values() ?? [])
+      .filter((card) => card.kind === kind)
+      .map((card) => card.height),
+  );
+  system.style.setProperty(`--piano-roll-${kind}-row-height`, `${Math.ceil(height) + 10}px`);
+  // Continuation arrows and transposition badges also change the harmony strip's
+  // intrinsic height. Keep that preceding row aligned before placing the cards.
+  const harmonyHeight = Math.max(
+    42,
+    ...Array.from(system.querySelectorAll<HTMLElement>(".piano-roll-chord")).map((chord) => {
+      const style = getComputedStyle(chord);
+      const children = Array.from(chord.children);
+      return (
+        children.reduce((total, child) => total + child.getBoundingClientRect().height, 0) +
+        Math.max(0, children.length - 1) * (parseFloat(style.rowGap) || 0) +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom) +
+        3
+      );
+    }),
+  );
+  system.style.setProperty("--piano-roll-harmony-row-height", `${Math.ceil(harmonyHeight)}px`);
+}
+
+function ScaledCard({ children, kind }: { readonly children: ReactNode; readonly kind: string }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ scale: 1, height: 0 });
@@ -21,16 +54,29 @@ function ScaledCard({ children }: { readonly children: ReactNode }) {
     const host = outer.current;
     const content = inner.current;
     if (!host || !content) return;
+    const system = host.closest<HTMLElement>(".score-system-measures-row");
+    if (system && !systemCardHeights.has(system)) systemCardHeights.set(system, new Map());
     const update = () => {
       const scale = Math.min(1, host.clientWidth / content.offsetWidth);
-      setSize({ scale, height: content.offsetHeight * scale });
+      const height = content.offsetHeight * scale;
+      setSize({ scale, height });
+      if (system) {
+        systemCardHeights.get(system)!.set(host, { kind, height });
+        updateSystemRowHeight(system, kind);
+      }
     };
     const observer = new ResizeObserver(update);
     observer.observe(host);
     observer.observe(content);
     update();
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      observer.disconnect();
+      if (system) {
+        systemCardHeights.get(system)?.delete(host);
+        updateSystemRowHeight(system, kind);
+      }
+    };
+  }, [kind]);
   return (
     <div ref={outer} className="piano-roll-card-scale" style={{ height: size.height }}>
       <div
@@ -113,7 +159,7 @@ export function PianoRollChordCards({
                     onSelect(step.id, event.shiftKey);
                   }}
                 >
-                  <ScaledCard>
+                  <ScaledCard kind={kind}>
                     {kind === "piano" ? (
                       <PianoCardView
                         chordPitches={realization.pitches}

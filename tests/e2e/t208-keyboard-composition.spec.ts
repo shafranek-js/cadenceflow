@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { decodePortableProject } from "../../src/persistence/portableProject";
 
 async function openMelodyMenu(page: import("@playwright/test").Page) {
-  await page.locator("[data-progression-step-select]").first().click({ button: "right" });
+  await page
+    .locator("[data-progression-step-select], .piano-roll-chord")
+    .first()
+    .click({ button: "right" });
   return page.getByRole("menu", { name: /Melody actions/ });
 }
 
@@ -18,6 +23,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
 }) => {
   test.setTimeout(90_000);
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("progression-view-btn-tablature").click();
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
   await page
     .getByTestId("chord-card-I")
@@ -38,18 +44,19 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
   await expect(dialog).toHaveCount(0);
 
-  for (const view of ["piano", "staff"] as const) {
+  for (const view of ["tablature", "staff"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     const viewMenu = await openMelodyMenu(page);
     await viewMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
     const viewDialog = page.getByRole("dialog", { name: "Edit Melody" });
     await expect(viewDialog).toBeVisible();
+    await viewDialog.getByRole("button", { name: "Close melody dialog" }).focus();
     await page.keyboard.press("Escape");
     await expect(viewDialog).toHaveCount(0);
     await expect(viewMenu).toHaveCount(0);
   }
 
-  await page.getByTestId("progression-view-btn-piano").click();
+  await page.getByTestId("progression-view-btn-piano-roll").click();
   const editMenu = await openMelodyMenu(page);
   await editMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
   dialog = page.getByRole("dialog", { name: "Edit Melody" });
@@ -82,15 +89,21 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   await expect(dialog.locator("[data-authored-note-id]")).toHaveCount(2);
   await page.keyboard.press("Enter");
   await expect(dialog).toBeVisible();
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(2);
+  await expect(page.locator("button.piano-roll-note, button.melody-staff-note")).toHaveCount(2);
 
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("E4");
+  await expect(
+    page.locator("button.piano-roll-note, button.melody-staff-note").first(),
+  ).toHaveAttribute("aria-label", /E4/);
   await runEditAction(page, "Undo");
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("C4");
+  await expect(
+    page.locator("button.piano-roll-note, button.melody-staff-note").first(),
+  ).toHaveAttribute("aria-label", /C4/);
   await runEditAction(page, "Redo");
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("E4");
+  await expect(
+    page.locator("button.piano-roll-note, button.melody-staff-note").first(),
+  ).toHaveAttribute("aria-label", /E4/);
 
   const insertionMenu = await openMelodyMenu(page);
   await insertionMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
@@ -108,7 +121,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(2);
+  await expect(page.locator("button.piano-roll-note, button.melody-staff-note")).toHaveCount(2);
 
   const deleteDraftMenu = await openMelodyMenu(page);
   await deleteDraftMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
@@ -118,7 +131,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   await page.keyboard.press("Delete");
   await expect(dialog.locator("[data-authored-note-id]")).toHaveCount(1);
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(2);
+  await expect(page.locator("button.piano-roll-note, button.melody-staff-note")).toHaveCount(2);
 
   const applyInsertionMenu = await openMelodyMenu(page);
   await applyInsertionMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
@@ -132,13 +145,22 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   await dialog.getByTestId("authored-note-list").focus();
   await page.keyboard.press("Enter");
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
-  const inserted = page.getByTestId("melody-lane-note").filter({ hasText: "F4" }).last();
-  await expect(inserted).toHaveAttribute("data-start-beats", "3/2");
-  await expect(inserted).toHaveAttribute("data-duration-beats", "3/8");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("export-menu-toggle").click();
+  await page.getByTestId("project-export-btn").click();
+  const path = await (await downloadPromise).path();
+  if (!path) throw new Error("Missing portable Project export");
+  const exported = decodePortableProject(await readFile(path, "utf8"));
+  const firstStep = exported.progression.steps[0];
+  if (firstStep?.kind !== "chord" || firstStep.melody?.mode !== "authored")
+    throw new Error("Expected authored Melody");
+  const inserted = firstStep.melody.phrase.notes.find((note) => note.pitch.midiNumber === 65);
+  expect(inserted?.onset).toEqual({ numerator: 3, denominator: 2 });
+  expect(inserted?.duration).toEqual({ numerator: 3, denominator: 8 });
   await runEditAction(page, "Undo");
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(2);
+  await expect(page.locator("button.piano-roll-note, button.melody-staff-note")).toHaveCount(2);
   await runEditAction(page, "Redo");
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(3);
+  await expect(page.locator("button.piano-roll-note, button.melody-staff-note")).toHaveCount(3);
 
   for (const theme of ["Dark theme", "Light theme"] as const) {
     await page.getByRole("button", { name: theme }).click();
@@ -158,6 +180,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
       expect(bounds!.y).toBeGreaterThanOrEqual(0);
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
       expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+      await dialog.getByRole("button", { name: "Close melody dialog" }).focus();
       await page.keyboard.press("Escape");
       await expect(dialog).toHaveCount(0);
     }

@@ -11,12 +11,12 @@ async function addChord(page: Page, functionId: string) {
 test.describe("T200 — label hierarchy and compact quick edit", () => {
   test("keeps three label modes consistent across Progression views", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("progression-view-btn-tablature").click();
     await expect(page.getByTestId("label-hierarchy-control")).toBeVisible();
     await addChord(page, "I");
 
-    const cardLabel = page.locator(
-      '.progression-step-card [data-testid="progression-chord-label"]',
-    );
+    await page.getByTestId("progression-view-btn-piano-roll").click();
+    const cardLabel = page.locator('.piano-roll-chord [data-testid="progression-chord-label"]');
     for (const [testId, expected] of [
       ["label-hierarchy-function-first", "I"],
       ["label-hierarchy-chord-first", "C"],
@@ -35,15 +35,8 @@ test.describe("T200 — label hierarchy and compact quick edit", () => {
       }
     }
 
-    for (const view of ["piano", "guitar"] as const) {
-      await page.getByTestId(`progression-view-btn-${view}`).click();
-      await expect(
-        page.locator(`[data-view="${view}"] [data-testid="progression-step"]`),
-      ).toHaveCount(1);
-      await expect(
-        page.locator(`[data-view="${view}"] [data-testid="progression-chord-label"]`),
-      ).toHaveAttribute("data-label-mode", "inline");
-    }
+    await page.getByTestId("progression-view-btn-tablature").click();
+    await expect(page.locator(".measure-staff-event-select").first()).toContainText("C (I)");
 
     await page.getByTestId("progression-view-btn-staff").click();
     await expect(page.locator(".measure-staff-event-select").first()).toContainText("C (I)");
@@ -55,6 +48,7 @@ test.describe("T200 — label hierarchy and compact quick edit", () => {
     page,
   }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("progression-view-btn-tablature").click();
     await addChord(page, "I");
 
     const stepButton = page.locator("[data-progression-step-select]").first();
@@ -106,6 +100,7 @@ test.describe("T200 — label hierarchy and compact quick edit", () => {
     test.slow();
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("progression-view-btn-tablature").click();
 
     for (const functionId of ["I", "V", "IV", "I", "V", "IV", "I", "V", "IV", "I"]) {
       await addChord(page, functionId);

@@ -5,7 +5,7 @@ import { addRestToProgression } from "./test-helpers/progression-settings";
 
 const screenshotRoot =
   "C:/Users/pavel/.codex/visualizations/2026/09/30/01a0f3c2-898f-7322-a361-ad7b563d465e/piano-roll-batch1";
-const views = ["harmonic", "piano", "guitar", "staff", "tablature"] as const;
+const views = ["staff", "tablature"] as const;
 const sizes = [
   { width: 1280, height: 720 },
   { width: 1920, height: 1080 },

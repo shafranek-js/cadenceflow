@@ -4,7 +4,7 @@ async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
-  await page.getByTestId("progression-view-btn-piano").click();
+  await page.getByTestId("progression-view-btn-tablature").click();
 }
 
 async function addChord(page: Page, functionId = "I"): Promise<void> {
@@ -110,7 +110,7 @@ test.describe("T201 — direct duration resize", () => {
     await openStudio(page);
     await addChord(page);
 
-    for (const view of ["piano", "staff", "tablature"] as const) {
+    for (const view of ["staff", "tablature"] as const) {
       await page.getByLabel("Progression Card View").selectOption(view);
       const handle = page.locator("[data-duration-resize-handle]").first();
       const before = await handle.getAttribute("aria-valuenow");
@@ -157,16 +157,16 @@ test.describe("T201 — direct duration resize", () => {
     await page.locator("[data-progression-step-select]").first().click();
     await setSelectedDuration(page, "6");
 
-    await expect(page.locator("[data-testid=progression-step-continuation]")).toHaveCount(1);
+    await expect(page.locator(".measure-staff-event.is-continuation")).toHaveCount(1);
     await expect(
-      page.locator("[data-testid=progression-step-continuation] [data-duration-resize-handle]"),
+      page.locator(".measure-staff-event.is-continuation [data-duration-resize-handle]"),
     ).toHaveCount(1);
     await expect(page.locator(".progression-step-card [data-duration-resize-handle]")).toHaveCount(
       0,
     );
 
     const continuationHandle = page.locator(
-      "[data-testid=progression-step-continuation] [data-duration-resize-handle]",
+      ".measure-staff-event.is-continuation [data-duration-resize-handle]",
     );
     await continuationHandle.focus();
     await page.keyboard.press("ArrowLeft");
@@ -177,10 +177,10 @@ test.describe("T201 — direct duration resize", () => {
     const heading = page.getByTestId("progression-heading");
     await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
     await page.getByTestId("progression-menu-add-rest").click();
-    await expect(page.locator(".progression-rest-card")).toHaveCount(1);
-    await expect(page.locator(".progression-rest-card [data-duration-resize-handle]")).toHaveCount(
-      0,
-    );
+    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(1);
+    await expect(
+      page.locator(".measure-staff-event.is-rest [data-duration-resize-handle]"),
+    ).toHaveCount(0);
   });
 
   test("keeps the same final-fragment handle in Staff and Tablature overlays", async ({ page }) => {
@@ -236,7 +236,7 @@ test.describe("T201 — direct duration resize", () => {
     const heading = page.getByTestId("progression-heading");
     await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
     await page.getByTestId("progression-menu-add-rest").click();
-    await page.locator(".progression-rest-card .progression-step-select-button").click();
+    await page.locator(".measure-staff-event.is-rest [data-progression-step-select]").click();
     await setSelectedDuration(page, "1/3");
     await addChord(page, "V");
     await page.getByLabel("Progression Card View").selectOption("staff");

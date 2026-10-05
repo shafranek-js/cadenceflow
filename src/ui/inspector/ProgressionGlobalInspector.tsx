@@ -792,27 +792,11 @@ export function ProgressionGlobalInspector({
                 >
                   <button
                     type="button"
-                    className={project.presentation.progressionView === "piano" ? "is-active" : ""}
-                    onClick={() => onSetProgressionView("piano")}
-                    aria-label="Piano view"
-                  >
-                    Piano
-                  </button>
-                  <button
-                    type="button"
                     className={project.presentation.progressionView === "staff" ? "is-active" : ""}
                     onClick={() => onSetProgressionView("staff")}
                     aria-label="Staff view"
                   >
                     Staff
-                  </button>
-                  <button
-                    type="button"
-                    className={project.presentation.progressionView === "guitar" ? "is-active" : ""}
-                    onClick={() => onSetProgressionView("guitar")}
-                    aria-label="Guitar view"
-                  >
-                    Guitar
                   </button>
                   <button
                     type="button"

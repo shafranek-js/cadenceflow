@@ -148,7 +148,7 @@ test.describe("T206 — read-only inline Melody Lane", () => {
       desktopOnsets.push(await expectMelodyHarmonyOnsetAlignment(page, stepId));
     }
     expect(new Set(desktopOnsets.map((position) => Math.round(position))).size).toBe(3);
-    for (const view of ["piano", "guitar"] as const) {
+    for (const view of ["tablature"] as const) {
       await setProgressionView(page, view);
       await expect(page.getByTestId("progression-step")).toHaveCount(4);
       for (const stepId of owners) await expectMelodyHarmonyOnsetAlignment(page, stepId);

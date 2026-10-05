@@ -430,7 +430,7 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
   await addRestMenuItem.click();
   await expect(page.locator(".piano-roll-chord.is-rest")).toHaveCount(1);
   await page
-    .getByTestId("progression-view-btn-piano")
+    .getByTestId("progression-view-btn-tablature")
     .evaluate((button) => (button as HTMLButtonElement).click());
   const authoredRestStep = page
     .getByTestId("progression-step")

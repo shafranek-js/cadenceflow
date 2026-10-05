@@ -290,10 +290,11 @@ test("T213 keeps guitar marker colors accessible and consistent across views and
     await chord.focus();
     await page.keyboard.press("Control+Enter");
   }
-  await expect(page.getByTestId("progression-step")).toHaveCount(2);
+  await expect(page.getByTestId("piano-roll-chord")).toHaveCount(2);
 
   await chooseViewItem(page, "matrix-card-view-guitar");
-  await chooseViewItem(page, "progression-card-view-guitar");
+  await chooseViewItem(page, "progression-card-view-piano-roll");
+  await page.getByRole("button", { name: "Show guitar chord", exact: true }).first().click();
   const defaultViewMenu = await openViewMenu(page);
   await expect(defaultViewMenu.getByTestId("guitar-chord-color-mode-chord-roles")).toHaveAttribute(
     "aria-checked",
@@ -303,10 +304,10 @@ test("T213 keeps guitar marker colors accessible and consistent across views and
 
   const matrixGuitars = page.locator('.matrix-panel [data-testid="mini-guitar-card-visual"]');
   const progressionGuitars = page.locator(
-    '[data-testid="progression-step"] [data-testid="mini-guitar-card-visual"]',
+    '.piano-roll-card-row [data-testid="mini-guitar-card-visual"]',
   );
   let activeTheme: Theme = "light";
-  let activeOrientation: Orientation = "vertical";
+  let activeOrientation: Orientation = "horizontal";
   let activeMode: ColorMode = "chord-roles";
 
   for (const viewport of viewports) {
@@ -370,7 +371,7 @@ test("T213 keeps guitar marker colors accessible and consistent across views and
 
           const legendCount = await page.locator(".matrix-panel .guitar-fingering-legend").count();
           const progressionLegendCount = await page
-            .locator('[data-testid="progression-step"] .guitar-fingering-legend')
+            .locator(".piano-roll-card-row .guitar-fingering-legend")
             .count();
           if (mode === "fingering") {
             expect(legendCount).toBeGreaterThan(0);

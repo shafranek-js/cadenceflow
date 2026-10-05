@@ -79,7 +79,7 @@ function createInsertionFixture(options: {
     presentation: Object.freeze({
       ...project.presentation,
       theme: options.theme ?? "dark",
-      progressionView: options.view ?? "piano",
+      progressionView: options.view ?? "tablature",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -107,7 +107,7 @@ function createPartialFinalFixture(id: string): Project {
     id,
     name: `Partial final Measure ${id}`,
     globalTiming: globalTiming(100, meter(4, 4)),
-    presentation: Object.freeze({ ...project.presentation, progressionView: "piano" as const }),
+    presentation: Object.freeze({ ...project.presentation, progressionView: "tablature" as const }),
     progression: Object.freeze({
       ...project.progression,
       steps: Object.freeze([
@@ -129,7 +129,7 @@ async function importPortableProject(page: Page, project: Project): Promise<void
     mimeType: "application/json",
     buffer: Buffer.from(encodePortableProject(project), "utf8"),
   });
-  await expect(page.getByTestId("progression-view-btn-piano")).toBeVisible();
+  await expect(page.getByTestId("progression-view-btn-tablature")).toBeVisible();
   await page.keyboard.press("Escape");
 }
 

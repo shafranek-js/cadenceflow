@@ -2265,9 +2265,9 @@ test("lost capture, blur, view change and stale Project updates cancel boundary 
 
   await startPreview();
   await page
-    .getByTestId("progression-view-btn-piano")
+    .getByTestId("progression-view-btn-tablature")
     .evaluate((button) => (button as HTMLButtonElement).click());
-  await expect(page.getByTestId("progression-view-btn-piano")).toHaveAttribute(
+  await expect(page.getByTestId("progression-view-btn-tablature")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
