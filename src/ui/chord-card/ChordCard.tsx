@@ -25,7 +25,7 @@ export function ChordCard({
   suzukiColors = false,
   noteColorMode = suzukiColors ? "suzuki" : "standard",
   roleContext,
-  guitarChordOrientation = "vertical",
+  guitarChordOrientation = "horizontal",
   guitarChordColorMode = "chord-roles",
   resolutionTargetSymbol,
   isResolutionTarget,

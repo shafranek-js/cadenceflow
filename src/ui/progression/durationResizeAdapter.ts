@@ -245,7 +245,9 @@ export function createDurationResizeSnapshot(
       ? layout.playbackDurationBeats
       : minimumHorizon;
   const step = project.progression.steps[stepIndex]!;
-  if (step.kind === "chord") {
+  // Piano Roll transfers chord boundaries inside its available interval; generic
+  // T201 Step resizing retains the finite multi-Measure timeline horizon.
+  if (step.kind === "chord" && project.presentation.progressionView === "piano-roll") {
     const minimumNeighbor = rational(1, 24);
     const originalEnd = addRational(entry.startBeats, step.duration.beats);
     const next = project.progression.steps[stepIndex + 1];

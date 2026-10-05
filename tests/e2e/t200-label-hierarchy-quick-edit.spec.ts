@@ -35,7 +35,7 @@ test.describe("T200 — label hierarchy and compact quick edit", () => {
       }
     }
 
-    for (const view of ["harmonic", "piano", "guitar"] as const) {
+    for (const view of ["piano", "guitar"] as const) {
       await page.getByTestId(`progression-view-btn-${view}`).click();
       await expect(
         page.locator(`[data-view="${view}"] [data-testid="progression-step"]`),

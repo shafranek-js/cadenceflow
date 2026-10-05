@@ -38,7 +38,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
   await expect(dialog).toHaveCount(0);
 
-  for (const view of ["harmonic", "piano", "staff"] as const) {
+  for (const view of ["piano", "staff"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     const viewMenu = await openMelodyMenu(page);
     await viewMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
@@ -49,7 +49,7 @@ test("T208 composes with keyboard in the authored draft and commits one undoable
     await expect(viewMenu).toHaveCount(0);
   }
 
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   const editMenu = await openMelodyMenu(page);
   await editMenu.getByRole("menuitem", { name: "Edit Melody…" }).click();
   dialog = page.getByRole("dialog", { name: "Edit Melody" });

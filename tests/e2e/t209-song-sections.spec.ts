@@ -140,7 +140,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await expect(page.getByTestId("melody-lane-note")).toHaveCount(1);
 
   const timelineBaselines: Record<string, Awaited<ReturnType<typeof readTimelineGeometry>>> = {};
-  for (const view of ["harmonic", "piano", "guitar"] as const) {
+  for (const view of ["piano", "guitar"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     timelineBaselines[view] = await readTimelineGeometry(page);
     expect(timelineBaselines[view].length).toBeGreaterThan(0);
@@ -162,7 +162,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   expect(timelineBaselines.harmonic[1]?.segments.map((segment) => segment.durationBeats)).toContain(
     "1/2",
   );
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
 
   const createAtStep1 = page.getByLabel(/New section name at Step 1/);
   await createAtStep1.fill("Verse A");
@@ -196,7 +196,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await expect(page.locator(".song-section-boundaries")).toHaveCount(2);
   await expect(page.getByTestId("song-section-boundary")).toHaveCount(3);
 
-  for (const view of ["harmonic", "piano", "staff", "guitar", "tablature"] as const) {
+  for (const view of ["piano", "staff", "guitar", "tablature"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
     await expect(
       page.getByTestId("song-section-boundary").filter({ hasText: "Opening Verse" }),
@@ -296,7 +296,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await expect(
     page.getByTestId("song-section-boundary").filter({ hasText: "Opening Verse" }),
   ).toHaveCount(1);
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   await page.locator("[data-progression-step-select]").nth(1).press("Enter");
   await page.getByRole("button", { name: "Delete section Chorus" }).focus();
   await page.keyboard.press("Enter");
@@ -315,7 +315,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
     { width: 640, height: 360 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const view of ["harmonic", "piano", "staff", "guitar", "tablature"] as const) {
+    for (const view of ["piano", "staff", "guitar", "tablature"] as const) {
       await page.getByTestId(`progression-view-btn-${view}`).click();
       const boundary = page.getByTestId("song-section-boundary").first();
       await placeBelowAppHeader(page, boundary);
@@ -347,7 +347,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
     inner: window.innerWidth,
   }));
   expect(mobileBounds.width).toBeLessThanOrEqual(mobileBounds.inner + 2);
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   const editorInput = page.getByLabel("Section name: Chorus");
   for (const theme of ["dark", "light"] as const) {
     await page

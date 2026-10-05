@@ -199,7 +199,7 @@ test.describe("US10 Batch 4 — global UI system", () => {
   }, testInfo) => {
     await waitForStudio(page);
     await addSteps(page, 3);
-    await page.getByLabel("Progression Card View").selectOption("harmonic");
+    await page.getByLabel("Progression Card View").selectOption("piano");
     await expect(page.getByLabel("Note color mode")).toBeVisible();
     const measurements: Array<Record<string, unknown>> = [];
     const theme = page.getByRole("group", { name: "Theme" });
@@ -214,64 +214,64 @@ test.describe("US10 Batch 4 — global UI system", () => {
         await theme.getByRole("button", { name: `${themeName} theme` }).click();
         await expectNoPageHorizontalScroll(page);
         const snapshot = await page.evaluate(() => {
-            const rect = (element: Element | null) => {
-              if (!(element instanceof HTMLElement)) return null;
-              const bounds = element.getBoundingClientRect();
+          const rect = (element: Element | null) => {
+            if (!(element instanceof HTMLElement)) return null;
+            const bounds = element.getBoundingClientRect();
+            return {
+              left: bounds.left,
+              right: bounds.right,
+              top: bounds.top,
+              bottom: bounds.bottom,
+              width: bounds.width,
+              height: bounds.height,
+            };
+          };
+          const stack = document.querySelector<HTMLElement>(".progression-measures-stack");
+          const noteColorSelect = document.querySelector<HTMLElement>(
+            '[aria-label="Note color mode"]',
+          );
+          const noteColorLabel = noteColorSelect?.closest("label") ?? null;
+          const measures = Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '.progression-measures-stack [data-testid="progression-measure"]',
+            ),
+          ).map((measure) => rect(measure));
+          const visibleControls = Array.from(
+            document.querySelectorAll<HTMLElement>("button, select, input"),
+          )
+            .filter((control) => control.offsetParent !== null)
+            .map((control) => {
+              const bounds = control.getBoundingClientRect();
               return {
+                name:
+                  control.getAttribute("aria-label") ??
+                  control.getAttribute("title") ??
+                  control.textContent?.trim() ??
+                  control.tagName.toLowerCase(),
                 left: bounds.left,
                 right: bounds.right,
                 top: bounds.top,
                 bottom: bounds.bottom,
-                width: bounds.width,
-                height: bounds.height,
               };
-            };
-            const stack = document.querySelector<HTMLElement>(".progression-measures-stack");
-            const noteColorSelect = document.querySelector<HTMLElement>(
-              '[aria-label="Note color mode"]',
+            })
+            .filter(
+              ({ left, right, top, bottom }) =>
+                right > 0 && left < window.innerWidth && bottom > 0 && top < window.innerHeight,
             );
-            const noteColorLabel = noteColorSelect?.closest("label") ?? null;
-            const measures = Array.from(
-              document.querySelectorAll<HTMLElement>(
-                '.progression-measures-stack [data-testid="progression-measure"]',
-              ),
-            ).map((measure) => rect(measure));
-            const visibleControls = Array.from(
-              document.querySelectorAll<HTMLElement>("button, select, input"),
-            )
-              .filter((control) => control.offsetParent !== null)
-              .map((control) => {
-                const bounds = control.getBoundingClientRect();
-                return {
-                  name:
-                    control.getAttribute("aria-label") ??
-                    control.getAttribute("title") ??
-                    control.textContent?.trim() ??
-                    control.tagName.toLowerCase(),
-                  left: bounds.left,
-                  right: bounds.right,
-                  top: bounds.top,
-                  bottom: bounds.bottom,
-                };
-              })
-              .filter(
-                ({ left, right, top, bottom }) =>
-                  right > 0 && left < window.innerWidth && bottom > 0 && top < window.innerHeight,
-              );
-            return {
-              viewport: { width: window.innerWidth, height: window.innerHeight },
-              document: {
-                clientWidth: document.documentElement.clientWidth,
-                scrollWidth: document.documentElement.scrollWidth,
-                bodyScrollWidth: document.body.scrollWidth,
-              },
-              stack: rect(stack),
-              noteColorLabel: rect(noteColorLabel),
-              noteColorSelect: rect(noteColorSelect),
-              measures,
-              visibleControls,
-            };
-          });
+          return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            document: {
+              clientWidth: document.documentElement.clientWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              bodyScrollWidth: document.body.scrollWidth,
+            },
+            stack: rect(stack),
+            noteColorLabel: rect(noteColorLabel),
+            noteColorSelect: rect(noteColorSelect),
+            measures,
+            visibleControls,
+          };
+        });
 
         const outOfBoundsControls = snapshot.visibleControls.filter(
           ({ left, right }) => left < -1 || right > viewport.width + 1,

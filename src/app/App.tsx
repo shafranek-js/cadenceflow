@@ -3657,7 +3657,7 @@ export function App() {
     store.dispatch(command, setGenreFocus);
   };
   const changeGuitarChordOrientation = (orientation: "vertical" | "horizontal") => {
-    if (orientation === (project.presentation.guitarChordOrientation ?? "vertical")) return;
+    if (orientation === (project.presentation.guitarChordOrientation ?? "horizontal")) return;
     const command: SetGuitarChordOrientationCommand = {
       type: "presentation/set-guitar-chord-orientation",
       payload: { orientation, nowIso: new Date().toISOString() },
@@ -4847,7 +4847,7 @@ export function App() {
                 onSuzukiColorsChange={changeSuzukiColors}
                 resolutionArrows={project.presentation.resolutionArrows !== false}
                 onResolutionArrowsChange={changeResolutionArrows}
-                guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
+                guitarChordOrientation={project.presentation.guitarChordOrientation ?? "horizontal"}
                 onGuitarChordOrientationChange={changeGuitarChordOrientation}
                 guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
                 onGuitarChordColorModeChange={changeGuitarChordColorMode}
@@ -5429,7 +5429,7 @@ export function App() {
                 onChangeView={changeProgressionView}
                 selectAriaLabel="Progression Card View"
                 testIdPrefix="progression-view"
-                availableViews={["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"]}
+                availableViews={["piano", "staff", "guitar", "tablature", "piano-roll"]}
               />
               <LabelHierarchyControl value={labelHierarchyMode} onChange={setLabelHierarchyMode} />
             </div>
@@ -5539,7 +5539,11 @@ export function App() {
             onSelectStep={selectProgressionStep}
             onClearSelection={() => setProgressionSelection()}
             onEditPerformance={editProgressionPerformance}
-            onSetStepDuration={resizeProgressionChordDuration}
+            onSetStepDuration={
+              project.presentation.progressionView === "piano-roll"
+                ? resizeProgressionChordDuration
+                : changeStepDuration
+            }
             onDurationResizeStatusChange={setDurationResizeStatus}
             labelMode={labelHierarchyMode}
             onSetProgressionView={changeProgressionView}

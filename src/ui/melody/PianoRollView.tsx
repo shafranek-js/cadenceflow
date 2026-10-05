@@ -1,3 +1,5 @@
+import { PianoRollChordCards } from "./PianoRollChordCards";
+import type { ChordCardVisibility } from "./chordCardPreferences";
 import {
   useCallback,
   useEffect,
@@ -489,6 +491,7 @@ export function PianoRollMeasure({
   activeEventStartedAt,
   transportPlaying,
   labelMode,
+  chordCardVisibility = { piano: false, guitar: false },
   onSelectStep,
   onHarmonySelected,
   renderBoundaryResizeHandle,
@@ -535,6 +538,7 @@ export function PianoRollMeasure({
   readonly playingStepId?: string | null;
   readonly activeEventStartedAt?: number | null | undefined;
   readonly transportPlaying?: boolean | undefined;
+  readonly chordCardVisibility?: ChordCardVisibility;
   readonly labelMode: LabelHierarchyMode;
   readonly onSelectStep: (stepId: string) => void;
   readonly onHarmonySelected?: (
@@ -2603,7 +2607,7 @@ export function PianoRollMeasure({
               {hasLeftBoundary ? renderBoundaryResizeHandle?.(item, "left", measure) : null}
               <button
                 type="button"
-                className={`piano-roll-chord ${hookpadColors && chordPaletteDegrees ? "is-hookpad-palette" : ""} ${!selectedNoteKey && (selectedChordStepIds?.size ? selectedChordStepIds.has(step.id) : selectedStepId === step.id) ? "is-selected" : ""} ${playingStepId === step.id ? "is-playing" : ""} ${step.kind === "rest" ? "is-rest" : ""}`}
+                className={`piano-roll-chord ${chordPaletteDegrees ? "is-hookpad-palette" : ""} ${!selectedNoteKey && (selectedChordStepIds?.size ? selectedChordStepIds.has(step.id) : selectedStepId === step.id) ? "is-selected" : ""} ${playingStepId === step.id ? "is-playing" : ""} ${step.kind === "rest" ? "is-rest" : ""}`}
                 data-testid="piano-roll-chord"
                 data-source-step-id={step.id}
                 {...(chordPaletteDegrees
@@ -2671,6 +2675,26 @@ export function PianoRollMeasure({
           />
         ) : null}
       </div>
+      <PianoRollChordCards
+        project={project}
+        measure={measure}
+        visibility={chordCardVisibility}
+        labelMode={labelMode}
+        selectedStepIds={
+          selectedNoteKey
+            ? new Set()
+            : selectedChordStepIds?.size
+              ? selectedChordStepIds
+              : new Set(selectedStepId ? [selectedStepId] : [])
+        }
+        playingStepId={playingStepId}
+        onSelect={(stepId, additive) => {
+          onClearNoteSelection();
+          if (onHarmonySelected) onHarmonySelected(stepId, systemIndex, additive);
+          else onSelectStep(stepId);
+          if (!additive) onAuditionChord?.(stepId);
+        }}
+      />
       {inspectorOpen &&
       inspectorNote &&
       inspectorDraft &&

@@ -313,11 +313,188 @@ async function expectVisibleMusicAndPanel(
   await expect(panel).toBeVisible();
 }
 
+test("Piano Roll instrument cards are global, persistent, selectable and fit short harmony fragments", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.addInitScript(() => {
+    (
+      window as Window & { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
+    ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openStudio(page);
+  const fixture = createPianoRollSystemChordFixture("instrument-card-fixture");
+  const steps = fixture.progression.steps.map((step, index) =>
+    index === 0
+      ? Object.freeze({ ...step, duration: musicalDuration(rational(6)) })
+      : index === 1
+        ? Object.freeze({ ...step, duration: musicalDuration(rational(1, 4)) })
+        : step,
+  );
+  await importVisualFixture(page, { ...fixture, progression: { ...fixture.progression, steps } });
+  await page.evaluate(() => {
+    const target = window as Window & {
+      __cardAuditions?: unknown[];
+      __cadenceflow_audio__?: {
+        PreviewAuditionController: { prototype: { audition: (events: unknown[]) => null } };
+      };
+    };
+    target.__cardAuditions = [];
+    if (!target.__cadenceflow_audio__) throw new Error("Missing guarded audio hook");
+    target.__cadenceflow_audio__.PreviewAuditionController.prototype.audition = (events) => {
+      target.__cardAuditions!.push(events);
+      return null;
+    };
+  });
+  const pianoButtons = page.getByRole("button", { name: "Show piano", exact: true });
+  const guitarButtons = page.getByRole("button", { name: "Show guitar chord", exact: true });
+  await expect(pianoButtons.first()).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".piano-roll-instrument-card")).toHaveCount(0);
+  const before = await readFile(await exportProjectFilePath(page), "utf8");
+  await pianoButtons.first().click();
+  await expect(page.getByTestId("piano-roll-piano-cards").first()).toBeVisible();
+  await expect(page.getByTestId("piano-roll-guitar-cards")).toHaveCount(0);
+  await expect(pianoButtons).toHaveCount(3);
+  for (const button of await pianoButtons.all())
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+  await guitarButtons.first().click();
+  await expect(page.getByTestId("piano-roll-guitar-cards").first()).toBeVisible();
+  const cardsA = page.locator('.piano-roll-instrument-card[data-source-step-id="chord-a"]');
+  await expect(cardsA).toHaveCount(4); // Piano and Guitar, including the next Measure continuation.
+  await cardsA.first().click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __cardAuditions: unknown[] }).__cardAuditions.length,
+      ),
+    )
+    .toBe(1);
+  for (const card of await cardsA.all()) await expect(card).toHaveAttribute("aria-pressed", "true");
+  const cardB = page.locator('.piano-roll-instrument-card[data-source-step-id="chord-b"]').first();
+  await cardB.click({ modifiers: ["Shift"] });
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __cardAuditions: unknown[] }).__cardAuditions.length,
+    ),
+  ).toBe(1);
+  await expect(cardsA.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(cardB).toHaveAttribute("aria-pressed", "true");
+  // Display toggles and transient selection never enter Project or history.
+  expect(await readFile(await exportProjectFilePath(page), "utf8")).toBe(before);
+  for (const viewport of [
+    { width: 640, height: 360 },
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const theme of ["Dark", "Light"] as const) {
+      await page.getByRole("button", { name: `${theme} theme` }).click();
+      await alignSystemHeader(page);
+      await dismissSelectionHelp(page);
+      await expect
+        .poll(() =>
+          cardB
+            .locator(".piano-roll-card-content")
+            .evaluate((element) => element.getBoundingClientRect().width),
+        )
+        .toBeGreaterThan(0);
+      const geometry = await page.locator(".piano-roll-instrument-card").evaluateAll((cards) =>
+        cards.map((card) => {
+          const content = card.querySelector(".piano-roll-card-content")!;
+          return {
+            width: card.clientWidth,
+            contentWidth: content.getBoundingClientRect().width,
+            scrollWidth: card.scrollWidth,
+          };
+        }),
+      );
+      expect(
+        geometry.every(
+          (card) => card.contentWidth <= card.width + 1 && card.scrollWidth <= card.width + 1,
+        ),
+      ).toBe(true);
+      const shortScale = await cardB
+        .locator(".piano-roll-card-content")
+        .evaluate((element) => getComputedStyle(element).transform);
+      expect(shortScale).not.toBe("none");
+      await page.screenshot({
+        path: `artifacts/validation/piano-roll-chord-cards/${viewport.width}x${viewport.height}-${theme.toLowerCase()}.png`,
+      });
+      await revealWithinStudioGrid(cardsA.first());
+      await page.screenshot({
+        path: `artifacts/validation/piano-roll-chord-cards/${viewport.width}x${viewport.height}-${theme.toLowerCase()}-piano.png`,
+      });
+      await revealWithinStudioGrid(page.getByTestId("piano-roll-guitar-cards").first());
+      await page.screenshot({
+        path: `artifacts/validation/piano-roll-chord-cards/${viewport.width}x${viewport.height}-${theme.toLowerCase()}-guitar.png`,
+      });
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await pianoButtons.first().click();
+  await expect(page.getByTestId("piano-roll-piano-cards")).toHaveCount(0);
+  await expect(page.getByTestId("piano-roll-guitar-cards").first()).toBeVisible();
+  await page.reload();
+  await expect(guitarButtons.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(pianoButtons.first()).toHaveAttribute("aria-pressed", "false");
+  await guitarButtons.first().click();
+  await expect(page.locator(".piano-roll-instrument-card")).toHaveCount(0);
+});
+
+test("embedded chord cards match Piano and Guitar views for inversion and transposition", async ({
+  page,
+}) => {
+  await openStudio(page);
+  const fixture = createPianoRollSystemChordFixture("instrument-card-realization");
+  const first = fixture.progression.steps[0];
+  if (first?.kind !== "chord") throw new Error("Expected a chord");
+  const step = {
+    ...first,
+    transpositionSemitones: 2,
+    performance: {
+      ...first.performance,
+      inversion: 1 as const,
+      bass: { ...first.performance.bass, choice: "third" as const },
+    },
+  };
+  await importVisualFixture(page, {
+    ...fixture,
+    progression: { ...fixture.progression, steps: [step, ...fixture.progression.steps.slice(1)] },
+  });
+  await page.getByRole("button", { name: "Show piano", exact: true }).first().click();
+  await page.getByRole("button", { name: "Show guitar chord", exact: true }).first().click();
+  const piano = page.locator(".piano-roll-card-row .mini-piano-card-visual").first();
+  const pianoSnapshot = await piano
+    .locator('.mini-key[data-active="true"]')
+    .evaluateAll((keys) => keys.map((key) => key.getAttribute("data-midi")));
+  const guitar = page.locator(".piano-roll-card-row .mini-guitar-card-visual").first();
+  const frets = await guitar.getAttribute("data-frets");
+  const symbol = await guitar.getAttribute("data-chord-symbol");
+  await page.getByTestId("progression-view-btn-piano").click();
+  expect(
+    await page
+      .locator(".progression-step-card")
+      .first()
+      .locator('.mini-key[data-active="true"]')
+      .evaluateAll((keys) => keys.map((key) => key.getAttribute("data-midi"))),
+  ).toEqual(pianoSnapshot);
+  await page.getByTestId("progression-view-btn-guitar").click();
+  const standardGuitar = page.locator(".progression-step-card .mini-guitar-card-visual").first();
+  await expect(standardGuitar).toHaveAttribute("data-frets", frets!);
+  await expect(standardGuitar).toHaveAttribute("data-chord-symbol", symbol!);
+  await page.getByTestId("progression-view-btn-piano-roll").click();
+  await expect(
+    page.getByRole("button", { name: "Show piano", exact: true }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
 test("Piano Roll chord controls stay on the System row and edit through undoable actions", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await openStudio(page);
+  await page.getByTestId("progression-view-btn-piano").click();
   for (const functionId of ["I", "V", "vi", "IV"]) await addChord(page, functionId);
   // Put two contiguous chords in one Measure so ArrowRight has a valid shared-boundary preview.
   const progressionSteps = page.locator("[data-progression-step-select]");
@@ -339,6 +516,31 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
   const afterSelectionPath = await exportProjectFilePath(page);
   const afterSelection = await readFile(afterSelectionPath, "utf8");
   expect(afterSelection).toBe(beforeSelection);
+
+  // Note colors affect the melody, while harmony keeps its Scale degrees appearance.
+  const harmonyAppearance = () =>
+    page.getByTestId("piano-roll-chord").evaluateAll((chords) =>
+      chords.map((chord) => {
+        const style = getComputedStyle(chord);
+        const label = chord.querySelector(".progression-chord-label");
+        return {
+          background: style.background,
+          color: style.color,
+          outline: style.boxShadow,
+          stripe: getComputedStyle(chord, "::before").background,
+          labelBackground: label ? getComputedStyle(label).background : null,
+          selected: chord.getAttribute("aria-pressed"),
+        };
+      }),
+    );
+  await page.getByLabel("Piano Roll note colors").selectOption("hookpad");
+  const scaleDegreesHarmony = await harmonyAppearance();
+  for (const colorMode of ["project", "standard", "suzuki", "harmonic-role"]) {
+    await page.getByLabel("Piano Roll note colors").selectOption(colorMode);
+    expect(await harmonyAppearance()).toEqual(scaleDegreesHarmony);
+    await expect(firstChord).toHaveAttribute("aria-pressed", "true");
+  }
+  await page.getByLabel("Piano Roll note colors").selectOption("hookpad");
 
   const panel = page.getByTestId("piano-roll-system-chord-panel-0");
   await expect(panel).toBeVisible();

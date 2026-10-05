@@ -33,7 +33,7 @@ function createMeasureFixture(options: {
     presentation: Object.freeze({
       ...source.presentation,
       theme: options.theme ?? "dark",
-      progressionView: options.view ?? "harmonic",
+      progressionView: options.view ?? "piano",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -65,7 +65,7 @@ function createActiveBranchFixture(theme: "dark" | "light" = "dark"): Project {
     presentation: Object.freeze({
       ...source.presentation,
       theme,
-      progressionView: "harmonic" as const,
+      progressionView: "piano" as const,
       measuresPerSystem: 2,
     }),
   });
@@ -179,11 +179,12 @@ async function openStudio(page: Page, project: Project): Promise<void> {
     mimeType: "application/json",
     buffer: Buffer.from(encodePortableProject(project), "utf8"),
   });
-  await expect(page.getByTestId("progression-view-btn-harmonic")).toBeVisible();
+  await expect(page.getByTestId("progression-view-btn-piano")).toBeVisible();
   await expect(
     page.getByTestId(`progression-view-btn-${project.presentation.progressionView}`),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
+  const projectMenu = page.getByTestId("project-menu-toggle");
+  if ((await projectMenu.getAttribute("aria-expanded")) === "true") await projectMenu.click();
 }
 
 async function openMeasureMenu(page: Page, index: number): Promise<void> {
@@ -248,7 +249,7 @@ test("measure header actions target the displayed Measure and preserve one-step 
   );
   await secondMeasureTrigger.click();
   await expect(menu).toBeVisible();
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   await expect(menu).toHaveCount(0);
   await expect(secondMeasureTrigger).toBeFocused();
 

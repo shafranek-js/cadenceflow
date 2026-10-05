@@ -33,6 +33,7 @@ function projectWithSteps(
   }));
   return Object.freeze({
     ...base,
+    presentation: Object.freeze({ ...base.presentation, progressionView: "piano" as const }),
     globalTiming: Object.freeze({ ...base.globalTiming, meter: meterValue }),
     progression: Object.freeze({ steps: Object.freeze(steps) }),
   });
@@ -80,6 +81,22 @@ describe("T201 direct duration resize adapter", () => {
     expect(preview.duration).toEqual(rational(9));
     expect(previous.endpoint).toEqual(rational(263, 24));
     expect(next.endpoint).toEqual(preview.endpoint);
+  });
+
+  it("keeps the Piano Roll final chord capped while generic Step resizing spans Measures", () => {
+    const project = projectWithSteps(meter(3, 4, [3]), [rational(2), rational(1)]);
+    const pianoRoll = {
+      ...project,
+      presentation: { ...project.presentation, progressionView: "piano-roll" as const },
+    };
+    const snapshot = createDurationResizeSnapshot(pianoRoll, "step-2");
+    const preview = snapDurationResizeEndpoint(11, snapshot);
+    expect(preview.endpoint).toEqual(rational(3));
+    expect(preview.duration).toEqual(rational(1));
+    expect(preview.clamp).toBe("upper");
+    expect(
+      snapDurationResizeEndpoint(11, createDurationResizeSnapshot(project, "step-2")).endpoint,
+    ).toEqual(rational(11));
   });
 
   it("converts screen geometry to an absolute endpoint without restarting at a measure", () => {

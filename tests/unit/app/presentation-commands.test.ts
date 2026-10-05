@@ -191,21 +191,21 @@ describe("US10 presentation commands", () => {
     const store = new AppStore(initial);
     const command: SetGuitarChordOrientationCommand = {
       type: "presentation/set-guitar-chord-orientation",
-      payload: { orientation: "horizontal", nowIso },
+      payload: { orientation: "vertical", nowIso },
     };
 
-    expect(initial.presentation.guitarChordOrientation).toBe("vertical");
+    expect(initial.presentation.guitarChordOrientation).toBe("horizontal");
     store.dispatch(command, setGuitarChordOrientation);
-    expect(store.project.presentation.guitarChordOrientation).toBe("horizontal");
+    expect(store.project.presentation.guitarChordOrientation).toBe("vertical");
 
     expect(store.undo()).toBe(true);
-    expect(store.project.presentation.guitarChordOrientation).toBe("vertical");
-    expect(store.redo()).toBe(true);
     expect(store.project.presentation.guitarChordOrientation).toBe("horizontal");
+    expect(store.redo()).toBe(true);
+    expect(store.project.presentation.guitarChordOrientation).toBe("vertical");
 
     const inverseResult = setGuitarChordOrientation(initial, command);
     const undone = applyInverseCommand(inverseResult.project, inverseResult.inverse);
-    expect(undone.presentation.guitarChordOrientation).toBe("vertical");
+    expect(undone.presentation.guitarChordOrientation).toBe("horizontal");
   });
 
   it("changes only the project guitar marker color preference and supports undo/redo", () => {

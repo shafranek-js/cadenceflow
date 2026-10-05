@@ -1,5 +1,7 @@
 # CadenceFlow release-gate handoff — 2026-10-04
 
+Current status update — 2026-10-05: the T201 adapter/command-routing conflict described below is resolved with 33/33 focused units and 41/41 scoped Chromium cases. See [the resolution and current remaining release boundary](t201-endpoint-resolution-2026-10-05.md). The original results and investigation below remain historical evidence; complete release acceptance is still pending.
+
 ## Current state
 
 The reviewed checkout is `master` at `361c914a39032e0be69aae52b85f47c3a15ad845`, equal to

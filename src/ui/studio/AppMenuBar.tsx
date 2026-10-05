@@ -12,7 +12,6 @@ const MATRIX_CARD_VIEWS: readonly { id: CardViewId; label: string }[] = [
 ];
 
 const PROGRESSION_VIEWS: readonly { id: ProgressionView; label: string }[] = [
-  { id: "harmonic", label: "Harmonic" },
   { id: "piano", label: "Piano" },
   { id: "staff", label: "Staff" },
   { id: "guitar", label: "Guitar" },
@@ -66,7 +65,7 @@ export function AppMenuBar({
   onSuzukiColorsChange,
   resolutionArrows = true,
   onResolutionArrowsChange,
-  guitarChordOrientation = "vertical",
+  guitarChordOrientation = "horizontal",
   onGuitarChordOrientationChange,
   guitarChordColorMode = "chord-roles",
   onGuitarChordColorModeChange,

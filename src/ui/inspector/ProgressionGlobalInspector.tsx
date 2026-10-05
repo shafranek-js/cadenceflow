@@ -792,16 +792,6 @@ export function ProgressionGlobalInspector({
                 >
                   <button
                     type="button"
-                    className={
-                      project.presentation.progressionView === "harmonic" ? "is-active" : ""
-                    }
-                    onClick={() => onSetProgressionView("harmonic")}
-                    aria-label="Harmonic view"
-                  >
-                    Harmonic
-                  </button>
-                  <button
-                    type="button"
                     className={project.presentation.progressionView === "piano" ? "is-active" : ""}
                     onClick={() => onSetProgressionView("piano")}
                     aria-label="Piano view"
@@ -833,6 +823,16 @@ export function ProgressionGlobalInspector({
                     aria-label="Tablature view"
                   >
                     Tab
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      project.presentation.progressionView === "piano-roll" ? "is-active" : ""
+                    }
+                    onClick={() => onSetProgressionView("piano-roll")}
+                    aria-label="Piano Roll view"
+                  >
+                    Piano Roll
                   </button>
                 </div>
               ) : null}
@@ -998,7 +998,11 @@ export function ProgressionGlobalInspector({
               disabled={!selectedPianoNote}
               onClick={onEditSelectedPianoNote}
               aria-label="Edit selected note"
-              title={selectedPianoNote ? "Edit selected Piano Roll note" : "Select a Piano Roll note to edit"}
+              title={
+                selectedPianoNote
+                  ? "Edit selected Piano Roll note"
+                  : "Select a Piano Roll note to edit"
+              }
             >
               Edit note
             </button>

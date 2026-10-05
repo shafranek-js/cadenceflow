@@ -78,7 +78,7 @@ function duplicateFixture(options: {
     presentation: Object.freeze({
       ...project.presentation,
       theme: options.theme ?? "light",
-      progressionView: options.view ?? "harmonic",
+      progressionView: options.view ?? "piano",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -104,7 +104,8 @@ async function importPortableProject(page: Page, project: Project): Promise<void
   await expect(
     page.getByTestId(`progression-view-btn-${project.presentation.progressionView}`),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
+  const projectMenu = page.getByTestId("project-menu-toggle");
+  if ((await projectMenu.getAttribute("aria-expanded")) === "true") await projectMenu.click();
 }
 
 async function openStudio(page: Page, project: Project): Promise<void> {

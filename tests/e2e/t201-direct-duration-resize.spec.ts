@@ -4,6 +4,7 @@ async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+  await page.getByTestId("progression-view-btn-piano").click();
 }
 
 async function addChord(page: Page, functionId = "I"): Promise<void> {
@@ -109,7 +110,7 @@ test.describe("T201 — direct duration resize", () => {
     await openStudio(page);
     await addChord(page);
 
-    for (const view of ["harmonic", "staff", "tablature"] as const) {
+    for (const view of ["piano", "staff", "tablature"] as const) {
       await page.getByLabel("Progression Card View").selectOption(view);
       const handle = page.locator("[data-duration-resize-handle]").first();
       const before = await handle.getAttribute("aria-valuenow");

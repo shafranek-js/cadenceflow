@@ -1,3 +1,4 @@
+import { readChordCardVisibility, saveChordCardVisibility } from "../melody/chordCardPreferences";
 import {
   useCallback,
   useRef,
@@ -536,6 +537,8 @@ export function ProgressionTrack({
     ((stepIds: readonly string[], semitones: number) => string | undefined) | undefined;
   readonly onExploreRange?: ((stepIds: readonly string[]) => void) | undefined;
 }) {
+  const [chordCardVisibility, setChordCardVisibility] = useState(readChordCardVisibility);
+  useEffect(() => saveChordCardVisibility(chordCardVisibility), [chordCardVisibility]);
   const trackRef = useRef<HTMLDivElement>(null);
   const [pianoRollGridMode, setPianoRollGridMode] = useState<"degrees" | "chromatic">(
     () => readPianoRollPreferences().gridMode,
@@ -2768,7 +2771,7 @@ export function ProgressionTrack({
           nextStep={project.progression.steps
             .slice(index + 1)
             .find((candidate): candidate is ChordStep => candidate.kind === "chord")}
-          guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
+          guitarChordOrientation={project.presentation.guitarChordOrientation ?? "horizontal"}
           guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
           onSelect={() => onSelectStep(step.id)}
           onPerformanceChange={(performance) => onEditPerformance(step.id, performance)}
@@ -2880,6 +2883,7 @@ export function ProgressionTrack({
             });
             onSelectedPianoChordChange?.(stepId);
           }}
+          chordCardVisibility={chordCardVisibility}
           colorMode={pianoRollColorMode}
           guidesEnabled={pianoRollGuidesEnabled}
           inspectorRequest={pianoRollInspectorRequest}
@@ -3327,6 +3331,30 @@ export function ProgressionTrack({
               : {})}
             {...(project.presentation.progressionView === "piano-roll"
               ? {
+                  renderSystemControls: () => (
+                    <div className="piano-roll-card-toggles" role="group" aria-label="Chord cards">
+                      <button
+                        type="button"
+                        aria-pressed={chordCardVisibility.piano}
+                        title="Show piano chord cards throughout the progression"
+                        onClick={() =>
+                          setChordCardVisibility((value) => ({ ...value, piano: !value.piano }))
+                        }
+                      >
+                        Show piano
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={chordCardVisibility.guitar}
+                        title="Show guitar chord cards throughout the progression"
+                        onClick={() =>
+                          setChordCardVisibility((value) => ({ ...value, guitar: !value.guitar }))
+                        }
+                      >
+                        Show guitar chord
+                      </button>
+                    </div>
+                  ),
                   renderSystemPitchScale: (system: ScoreSystem) => (
                     <PianoRollSystemPitchGutter
                       project={project}

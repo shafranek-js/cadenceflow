@@ -194,7 +194,7 @@ export function HarmonicMatrix({
           rootPitchClass: preview.chord.rootPitchClass,
           chordPitches: preview.upperPitches,
         })}
-        guitarChordOrientation={project.presentation.guitarChordOrientation ?? "vertical"}
+        guitarChordOrientation={project.presentation.guitarChordOrientation ?? "horizontal"}
         guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
         selected={previewFunctionId === identity.functionId}
         playing={playingFunctionId === identity.functionId}

@@ -168,12 +168,12 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     const progressionViews = await progressionView
       .locator("option")
       .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
-    expect(progressionViews).toEqual(["harmonic", "piano", "staff", "guitar", "tablature"]);
+    expect(progressionViews).toEqual(["piano", "staff", "guitar", "tablature"]);
     const matrixViews = await page
       .getByLabel("Global Card View")
       .locator("option")
       .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
-    expect(matrixViews).toEqual(["harmonic", "piano", "staff", "guitar"]);
+    expect(matrixViews).toEqual(["piano", "staff", "guitar"]);
     await expect(page.getByText("Mixed", { exact: true })).toHaveCount(0);
 
     const globalInspector = page.getByTestId("progression-global-inspector");
@@ -227,7 +227,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
 
     const progressionView = page.getByLabel("Progression Card View");
     const stack = page.getByTestId("progression-score-systems");
-    for (const view of ["harmonic", "piano", "guitar"] as const) {
+    for (const view of ["piano", "guitar"] as const) {
       await progressionView.selectOption(view);
       await expect(stack).toHaveAttribute("data-layout-mode", "measures");
       await expect(stack).toHaveAttribute(
@@ -514,11 +514,11 @@ test.describe("T184 — final Progression score-system acceptance", () => {
       )
       .toBeGreaterThan(0);
 
-    await page.getByLabel("Progression Card View").selectOption("harmonic");
+    await page.getByLabel("Progression Card View").selectOption("piano");
     await page.getByLabel("Progression Card View").selectOption("staff");
     await setLayoutMeasuresPerSystem(page, 1);
     await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "1");
-    await page.getByLabel("Progression Card View").selectOption("harmonic");
+    await page.getByLabel("Progression Card View").selectOption("piano");
     await expect(page.getByTestId("progression-measure")).not.toHaveCount(0);
     await expect(page.getByLabel("Measures Layout")).toHaveCount(0);
     await expect(

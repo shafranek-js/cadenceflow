@@ -505,6 +505,7 @@ interface ScoreSystemCanvasProps {
     ((measure: ProgressionMeasure, systemIndex?: number) => ReactNode) | undefined;
   readonly renderSystemPitchScale?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderSystemNotePanel?: ((system: ScoreSystem) => ReactNode) | undefined;
+  readonly renderSystemControls?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderSystemChordPanel?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderDurationResizeHandle?: (
     item: MeasureStaffChordItem,
@@ -575,6 +576,7 @@ function ScoreSystemCanvas({
   renderSystemPitchScale,
   renderSystemNotePanel,
   renderSystemChordPanel,
+  renderSystemControls,
   renderDurationResizeHandle,
 }: ScoreSystemCanvasProps) {
   const hasPianoRollMeasureSlots =
@@ -1195,8 +1197,7 @@ function ScoreSystemCanvas({
               Scope
             </button>
           ) : null}
-          {project.presentation.progressionView === "piano-roll" &&
-          onSelectPianoRollSystemNotes ? (
+          {project.presentation.progressionView === "piano-roll" && onSelectPianoRollSystemNotes ? (
             <PianoRollSelectionAction
               accessibleName={`Select effective Melody notes in System ${system.index + 1}`}
               title={`Select Melody notes in System ${system.index + 1}`}
@@ -1276,6 +1277,7 @@ function ScoreSystemCanvas({
             </div>
           ) : null}
           {renderSystemChordPanel?.(system) ?? renderSystemNotePanel?.(system)}
+          {renderSystemControls?.(system)}
           {isMuted ? (
             <span
               className="score-system-status-tag muted"
@@ -1944,6 +1946,7 @@ export interface ScoreSystemViewProps {
     ((measure: ProgressionMeasure, systemIndex?: number) => ReactNode) | undefined;
   readonly renderSystemPitchScale?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderSystemNotePanel?: ((system: ScoreSystem) => ReactNode) | undefined;
+  readonly renderSystemControls?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderSystemChordPanel?: ((system: ScoreSystem) => ReactNode) | undefined;
   readonly renderDurationResizeHandle?: (
     item: MeasureStaffChordItem,
@@ -2007,6 +2010,7 @@ export function ScoreSystemView({
   renderSystemPitchScale,
   renderSystemNotePanel,
   renderSystemChordPanel,
+  renderSystemControls,
   renderDurationResizeHandle,
 }: ScoreSystemViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -2193,6 +2197,7 @@ export function ScoreSystemView({
                 {...(renderSystemPitchScale ? { renderSystemPitchScale } : {})}
                 {...(renderSystemNotePanel ? { renderSystemNotePanel } : {})}
                 {...(renderSystemChordPanel ? { renderSystemChordPanel } : {})}
+                {...(renderSystemControls ? { renderSystemControls } : {})}
                 {...(renderDurationResizeHandle ? { renderDurationResizeHandle } : {})}
               />
             );

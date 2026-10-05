@@ -1366,8 +1366,8 @@ test("ordinary completed note clicks audition the effective Melody once and canc
       typeof (window as Window & { __noteClickPrepareResolve?: unknown })
         .__noteClickPrepareResolve === "function",
   );
-  await page.getByTestId("progression-view-btn-harmonic").click();
-  await expect(page.getByTestId("progression-view-btn-harmonic")).toHaveAttribute(
+  await page.getByTestId("progression-view-btn-piano").click();
+  await expect(page.getByTestId("progression-view-btn-piano")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -1382,7 +1382,7 @@ test("ordinary completed note clicks audition the effective Melody once and canc
   expect(await capturedNoteClickSettings(page)).toHaveLength(0);
   await expectProjectContents(await exportProject(page, false), {
     ...baseline,
-    presentation: { ...baseline.presentation, progressionView: "harmonic" },
+    presentation: { ...baseline.presentation, progressionView: "piano" },
   });
 });
 

@@ -46,7 +46,7 @@ export function ProgressionStepCard({
   noteColorMode = suzukiColors ? "suzuki" : "standard",
   activeModule = "progressions",
   nextStep,
-  guitarChordOrientation = "vertical",
+  guitarChordOrientation = "horizontal",
   guitarChordColorMode = "chord-roles",
   onSelect,
   onPerformanceChange,

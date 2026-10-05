@@ -277,7 +277,7 @@ export function setGuitarChordOrientation(
   project: Project,
   command: SetGuitarChordOrientationCommand,
 ): AppliedCommand {
-  const previous = project.presentation.guitarChordOrientation ?? "vertical";
+  const previous = project.presentation.guitarChordOrientation ?? "horizontal";
   return {
     project: Object.freeze({
       ...project,

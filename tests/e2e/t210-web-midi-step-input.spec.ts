@@ -422,7 +422,7 @@ test("device selection, Escape, disconnect, and view changes disarm MIDI input",
   await expect(midi).toHaveAttribute("data-midi-armed", "true");
   await expect(page.locator("#midi-status-content")).toContainText("temporarily paused");
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   await page.getByTestId("progression-view-btn-piano-roll").click();
   await expect(midi).toHaveAttribute("data-midi-armed", "false");
 });
@@ -680,7 +680,7 @@ test("blur drops background input and resumes intent; Escape and view safety OFF
   await expect(page.locator('.piano-roll-note[data-pitch-midi="19"]')).toHaveCount(0);
   await armMidi(page);
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await page.getByTestId("progression-view-btn-harmonic").click();
+  await page.getByTestId("progression-view-btn-piano").click();
   await page.getByTestId("progression-view-btn-piano-roll").click();
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await emit(20);
@@ -785,7 +785,7 @@ test("MIDI-authored Rest continuation retains owner and exact phrase across exis
   await page.getByRole("button", { name: "Close Midi Settings" }).click();
   for (const theme of ["Dark theme", "Light theme"]) {
     await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: theme }).click();
-    for (const view of ["piano-roll", "harmonic", "piano", "guitar", "staff", "tablature"]) {
+    for (const view of ["piano-roll", "piano", "guitar", "staff", "tablature"]) {
       await page.getByTestId(`progression-view-btn-${view}`).click();
       const attribute =
         view === "piano-roll" ? "data-piano-roll-event-key" : "data-melody-event-key";

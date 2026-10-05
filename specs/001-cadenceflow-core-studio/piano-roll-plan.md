@@ -158,5 +158,5 @@ Status update (2026-10-04): this queued chord-panel work was separately authoriz
 #### Explicit state separation
 
 - **Accepted:** Batches 1–3, the System NOTE panel, and the System CHORD panel, each within its own recorded scope. The NOTE and CHORD records include their scoped checks and explicitly do not claim a full release regression.
-- **Pending:** the complete project release regression and disposition of the T201 duration-endpoint conflict; see the [current release handoff](release-gate-handoff-2026-10-04.md).
+- **Pending:** the complete project release regression. The T201 endpoint conflict is resolved by preserving generic multi-Measure resizing and restricting the chord endpoint cap to Piano Roll; see [the resolution](t201-endpoint-resolution-2026-10-05.md) and the historical [release handoff](release-gate-handoff-2026-10-04.md).
 - **Future work:** any additional Piano Roll feature or editor batch still requires a separate user command. Accepted NOTE/CHORD work and its historic queued descriptions do not authorize adjacent implementation.

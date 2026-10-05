@@ -2155,6 +2155,99 @@ button.piano-roll-note > span {
 .piano-roll-chord.is-hookpad-palette.is-selected {
   box-shadow: inset 0 0 0 2px var(--score-focus);
 }
+.piano-roll-chord.is-selected .progression-chord-label {
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--score-focus);
+  color: #fff;
+}
+.piano-roll-chord.is-selected .progression-chord-label-primary,
+.piano-roll-chord.is-selected .progression-chord-label-secondary {
+  color: #fff;
+}
+.piano-roll-card-toggles {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.piano-roll-card-toggles button {
+  min-height: 24px;
+  padding: 2px 5px;
+  font-size: 0.68rem;
+  color: var(--score-ink);
+  background: var(--score-paper);
+  border: 1px solid var(--score-rule);
+}
+.piano-roll-card-toggles button[aria-pressed="true"] {
+  background: var(--score-focus);
+  color: #fff;
+}
+.piano-roll-card-row {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  background: var(--score-paper);
+}
+.piano-roll-instrument-card,
+.piano-roll-card-empty {
+  min-width: 0;
+  border: 1px solid var(--score-rule);
+}
+.piano-roll-instrument-card {
+  padding: 4px 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: transparent;
+  color: var(--score-ink);
+}
+.piano-roll-instrument-card.is-selected {
+  background: var(--score-paper);
+  color: var(--score-ink);
+  box-shadow: inset 0 0 0 2px var(--score-focus);
+}
+.piano-roll-instrument-card.is-selected .progression-chord-label {
+  background: var(--score-focus);
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+.piano-roll-instrument-card.is-selected .progression-chord-label-primary,
+.piano-roll-instrument-card.is-selected .progression-chord-label-secondary {
+  color: #fff;
+}
+.progression-step-cards[data-view="piano-roll"] .score-system-header:has(.piano-roll-card-toggles) {
+  flex-wrap: wrap;
+}
+@media (min-width: 961px) {
+  .score-system-header:has(.piano-roll-card-toggles) .piano-roll-system-chord-panel,
+  .score-system-header:has(.piano-roll-card-toggles) .piano-roll-system-note-panel {
+    flex-shrink: 0;
+  }
+}
+.piano-roll-instrument-card.is-playing {
+  background: color-mix(in srgb, var(--score-focus) 15%, var(--score-paper));
+}
+.piano-roll-instrument-card:focus-visible {
+  outline: 2px solid var(--score-focus);
+  outline-offset: -2px;
+}
+.piano-roll-card-scale {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.piano-roll-card-content {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 240px;
+  transform-origin: top center;
+  pointer-events: none;
+}
+.score-system .piano-roll-card-content .mini-piano-card-visual {
+  width: 232px;
+}
 .piano-roll-chord.is-hookpad-palette.is-rest,
 .piano-roll-chord.is-hookpad-palette.is-gap {
   border-color: var(--score-border);
