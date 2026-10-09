@@ -4,7 +4,7 @@ import type { PianoArticulation, ProgressionStep } from "../../domain/progressio
 import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import type { MeasuresPerSystem } from "../../domain/project/project";
 import { MELODY_GRID_LABELS } from "../melody/labels";
-import { MELODY_CONTOUR_GROUPS } from "../staff/ScoreSystemContextMenu";
+import { MELODY_CONTOUR_GROUPS } from "../melody/melodyContours";
 
 export interface ProgressionContextMenuPosition {
   readonly x: number;

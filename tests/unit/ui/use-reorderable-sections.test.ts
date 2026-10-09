@@ -3,7 +3,10 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useReorderableSections, type UseReorderableSectionsResult } from "../../../src/ui/inspector/useReorderableSections";
+import {
+  useReorderableSections,
+  type UseReorderableSectionsResult,
+} from "../../../src/ui/inspector/useReorderableSections";
 
 const TEST_KEY = "test.sections.order";
 const DEFAULT_ORDER = ["meter", "groove", "tracks", "register", "dynamics"] as const;
@@ -128,9 +131,14 @@ describe("useReorderableSections", () => {
     const propsDynamics = getResult().getSectionItemProps("dynamics");
     const propsMeter = getResult().getSectionItemProps("meter");
 
-    // Simulate drag start on dynamics
+    // Simulate drag start on dynamics.
+    //
+    // The mock deliberately implements only the handful of members the hook touches, so it is
+    // typed as `unknown` and converted once through a named alias. The previous `as any` casts
+    // at each call site disabled type checking on the handler signatures as well.
     const dataStore: Record<string, string> = {};
-    const mockDragEvent = (type: string, target?: HTMLElement) => ({
+    const mockDragEvent = (type: string, target?: HTMLElement): unknown => ({
+      type,
       preventDefault: () => {},
       currentTarget: {
         getBoundingClientRect: () => ({ top: 0, height: 100 }),
@@ -147,20 +155,21 @@ describe("useReorderableSections", () => {
         getData: (k: string) => dataStore[k] ?? "",
       },
     });
+    const asDragEvent = (event: unknown) => event as React.DragEvent<HTMLElement>;
 
     act(() => {
-      propsDynamics.onDragStart(mockDragEvent("dragstart") as any);
+      propsDynamics.onDragStart(asDragEvent(mockDragEvent("dragstart")));
     });
     expect(getResult().draggingId).toBe("dynamics");
 
     act(() => {
-      propsMeter.onDragOver(mockDragEvent("dragover") as any);
+      propsMeter.onDragOver(asDragEvent(mockDragEvent("dragover")));
     });
     expect(getResult().dropIndicator).toEqual({ targetId: "meter", position: "before" });
 
     // Drop dynamics before meter
     act(() => {
-      propsMeter.onDrop(mockDragEvent("drop") as any);
+      propsMeter.onDrop(asDragEvent(mockDragEvent("drop")));
     });
 
     expect(getResult().order).toEqual(["dynamics", "meter", "groove", "tracks", "register"]);
@@ -171,9 +180,8 @@ describe("useReorderableSections", () => {
   });
 
   it("exports valid default sections for Selected Step Inspector", async () => {
-    const { DEFAULT_SELECTED_STEP_SECTIONS, SELECTED_STEP_SECTION_ORDER_STORAGE_KEY } = await import(
-      "../../../src/ui/inspector/PianoPerformanceInspector"
-    );
+    const { DEFAULT_SELECTED_STEP_SECTIONS, SELECTED_STEP_SECTION_ORDER_STORAGE_KEY } =
+      await import("../../../src/ui/inspector/PianoPerformanceInspector");
     expect(SELECTED_STEP_SECTION_ORDER_STORAGE_KEY).toBe(
       "cadenceflow:inspector:selected_step:sections_order",
     );
@@ -183,7 +191,6 @@ describe("useReorderableSections", () => {
       "articulation",
       "duration",
       "voicing",
-      "bass",
       "dynamics",
       "progression",
     ]);

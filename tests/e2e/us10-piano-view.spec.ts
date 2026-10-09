@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test.describe("Piano Card View — chord-tone keyboard contract", () => {
   test("renders real key geometry and excludes Matrix bass from Piano markers", async ({
@@ -75,9 +76,11 @@ test.describe("Piano Card View — chord-tone keyboard contract", () => {
       .getByTestId("chord-card-I")
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
-    await page.getByLabel("Progression Card View").selectOption("piano");
+    await setProgressionView(page, "piano-roll");
+    await page.getByRole("button", { name: "Show piano chord", exact: true }).first().click();
     const progressionPiano = page
-      .locator('[data-testid="progression-step"]')
+      .getByTestId("piano-roll-piano-cards")
+      .locator(".piano-roll-instrument-card")
       .first()
       .locator(".mini-piano");
     await expect(progressionPiano).toBeVisible();

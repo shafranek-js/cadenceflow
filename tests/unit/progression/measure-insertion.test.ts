@@ -36,7 +36,7 @@ function chord(
   duration: ReturnType<typeof rational>,
   patch: Partial<Extract<ProgressionStep, { kind: "chord" }>> = {},
 ): Extract<ProgressionStep, { kind: "chord" }> {
-  return Object.freeze({
+  return Object.freeze<Extract<ProgressionStep, { kind: "chord" }>>({
     ...createMatrixChordStep(project, functionId, id),
     duration: musicalDuration(duration),
     ...patch,
@@ -48,14 +48,19 @@ function rest(
   duration: ReturnType<typeof rational>,
   patch: Partial<RestStep> = {},
 ): RestStep {
-  return Object.freeze({ id, kind: "rest", duration: musicalDuration(duration), ...patch });
+  return Object.freeze<RestStep>({
+    id,
+    kind: "rest",
+    duration: musicalDuration(duration),
+    ...patch,
+  });
 }
 
 function projectWith(
   steps: readonly ProgressionStep[],
   progressionPatch: Partial<Project["progression"]> = {},
 ): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     progression: Object.freeze({
       ...base.progression,
@@ -133,7 +138,7 @@ describe("T216 Measure insertion model", () => {
     const crossing = chord(base, "crossing", "I", rational(6), {
       transpositionSemitones: 2,
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [
             {
@@ -184,7 +189,7 @@ describe("T216 Measure insertion model", () => {
   it("preserves effective generated Melody and leaves the inserted interval silent", () => {
     const generated = chord(base, "generated", "I", rational(8), {
       melody: {
-        mode: "generated",
+        mode: "generated" as const,
         recipe: {
           pitchMotion: "up",
           rhythm: "even",

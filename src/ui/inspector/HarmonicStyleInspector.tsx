@@ -1,17 +1,19 @@
-import {
-  GENRE_FOCUS_OPTIONS,
-  type GenreFocusId,
-} from "../../domain/harmony/functionSemantics";
+import { useId } from "react";
+import { GENRE_FOCUS_OPTIONS, type GenreFocusId } from "../../domain/harmony/functionSemantics";
+import { InspectorDisclosureToggle } from "./InspectorDisclosure";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
+
+const HARMONIC_STYLE_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.harmonic-style-inspector-disclosure-open";
 
 export interface HarmonicStyleInspectorProps {
   readonly value: GenreFocusId;
   readonly onChange: (genre: GenreFocusId) => void;
 }
 
-export function HarmonicStyleInspector({
-  value,
-  onChange,
-}: HarmonicStyleInspectorProps) {
+export function HarmonicStyleInspector({ value, onChange }: HarmonicStyleInspectorProps) {
+  const bodyId = useId();
+  const disclosure = useInspectorDisclosure(HARMONIC_STYLE_DISCLOSURE_STORAGE_KEY, true);
   const currentOption =
     GENRE_FOCUS_OPTIONS.find((opt) => opt.id === value) ?? GENRE_FOCUS_OPTIONS[0]!;
 
@@ -23,9 +25,18 @@ export function HarmonicStyleInspector({
       data-testid="harmonic-style-inspector"
     >
       <header className="harmonic-style-header">
-        <div>
-          <span className="inspector-context-kicker">Harmonic Guide</span>
-          <h3>Style Focus</h3>
+        <div className="inspector-panel-heading">
+          <InspectorDisclosureToggle
+            isOpen={disclosure.isOpen}
+            onToggle={disclosure.toggle}
+            ariaLabel="Toggle Style Focus section"
+            controlsId={bodyId}
+            testId="harmonic-style-disclosure-btn"
+          />
+          <div>
+            <span className="inspector-context-kicker">Harmonic Guide</span>
+            <h3>Style Focus</h3>
+          </div>
         </div>
         <span
           className="style-active-badge"
@@ -36,36 +47,38 @@ export function HarmonicStyleInspector({
         </span>
       </header>
 
-      <div className="harmonic-style-body">
-        <div
-          className="genre-focus-pills"
-          role="radiogroup"
-          aria-label="Select musical style focus"
-          data-testid="genre-focus-selector"
-        >
-          {GENRE_FOCUS_OPTIONS.map((option) => {
-            const active = value === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`genre-focus-pill ${active ? "is-active" : ""}`}
-                title={`${option.label}: ${option.description}`}
-                data-testid={`genre-focus-${option.id}`}
-                onClick={() => onChange(option.id)}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+      {disclosure.isOpen ? (
+        <div id={bodyId} className="harmonic-style-body">
+          <div
+            className="genre-focus-pills"
+            role="radiogroup"
+            aria-label="Select musical style focus"
+            data-testid="genre-focus-selector"
+          >
+            {GENRE_FOCUS_OPTIONS.map((option) => {
+              const active = value === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`genre-focus-pill ${active ? "is-active" : ""}`}
+                  title={`${option.label}: ${option.description}`}
+                  data-testid={`genre-focus-${option.id}`}
+                  onClick={() => onChange(option.id)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
 
-        <p className="harmonic-style-description" data-testid="harmonic-style-description">
-          {currentOption.description}
-        </p>
-      </div>
+          <p className="harmonic-style-description" data-testid="harmonic-style-description">
+            {currentOption.description}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }

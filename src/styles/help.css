@@ -314,7 +314,8 @@
 }
 
 @media (max-width: 680px) {
-  .help-grid-3, .help-grid-2 {
+  .help-grid-3,
+  .help-grid-2 {
     grid-template-columns: 1fr;
   }
 }
@@ -490,11 +491,21 @@
   flex-shrink: 0;
 }
 
-.help-finger-badge.finger-1 { background: #f7aa06; }
-.help-finger-badge.finger-2 { background: #c920ff; }
-.help-finger-badge.finger-3 { background: #00affe; }
-.help-finger-badge.finger-4 { background: #f56e50; }
-.help-finger-badge.finger-0 { background: #9ca3af; }
+.help-finger-badge.finger-1 {
+  background: #f7aa06;
+}
+.help-finger-badge.finger-2 {
+  background: #c920ff;
+}
+.help-finger-badge.finger-3 {
+  background: #00affe;
+}
+.help-finger-badge.finger-4 {
+  background: #f56e50;
+}
+.help-finger-badge.finger-0 {
+  background: #9ca3af;
+}
 
 .help-finger-card div {
   display: flex;

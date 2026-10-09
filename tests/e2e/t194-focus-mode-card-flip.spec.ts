@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 const acceptanceModes = [
   { width: 1280, height: 720, theme: "light" },
@@ -18,6 +19,7 @@ for (const acceptance of acceptanceModes) {
       sessionStorage.clear();
     });
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await setProgressionView(page, "staff");
 
     await page
       .getByRole("button", {
@@ -29,7 +31,7 @@ for (const acceptance of acceptanceModes) {
     const focusToggle = page.getByTestId("matrix-focus-toggle");
     const panel = page.locator(".matrix-panel");
     const harmonicView = page.getByTestId("matrix-view-btn-harmonic");
-    const progressionSteps = page.getByTestId("progression-step");
+    const progressionSteps = page.locator(".measure-staff-event-select");
     const initialStepCount = await progressionSteps.count();
     await expect(harmonicView).toHaveAttribute("aria-pressed", "true");
 

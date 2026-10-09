@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test.describe("US10 — progression-owned playback transport", () => {
   test.beforeEach(async ({ page }) => {
@@ -9,6 +10,7 @@ test.describe("US10 — progression-owned playback transport", () => {
     });
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("main", { name: "CadenceFlow Studio" })).toBeVisible();
+    await setProgressionView(page, "staff");
   });
 
   test("renders one transport cluster and keeps disabled states with no selected step", async ({
@@ -46,7 +48,7 @@ test.describe("US10 — progression-owned playback transport", () => {
     const resume = controls.getByRole("button", { name: "Resume", exact: true });
     const stop = controls.getByRole("button", { name: "Stop", exact: true });
     const status = controls.getByTestId("transport-status");
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     const selectedInspector = page.getByTestId("step-performance-inspector");
 
     await page
@@ -61,7 +63,7 @@ test.describe("US10 — progression-owned playback transport", () => {
 
     await steps.nth(1).click();
     await expect(fromHere).toBeEnabled();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await play.click();
@@ -70,8 +72,8 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(pause).toBeEnabled();
     await expect(fromHere).toBeDisabled();
     await expect(stop).toBeEnabled();
-    await expect(steps.nth(0)).toHaveClass(/is-playing/);
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(0).locator("..")).toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await pause.click();
@@ -79,14 +81,14 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(pause).toBeDisabled();
     await expect(resume).toBeEnabled();
     await expect(stop).toBeEnabled();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await resume.click();
     await expect(status).toContainText("Playing");
     await expect(resume).toBeDisabled();
     await expect(pause).toBeEnabled();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await stop.click();
@@ -96,17 +98,17 @@ test.describe("US10 — progression-owned playback transport", () => {
     await expect(pause).toBeDisabled();
     await expect(resume).toBeDisabled();
     await expect(stop).toBeDisabled();
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
-    await expect(steps.nth(1)).not.toHaveClass(/is-playing/);
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1).locator("..")).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await expect(fromHere).toBeEnabled();
     await fromHere.click();
     await expect(status).toContainText("Playing");
-    await expect(steps.nth(1)).toHaveClass(/is-playing/);
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1).locator("..")).toHaveClass(/is-playing/);
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(selectedInspector).toContainText("Step Performance: IV");
 
     await stop.click();
@@ -121,7 +123,7 @@ test.describe("US10 — progression-owned playback transport", () => {
       .getByTestId("chord-card-I")
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(1);
 
     const status = page.getByTestId("transport-status");
     const stop = page.getByRole("button", { name: "Stop", exact: true });

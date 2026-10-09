@@ -9,6 +9,7 @@ import { editStepPerformance, replaceStep } from "../../../src/app/commands/prog
 import { setStepDuration } from "../../../src/app/commands/timingCommands";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../../src/domain/project/migrations";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 import { ProgressionQuickEdit } from "../../../src/ui/progression/ProgressionQuickEdit";
@@ -65,7 +66,7 @@ describe("T200 label hierarchy", () => {
   });
 
   it("keeps the hierarchy mode presentation-only", () => {
-    expect(baseProject.schemaVersion).toBe(6);
+    expect(baseProject.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     expect(baseProject.progression.steps).toHaveLength(0);
   });
 });
@@ -175,13 +176,13 @@ describe("T200 canonical quick-edit command routes", () => {
     expect(store.project.progression.steps[0]?.kind === "chord").toBe(true);
     expect(
       store.project.progression.steps[0]?.kind === "chord" &&
-        store.project.progression.steps[0].harmonicFunction.functionId,
+        store.project.progression.steps[0]!.harmonicFunction.functionId,
     ).toBe("V");
     expect(store.undo()).toBe(true);
     expect(store.project.progression.selectedStepId).toBe(chordStep.id);
     expect(
       store.project.progression.steps[0]?.kind === "chord" &&
-        store.project.progression.steps[0].harmonicFunction.functionId,
+        store.project.progression.steps[0]!.harmonicFunction.functionId,
     ).toBe("I");
     expect(store.redo()).toBe(true);
     expect(store.project.progression.selectedStepId).toBe(chordStep.id);
@@ -220,7 +221,7 @@ describe("T200 canonical quick-edit command routes", () => {
     expect(store.undo()).toBe(true);
     expect(
       store.project.progression.steps[0]?.kind === "chord" &&
-        store.project.progression.steps[0].performance.inversion,
+        store.project.progression.steps[0]!.performance.inversion,
     ).toBe(chordStep.performance.inversion);
     expect(store.redo()).toBe(true);
     expect(store.project.progression.selectedStepId).toBe(chordStep.id);

@@ -1,3 +1,4 @@
+import { requireValue } from "../../../fixtures/assertions";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AudioNoteEvent } from "../../../../src/audio/contracts";
@@ -7,12 +8,13 @@ import {
   MELODY_SAMPLE_FILES,
   MelodySoundFontProvider,
   type MelodySamplePlayer,
+  type MelodySoundFontProviderOptions,
 } from "../../../../src/audio/soundfont/melodyProvider";
 
-function createPlayer(): MelodySamplePlayer & { play: ReturnType<typeof vi.fn> } {
+function createPlayer() {
   return {
-    play: vi.fn(() => ({ stop: vi.fn() })),
-    stop: vi.fn(),
+    play: vi.fn<MelodySamplePlayer["play"]>(() => ({ stop: vi.fn() })),
+    stop: vi.fn<MelodySamplePlayer["stop"]>(),
   };
 }
 
@@ -20,7 +22,7 @@ function createContext(): AudioContext {
   return { currentTime: 10, destination: {} } as AudioContext;
 }
 
-const event: AudioNoteEvent = Object.freeze({
+const event: AudioNoteEvent = Object.freeze<AudioNoteEvent>({
   pitch: 72,
   startSeconds: 0.25,
   durationSeconds: 0.5,
@@ -31,7 +33,9 @@ const event: AudioNoteEvent = Object.freeze({
 describe("T172 — local sampled Melody provider", () => {
   it("deduplicates local instrument loading and schedules decoded samples", async () => {
     const player = createPlayer();
-    const loader = vi.fn(async () => player);
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async () => player,
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
@@ -60,7 +64,9 @@ describe("T172 — local sampled Melody provider", () => {
   it("keeps live Melody and editor preview cancellation isolated", async () => {
     const violin = createPlayer();
     const cello = createPlayer();
-    const loader = vi.fn(async (_context, instrument) => (instrument === "cello" ? cello : violin));
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async (_context, instrument) => (instrument === "cello" ? cello : violin),
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
@@ -86,7 +92,9 @@ describe("T172 — local sampled Melody provider", () => {
     const violin = createPlayer();
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
-      loadInstrument: vi.fn(async () => violin),
+      loadInstrument: vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+        async () => violin,
+      ),
       instrument: "violin",
     });
     await provider.prepare();
@@ -118,7 +126,9 @@ describe("T172 — local sampled Melody provider", () => {
 
   it("loads non-stable instruments from the local FluidR3_GM bank", async () => {
     const trumpetPlayer = createPlayer();
-    const loader = vi.fn(async () => trumpetPlayer);
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async () => trumpetPlayer,
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
@@ -141,8 +151,8 @@ describe("T172 — local sampled Melody provider", () => {
   it("mixes stable and catalog-local instruments in one preparation", async () => {
     const violin = createPlayer();
     const trumpet = createPlayer();
-    const loader = vi.fn(async (_context, instrument) =>
-      instrument === "violin" ? violin : trumpet,
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async (_context, instrument) => (instrument === "violin" ? violin : trumpet),
     );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
@@ -165,7 +175,9 @@ describe("T172 — local sampled Melody provider", () => {
   });
 
   it("resolves all 128 GM programs to distinct local assets without a network fallback", async () => {
-    const loader = vi.fn(async () => createPlayer());
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(async () =>
+      createPlayer(),
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
@@ -178,7 +190,7 @@ describe("T172 — local sampled Melody provider", () => {
     expect(loader).toHaveBeenCalledTimes(128);
     const urls = loader.mock.calls.map((call) => call[2]);
     expect(new Set(urls).size).toBe(128);
-    expect(urls.every((url) => !url.includes("gleitz.github.io"))).toBe(true);
+    expect(urls.every((url) => !requireValue(url).includes("gleitz.github.io"))).toBe(true);
     expect(urls).toContain("/audio/soundfont/church_organ-mp3.js");
     expect(urls).toContain("/audio/melody/FluidR3_GM/violin-mp3.js");
     expect(urls).toContain("/audio/guitar/acoustic_guitar_steel-mp3.js");
@@ -186,10 +198,12 @@ describe("T172 — local sampled Melody provider", () => {
 
   it("keeps available playback running when another realtime lane fails to load", async () => {
     const violin = createPlayer();
-    const loader = vi.fn(async (_context, instrument) => {
-      if (instrument === "cello") throw new Error("cello sample failed");
-      return violin;
-    });
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async (_context, instrument) => {
+        if (instrument === "cello") throw new Error("cello sample failed");
+        return violin;
+      },
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,
@@ -217,7 +231,9 @@ describe("T172 — local sampled Melody provider", () => {
 
   it("loads guitar soundfonts gm-024 (nylon) and gm-025 (steel) from local assets", async () => {
     const guitarPlayer = createPlayer();
-    const loader = vi.fn(async () => guitarPlayer);
+    const loader = vi.fn<NonNullable<MelodySoundFontProviderOptions["loadInstrument"]>>(
+      async () => guitarPlayer,
+    );
     const provider = new MelodySoundFontProvider({
       audioContext: createContext(),
       loadInstrument: loader,

@@ -150,7 +150,7 @@ describe("Piano Roll chord audition", () => {
         (event) => event.durationSeconds <= 4 * (60 / project.globalTiming.tempoBpm),
       ),
     ).toBe(true);
-    expect(preview!.events.some((event) => event.pitch.midiNumber === 111)).toBe(false);
+    expect(preview!.events.some((event) => event.pitch === 111)).toBe(false);
     expect(realizePianoRollChordAudition(project, "missing")).toBeNull();
 
     const scheduledEvents: import("../../../src/audio/contracts").AudioNoteEvent[][] = [];
@@ -173,7 +173,7 @@ describe("Piano Roll chord audition", () => {
     expect(actualPlayback?.scheduledAt).toBe(18.75);
     expect(scheduledEvents).toHaveLength(1);
     expect(scheduledEvents[0]).toEqual(preview!.events);
-    expect(scheduledEvents[0]!.some((event) => event.pitch.midiNumber === 111)).toBe(false);
+    expect(scheduledEvents[0]!.some((event) => event.pitch === 111)).toBe(false);
   });
 
   it("schedules a Harmony attack at Split without introducing a Melody attack", () => {

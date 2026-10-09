@@ -11,7 +11,12 @@ import { globalTiming, meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import { groove } from "../../../src/domain/timing/swing";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
-import { snapshotChordMelodyRecipe, type MelodyInstrument } from "../../../src/domain/melody/types";
+import {
+  snapshotChordMelody,
+  type ChordMelody,
+  type MelodyInstrument,
+  type MelodyRecipeInput,
+} from "../../../src/domain/melody/types";
 import {
   MIDI_PPQ,
   projectProjectToMidi,
@@ -21,7 +26,7 @@ import {
 import { writeMidiFile, writeStandardMidiFile } from "../../../src/export/midi/writer";
 
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     ...DEFAULT_PIANO_PERFORMANCE,
     articulation: "block",
     ...overrides,
@@ -46,20 +51,21 @@ function chord(
   performanceOverrides: Partial<StepPerformance> = {},
 ): ChordStep {
   const base = createMatrixChordStep(project, functionId, id);
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     ...base,
     duration: musicalDuration(rational(durationNumerator, durationDenominator)),
     performance: performance(performanceOverrides),
   });
 }
 
-function melodyChord(step: ChordStep, recipe: ChordStep["melody"]): ChordStep {
-  if (!recipe) throw new Error("melody fixture requires a recipe");
-  return Object.freeze({ ...step, melody: snapshotChordMelodyRecipe(recipe) });
+// `ChordStep.melody` is a `ChordMelody` (`{ mode: "generated" as const, recipe }`), not a bare recipe.
+// Accepting either lets callers pass a recipe literal, which is what every call site does.
+function melodyChord(step: ChordStep, melody: ChordMelody | MelodyRecipeInput): ChordStep {
+  return Object.freeze<ChordStep>({ ...step, melody: snapshotChordMelody(melody) });
 }
 
 function rest(id: string, numerator: number, denominator = 1): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(numerator, denominator)),
@@ -71,7 +77,7 @@ function projectWithSteps(
   overrides: Partial<Project> = {},
 ): Project {
   const base = createDefaultProject("midi-fixture", "MIDI Fixture", "2026-09-07T00:00:00.000Z");
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     ...overrides,
     progression: Object.freeze({ steps: Object.freeze([...steps]) }),
@@ -103,7 +109,7 @@ function makeManualProject(): Project {
         perNoteVelocityOverrides: { "60": 111 },
       }),
     ],
-    { ...project },
+    { ...project, independentBassEnabled: true },
   );
 }
 
@@ -121,12 +127,20 @@ function makeMelodyExportProject(instrument: MelodyInstrument = "violin"): Proje
       masterVelocity: 92,
       perNoteVelocityOverrides: { "64": 111 },
     }),
-    { pattern: "up", grid: "quarter", octaveOffset: 1 },
+    {
+      pitchMotion: "up",
+      grid: "quarter",
+      octaveOffset: 1,
+      rhythm: "even",
+      connection: "retrigger",
+    },
   );
   const second = melodyChord(chord(base, "V", "melody-second", 1, 1), {
-    pattern: "down",
+    pitchMotion: "down",
     grid: "quarter",
     octaveOffset: 0,
+    rhythm: "even",
+    connection: "retrigger",
   });
   return projectWithSteps([first, rest("melody-rest", 1, 2), second], {
     globalTiming: globalTiming(120, meter(4, 4, [4])),
@@ -239,7 +253,10 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
           bass: { choice: "custom", octaveOffset: "auto", customPitch: bass },
         }),
       ],
-      { globalTiming: globalTiming(120, meter(4, 4, [4])) },
+      {
+        globalTiming: globalTiming(120, meter(4, 4, [4])),
+        independentBassEnabled: true,
+      },
     );
     const projection = projectProjectToMidi(project);
 
@@ -283,7 +300,7 @@ describe("US9 MIDI projection and deterministic SMF writer", () => {
     const base = createDefaultProject("context-fixture", "Context Fixture");
     const first = chord(base, "IV", "context-iv", 1, 1);
     const second = chord(base, "I", "context-i", 1, 1, { register: 2 });
-    const project = projectWithSteps([first, second]);
+    const project = projectWithSteps([first, second], { independentBassEnabled: true });
     const projection = projectProjectToMidi(project);
 
     // Literal golden values: the expected table does not call the production realizer.
@@ -806,9 +823,11 @@ describe("notation-friendly MIDI export", () => {
         progression: Object.freeze({
           steps: Object.freeze([
             melodyChord(chord(base, "I", "triplet-melody", 1, 1), {
-              pattern: "up",
+              pitchMotion: "up",
               grid: "eighth-triplet",
               octaveOffset: 0,
+              rhythm: "even",
+              connection: "retrigger",
             }),
           ]),
         }),
@@ -828,7 +847,13 @@ describe("notation-friendly MIDI export", () => {
         voicingMode: "manual",
         manualVoicing: [exactPitch(60, { step: "C", alter: 0 })],
       }),
-      { pattern: "up", grid: "quarter", octaveOffset: 0 },
+      {
+        pitchMotion: "up",
+        grid: "quarter",
+        octaveOffset: 0,
+        rhythm: "even",
+        connection: "retrigger",
+      },
     );
     const parsed = parseFormatOneSmf(writeMidiFile(projectProjectToMidi(projectWithSteps([step]))));
     expect(
@@ -841,9 +866,11 @@ describe("notation-friendly MIDI export", () => {
   it("keeps Mute, Solo, and Temporary Branch outside the exported Melody data", () => {
     const base = makeMelodyExportProject();
     const branchStep = melodyChord(chord(base, "ii", "branch-melody-only", 1, 1), {
-      pattern: "up",
+      pitchMotion: "up",
       grid: "quarter",
       octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
     });
     const muted = Object.freeze({
       ...base,
@@ -884,6 +911,7 @@ describe("notation-friendly MIDI export", () => {
     const step = createMatrixChordStep(base, "I", "golden-step");
     const project = Object.freeze({
       ...base,
+      independentBassEnabled: true,
       progression: Object.freeze({ steps: Object.freeze([step]) }),
     });
     const projection = projectProjectToMidi(project);

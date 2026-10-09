@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
-async function openEmptyStudio(page: Page, viewport?: { width: number; height: number }) {
+async function openEmptyStudio(
+  page: Page,
+  viewport?: { width: number; height: number },
+  setStaffView = true,
+) {
   if (viewport) await page.setViewportSize(viewport);
   await page.addInitScript(() => {
     localStorage.clear();
@@ -9,10 +14,11 @@ async function openEmptyStudio(page: Page, viewport?: { width: number; height: n
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("guided-start")).toBeVisible();
+  if (setStaffView) await setProgressionView(page, "staff");
 }
 
 async function progressionCount(page: Page): Promise<number> {
-  return page.getByTestId("progression-step").count();
+  return page.locator(".measure-staff-event-select").count();
 }
 
 async function expectOneHistoryEntry(page: Page, expectedCount: number): Promise<void> {
@@ -23,24 +29,24 @@ async function expectOneHistoryEntry(page: Page, expectedCount: number): Promise
   });
   await expect(undo).toBeEnabled();
   await undo.click();
-  await expect(page.getByTestId("progression-step")).toHaveCount(0);
+  await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
   await editToggle.click();
   const redo = page.getByRole("menu", { name: "Edit menu" }).getByRole("menuitem", {
     name: "Redo",
   });
   await expect(redo).toBeEnabled();
   await redo.click();
-  await expect(page.getByTestId("progression-step")).toHaveCount(expectedCount);
+  await expect(page.locator(".measure-staff-event-select")).toHaveCount(expectedCount);
 }
 
 test.describe("T205 — Guided Start", () => {
   test("Blank project keeps the project empty and dismisses beginner guidance", async ({
     page,
   }) => {
-    await openEmptyStudio(page);
+    await openEmptyStudio(page, undefined, false);
 
     await page.getByTestId("guided-start-blank").click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
     await expect(page.getByTestId("guided-start")).toHaveCount(0);
     await expect(page.getByTestId("progression-empty-dismissed")).toBeVisible();
     await page.getByTestId("edit-menu-toggle").click();
@@ -61,15 +67,15 @@ test.describe("T205 — Guided Start", () => {
 
     const firstCard = page.getByTestId("chord-card-I").locator(".chord-main");
     await firstCard.click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
 
     await page.getByTestId("guided-start-guided-back").click();
     await expect(page.getByTestId("guided-start-paths")).toBeVisible();
     await firstCard.click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
 
     await firstCard.click({ modifiers: ["Control"] });
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(1);
     await expect(page.getByTestId("guided-start")).toHaveCount(0);
     await expectOneHistoryEntry(page, 1);
   });
@@ -87,7 +93,7 @@ test.describe("T205 — Guided Start", () => {
       .getByRole("menu", { name: "Edit menu" })
       .getByRole("menuitem", { name: "Undo" })
       .click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
     await expect(page.getByTestId("guided-start")).toHaveCount(0);
     await expect(page.getByTestId("progression-empty-dismissed")).toBeVisible();
   });
@@ -96,7 +102,7 @@ test.describe("T205 — Guided Start", () => {
     await openEmptyStudio(page);
 
     await page.getByTestId("guided-start-example").click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(4);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(4);
     await expect(page.getByTestId("guided-start")).toHaveCount(0);
     await expectOneHistoryEntry(page, 4);
   });
@@ -106,8 +112,9 @@ test.describe("T205 — Guided Start", () => {
     await page.getByRole("button", { name: /^Dark Harmony/ }).click();
     await expect(page.locator('.matrix-panel[data-module="dark-harmony"]')).toBeVisible();
     await page.getByTestId("guided-start-example").click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(4);
-    await expect(page.getByTestId("progression-step").first()).toContainText("i");
+    const steps = page.locator(".measure-staff-event-select");
+    await expect(steps).toHaveCount(4);
+    await expect(steps.first()).toHaveAttribute("aria-label", /Select i ·/);
     await expectOneHistoryEntry(page, 4);
   });
 

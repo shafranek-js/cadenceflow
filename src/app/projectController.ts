@@ -5,7 +5,8 @@ import { InvalidProjectNameError, normalizeProjectName } from "../domain/project
 import type { Project } from "../domain/project/project";
 import { UnsupportedProjectVersionError } from "../domain/project/migrations";
 import {
-  decodePortableProject,
+  decodePortableProjectWithDiagnostics,
+  type PortableProjectDecodeResult,
   encodePortableProject,
   InvalidPortableProjectError,
   sanitizePortableProjectFilename,
@@ -31,6 +32,13 @@ export interface ProjectControllerOptions {
   readonly now?: () => string;
   /** Stop/cancel transport and other runtime state before identity replacement. */
   readonly beforeProjectSwitch?: () => void;
+  /**
+   * Reports an autosave failure to the shell so the user learns their work is not saved.
+   * Without this the engine's rejection was invisible: no status and no retry feedback.
+   */
+  readonly onAutosaveError?: (error: unknown, project: Project) => void;
+  /** Reports a successful autosave, e.g. to clear a previous failure notice. */
+  readonly onAutosaveComplete?: (project: Project) => void;
 }
 
 export class ProjectNotFoundError extends Error {
@@ -44,6 +52,13 @@ export class ProjectOperationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ProjectOperationError";
+  }
+}
+
+export class ProjectRecoveryCancelledError extends ProjectOperationError {
+  constructor() {
+    super("Project recovery was cancelled. The stored project was left unchanged.");
+    this.name = "ProjectRecoveryCancelledError";
   }
 }
 
@@ -94,19 +109,35 @@ export class ProjectController {
   private readonly createId: () => string;
   private readonly now: () => string;
   private beforeProjectSwitch: () => void;
+  private onAutosaveError: (error: unknown, project: Project) => void;
+  private onAutosaveComplete: (project: Project) => void;
+  private isDisposed = false;
   private autosaveStarted = false;
+  private startupPromise: Promise<Project> | null = null;
+  private startupComplete = false;
   private unsubscribeStore: (() => void) | null = null;
   private operation: Promise<unknown> = Promise.resolve();
 
   constructor(options: ProjectControllerOptions) {
     this.store = options.store;
     this.repo = options.repo ?? createProjectRepository();
+    this.onAutosaveError = options.onAutosaveError ?? (() => {});
+    this.onAutosaveComplete = options.onAutosaveComplete ?? (() => {});
     this.autosave =
       options.autosave ??
       createAutosaveEngine({
         repo: this.repo,
         onSaveScheduled: reportAutosaveScheduled,
-        onSaveComplete: reportAutosaveComplete,
+        onSaveComplete: (project) => {
+          if (this.isDisposed || project.id !== this.store.project.id) return;
+          reportAutosaveComplete(project);
+          this.onAutosaveComplete(project);
+        },
+        onSaveError: (error, project) => {
+          if (!this.isDisposed && project.id === this.store.project.id) {
+            this.onAutosaveError(error, project);
+          }
+        },
       });
     this.createId = options.createId ?? createProjectId;
     this.now = options.now ?? (() => new Date().toISOString());
@@ -117,9 +148,38 @@ export class ProjectController {
     this.beforeProjectSwitch = callback;
   }
 
+  /**
+   * Registers the shell's autosave-failure reporter.
+   *
+   * The shell learns of a failed write here rather than through a constructor option so the
+   * reporter can be a component-scoped callback that closes over UI state.
+   */
+  setAutosaveErrorHandler(callback: (error: unknown, project: Project) => void): void {
+    this.onAutosaveError = callback;
+  }
+
+  setAutosaveCompleteHandler(callback: (project: Project) => void): void {
+    this.onAutosaveComplete = callback;
+  }
+
+  /**
+   * Writes any pending autosave immediately.
+   *
+   * Best effort for pagehide: a browser may terminate asynchronous persistence on unload.
+   * Explicit project operations await flush instead.
+   */
+  flushPendingAutosave(): void {
+    const project = this.store.project;
+    void this.autosave.flush().catch((error: unknown) => {
+      if (!this.isDisposed && this.store.project.id === project.id) {
+        this.onAutosaveError(error, project);
+      }
+    });
+  }
+
   /** Starts the single autosave subscription after startup recovery has run. */
   startAutosave(): void {
-    if (this.autosaveStarted) return;
+    if (this.autosaveStarted || this.isDisposed) return;
     this.autosaveStarted = true;
     this.unsubscribeStore = this.store.subscribe((change) => {
       if (change.persist) this.autosave.scheduleAutosave(this.store.project);
@@ -127,12 +187,16 @@ export class ProjectController {
     this.autosave.scheduleAutosave(this.store.project);
   }
 
-  async recoverLastSession(): Promise<Project | null> {
-    const recovered = await this.autosave.loadAutosavedProject();
-    if (!recovered) return null;
+  async recoverLastSession(
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<Project | null> {
+    const result = await this.autosave.loadAutosavedProjectWithDiagnostics();
+    if (!result) return null;
+    await this.requireRecoveryConfirmation(result, confirmRecovery);
     this.beforeProjectSwitch();
-    this.store.replaceLoadedProject(recovered);
-    return recovered;
+    this.assertActive();
+    this.store.replaceLoadedProject(result.project);
+    return result.project;
   }
 
   /**
@@ -141,13 +205,20 @@ export class ProjectController {
    * creates a collision-free default project instead of persisting the
    * transient App placeholder identity.
    */
-  async initializeSession(rawFallbackName: string): Promise<Project> {
-    return this.runExclusive(async () => {
-      const recovered = await this.autosave.loadAutosavedProject();
+  initializeSession(
+    rawFallbackName: string,
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<Project> {
+    if (this.startupComplete && this.startupPromise) return this.startupPromise;
+    if (this.startupPromise) return this.startupPromise;
+    const startup = this.runExclusive(async () => {
+      const recovered = await this.autosave.loadAutosavedProjectWithDiagnostics();
       if (recovered) {
+        await this.requireRecoveryConfirmation(recovered, confirmRecovery);
         this.beforeProjectSwitch();
-        this.store.replaceLoadedProject(recovered);
-        return recovered;
+        this.assertActive();
+        this.store.replaceLoadedProject(recovered.project);
+        return recovered.project;
       }
 
       const project = createDefaultProject(
@@ -159,6 +230,16 @@ export class ProjectController {
       await this.persistAndActivate(project);
       return project;
     });
+    this.startupPromise = startup;
+    void startup.then(
+      () => {
+        this.startupComplete = true;
+      },
+      () => {
+        if (this.startupPromise === startup) this.startupPromise = null;
+      },
+    );
+    return startup;
   }
 
   async listProjects(): Promise<readonly ProjectMetadata[]> {
@@ -183,7 +264,10 @@ export class ProjectController {
     });
   }
 
-  async openNamedProject(id: string): Promise<Project> {
+  async openNamedProject(
+    id: string,
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<Project> {
     return this.runExclusive(async () => {
       // Persist the outgoing runtime before reading any repository snapshot.
       // Loading first can re-activate stale data when `id` is already active.
@@ -192,10 +276,18 @@ export class ProjectController {
         return this.store.project;
       }
 
-      const project = await this.repo.loadProject(id);
-      if (!project) throw new ProjectNotFoundError(id);
+      const result = await this.loadProjectWithDiagnostics(id);
+      if (!result) throw new ProjectNotFoundError(id);
+      if (result.diagnostics.length > 0) {
+        if (!confirmRecovery)
+          throw new ProjectOperationError("Confirm the recovered project before opening it.");
+        if (!(await confirmRecovery(result))) return this.store.project;
+      }
+      const project = result.project;
       this.beforeProjectSwitch();
+      this.assertActive();
       await this.repo.setLastActiveProjectId(project.id);
+      this.assertActive();
       this.store.replaceLoadedProject(project);
       return project;
     });
@@ -208,13 +300,16 @@ export class ProjectController {
         payload: { name: normalizeProjectName(rawName), nowIso: this.now() },
       };
       this.store.dispatch(command, renameProject);
-      await this.repo.saveProject(this.store.project);
-      await this.repo.setLastActiveProjectId(this.store.project.id);
+      this.autosave.scheduleAutosave(this.store.project);
+      await this.autosave.flush();
       return this.store.project;
-    });
+    }, false);
   }
 
-  async deleteProject(id: string): Promise<Project> {
+  async deleteProject(
+    id: string,
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<Project> {
     return this.runExclusive(async () => {
       const isActive = this.store.project.id === id;
       if (!isActive) {
@@ -222,32 +317,39 @@ export class ProjectController {
         return this.store.project;
       }
 
-      // Stop runtime first, then flush the outgoing semantic state before the
-      // transactional repository deletion. The repository clears the matching
-      // recovery pointer as part of deleteProject().
+      // Resolve a safe replacement before deleting the active record. If its
+      // migration drops fields, the user must confirm while the old record is intact.
       this.beforeProjectSwitch();
       await this.autosave.flush();
-      await this.repo.deleteProject(id);
-
-      // Deterministic policy: restore the most recently updated surviving
-      // project; if none survives, create a fresh Untitled project.
-      const remaining = await this.listProjects();
+      const remaining = (await this.listProjects()).filter((metadata) => metadata.id !== id);
+      let replacement: Project | null = null;
       for (const metadata of remaining) {
-        const replacement = await this.repo.loadProject(metadata.id);
-        if (replacement) {
-          await this.repo.setLastActiveProjectId(replacement.id);
-          this.store.replaceLoadedProject(replacement);
-          return replacement;
-        }
+        const result = await this.loadProjectWithDiagnostics(metadata.id);
+        if (!result) continue;
+        await this.requireRecoveryConfirmation(result, confirmRecovery);
+        replacement = result.project;
+        break;
       }
 
-      const replacement = createDefaultProject(
-        await this.nextAvailableId(),
-        "Untitled",
-        this.now(),
-      );
-      await this.repo.saveProject(replacement);
-      await this.repo.setLastActiveProjectId(replacement.id);
+      const replacementIsFresh = replacement === null;
+      if (!replacement) {
+        replacement = createDefaultProject(await this.nextAvailableId(), "Untitled", this.now());
+      }
+      if (this.repo.replaceActiveProject) {
+        await this.repo.replaceActiveProject(id, replacement);
+      } else {
+        // Keep the old active record recoverable until the replacement is safely
+        // stored and selected. Roll the pointer back if deletion fails.
+        if (replacementIsFresh) await this.repo.saveProject(replacement);
+        await this.repo.setLastActiveProjectId(replacement.id);
+        try {
+          await this.repo.deleteProject(id);
+        } catch (error) {
+          await this.repo.setLastActiveProjectId(id).catch(() => {});
+          throw error;
+        }
+      }
+      this.assertActive();
       this.store.replaceLoadedProject(replacement);
       return replacement;
     });
@@ -271,10 +373,31 @@ export class ProjectController {
     });
   }
 
-  async openPortableProject(text: string): Promise<Project> {
+  async openPortableProject(
+    text: string,
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<Project> {
     // Decode and collision-check before touching current runtime, history, or
     // recovery metadata. Invalid/future-version files are non-destructive.
-    const decoded = decodePortableProject(text);
+    const result = decodePortableProjectWithDiagnostics(text);
+    if (result.diagnostics.length > 0) {
+      if (!confirmRecovery)
+        throw new ProjectOperationError("Confirm the recovered project before opening it.");
+      if (!(await confirmRecovery(result))) return this.store.project;
+    }
+    return this.openPreparedPortableProject(result, result.diagnostics.length > 0);
+  }
+
+  /** Caller must present diagnostics before invoking activation of this immutable snapshot. */
+  async openPreparedPortableProject(
+    result: PortableProjectDecodeResult,
+    recoveryConfirmed = false,
+  ): Promise<Project> {
+    if (result.diagnostics.length > 0 && !recoveryConfirmed) {
+      throw new ProjectOperationError("Confirm the recovered project before opening it.");
+    }
+    this.assertActive();
+    const decoded = result.project;
     const sameId = await this.repo.loadProject(decoded.id);
     const imported = sameId
       ? copyProjectWithIdentity(
@@ -296,6 +419,7 @@ export class ProjectController {
   }
 
   dispose(): void {
+    this.isDisposed = true;
     this.unsubscribeStore?.();
     this.unsubscribeStore = null;
     this.autosave.dispose();
@@ -309,19 +433,60 @@ export class ProjectController {
     throw new ProjectOperationError("Could not allocate a unique project ID.");
   }
 
+  private async loadProjectWithDiagnostics(
+    id: string,
+  ): Promise<PortableProjectDecodeResult | null> {
+    if (this.repo.loadProjectWithDiagnostics) {
+      return this.repo.loadProjectWithDiagnostics(id);
+    }
+    const project = await this.repo.loadProject(id);
+    return project ? Object.freeze({ project, diagnostics: Object.freeze([]) }) : null;
+  }
+
+  private async requireRecoveryConfirmation(
+    result: PortableProjectDecodeResult,
+    confirmRecovery?: (result: PortableProjectDecodeResult) => Promise<boolean>,
+  ): Promise<void> {
+    if (result.diagnostics.length === 0) return;
+    if (!confirmRecovery) {
+      throw new ProjectOperationError("Confirm the recovered project before opening it.");
+    }
+    if (!(await confirmRecovery(result))) throw new ProjectRecoveryCancelledError();
+  }
+
   private async prepareIdentityReplacement(): Promise<void> {
     this.beforeProjectSwitch();
     await this.autosave.flush();
+    this.assertActive();
+  }
+
+  private assertActive(): void {
+    if (this.isDisposed) throw new ProjectOperationError("The project session was closed.");
   }
 
   private async persistAndActivate(project: Project): Promise<void> {
     await this.repo.saveProject(project);
+    this.assertActive();
     await this.repo.setLastActiveProjectId(project.id);
+    this.assertActive();
     this.store.replaceLoadedProject(project);
   }
 
-  private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.operation.then(operation, operation);
+  private runExclusive<T>(operation: () => Promise<T>, suspendEditing = true): Promise<T> {
+    const guardedOperation = async () => {
+      this.assertActive();
+      if (!suspendEditing) return operation();
+      // Stop MIDI/audio before the first asynchronous boundary. Commands cannot modify
+      // the outgoing snapshot while it is being drained or a target is being loaded.
+      this.beforeProjectSwitch();
+      this.store.setEditingSuspended(true);
+      try {
+        return await operation();
+      } finally {
+        this.store.setEditingSuspended(false);
+      }
+    };
+    const result = this.operation.then(guardedOperation, guardedOperation);
     this.operation = result.then(
       () => undefined,
       () => undefined,

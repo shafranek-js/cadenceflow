@@ -7,7 +7,13 @@ import { melodyGridDuration } from "../domain/melody/patterns";
 import { projectSwingTiming, type TimedEvent } from "../domain/timing/swing";
 import { snapshotChordMelody, type MelodyTrackSettings } from "../domain/melody/types";
 import type { ProgressionStep } from "../domain/progression/step";
-import { addRational, compareRational, rationalToNumber, subtractRational, type Rational } from "../domain/timing/rational";
+import {
+  addRational,
+  compareRational,
+  rationalToNumber,
+  subtractRational,
+  type Rational,
+} from "../domain/timing/rational";
 import { resolveEffectiveNoteVelocity } from "../instruments/piano/dynamics";
 
 export interface MelodyPerformanceEvent extends AudioNoteEvent {
@@ -71,7 +77,7 @@ export function realizeProgressionMelodyPerformance(
   const secondsPerBeat = 60 / input.tempoBpm;
   const initialStartSeconds = input.initialStartSeconds ?? 0;
   const events: MelodyPerformanceEvent[] = [];
-  const notesByStep = new Map<number, typeof effective[number][]>();
+  const notesByStep = new Map<number, (typeof effective)[number][]>();
   effective.forEach((note) => {
     const notes = notesByStep.get(note.stepIndex) ?? [];
     notes.push(note);
@@ -91,9 +97,19 @@ export function realizeProgressionMelodyPerformance(
     const step = input.steps[note.stepIndex]!;
     const timing = projected.timings.get(note.stepIndex);
     if (!timing) throw new Error(`missing Step timing for Melody owner ${step.id}`);
-    const chordMelody = step.kind === "chord" && step.melody ? snapshotChordMelody(step.melody) : undefined;
-    const recipe = chordMelody?.mode === "generated" ? chordMelody.recipe : chordMelody?.mode === "authored" ? chordMelody.sourceRecipe : undefined;
-    if (recipe?.rhythm === "even" && (input.groove?.feel ?? "straight") === "swing" && !recipe.grid.endsWith("-triplet")) {
+    const chordMelody =
+      step.kind === "chord" && step.melody ? snapshotChordMelody(step.melody) : undefined;
+    const recipe =
+      chordMelody?.mode === "generated"
+        ? chordMelody.recipe
+        : chordMelody?.mode === "authored"
+          ? chordMelody.sourceRecipe
+          : undefined;
+    if (
+      recipe?.rhythm === "even" &&
+      (input.groove?.feel ?? "straight") === "swing" &&
+      !recipe.grid.endsWith("-triplet")
+    ) {
       const sameStep = notesByStep.get(note.stepIndex) ?? [];
       const timed: readonly TimedEvent[] = sameStep.map((item) => ({
         startBeats: subtractRational(item.startBeats, timing.startBeats),
@@ -101,29 +117,42 @@ export function realizeProgressionMelodyPerformance(
       }));
       const swung = projectSwingTiming(timed, input.groove!, melodyGridDuration(recipe.grid));
       const adjusted = swung[sameStep.indexOf(baseNote)];
-      if (adjusted) note = { ...baseNote, startBeats: addRational(timing.startBeats, adjusted.startBeats), durationBeats: adjusted.durationBeats };
+      if (adjusted)
+        note = {
+          ...baseNote,
+          startBeats: addRational(timing.startBeats, adjusted.startBeats),
+          durationBeats: adjusted.durationBeats,
+        };
     }
     if (compareRational(note.startBeats, progressionEnd) >= 0) return;
     const effectiveEnd = addRational(note.startBeats, note.durationBeats);
-    if (compareRational(effectiveEnd, progressionEnd) > 0) note = { ...note, durationBeats: subtractRational(progressionEnd, note.startBeats) };
-    const sourceVelocity = step.kind === "chord"
-      ? resolveEffectiveNoteVelocity(step.performance.masterVelocity, String(note.sourcePitchMidi), step.performance.perNoteVelocityOverrides)
-      : 100;
-    events.push(Object.freeze({
-      pitch: note.pitch.midiNumber,
-      startSeconds: initialStartSeconds + rationalToNumber(note.startBeats) * secondsPerBeat,
-      durationSeconds: rationalToNumber(note.durationBeats) * secondsPerBeat,
-      velocity: sourceVelocity,
-      channelRole: "melody" as const,
-      eventKey: note.eventKey,
-      sourceStepId: note.sourceStepId,
-      sourcePitchMidi: note.sourcePitchMidi,
-      eventIndex: note.eventIndex,
-      stepIndex: note.stepIndex,
-      startBeats: note.startBeats,
-      durationBeats: note.durationBeats,
-      instrument: note.instrument,
-    }));
+    if (compareRational(effectiveEnd, progressionEnd) > 0)
+      note = { ...note, durationBeats: subtractRational(progressionEnd, note.startBeats) };
+    const sourceVelocity =
+      step.kind === "chord"
+        ? resolveEffectiveNoteVelocity(
+            step.performance.masterVelocity,
+            String(note.sourcePitchMidi),
+            step.performance.perNoteVelocityOverrides,
+          )
+        : 100;
+    events.push(
+      Object.freeze({
+        pitch: note.pitch.midiNumber,
+        startSeconds: initialStartSeconds + rationalToNumber(note.startBeats) * secondsPerBeat,
+        durationSeconds: rationalToNumber(note.durationBeats) * secondsPerBeat,
+        velocity: sourceVelocity,
+        channelRole: "melody" as const,
+        eventKey: note.eventKey,
+        sourceStepId: note.sourceStepId,
+        sourcePitchMidi: note.sourcePitchMidi,
+        eventIndex: note.eventIndex,
+        stepIndex: note.stepIndex,
+        startBeats: note.startBeats,
+        durationBeats: note.durationBeats,
+        instrument: note.instrument,
+      }),
+    );
   });
 
   events.sort(melodyEventComparator);

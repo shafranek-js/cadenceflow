@@ -38,7 +38,7 @@ describe("T191 strict harmonic routing", () => {
       const result = recommend({
         moduleId: "progressions",
         currentFunctionId: source.harmonicFunction.functionId,
-        currentTargetId: targetId,
+        ...(targetId === undefined ? {} : { currentTargetId: targetId }),
         recentFunctionIds: [source.harmonicFunction.functionId],
         visibleFunctionIds: progressionsVisible,
       });

@@ -109,4 +109,89 @@ describe("PreviewAuditionController scheduling notification", () => {
     expect(replacedStart).not.toHaveBeenCalled();
     expect(replaced.schedule).not.toHaveBeenCalled();
   });
+
+  it("publishes scheduled preview events with their own clock and clears only on stop", () => {
+    const instrument = provider();
+    instrument.setState("ready");
+    let now = 8.5;
+    const clock = { now: () => now };
+    const onActivityChange = vi.fn();
+    const controller = new PreviewAuditionController({
+      provider: instrument.instance,
+      clock,
+      onActivityChange,
+    });
+    const events = [event(64), { ...event(48), channelRole: "bass" as const }];
+
+    const scheduled = controller.audition(events);
+    expect(scheduled).not.toBeNull();
+    expect(onActivityChange).toHaveBeenCalledWith({ events, playback: scheduled, clock });
+
+    now = 9;
+    const otherOwner = vi.fn();
+    const otherController = new PreviewAuditionController({
+      provider: instrument.instance,
+      clock,
+      onActivityChange: otherOwner,
+    });
+    otherController.stop();
+    expect(onActivityChange).toHaveBeenCalledTimes(2);
+    expect(onActivityChange).toHaveBeenLastCalledWith({ events, playback: scheduled, clock });
+    expect(otherOwner).toHaveBeenCalledWith(null);
+
+    controller.stop();
+    expect(onActivityChange).toHaveBeenCalledTimes(3);
+    expect(onActivityChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("publishes after delayed schedule readiness and clears if readiness fails", async () => {
+    const ready = deferred<void>();
+    const playback: ScheduledPlayback = {
+      id: "ready-preview",
+      scheduledAt: 12,
+      ready: ready.promise,
+      cancel: vi.fn(),
+    };
+    const instrument = provider({ schedule: vi.fn(() => playback) });
+    instrument.setState("ready");
+    const onActivityChange = vi.fn();
+    const controller = new PreviewAuditionController({
+      provider: instrument.instance,
+      clock: { now: () => 10 },
+      onActivityChange,
+    });
+    const events = [event(67)];
+
+    controller.audition(events);
+    expect(onActivityChange).toHaveBeenCalledOnce();
+    expect(onActivityChange).toHaveBeenLastCalledWith(null);
+    ready.resolve();
+    await ready.promise;
+    await Promise.resolve();
+    expect(onActivityChange).toHaveBeenCalledWith({
+      events,
+      playback,
+      clock: expect.objectContaining({ now: expect.any(Function) }),
+    });
+
+    const failedReady = deferred<void>();
+    const failedPlayback: ScheduledPlayback = {
+      id: "failed-preview",
+      ready: failedReady.promise,
+      cancel: vi.fn(),
+    };
+    const failingInstrument = provider({ schedule: vi.fn(() => failedPlayback) });
+    failingInstrument.setState("ready");
+    const onFailedActivity = vi.fn();
+    const failingController = new PreviewAuditionController({
+      provider: failingInstrument.instance,
+      onActivityChange: onFailedActivity,
+    });
+    failingController.audition([event(70)]);
+    failedReady.reject(new Error("sample load failed"));
+    await failedReady.promise.catch(() => undefined);
+    await Promise.resolve();
+    expect(onFailedActivity).toHaveBeenLastCalledWith(null);
+    expect(failedPlayback.cancel).toHaveBeenCalledOnce();
+  });
 });

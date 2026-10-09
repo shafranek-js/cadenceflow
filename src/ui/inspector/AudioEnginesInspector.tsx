@@ -1,32 +1,12 @@
-import { useState } from "react";
 import type { HarmonyTrackSettings } from "../../domain/harmony/track";
 import type { MelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
 import type { CardViewId } from "../../domain/progression/step";
 import type { ProgressionView } from "../../domain/project/project";
-import { Icon } from "../common/Icon";
+import { InspectorDisclosureToggle } from "./InspectorDisclosure";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 import { GUITAR_SOUNDFONT_OPTIONS, PIANO_SOUNDFONT_OPTIONS } from "../harmony/HarmonyTrackControls";
 
-export const AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY =
-  "cadenceflow.ui.audio-engines-disclosure-open";
-
-function readDisclosureState(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
-function persistDisclosureState(key: string, open: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, String(open));
-  } catch {
-    // Disclosure preferences are best-effort when storage is unavailable.
-  }
-}
+export const AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.audio-engines-disclosure-open";
 
 export interface AudioEnginesInspectorProps {
   readonly settings: HarmonyTrackSettings;
@@ -41,17 +21,10 @@ export function AudioEnginesInspector({
   globalMatrixCardView = "harmonic",
   progressionView = "harmonic",
 }: AudioEnginesInspectorProps) {
-  const [isOpen, setIsOpen] = useState(() =>
-    readDisclosureState(AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY, true),
+  const { isOpen, toggle: toggleOpen } = useInspectorDisclosure(
+    AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY,
+    true,
   );
-
-  const toggleOpen = () => {
-    setIsOpen((prev) => {
-      const next = !prev;
-      persistDisclosureState(AUDIO_ENGINES_DISCLOSURE_STORAGE_KEY, next);
-      return next;
-    });
-  };
 
   const pianoEngine = settings.pianoEngine ?? "hq-samples";
   const pianoSoundfontInstrument = settings.pianoSoundfontInstrument ?? "gm-000";
@@ -93,17 +66,13 @@ export function AudioEnginesInspector({
       data-testid="audio-engines-inspector"
     >
       <header className="inspector-panel-header audio-engines-header">
-        <button
-          type="button"
-          className="inspector-disclosure-toggle"
-          onClick={toggleOpen}
-          aria-expanded={isOpen}
-          aria-controls="audio-engines-content"
-          data-testid="audio-engines-disclosure-btn"
-        >
-          <Icon name="disclosure" className={isOpen ? "is-rotated" : ""} />
-          <span className="inspector-panel-title">Sound Engines</span>
-        </button>
+        <InspectorDisclosureToggle
+          isOpen={isOpen}
+          onToggle={toggleOpen}
+          label="Sound Engines"
+          controlsId="audio-engines-content"
+          testId="audio-engines-disclosure-btn"
+        />
         <span
           className="style-active-badge audio-engine-active-badge"
           data-testid="audio-engine-active-badge"
@@ -159,10 +128,7 @@ export function AudioEnginesInspector({
           {/* Piano Tone select if piano is SoundFont */}
           {pianoEngine === "soundfont" ? (
             <div className="audio-engine-tone-row" data-testid="piano-soundfont-tone-row">
-              <label
-                className="audio-engine-tone-label"
-                htmlFor="inspector-piano-soundfont-select"
-              >
+              <label className="audio-engine-tone-label" htmlFor="inspector-piano-soundfont-select">
                 Tone
               </label>
               <select

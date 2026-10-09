@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -12,6 +13,7 @@ async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function addChord(page: Page, functionId: string): Promise<void> {
@@ -39,7 +41,7 @@ test.describe("T195 — Printable A4 release gate", () => {
     }
 
     const stepIdsBefore = await page
-      .locator('[data-testid="progression-step"] [data-step-id]')
+      .locator(".measure-staff-event-select[data-step-id]")
       .evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset.stepId ?? ""));
 
     await page.getByTestId("print-progression").focus();
@@ -62,6 +64,14 @@ test.describe("T195 — Printable A4 release gate", () => {
       const measures = Array.from(
         printable.querySelectorAll<HTMLElement>("[data-testid='printable-measure']"),
       );
+      const projectMeta = printable.querySelector<HTMLElement>(".printable-project-meta");
+      if (!projectMeta) throw new Error("Printable project metadata is missing");
+      const projectMetaTextRight = Math.max(
+        ...Array.from(projectMeta.children, (child) => child.getBoundingClientRect().right),
+      );
+      const projectMetaSafeRight =
+        projectMeta.getBoundingClientRect().right -
+        Number.parseFloat(getComputedStyle(projectMeta).paddingRight);
       return {
         printCalled: document.documentElement.dataset.printCalled === "true",
         measureCount: measures.length,
@@ -76,6 +86,15 @@ test.describe("T195 — Printable A4 release gate", () => {
         textColor: getComputedStyle(
           printable.querySelector<HTMLElement>(".printable-chord-symbol")!,
         ).color,
+        printSurfaceColors: [
+          getComputedStyle(document.documentElement).backgroundColor,
+          getComputedStyle(document.body).backgroundColor,
+          getComputedStyle(document.querySelector<HTMLElement>("#root")!).backgroundColor,
+          getComputedStyle(document.querySelector<HTMLElement>(".app-shell")!).backgroundColor,
+        ],
+        projectMetaPaddingRight: getComputedStyle(projectMeta).paddingRight,
+        projectMetaTextRight,
+        projectMetaSafeRight,
         pageCount,
       };
     }, pdfPageCount);
@@ -90,10 +109,13 @@ test.describe("T195 — Printable A4 release gate", () => {
     expect(evidence.breakInside).toBe("avoid");
     expect(evidence.pageBreakInside).toBe("avoid");
     expect(evidence.textColor).toBe("rgb(17, 24, 39)");
+    expect(evidence.printSurfaceColors).toEqual(Array(4).fill("rgb(255, 255, 255)"));
+    expect(Number.parseFloat(evidence.projectMetaPaddingRight)).toBeGreaterThan(0);
+    expect(evidence.projectMetaTextRight).toBeLessThanOrEqual(evidence.projectMetaSafeRight + 0.5);
     expect(evidence.pageCount).toBeGreaterThan(1);
     expect(
       await page
-        .locator('[data-testid="progression-step"] [data-step-id]')
+        .locator(".measure-staff-event-select[data-step-id]")
         .evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset.stepId ?? "")),
     ).toEqual(stepIdsBefore);
   });

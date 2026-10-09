@@ -3,7 +3,10 @@ import { readFile } from "node:fs/promises";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 import {
   addRestToProgression,
+  enableIndependentBassVoice,
   ensureSelectedProgressionSettingsVisible,
+  getLogicalProgressionStepButtons,
+  setProgressionView,
   startBranchAlternative,
 } from "./test-helpers/progression-settings";
 
@@ -46,6 +49,7 @@ async function clickExport(page: Page, testId: "export-midi-btn" | "export-music
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForApp(page);
+  await setProgressionView(page, "staff");
   await ensureHistoryControlsVisible(page);
 });
 
@@ -118,6 +122,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
   }) => {
     await page.goto("/");
     await waitForApp(page);
+    await setProgressionView(page, "staff");
 
     await openProjectMenu(page);
     await page.getByTestId("rename-project-btn").click();
@@ -126,13 +131,15 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await expect(page.getByTestId("project-menu-toggle")).toContainText("Session: / take?*");
 
     await addChord(page, "I");
-    const firstStep = page.locator('[data-testid="progression-step"]').first();
+    const firstStep = page.locator(".measure-staff-event-select").first();
     await firstStep.click();
-    await expect(firstStep).toHaveAttribute("data-selected", "true");
+    await enableIndependentBassVoice(page);
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "MIDI velocity view" }).click();
     await page.getByLabel("Master Velocity", { exact: true }).fill("95");
     await expect(page.getByLabel("Master Velocity", { exact: true })).toHaveValue("95");
     await page.getByTestId("duration-preset-half").first().click();
+    const redoStepLabel = await firstStep.getAttribute("aria-label");
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
     // Export immediately after a fresh UI edit; no autosave wait or reload is used.
@@ -149,7 +156,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     // Create a redo state before export and verify the pure export does not clear it.
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("button", { name: "Redo" })).toBeEnabled();
-    const redoStepText = await firstStep.innerText();
+    await expect(firstStep).toHaveAttribute("aria-label", /4 beats/);
     await openExportMenu(page);
     const redoMidi = await clickExport(page, "export-midi-btn");
     expect(redoMidi.bytes.subarray(0, 4).toString("ascii")).toBe("MThd");
@@ -157,7 +164,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     await expect(page.getByRole("button", { name: "Redo" })).toBeEnabled();
     await page.getByTestId("export-menu-toggle").click();
     await page.getByRole("button", { name: "Redo" }).click();
-    await expect(firstStep).toContainText(redoStepText.split("\n")[0] ?? "I");
+    await expect(firstStep).toHaveAttribute("aria-label", redoStepLabel!);
 
     // Swing and a live temporary branch produce concise MusicXML diagnostics;
     // the branch itself is never used as the export source.
@@ -207,8 +214,9 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
   test("exports a Rest-only progression and supports repeated downloads", async ({ page }) => {
     await page.goto("/");
     await waitForApp(page);
+    await setProgressionView(page, "staff");
     await addRestToProgression(page);
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
+    await expect(await getLogicalProgressionStepButtons(page)).toHaveLength(1);
 
     await openExportMenu(page);
     await expect(page.getByTestId("export-midi-btn")).toBeEnabled();
@@ -240,6 +248,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
     });
     await page.goto("/");
     await waitForApp(page);
+    await setProgressionView(page, "staff");
     await addChord(page, "I");
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
     let downloadObserved = false;
@@ -253,7 +262,7 @@ test.describe("US9 Batch C — export UI and final acceptance", () => {
       "This browser cannot download exported musical files.",
     );
     expect(downloadObserved).toBe(false);
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
+    await expect(await getLogicalProgressionStepButtons(page)).toHaveLength(1);
     await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
   });
 });

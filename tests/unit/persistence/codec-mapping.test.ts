@@ -31,7 +31,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
       hint?: DurationDisplayHint;
       expectedWire?: string;
     }> = [
-      { name: "undefined", hint: undefined, expectedWire: undefined },
+      { name: "undefined" },
       { name: "beats without label", hint: { kind: "beats" }, expectedWire: "beats" },
       {
         name: "beats with simple label",
@@ -136,9 +136,9 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
     });
 
     it("rejects future schemaVersion with UnsupportedProjectVersionError", () => {
-      expect(() => migrateProjectData({ schemaVersion: 11 })).toThrow(
-        UnsupportedProjectVersionError,
-      );
+      expect(() =>
+        migrateProjectData({ schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION + 1 }),
+      ).toThrow(UnsupportedProjectVersionError);
       expect(() => migrateProjectData({ schemaVersion: 100 })).toThrow(
         UnsupportedProjectVersionError,
       );
@@ -288,7 +288,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       // Loading returns exact previous valid project
       const loaded = await repo.loadProject(validProject.id);
-      expect(loaded?.schemaVersion).toBe(10);
+      expect(loaded?.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(loaded?.name).toBe(validProject.name);
 
       await db.delete();
@@ -345,7 +345,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
       await Promise.resolve(); // flush microtasks
 
       expect(saveCount).toBe(1);
-      expect(lastSavedProject?.name).toBe("Version C");
+      expect(((): Project | null => lastSavedProject)()?.name).toBe("Version C");
 
       autosave.dispose();
     });
@@ -390,7 +390,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       expect(scheduled).toEqual(["Version A", "Version B", "Version C"]);
       expect(completed).toEqual(["Version C"]);
-      expect(lastSavedProject?.name).toBe("Version C");
+      expect(((): Project | null => lastSavedProject)()?.name).toBe("Version C");
 
       autosave.dispose();
     });
@@ -446,7 +446,7 @@ describe("T121–T125 — US8 Persistence & Codec Verification Suite", () => {
 
       // Both writes executed sequentially without tearing, and B was committed last
       expect(saveOrder).toEqual(["Version A", "Version B"]);
-      expect(finalCommittedProject?.name).toBe("Version B");
+      expect(((): Project | null => finalCommittedProject)()?.name).toBe("Version B");
 
       const loaded = await autosave.loadAutosavedProject();
       expect(loaded?.name).toBe("Version B");

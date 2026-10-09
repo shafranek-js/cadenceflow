@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startBranchAlternative } from "./test-helpers/progression-settings";
+import { setProgressionView, startBranchAlternative } from "./test-helpers/progression-settings";
 
 test("US2 explores a mid-progression branch, compares paths, rejoins, and commits", async ({
   page,
@@ -10,7 +10,9 @@ test("US2 explores a mid-progression branch, compares paths, rejoins, and commit
       .getByTestId(`chord-card-${fn}`)
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
-  await expect(page.getByTestId("progression-step")).toHaveCount(4);
+  await setProgressionView(page, "staff");
+  const steps = page.locator(".measure-staff-event-select");
+  await expect(steps).toHaveCount(4);
   await expect(page.locator('[data-context="composition-intent"]')).toHaveCount(0);
 
   await startBranchAlternative(page, 1);
@@ -28,14 +30,8 @@ test("US2 explores a mid-progression branch, compares paths, rejoins, and commit
   );
 
   await page.getByRole("button", { name: "Commit Branch" }).click();
-  await expect(page.getByTestId("progression-step")).toHaveCount(5);
-  await expect(page.getByTestId("progression-step").nth(2).getByTestId("step-function")).toHaveText(
-    "ii",
-  );
-  await expect(page.getByTestId("progression-step").nth(3).getByTestId("step-function")).toHaveText(
-    "V7/V",
-  );
-  await expect(page.getByTestId("progression-step").nth(4).getByTestId("step-function")).toHaveText(
-    "V",
-  );
+  await expect(steps).toHaveCount(5);
+  await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select ii ·/);
+  await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V7\/V ·/);
+  await expect(steps.nth(4)).toHaveAttribute("aria-label", /Select V ·/);
 });

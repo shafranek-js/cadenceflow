@@ -93,7 +93,7 @@ function projectWithExpectedProgressionSize(): Project {
   const steps = Array.from({ length: 96 }, (_, index) =>
     createMatrixChordStep(project, functionIds[index % functionIds.length]!, `existing-${index}`),
   );
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
   });
@@ -105,7 +105,7 @@ describe("T151 — deterministic recommendation and Matrix performance benchmark
     const visibleFunctionIds = Object.freeze(
       recommendationVocabulary("progressions").map((candidate) => candidate.functionId),
     );
-    const recommendationContext: RecommendationContext = Object.freeze({
+    const recommendationContext: RecommendationContext = Object.freeze<RecommendationContext>({
       moduleId: "progressions",
       currentFunctionId: "I",
       recentFunctionIds: Object.freeze(["IV", "V"]),

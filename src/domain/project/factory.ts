@@ -6,6 +6,7 @@ import { emptyProgression } from "../progression/progression";
 import type { StepPerformance } from "../progression/step";
 import type { Project } from "./project";
 import { CURRENT_PROJECT_SCHEMA_VERSION } from "./migrations";
+import { DEFAULT_PRESENTATION_STATE } from "./presentationDefaults";
 import { DEFAULT_MELODY_TRACK_SETTINGS } from "../melody/types";
 import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../harmony/track";
 
@@ -42,22 +43,10 @@ export function createDefaultProject(
     tonic: 0,
     globalTiming: globalTiming(100, meter(4, 4, [4])),
     groove: groove("straight"),
-    presentation: Object.freeze({
-      expertiseMode: "composer",
-      theme: "dark",
-      globalMatrixCardView: "harmonic",
-      progressionView: "piano-roll",
-      measuresPerSystem: "auto",
-      showBassInStaff: false,
-      noteColorMode: "standard",
-      resolutionArrows: true,
-      genreFocus: "all",
-      guitarChordOrientation: "horizontal",
-      guitarChordColorMode: "chord-roles",
-      sidePanelMode: "fixed",
-    }),
+    presentation: DEFAULT_PRESENTATION_STATE,
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
     melodyTrack: DEFAULT_MELODY_TRACK_SETTINGS,
+    independentBassEnabled: false,
     defaults,
     moduleTemplateStates: Object.freeze({
       progressions: Object.freeze({ cards: Object.freeze({}) }),

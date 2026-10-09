@@ -13,8 +13,8 @@ import {
 
 const now = "2026-10-03T10:00:00.000Z";
 
-describe("T212 schema v10", () => {
-  it("migrates saved and branch Steps from identity behavior without mutating v9 data", () => {
+describe("T212 transposition migration", () => {
+  it("migrates v9 saved and branch Steps through current schema without mutating source", () => {
     const v9 = {
       schemaVersion: 9,
       progression: { steps: [{ id: "saved", kind: "chord" }] },
@@ -25,7 +25,7 @@ describe("T212 schema v10", () => {
 
     expect(v9).toMatchObject({ schemaVersion: 9 });
     expect(migrated).toMatchObject({
-      schemaVersion: 10,
+      schemaVersion: 11,
       progression: { steps: [{ id: "saved", transpositionSemitones: 0 }] },
       temporaryBranch: { steps: [{ id: "branch", transpositionSemitones: 0 }] },
     });

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -40,6 +41,7 @@ test.describe("T197 + T192 — schema v6, note roles, and Target Notes", () => {
     await openStudio(page);
     await addChord(page, "I");
     await addChord(page, "V");
+    await setProgressionView(page, "staff");
 
     let dialog = await openMelodyDialog(page);
     await dialog.getByRole("button", { name: "Cancel" }).click();

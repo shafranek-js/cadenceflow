@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AcousticGuitarProvider,
   type GuitarSampleNode,
+  type GuitarInstrumentLoader,
   type GuitarSamplePlayer,
 } from "../../../../src/audio/guitar/AcousticGuitarProvider";
 import {
@@ -10,13 +11,10 @@ import {
 } from "../../../../src/audio/guitar/strumTiming";
 import type { AudioNoteEvent } from "../../../../src/audio/contracts";
 
-function createMockPlayer(): GuitarSamplePlayer & {
-  play: ReturnType<typeof vi.fn>;
-  stop: ReturnType<typeof vi.fn>;
-} {
+function createMockPlayer() {
   return {
-    play: vi.fn(() => ({ stop: vi.fn() }) as GuitarSampleNode),
-    stop: vi.fn(),
+    play: vi.fn<GuitarSamplePlayer["play"]>(() => ({ stop: vi.fn<GuitarSampleNode["stop"]>() })),
+    stop: vi.fn<GuitarSamplePlayer["stop"]>(),
   };
 }
 
@@ -31,7 +29,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
   it("prepares instrument soundbank and manages state transitions", async () => {
     const stateTransitions: string[] = [];
     const player = createMockPlayer();
-    const loader = vi.fn(async () => player);
+    const loader = vi.fn<GuitarInstrumentLoader>(async () => player);
 
     const provider = new AcousticGuitarProvider({
       audioContext: createMockContext(),
@@ -52,7 +50,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
 
   it("schedules six-string chords across a 30ms total spread from low to high", async () => {
     const player = createMockPlayer();
-    const loader = vi.fn(async () => player);
+    const loader = vi.fn<GuitarInstrumentLoader>(async () => player);
     const mockCtx = createMockContext();
 
     const provider = new AcousticGuitarProvider({
@@ -100,7 +98,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
     const player = createMockPlayer();
     const provider = new AcousticGuitarProvider({
       audioContext: createMockContext(),
-      loadInstrument: vi.fn(async () => player),
+      loadInstrument: vi.fn<GuitarInstrumentLoader>(async () => player),
       strumDelaySeconds: 0.015,
     });
     await provider.prepare();
@@ -123,7 +121,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
     const player = createMockPlayer();
     const provider = new AcousticGuitarProvider({
       audioContext: createMockContext(),
-      loadInstrument: vi.fn(async () => player),
+      loadInstrument: vi.fn<GuitarInstrumentLoader>(async () => player),
     });
     await provider.prepare();
 
@@ -156,7 +154,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
 
   it("schedules melodic scale notes at exact start times without strum offset", async () => {
     const player = createMockPlayer();
-    const loader = vi.fn(async () => player);
+    const loader = vi.fn<GuitarInstrumentLoader>(async () => player);
 
     const provider = new AcousticGuitarProvider({
       audioContext: createMockContext(),
@@ -191,7 +189,7 @@ describe("AcousticGuitarProvider (Sample-Backed)", () => {
     };
     const provider = new AcousticGuitarProvider({
       audioContext: createMockContext(),
-      loadInstrument: vi.fn(async () => player),
+      loadInstrument: vi.fn<GuitarInstrumentLoader>(async () => player),
     });
     await provider.prepare();
 

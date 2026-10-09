@@ -19,20 +19,22 @@ import type { HqPianoManifest } from "../../src/audio/hq-sample-piano/manifest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
   tonic: 0,
   mode: "major",
-  activeModuleId: "progressions",
+  moduleId: "progressions",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
 });
 
-const C_MINOR_DARK_CONTEXT: HarmonicContext = Object.freeze({
+const C_MINOR_DARK_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
   tonic: 0,
-  mode: "minor",
-  activeModuleId: "dark-harmony",
+  mode: "tonal-minor",
+  moduleId: "dark-harmony",
+  spellingContext: Object.freeze({ tonic: 0, mode: "tonal-minor" }),
 });
 
 function createStep(overrides: Partial<ChordStep> = {}): ChordStep {
-  const defaultPerformance: StepPerformance = Object.freeze({
+  const defaultPerformance: StepPerformance = Object.freeze<StepPerformance>({
     articulation: "block",
     register: "auto",
     voicingMode: "auto",
@@ -42,12 +44,16 @@ function createStep(overrides: Partial<ChordStep> = {}): ChordStep {
     dynamicsViewPreference: "musical",
   });
 
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id: "step-consistency-1",
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId: "I" }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions",
+      functionId: "I",
+      category: "core",
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
-    duration: musicalDuration(rational(4, 4), "whole"),
+    duration: musicalDuration(rational(4, 4), { kind: "beats", label: "whole" }),
     cardView: "piano",
     performance: defaultPerformance,
     ...overrides,
@@ -154,7 +160,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   // --- Fixture A: Automatic Major Voicing ---
   it("A. Automatic Major voicing preserves exact MIDI pitches across all projections", () => {
     const stepI = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" }, // C Major
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" }, // C Major
     });
     const realizationI = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
@@ -165,7 +171,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
     // Step IV with auto voice leading from Step I
     const stepIV = createStep({
       id: "step-iv",
-      harmonicFunction: { moduleId: "progressions", functionId: "IV" }, // F Major
+      harmonicFunction: { moduleId: "progressions", functionId: "IV", category: "core" }, // F Major
     });
 
     const result = verifyStepProjections(
@@ -185,7 +191,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   // --- Fixture B: Manual Exact Voicing ---
   it("B. Manual exact voicing round-trips exact MIDI pitches, octaves, and ignores register offset", () => {
     // Non-trivial 4-note open voicing: C3 (48), G3 (55), E4 (64), B4 (71)
-    const manualPitches: readonly ExactPitch[] = Object.freeze([
+    const manualPitches: readonly ExactPitch[] = Object.freeze<readonly ExactPitch[]>([
       exactPitch(48, { step: "C", alter: 0 }),
       exactPitch(55, { step: "G", alter: 0 }),
       exactPitch(64, { step: "E", alter: 0 }),
@@ -193,7 +199,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
     ]);
 
     const manualStep = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: {
         articulation: "block",
         register: 1, // +1 register offset MUST be ignored for manual exact voicing
@@ -227,7 +233,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
     // C Major chord with Custom bass F#2 (MIDI 42)
     const customBassPitch = exactPitch(42, { step: "F", alter: 1 });
     const stepWithCustomBass = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: {
         articulation: "block",
         register: "auto",
@@ -241,7 +247,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
 
     // Step with root bass for comparison
     const stepWithRootBass = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: {
         articulation: "block",
         register: "auto",
@@ -281,7 +287,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   it("D. Per-note velocities project exact effective values to AudioNoteEvent and HQ provider", () => {
     // C Major chord with Master Velocity 78, note 64 overridden to 110, note 60 inheriting
     const step = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: {
         articulation: "block",
         register: 0,
@@ -319,7 +325,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   // --- Fixture E: Dynamics Preset ---
   it("E. Dynamics preset projects identical velocity profiles through eventRealizer and HQ provider", () => {
     const baseStep = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: {
         articulation: "block",
         register: 0,
@@ -352,7 +358,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
     };
 
     const presetStep = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "I" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       performance: presetPerf,
     });
 
@@ -370,7 +376,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   // --- Fixture F: HarmonicVariant (7th/9th) ---
   it("F. HarmonicVariant (e.g. 7th) retains all chord tones without loss in Piano, Staff, or audio", () => {
     const stepV7 = createStep({
-      harmonicFunction: { moduleId: "progressions", functionId: "V" }, // G7 in C Major
+      harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" }, // G7 in C Major
       harmonicVariant: {
         ...EMPTY_HARMONIC_VARIANT,
         seventh: "minor7",
@@ -400,7 +406,7 @@ describe("T095 — Canonical projection consistency integration test", () => {
   // --- Fixture G: Dark Harmony / Tonal Minor ---
   it("G. Dark Harmony / Tonal Minor preserves consistency without hardcoding Major", () => {
     const stepDim = createStep({
-      harmonicFunction: { moduleId: "dark-harmony", functionId: "vii°7/V" }, // F#°7 in C Minor
+      harmonicFunction: { moduleId: "dark-harmony", functionId: "vii°7/V", category: "core" }, // F#°7 in C Minor
     });
 
     const result = verifyStepProjections(stepDim, 0, C_MINOR_DARK_CONTEXT);

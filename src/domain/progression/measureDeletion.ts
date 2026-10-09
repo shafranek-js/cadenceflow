@@ -11,11 +11,14 @@ import {
 } from "../melody/types";
 import { resolveEffectiveMelodyInstrument } from "../melody/instrumentCatalog";
 import { createProgressionMeasureLayout } from "../timing/measureLayout";
+import type { ProgressionMeasure } from "../timing/measureLayout";
 import { musicalDuration } from "../timing/duration";
 import {
   addRational,
   compareRational,
   equalRational,
+  multiplyRational,
+  rational,
   subtractRational,
   ZERO,
   type Rational,
@@ -87,8 +90,14 @@ function clonePiece(step: ProgressionStep, id: string, duration: Rational): Prog
   return withDuration(Object.freeze({ ...step, id }) as ProgressionStep, duration);
 }
 
-function uniqueStepId(sourceId: string, measureNumber: number, used: Set<string>): string {
-  const base = `${sourceId}~measure-${measureNumber}-right`;
+/** Mints the trailing Step id of a split: the original id stays on the earliest piece. */
+function uniqueStepId(
+  sourceId: string,
+  measureNumber: number,
+  used: Set<string>,
+  label = "right",
+): string {
+  const base = `${sourceId}~measure-${measureNumber}-${label}`;
   let id = base;
   let suffix = 2;
   while (used.has(id)) id = `${base}-${suffix++}`;
@@ -1375,4 +1384,647 @@ export function planMeasureDuplication(
           : "This Measure cannot be duplicated safely.",
     };
   }
+}
+
+export interface MeasureMovePlan {
+  readonly progression: Progression;
+  /** 1-based number of the Measure in its original position. */
+  readonly sourceMeasureNumber: number;
+  /** 1-based number the moved Measure occupies after the move. */
+  readonly targetMeasureNumber: number;
+  /** Ids of the Steps that make up the moved Measure, in their new order. */
+  readonly movedStepIds: readonly string[];
+  readonly movedDurationBeats: Rational;
+  /** Identity/renaming map for surviving Step ids, mirroring MeasureInsertionPlan. */
+  readonly reanchoredStepIds: ReadonlyMap<string, string | undefined>;
+  readonly loopStartStepIds: ReadonlyMap<string, string | undefined>;
+  readonly loopEndStepIds: ReadonlyMap<string, string | undefined>;
+}
+
+export type MeasureMoveResult = MeasureMovePlan | MeasureDeletionRefusal;
+
+export interface MeasureBlockMoveOptions {
+  /** Pad a partial final bar when the moved block touches it or is inserted after it. */
+  readonly padPartialFinalMeasure?: boolean;
+  /** Effective notes from before optional padding; padding must not activate dormant Melody. */
+  readonly preservedEffectiveMelody?: readonly EffectiveMelodyNote[];
+}
+
+/**
+ * One region of the splice: `[start, end)` in authored time is displaced by exactly `shiftBeats`.
+ * A Step/note piece is split wherever its span straddles a region boundary, so every piece lies
+ * inside one region and the whole move is a monotone piecewise translation of the timeline.
+ */
+interface MoveRegion {
+  readonly start: Rational;
+  readonly end: Rational;
+  readonly shiftBeats: Rational;
+}
+
+function minRational(a: Rational, b: Rational): Rational {
+  return compareRational(a, b) <= 0 ? a : b;
+}
+
+function maxRational(a: Rational, b: Rational): Rational {
+  return compareRational(a, b) >= 0 ? a : b;
+}
+
+function shiftForPosition(regions: readonly MoveRegion[], position: Rational): Rational {
+  for (const region of regions) {
+    if (compareRational(position, region.start) >= 0 && compareRational(position, region.end) < 0)
+      return region.shiftBeats;
+  }
+  return ZERO;
+}
+
+/**
+ * Splits one note into the segments the splice creates, measured in the destination timeline.
+ * Splitting happens at the region boundaries and wherever a landing owner boundary corresponds in
+ * source time, so no segment straddles two owners. Adjacent pieces that come back out adjacent stay
+ * merged, and each segment reports the onset it had in the Step it came from so the caller can
+ * re-attach it with its original phrase-local position.
+ */
+function moveNoteSpans(
+  noteStart: Rational,
+  noteEnd: Rational,
+  srcStart: Rational,
+  srcEnd: Rational,
+  progressionEnd: Rational,
+  ownerBounds: readonly Rational[],
+  regions: readonly MoveRegion[],
+  sourceStepStart: Rational,
+): readonly {
+  readonly start: Rational;
+  readonly end: Rational;
+  readonly onset: Rational;
+}[] {
+  const candidates = [srcStart, srcEnd];
+  for (const region of regions)
+    for (const bound of ownerBounds) candidates.push(subtractRational(bound, region.shiftBeats));
+  const points = [...new Set(candidates)]
+    .filter((point) => compareRational(point, noteStart) > 0 && compareRational(point, noteEnd) < 0)
+    .sort(compareRational);
+  const ordered = [noteStart, ...points, noteEnd];
+  const spans: { start: Rational; end: Rational; onset: Rational }[] = [];
+  for (let index = 0; index + 1 < ordered.length; index++) {
+    const from = ordered[index]!;
+    const to = ordered[index + 1]!;
+    const shiftBeats = shiftForPosition(regions, from);
+    const movedStart = addRational(from, shiftBeats);
+    const movedEnd = addRational(to, shiftBeats);
+    // The progression end never moves, so material from beyond it stays beyond it and is inaudible.
+    if (compareRational(movedStart, progressionEnd) >= 0) continue;
+    const clippedEnd = compareRational(movedEnd, progressionEnd) > 0 ? progressionEnd : movedEnd;
+    if (compareRational(clippedEnd, movedStart) <= 0) continue;
+    const previous = spans[spans.length - 1];
+    if (previous && compareRational(previous.end, movedStart) === 0) previous.end = clippedEnd;
+    else
+      spans.push({
+        start: movedStart,
+        end: clippedEnd,
+        onset: subtractRational(from, sourceStepStart),
+      });
+  }
+  return spans;
+}
+
+/**
+ * True only when authored Step fragments (not the implicit trailing gap) tile exactly
+ * `[measure.startBeats, measure.startBeats + barLength)`. A Measure whose authored content overruns
+ * its bar, or stops short of it, cannot be spliced as a whole bar.
+ */
+function coversExactBar(
+  measure: ProgressionMeasure,
+  barLength: Rational,
+  authoredDurationBeats: Rational,
+): boolean {
+  const barEnd = addRational(measure.startBeats, barLength);
+  let cursor = measure.startBeats;
+  for (const fragment of measure.fragments) {
+    if (compareRational(fragment.startBeats, cursor) !== 0) return false;
+    cursor = addRational(cursor, fragment.durationBeats);
+  }
+  // A Step overrunning the progression end is clipped by that end, so the authored Measure ends
+  // where the shorter of the two does.
+  const authoredEnd =
+    compareRational(cursor, authoredDurationBeats) < 0 ? cursor : authoredDurationBeats;
+  return compareRational(authoredEnd, barEnd) === 0;
+}
+
+/**
+ * Plans a move of one or more whole bars. The selected time block is spliced out and re-inserted
+ * immediately before the Measure currently at `toInsertIndex`, preserving Step identities and
+ * effective Melody through the existing piecewise-translation planner.
+ *
+ * `toInsertIndex === layout.measures.length` appends the block after the final Measure. Positions
+ * from the block's first Measure through the position immediately after its last Measure are
+ * refusals rather than unchanged plans.
+ */
+export function planMeasureBlockMove(
+  project: Project,
+  fromMeasureIndex: number,
+  measureCount: number,
+  toInsertIndex: number,
+  options: MeasureBlockMoveOptions = {},
+): MeasureMoveResult {
+  if (project.temporaryBranch)
+    return {
+      reason:
+        "Finish or discard the active branch before moving a Measure; its anchors refer to the current Steps. No content was changed.",
+    };
+  try {
+    const sourceSteps = project.progression.steps;
+    const layout = createProgressionMeasureLayout(sourceSteps, project.globalTiming.meter);
+    const count = layout.measures.length;
+    if (
+      !Number.isInteger(fromMeasureIndex) ||
+      fromMeasureIndex < 0 ||
+      fromMeasureIndex >= count ||
+      !Number.isInteger(measureCount) ||
+      measureCount < 1 ||
+      fromMeasureIndex + measureCount > count
+    )
+      return { reason: "This Measure block is no longer available." };
+    if (!Number.isInteger(toInsertIndex) || toInsertIndex < 0 || toInsertIndex > count)
+      return { reason: "The target position is no longer available." };
+    const finalMeasure = layout.measures.at(-1);
+    const finalPadding = finalMeasure?.trailingGap?.durationBeats ?? ZERO;
+    const blockTouchesPartialFinal = fromMeasureIndex + measureCount === count;
+    if (
+      options.padPartialFinalMeasure &&
+      compareRational(finalPadding, ZERO) > 0 &&
+      (blockTouchesPartialFinal || toInsertIndex === count)
+    ) {
+      const preservedEffectiveMelody =
+        options.preservedEffectiveMelody ?? createEffectiveMelodyTimeline(project);
+      const usedIds = new Set(sourceSteps.map((step) => step.id));
+      const paddingStep: RestStep = Object.freeze({
+        id: uniqueStepId(
+          `system-move-padding-${finalMeasure!.number}`,
+          finalMeasure!.number,
+          usedIds,
+          "rest",
+        ),
+        kind: "rest",
+        duration: musicalDuration(finalPadding),
+      });
+      const paddedProject: Project = Object.freeze({
+        ...project,
+        progression: Object.freeze({
+          ...project.progression,
+          steps: Object.freeze([...sourceSteps, paddingStep]),
+        }),
+      });
+      return planMeasureBlockMove(paddedProject, fromMeasureIndex, measureCount, toInsertIndex, {
+        preservedEffectiveMelody,
+      });
+    }
+    // Insertion anywhere within or directly after the selected block leaves its order unchanged.
+    if (toInsertIndex >= fromMeasureIndex && toInsertIndex <= fromMeasureIndex + measureCount)
+      return {
+        reason:
+          toInsertIndex === fromMeasureIndex
+            ? "This Measure block is already at that position; no content was changed."
+            : "This Measure block already sits immediately before that position; no content was changed.",
+      };
+
+    const measure = layout.measures[fromMeasureIndex]!;
+    const barLength = layout.barLengthBeats;
+    for (const sourceMeasure of layout.measures.slice(
+      fromMeasureIndex,
+      fromMeasureIndex + measureCount,
+    ))
+      if (!coversExactBar(sourceMeasure, barLength, layout.authoredDurationBeats))
+        return {
+          reason:
+            measureCount === 1
+              ? "This Measure does not cover one exact bar, so it cannot be moved safely. No content was changed."
+              : "Every Measure in a moved block must cover one exact bar, so this block cannot be moved safely. No content was changed.",
+        };
+
+    const srcStart = multiplyRational(barLength, rational(fromMeasureIndex));
+    const blockDuration = multiplyRational(barLength, rational(measureCount));
+    const srcEnd = addRational(srcStart, blockDuration);
+    const movingEarlier = toInsertIndex < fromMeasureIndex;
+    // Moving earlier: the block lands at the target bar. Moving later removes the block first,
+    // shifting the insertion boundary left by the complete block length.
+    const targetStart = multiplyRational(
+      barLength,
+      rational(movingEarlier ? toInsertIndex : toInsertIndex - measureCount),
+    );
+    const moveShift = subtractRational(targetStart, srcStart);
+    const movedBlockEnd = addRational(targetStart, blockDuration);
+
+    // Moving EARLIER: everything skipped over slides right by the block's full bar span.
+    //
+    // Moving LATER: the block is lifted out and the intervening time slides left by the same span.
+    const laterBoundary = multiplyRational(barLength, rational(toInsertIndex));
+    const regions: readonly MoveRegion[] = movingEarlier
+      ? [
+          { start: targetStart, end: srcStart, shiftBeats: blockDuration },
+          { start: srcStart, end: srcEnd, shiftBeats: moveShift },
+        ]
+      : [
+          { start: srcStart, end: srcEnd, shiftBeats: moveShift },
+          { start: srcEnd, end: laterBoundary, shiftBeats: subtractRational(ZERO, blockDuration) },
+        ];
+
+    const sourceStarts = new Map<string, Rational>();
+    const usedIds = new Set(sourceSteps.map((step) => step.id));
+    const pieceGroups = new Map<string, StepPiece[]>();
+    let oldCursor = ZERO;
+
+    sourceSteps.forEach((source) => {
+      const oldStart = oldCursor;
+      const oldEnd = addRational(oldStart, source.duration.beats);
+      sourceStarts.set(source.id, oldStart);
+      const intervals: { start: Rational; end: Rational }[] = [];
+      const beforeEnd = minRational(oldEnd, srcStart);
+      if (compareRational(oldStart, beforeEnd) < 0)
+        intervals.push({ start: oldStart, end: beforeEnd });
+      const moveStart = maxRational(oldStart, srcStart);
+      const moveEnd = minRational(oldEnd, srcEnd);
+      if (compareRational(moveStart, moveEnd) < 0)
+        intervals.push({ start: moveStart, end: moveEnd });
+      // Clamped at `srcEnd` in both directions: a Step can start after `srcEnd` (a piece that only
+      // slides) or before it (the trailing piece of a Step the moved bar cuts through).
+      const afterStart = maxRational(oldStart, srcEnd);
+      if (compareRational(oldEnd, afterStart) > 0)
+        intervals.push({ start: afterStart, end: oldEnd });
+      // Ordered by new position: the earliest piece keeps the source id, later pieces get new ids.
+      const ordered = intervals
+        .map((interval) => ({
+          interval,
+          newStart: addRational(interval.start, shiftForPosition(regions, interval.start)),
+        }))
+        .sort((a, b) => compareRational(a.newStart, b.newStart));
+      const group = ordered.map(({ interval, newStart }, pieceIndex) => {
+        const duration = subtractRational(interval.end, interval.start);
+        const id =
+          pieceIndex === 0
+            ? source.id
+            : uniqueStepId(
+                source.id,
+                measure.number,
+                usedIds,
+                pieceIndex === 1 ? "right" : `right-${pieceIndex}`,
+              );
+        return {
+          source,
+          newStart,
+          output: stripAuthoredMelody(clonePiece(source, id, duration)),
+        };
+      });
+      pieceGroups.set(source.id, group);
+      oldCursor = oldEnd;
+    });
+
+    const pieces: readonly StepPiece[] = Object.freeze(
+      [...pieceGroups.values()]
+        .flatMap((group) => group)
+        .sort((a, b) => compareRational(a.newStart, b.newStart)),
+    );
+    // The moved block occupies `[targetStart, targetStart + blockDuration)`.
+    const movedPieceIds = new Set(
+      pieces
+        .filter(
+          (piece) =>
+            compareRational(piece.newStart, targetStart) >= 0 &&
+            compareRational(piece.newStart, movedBlockEnd) < 0,
+        )
+        .map((piece) => piece.output.id),
+    );
+    const afterPieceIds = new Map<string, string>();
+    for (const piece of pieces) afterPieceIds.set(piece.source.id, piece.output.id);
+
+    // The pieces must tile the timeline exactly, in the order they occupy it: anything else would
+    // silently shift a bar line.
+    const newStarts = new Map<string, Rational>();
+    let newCursor = ZERO;
+    for (const piece of pieces) {
+      if (compareRational(piece.newStart, newCursor) !== 0)
+        return {
+          reason:
+            "This Measure cannot be moved without leaving a gap or an overlap in the progression. No content was changed.",
+        };
+      newStarts.set(piece.output.id, newCursor);
+      newCursor = addRational(newCursor, piece.output.duration.beats);
+    }
+    const nextStepsBeforeMelody = pieces.map((piece) => piece.output);
+
+    const originalMelody =
+      options.preservedEffectiveMelody ?? createEffectiveMelodyTimeline(project);
+    const generatedOwners = new Set(
+      sourceSteps.flatMap((step) =>
+        step.kind === "chord" && step.melody?.mode === "generated" ? [step.id] : [],
+      ),
+    );
+    const sourceRecipeById = new Map(sourceSteps.map((step) => [step.id, recipeForStep(step)]));
+    const preservedByOwner = new Map<string, PreservedNote[]>();
+    const ownerRecipes = new Map<string, ChordMelodyRecipe | undefined>();
+    const ownerHadMelody = new Set<string>();
+    // Destination-time boundaries of every piece, per source Step: splitting a note here keeps each
+    // of its segments inside exactly one owner.
+    const boundsBySourceStep = new Map<string, Rational[]>();
+    for (const piece of pieces) {
+      const bounds = boundsBySourceStep.get(piece.source.id) ?? [];
+      bounds.push(piece.newStart, addRational(piece.newStart, piece.output.duration.beats));
+      boundsBySourceStep.set(piece.source.id, bounds);
+    }
+
+    const addPreservedSegments = (
+      note: NoteInterval,
+      sourceStepId: string,
+      sourceStepStart: Rational,
+      wasGenerated: boolean,
+      recipe: ChordMelodyRecipe | undefined,
+    ): string | undefined => {
+      const noteEnd = addRational(note.startBeats, note.durationBeats);
+      // Owner boundaries in destination time become split points here, so every returned segment
+      // lands inside exactly one piece of the source Step.
+      const ownerBounds = boundsBySourceStep.get(sourceStepId) ?? [];
+      const spans = moveNoteSpans(
+        note.startBeats,
+        noteEnd,
+        srcStart,
+        srcEnd,
+        newCursor,
+        ownerBounds,
+        regions,
+        sourceStepStart,
+      );
+      if (spans.length === 0)
+        return "A retained authored Melody note would be removed by the move, and the move must preserve Melody. No content was changed.";
+      for (const [spanIndex, span] of spans.entries()) {
+        const owner = ownerAt(pieces, span.start);
+        if (!owner)
+          return "A retained authored Melody note would lose its Step owner, and schema v10 has no owner for notes outside the progression. No content was changed.";
+        const ownerDuration = owner.output.duration.beats;
+        // `span.start` is the segment's onset in the destination timeline, so its phrase-local
+        // onset is simply where it sits inside the piece that owns it.
+        const localOnset = subtractRational(span.start, owner.newStart);
+        const localEnd = subtractRational(span.end, owner.newStart);
+        if (compareRational(localEnd, ZERO) <= 0) continue;
+        if (compareRational(localOnset, ownerDuration) >= 0) continue;
+        const clippedOnset = compareRational(localOnset, ZERO) < 0 ? ZERO : localOnset;
+        const clippedEnd = compareRational(localEnd, ownerDuration) > 0 ? ownerDuration : localEnd;
+        const id =
+          spanIndex === 0 ? note.id : `${note.id}~measure-${measure.number}-after-${spanIndex}`;
+        const notes = preservedByOwner.get(owner.output.id) ?? [];
+        notes.push({
+          id,
+          pitch: note.pitch,
+          sourcePitchMidi: note.sourcePitchMidi,
+          startBeats: clippedOnset,
+          durationBeats: subtractRational(clippedEnd, clippedOnset),
+          instrument: note.instrument,
+          ...(recipe ? { sourceRecipe: recipe } : {}),
+          wasGenerated,
+        });
+        preservedByOwner.set(owner.output.id, notes);
+        ownerHadMelody.add(owner.output.id);
+        if (!ownerRecipes.has(owner.output.id))
+          ownerRecipes.set(owner.output.id, sourceRecipeById.get(sourceStepId));
+      }
+      return undefined;
+    };
+
+    for (const note of originalMelody) {
+      if (!generatedOwners.has(note.sourceStepId)) continue;
+      const reason = addPreservedSegments(
+        {
+          id: note.eventKey,
+          pitch: note.pitch,
+          sourcePitchMidi: note.sourcePitchMidi,
+          startBeats: note.startBeats,
+          durationBeats: note.durationBeats,
+          instrument: note.instrument,
+        },
+        note.sourceStepId,
+        sourceStarts.get(note.sourceStepId) ?? ZERO,
+        true,
+        sourceRecipeById.get(note.sourceStepId),
+      );
+      if (reason) return { reason };
+    }
+    for (const source of sourceSteps) {
+      const phrase =
+        source.kind === "rest"
+          ? source.authoredMelody
+          : source.melody?.mode === "authored"
+            ? source.melody.phrase
+            : undefined;
+      if (!phrase) continue;
+      const sourceStart = sourceStarts.get(source.id)!;
+      const instrument = resolveEffectiveMelodyInstrument(
+        source.melodyInstrumentOverride,
+        project.melodyTrack.instrument,
+      ).id;
+      for (const note of phrase.notes) {
+        const absoluteStart = addRational(sourceStart, note.onset);
+        const absoluteEnd = addRational(absoluteStart, note.duration);
+        const stepEnd = addRational(sourceStart, source.duration.beats);
+        // Phrase notes are performed only in the Step that owns them. A note that starts at/after
+        // the Step end (or after the progression end) is dormant and not retained content, and one
+        // that overruns the Step end contributes only its visible part.
+        if (compareRational(absoluteStart, stepEnd) >= 0) continue;
+        if (compareRational(absoluteStart, newCursor) >= 0) continue;
+        const visibleEnd = compareRational(absoluteEnd, stepEnd) < 0 ? absoluteEnd : stepEnd;
+        const visibleProgressionEnd =
+          compareRational(visibleEnd, newCursor) < 0 ? visibleEnd : newCursor;
+        if (compareRational(visibleProgressionEnd, absoluteStart) <= 0) continue;
+        const reason = addPreservedSegments(
+          {
+            id: note.id,
+            pitch: pitchToConcertFrame(note.pitch, source),
+            sourcePitchMidi:
+              note.sourcePitchMidi ??
+              note.pitch.midiNumber + (note.pitch.transpositionCompensationSemitones ?? 0),
+            startBeats: absoluteStart,
+            durationBeats: subtractRational(visibleProgressionEnd, absoluteStart),
+            instrument,
+          },
+          source.id,
+          sourceStart,
+          false,
+          phrase.sourceRecipe ?? sourceRecipeById.get(source.id),
+        );
+        if (reason) return { reason };
+      }
+    }
+
+    for (const piece of pieces) {
+      const source = piece.source;
+      const hadMelody =
+        source.kind === "rest" ? source.authoredMelody !== undefined : source.melody !== undefined;
+      if (hadMelody) ownerHadMelody.add(piece.output.id);
+      if (!ownerRecipes.has(piece.output.id))
+        ownerRecipes.set(piece.output.id, recipeForStep(source));
+    }
+
+    for (const [ownerId, notes] of preservedByOwner) {
+      const instruments = new Set(notes.map((note) => note.instrument));
+      if (instruments.size > 1) {
+        const names = [...instruments].sort().join(" and ");
+        return {
+          reason: `The retained notes would need ${names} in one Step, but v9 stores one Melody instrument per Step. No content was changed.`,
+        };
+      }
+      const index = nextStepsBeforeMelody.findIndex((step) => step.id === ownerId);
+      const ownerStep = nextStepsBeforeMelody[index];
+      if (ownerStep)
+        nextStepsBeforeMelody[index] = withInstrument(ownerStep, [...instruments][0]!, project);
+    }
+
+    const generationTestProject: Project = Object.freeze({
+      ...project,
+      progression: Object.freeze({
+        ...project.progression,
+        steps: Object.freeze([...nextStepsBeforeMelody]),
+      }),
+    });
+    const generatedAfterByOwner = new Map<string, EffectiveMelodyNote[]>();
+    for (const note of createEffectiveMelodyTimeline(generationTestProject)) {
+      const owner = generatedAfterByOwner.get(note.sourceStepId) ?? [];
+      owner.push(note);
+      generatedAfterByOwner.set(note.sourceStepId, owner);
+    }
+
+    const finalSteps = nextStepsBeforeMelody.map((step) => {
+      const preserved = preservedByOwner.get(step.id) ?? [];
+      const origin = pieces.find((piece) => piece.output.id === step.id)?.source;
+      const originallyGenerated = origin?.kind === "chord" && origin.melody?.mode === "generated";
+      const expectedAbsolute = preserved.map((note) => ({
+        ...note,
+        startBeats: addRational(newStarts.get(step.id)!, note.startBeats),
+      }));
+      if (
+        originallyGenerated &&
+        sameGeneratedPhrase(expectedAbsolute, generatedAfterByOwner.get(step.id) ?? [])
+      )
+        return step;
+      const sourceRecipe =
+        ownerRecipes.get(step.id) ?? preserved.find((note) => note.sourceRecipe)?.sourceRecipe;
+      return setAuthoredPhrase(step, preserved, ownerHadMelody.has(step.id), sourceRecipe);
+    });
+
+    // A move never drops a Step, so every surviving id is its own anchor. A split Step's loop end
+    // must still cover its trailing piece.
+    const reanchoredStepIds = new Map<string, string | undefined>(
+      sourceSteps.map((step) => [step.id, step.id]),
+    );
+    const loopStartStepIds = new Map<string, string | undefined>(reanchoredStepIds);
+    const loopEndStepIds = new Map<string, string | undefined>(
+      sourceSteps.map((step) => [step.id, afterPieceIds.get(step.id) ?? step.id]),
+    );
+    const sections: readonly SongSection[] = (project.progression.sections ?? []).flatMap(
+      (section) => {
+        const target = reanchoredStepIds.get(section.startStepId);
+        return target ? [Object.freeze({ ...section, startStepId: target })] : [];
+      },
+    );
+    const oldLoop = project.progression.loopRegion;
+    const loopStart = oldLoop ? loopStartStepIds.get(oldLoop.startStepId) : undefined;
+    const loopEnd = oldLoop ? loopEndStepIds.get(oldLoop.endStepId) : undefined;
+    const loopStartIndex = loopStart ? targetStepIndex(finalSteps, loopStart) : -1;
+    const loopEndIndex = loopEnd ? targetStepIndex(finalSteps, loopEnd) : -1;
+    const loopRegion =
+      loopStartIndex >= 0 && loopEndIndex >= loopStartIndex
+        ? Object.freeze({ startStepId: loopStart!, endStepId: loopEnd! })
+        : undefined;
+    const oldSelected = project.progression.selectedStepId;
+    const selectedStepId = oldSelected ? reanchoredStepIds.get(oldSelected) : undefined;
+    const progressionBase = {
+      ...project.progression,
+      steps: Object.freeze(finalSteps),
+      sections: Object.freeze(sections),
+      ...(selectedStepId ? { selectedStepId } : {}),
+    };
+    const {
+      loopRegion: _oldLoop,
+      selectedStepId: _oldSelection,
+      ...withoutOptionalState
+    } = progressionBase;
+    const progression = normalizeSongSections(
+      Object.freeze({
+        ...withoutOptionalState,
+        ...(selectedStepId ? { selectedStepId } : {}),
+        ...(loopRegion ? { loopRegion } : {}),
+      }),
+    );
+
+    const expectedEffective: {
+      sourceStepId: string;
+      eventKey: string;
+      pitch: AuthoredMelodyNote["pitch"];
+      sourcePitchMidi: number;
+      startBeats: Rational;
+      durationBeats: Rational;
+      instrument: EffectiveMelodyNote["instrument"];
+    }[] = [];
+    for (const step of finalSteps) {
+      const ownerStart = newStarts.get(step.id)!;
+      const used = new Set<string>();
+      for (const note of [...(preservedByOwner.get(step.id) ?? [])].sort(stableNoteOrder)) {
+        const eventKey = collisionSafeNoteId(note.id, used);
+        used.add(eventKey);
+        const startBeats = addRational(ownerStart, note.startBeats);
+        if (compareRational(startBeats, newCursor) >= 0) continue;
+        const noteEnd = addRational(startBeats, note.durationBeats);
+        const visibleEnd = compareRational(noteEnd, newCursor) > 0 ? newCursor : noteEnd;
+        if (compareRational(visibleEnd, startBeats) <= 0) continue;
+        expectedEffective.push({
+          sourceStepId: step.id,
+          eventKey,
+          pitch: note.pitch,
+          sourcePitchMidi: note.sourcePitchMidi,
+          startBeats,
+          durationBeats: subtractRational(visibleEnd, startBeats),
+          instrument: note.instrument,
+        });
+      }
+    }
+    const actualEffective = createEffectiveMelodyTimeline(
+      Object.freeze({ ...project, progression }),
+    );
+    if (!sameEffectiveTimeline(expectedEffective, actualEffective))
+      return {
+        reason:
+          "This Measure cannot be moved without changing retained effective Melody. No content was changed.",
+      };
+
+    const orderedMovedStepIds = finalSteps
+      .filter((step) => movedPieceIds.has(step.id))
+      .map((step) => step.id);
+    const movedStepDurations = new Map(finalSteps.map((step) => [step.id, step.duration.beats]));
+    const movedDurationBeats = orderedMovedStepIds.reduce(
+      (total: Rational, id) => addRational(total, movedStepDurations.get(id)!),
+      ZERO,
+    );
+    return Object.freeze({
+      progression,
+      sourceMeasureNumber: measure.number,
+      targetMeasureNumber: movingEarlier ? toInsertIndex + 1 : toInsertIndex - measureCount + 1,
+      movedStepIds: Object.freeze(orderedMovedStepIds),
+      movedDurationBeats,
+      reanchoredStepIds,
+      loopStartStepIds,
+      loopEndStepIds,
+    });
+  } catch (error) {
+    return {
+      reason:
+        error instanceof Error
+          ? `This Measure cannot be moved safely: ${error.message}`
+          : "This Measure cannot be moved safely.",
+    };
+  }
+}
+
+export function planMeasureMove(
+  project: Project,
+  fromMeasureIndex: number,
+  toInsertIndex: number,
+): MeasureMoveResult {
+  return planMeasureBlockMove(project, fromMeasureIndex, 1, toInsertIndex);
 }

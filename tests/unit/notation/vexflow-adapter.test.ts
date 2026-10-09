@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { Glyphs } from "vexflow";
+import { VexFlow } from "vexflow";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { musicalDuration, type MusicalDuration } from "../../../src/domain/timing/duration";
 import { meter } from "../../../src/domain/timing/meter";
@@ -13,6 +13,7 @@ import {
   renderStaffSequence,
   staffRhythmForDuration,
   type StaffSystemMeasureInput,
+  type StaffSequenceChordEntry,
   type StaffSystemPosition,
   type StaffSequenceEntry,
   type StaffSequencePosition,
@@ -270,9 +271,9 @@ describe("renderStaffSequence", () => {
     durationNumerator: number,
     durationDenominator: number,
     continuation: Partial<
-      Pick<StaffSequenceEntry, "continuesFromPrevious" | "continuesToNext">
+      Pick<StaffSequenceChordEntry, "continuesFromPrevious" | "continuesToNext">
     > = {},
-  ): StaffSequenceEntry {
+  ): StaffSequenceChordEntry {
     return {
       key,
       kind: "chord",
@@ -1057,16 +1058,16 @@ describe("renderStaffSystem", () => {
 
     expect(
       restSvg?.querySelector('.vf-stavenote[data-staff-entry="dotted-rest"]')?.textContent,
-    ).toContain(Glyphs.augmentationDot);
+    ).toContain(VexFlow.Glyphs.augmentationDot);
     expect(
       plainRestSvg?.querySelector('.vf-stavenote[data-staff-entry="plain-rest"]')?.textContent,
-    ).not.toContain(Glyphs.augmentationDot);
+    ).not.toContain(VexFlow.Glyphs.augmentationDot);
     expect(
       tabSvg?.querySelector('.vf-tabnote[data-staff-entry="dotted-tab-chord"]')?.textContent,
-    ).toContain(Glyphs.augmentationDot);
+    ).toContain(VexFlow.Glyphs.augmentationDot);
     expect(
       plainTabSvg?.querySelector('.vf-tabnote[data-staff-entry="plain-tab-chord"]')?.textContent,
-    ).not.toContain(Glyphs.augmentationDot);
+    ).not.toContain(VexFlow.Glyphs.augmentationDot);
   });
 
   it("ties adjacent written fragments by source owner and never through a Rest", () => {
@@ -1654,6 +1655,7 @@ describe("renderStaffSystem", () => {
     const container = document.createElement("div");
     const measure: StaffSystemMeasureInput = {
       measureIndex: 0,
+      widthPx: 300,
       harmonyEntries: [
         {
           kind: "chord",

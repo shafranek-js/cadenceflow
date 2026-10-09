@@ -33,7 +33,7 @@ import {
 const now = "2026-09-30T10:00:00.000Z";
 function fixture(): Project {
   const project = createDefaultProject("t209", "T209", now);
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({
       steps: Object.freeze(
@@ -64,7 +64,7 @@ describe("T209 Song Sections", () => {
   it("migrates v7 to empty sections while preserving authored Melody and project data", () => {
     const source = fixture();
     const authored = snapshotChordMelody({
-      mode: "authored",
+      mode: "authored" as const,
       phrase: {
         notes: [
           {
@@ -103,7 +103,7 @@ describe("T209 Song Sections", () => {
       },
     };
     const restored = decodePortableProject(JSON.stringify(v7));
-    expect(restored.schemaVersion).toBe(10);
+    expect(restored.schemaVersion).toBe(11);
     expect(restored.progression.sections).toEqual([]);
     expect(restored.progression.steps[0]).toMatchObject({ kind: "chord", melody: authored });
     expect(restored.temporaryBranch?.id).toBe("branch");

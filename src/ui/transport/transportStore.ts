@@ -1,4 +1,13 @@
 import type { Rational } from "../../domain/timing/rational";
+import type { AudioClock, AudioNoteEvent } from "../../audio/contracts";
+
+export interface KeyboardScheduledNote {
+  readonly pitch: number;
+  readonly part: AudioNoteEvent["channelRole"];
+  readonly start: number;
+  readonly end: number;
+  readonly voiceId?: string;
+}
 
 export type TransportStatus = "stopped" | "playing" | "paused";
 export type TransportPlayMode = "from-start" | "from-here";
@@ -50,6 +59,39 @@ export function generateTransportSessionId(): string {
 }
 
 export class TransportStore {
+  private keyboardNotes: KeyboardScheduledNote[] = [];
+  private keyboardClock: AudioClock | null = null;
+  private keyboardSession: string | null = null;
+
+  recordKeyboardNote(
+    sessionId: string,
+    event: AudioNoteEvent,
+    start: number,
+    clock: AudioClock,
+  ): void {
+    if (this.#state.sessionId !== sessionId || event.channelRole === "metronome") return;
+    if (this.keyboardSession !== sessionId) this.keyboardNotes = [];
+    this.keyboardSession = sessionId;
+    this.keyboardClock = clock;
+    this.keyboardNotes = this.keyboardNotes.filter((note) => note.end > clock.now());
+    this.keyboardNotes.push({
+      pitch: event.pitch,
+      part: event.channelRole,
+      start,
+      end: start + event.durationSeconds,
+      voiceId: `${sessionId}:${start}:${event.eventKey ?? event.eventIndex ?? event.pitch}`,
+    });
+  }
+
+  getKeyboardNotes(): readonly KeyboardScheduledNote[] {
+    return this.#state.status === "playing" && this.keyboardSession === this.#state.sessionId
+      ? this.keyboardNotes
+      : [];
+  }
+
+  getKeyboardAudioTime(): number {
+    return this.keyboardClock?.now() ?? 0;
+  }
   #state: TransportState;
   #listeners = new Set<() => void>();
 
@@ -185,6 +227,8 @@ export class TransportStore {
     if (this.#state.status !== "playing") {
       return;
     }
+
+    this.keyboardNotes = [];
 
     this.#state = Object.freeze({
       ...this.#state,

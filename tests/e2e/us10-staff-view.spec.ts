@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { enableIndependentBassVoice } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -23,14 +24,17 @@ async function expectStaffGeometry(page: Page, staff: Locator): Promise<void> {
     const staffBox = (stave as SVGGElement).getBBox();
     const noteHeads = [...note.querySelectorAll<SVGGElement>(".vf-notehead")];
     if (noteHeads.length === 0) throw new Error("Staff noteheads are missing");
-    const noteBox = noteHeads.reduce((bounds, head) => {
-      const box = head.getBBox();
-      const right = Math.max(bounds.x + bounds.width, box.x + box.width);
-      const bottom = Math.max(bounds.y + bounds.height, box.y + box.height);
-      const left = Math.min(bounds.x, box.x);
-      const top = Math.min(bounds.y, box.y);
-      return { x: left, y: top, width: right - left, height: bottom - top };
-    }, noteHeads[0]!.getBBox());
+    const noteBox = noteHeads.reduce<Pick<DOMRect, "x" | "y" | "width" | "height">>(
+      (bounds, head) => {
+        const box = head.getBBox();
+        const right = Math.max(bounds.x + bounds.width, box.x + box.width);
+        const bottom = Math.max(bounds.y + bounds.height, box.y + box.height);
+        const left = Math.min(bounds.x, box.x);
+        const top = Math.min(bounds.y, box.y);
+        return { x: left, y: top, width: right - left, height: bottom - top };
+      },
+      noteHeads[0]!.getBBox(),
+    );
     const viewBox = svg.viewBox.baseVal;
     return {
       background: getComputedStyle(element).backgroundColor,
@@ -98,6 +102,7 @@ async function exerciseStaffView(page: Page): Promise<void> {
 
   await waitForStudio(page);
   await page.getByLabel("Global Card View").selectOption("staff");
+  await enableIndependentBassVoice(page);
   const matrixStaff = page.getByTestId("chord-card-I").locator(".mini-staff");
   await expectStaffGeometry(page, matrixStaff);
   const paperHeights = await page

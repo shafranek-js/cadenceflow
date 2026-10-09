@@ -1,16 +1,11 @@
-import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { useContextMenuLayout } from "../common/useContextMenuLayout";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
 import type { PianoArticulation } from "../../domain/progression/step";
-import type { ChordMelodyRecipe, MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
+import type { MelodyGrid, MelodyPitchMotion } from "../../domain/melody/types";
 import { MELODY_GRID_LABELS } from "../melody/labels";
+import { MELODY_CONTOUR_GROUPS } from "../melody/melodyContours";
 
 export interface ScoreSystemMenuPosition {
   readonly x: number;
@@ -65,48 +60,6 @@ const ARTICULATIONS: ReadonlyArray<{ id: PianoArticulation; label: string }> = [
   { id: "broken-chord", label: "Broken Chord" },
 ];
 
-export interface MelodyContourItem {
-  readonly id: MelodyPitchMotion;
-  readonly label: string;
-}
-
-export interface MelodyContourGroup {
-  readonly id: string;
-  readonly label: string;
-  readonly items: readonly MelodyContourItem[];
-}
-
-export const MELODY_CONTOUR_GROUPS: readonly MelodyContourGroup[] = [
-  {
-    id: "directional",
-    label: "Directional",
-    items: [
-      { id: "up", label: "Ascending (Up)" },
-      { id: "down", label: "Descending (Down)" },
-      { id: "up-down", label: "Up & Down" },
-      { id: "down-up", label: "Down & Up" },
-    ],
-  },
-  {
-    id: "shapes",
-    label: "Shapes",
-    items: [
-      { id: "outside-in", label: "Outside In" },
-      { id: "inside-out", label: "Inside Out" },
-    ],
-  },
-  {
-    id: "pedal-and-alternating",
-    label: "Pedal & Alternating",
-    items: [
-      { id: "repeat-root", label: "Repeat Root" },
-      { id: "repeat-top", label: "Repeat Top" },
-      { id: "alternate-root-up", label: "Alternate Root / Up" },
-      { id: "alternate-top-down", label: "Alternate Top / Down" },
-    ],
-  },
-];
-
 const MELODY_GRIDS: ReadonlyArray<MelodyGrid> = [
   "quarter",
   "eighth",
@@ -154,11 +107,15 @@ export function ScoreSystemContextMenu({
   onDelete,
   onClose,
 }: ScoreSystemContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Shared with the other context menus: stable item refs plus a measured menu width. The
+  // width used to be read from `menuRef.current` during render, which is `null` on first paint
+  // and fell back to a guessed 220.
+  const { registerRef, itemRefs, menuRef, menuWidth } = useContextMenuLayout();
   const submenuRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-  const [activeSubmenu, setActiveSubmenu] = useState<"articulation" | "melody" | "grid" | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<"articulation" | "melody" | "grid" | null>(
+    null,
+  );
   const [submenuTop, setSubmenuTop] = useState(0);
 
   useLayoutEffect(() => {
@@ -171,7 +128,7 @@ export function ScoreSystemContextMenu({
       x: Math.max(margin, Math.min(position.x, window.innerWidth - width - margin)),
       y: Math.max(margin, Math.min(position.y, window.innerHeight - height - margin)),
     });
-  }, [position]);
+  }, [position, menuRef]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => itemRefs.current[0]?.focus());
@@ -203,7 +160,7 @@ export function ScoreSystemContextMenu({
       document.removeEventListener("keydown", handleDocumentKeyDown);
       invoker.focus();
     };
-  }, [invoker, onClose, activeSubmenu]);
+  }, [invoker, onClose, activeSubmenu, itemRefs, menuRef]);
 
   useEffect(() => {
     if (activeSubmenu && submenuRef.current) {
@@ -252,7 +209,10 @@ export function ScoreSystemContextMenu({
     const enabledItems = itemRefs.current.filter(
       (item): item is HTMLButtonElement => item !== null && !item.disabled,
     );
-    const currentIndex = Math.max(0, enabledItems.indexOf(document.activeElement as HTMLButtonElement));
+    const currentIndex = Math.max(
+      0,
+      enabledItems.indexOf(document.activeElement as HTMLButtonElement),
+    );
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -312,11 +272,6 @@ export function ScoreSystemContextMenu({
     }
   };
 
-  const registerRef = (index: number) => (node: HTMLButtonElement | null) => {
-    itemRefs.current[index] = node;
-  };
-
-  const menuWidth = menuRef.current?.getBoundingClientRect().width ?? 220;
   const submenuX =
     adjustedPosition.x + menuWidth + 210 < window.innerWidth
       ? adjustedPosition.x + menuWidth + 2
@@ -340,388 +295,390 @@ export function ScoreSystemContextMenu({
         onKeyDownCapture={handleKeyDown}
         data-testid="score-system-context-menu"
       >
-      {/* 1. Playback & Rehearsal */}
-      {onPlayFromHere ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-play-from-here"
-          onClick={() => {
-            onPlayFromHere();
-            onClose();
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>Play from this System</span>
-            <span style={{ fontSize: 11, opacity: 0.7 }}>▶</span>
-          </span>
-        </button>
-      ) : null}
-
-      {onToggleLoop ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-toggle-loop"
-          onClick={() => {
-            onToggleLoop();
-            onClose();
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>Loop System</span>
-            {isLooping ? <span className="score-system-menu-check">✓</span> : null}
-          </span>
-        </button>
-      ) : null}
-
-      {onToggleMute ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-toggle-mute"
-          onClick={() => {
-            onToggleMute();
-            onClose();
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>{isMuted ? "Unmute System" : "Mute System"}</span>
-            {isMuted ? <span className="score-system-menu-check">✓</span> : null}
-          </span>
-        </button>
-      ) : null}
-
-      {onToggleSolo ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-toggle-solo"
-          onClick={() => {
-            onToggleSolo();
-            onClose();
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>{isSolo ? "Unsolo System" : "Solo System"}</span>
-            {isSolo ? <span className="score-system-menu-check">✓</span> : null}
-          </span>
-        </button>
-      ) : null}
-
-      <div className="score-system-menu-separator" role="separator" />
-
-      {/* 2. Structure & Arrangement */}
-      {onMoveUp ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!canMoveUp}
-          data-testid="score-system-move-up"
-          onClick={() => {
-            onMoveUp();
-            onClose();
-          }}
-        >
-          Move System Up
-        </button>
-      ) : null}
-
-      {onMoveDown ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!canMoveDown}
-          data-testid="score-system-move-down"
-          onClick={() => {
-            onMoveDown();
-            onClose();
-          }}
-        >
-          Move System Down
-        </button>
-      ) : null}
-
-      <button
-        ref={registerRef(btnIndex++)}
-        type="button"
-        role="menuitem"
-        data-testid="score-system-duplicate"
-        onClick={() => {
-          onDuplicate();
-          onClose();
-        }}
-      >
-        Duplicate System
-      </button>
-
-      {onCopy ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-copy"
-          onClick={() => {
-            onCopy();
-            onClose();
-          }}
-        >
-          Copy System
-        </button>
-      ) : null}
-
-      {onPasteAfter ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!canPaste}
-          data-testid="score-system-paste-after"
-          onClick={() => {
-            onPasteAfter();
-            onClose();
-          }}
-        >
-          Paste System After
-        </button>
-      ) : null}
-
-      {onInsertEmptyAfter ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-insert-empty-after"
-          onClick={() => {
-            onInsertEmptyAfter();
-            onClose();
-          }}
-        >
-          Insert Empty System After
-        </button>
-      ) : null}
-
-      {onInsertRestAfter ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-insert-rest"
-          onClick={() => {
-            onInsertRestAfter();
-            onClose();
-          }}
-        >
-          Insert Rest After System
-        </button>
-      ) : null}
-
-      {onExploreAlternative ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-explore-alternative"
-          onClick={() => {
-            onExploreAlternative();
-            onClose();
-          }}
-        >
-          Explore Alternative from System
-        </button>
-      ) : null}
-
-      <div className="score-system-menu-separator" role="separator" />
-
-      {/* 3. Pitch, Voicing & Articulation */}
-      {onOctaveUp ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!canShiftOctaveUp}
-          data-testid="score-system-octave-up"
-          onClick={() => {
-            onOctaveUp();
-            onClose();
-          }}
-        >
-          Octave Up (+1 8va)
-        </button>
-      ) : null}
-
-      {onOctaveDown ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!canShiftOctaveDown}
-          data-testid="score-system-octave-down"
-          onClick={() => {
-            onOctaveDown();
-            onClose();
-          }}
-        >
-          Octave Down (-1 8vb)
-        </button>
-      ) : null}
-
-      {onResetPerformance ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-testid="score-system-reset-performance"
-          onClick={() => {
-            onResetPerformance();
-            onClose();
-          }}
-        >
-          Reset Performance & Voicings
-        </button>
-      ) : null}
-
-      {onSetArticulation ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-has-submenu="articulation"
-          data-testid="score-system-open-articulation"
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu("articulation");
-          }}
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu((prev) => (prev === "articulation" ? null : "articulation"));
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>Set Articulation</span>
-            <span className="score-system-submenu-arrow">▸</span>
-          </span>
-        </button>
-      ) : null}
-
-      <div className="score-system-menu-separator" role="separator" />
-
-      {/* 4. Melody Layer */}
-      {onApplyMelodyContour ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-has-submenu="melody"
-          data-testid="score-system-open-melody"
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu("melody");
-          }}
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu((prev) => (prev === "melody" ? null : "melody"));
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>Apply Melody Contour</span>
-            <span className="score-system-submenu-arrow">▸</span>
-          </span>
-        </button>
-      ) : null}
-
-      {onSetMelodyGrid ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          data-has-submenu="grid"
-          data-testid="score-system-open-grid"
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu("grid");
-          }}
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setSubmenuTop(rect.top);
-            setActiveSubmenu((prev) => (prev === "grid" ? null : "grid"));
-          }}
-        >
-          <span className="score-system-menu-item-row">
-            <span>Set Melody Grid</span>
-            <span className="score-system-submenu-arrow">▸</span>
-          </span>
-        </button>
-      ) : null}
-
-      {onClearMelody ? (
-        <button
-          ref={registerRef(btnIndex++)}
-          type="button"
-          role="menuitem"
-          disabled={!hasMelody}
-          data-testid="score-system-clear-melody"
-          onClick={() => {
-            onClearMelody();
-            onClose();
-          }}
-        >
-          Clear Melody
-        </button>
-      ) : null}
-
-      {onToggleSuzukiColors ? (
-        <>
-          <div className="score-system-menu-separator" role="separator" />
-          <div className="score-system-menu-group-header" role="presentation">View Options</div>
+        {/* 1. Playback & Rehearsal */}
+        {onPlayFromHere ? (
           <button
             ref={registerRef(btnIndex++)}
             type="button"
             role="menuitem"
-            data-testid="score-system-toggle-suzuki-colors"
+            data-testid="score-system-play-from-here"
             onClick={() => {
-              onToggleSuzukiColors();
+              onPlayFromHere();
               onClose();
             }}
           >
             <span className="score-system-menu-item-row">
-              <span>Suzuki Note Colors</span>
-              {suzukiColors ? <span className="score-system-menu-check">✓</span> : null}
+              <span>Play from this System</span>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>▶</span>
             </span>
           </button>
-        </>
-      ) : null}
+        ) : null}
 
-      {/* 5. Destruction */}
-      {onDelete ? (
-        <>
-          <div className="score-system-menu-separator" role="separator" />
+        {onToggleLoop ? (
           <button
             ref={registerRef(btnIndex++)}
             type="button"
             role="menuitem"
-            className="danger"
-            data-testid="score-system-delete"
+            data-testid="score-system-toggle-loop"
             onClick={() => {
-              onDelete();
+              onToggleLoop();
               onClose();
             }}
           >
-            Delete System
+            <span className="score-system-menu-item-row">
+              <span>Loop System</span>
+              {isLooping ? <span className="score-system-menu-check">✓</span> : null}
+            </span>
           </button>
-        </>
-      ) : null}
+        ) : null}
+
+        {onToggleMute ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-toggle-mute"
+            onClick={() => {
+              onToggleMute();
+              onClose();
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>{isMuted ? "Unmute System" : "Mute System"}</span>
+              {isMuted ? <span className="score-system-menu-check">✓</span> : null}
+            </span>
+          </button>
+        ) : null}
+
+        {onToggleSolo ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-toggle-solo"
+            onClick={() => {
+              onToggleSolo();
+              onClose();
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>{isSolo ? "Unsolo System" : "Solo System"}</span>
+              {isSolo ? <span className="score-system-menu-check">✓</span> : null}
+            </span>
+          </button>
+        ) : null}
+
+        <div className="score-system-menu-separator" role="separator" />
+
+        {/* 2. Structure & Arrangement */}
+        {onMoveUp ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!canMoveUp}
+            data-testid="score-system-move-up"
+            onClick={() => {
+              onMoveUp();
+              onClose();
+            }}
+          >
+            Move System Up
+          </button>
+        ) : null}
+
+        {onMoveDown ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!canMoveDown}
+            data-testid="score-system-move-down"
+            onClick={() => {
+              onMoveDown();
+              onClose();
+            }}
+          >
+            Move System Down
+          </button>
+        ) : null}
+
+        <button
+          ref={registerRef(btnIndex++)}
+          type="button"
+          role="menuitem"
+          data-testid="score-system-duplicate"
+          onClick={() => {
+            onDuplicate();
+            onClose();
+          }}
+        >
+          Duplicate System
+        </button>
+
+        {onCopy ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-copy"
+            onClick={() => {
+              onCopy();
+              onClose();
+            }}
+          >
+            Copy System
+          </button>
+        ) : null}
+
+        {onPasteAfter ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!canPaste}
+            data-testid="score-system-paste-after"
+            onClick={() => {
+              onPasteAfter();
+              onClose();
+            }}
+          >
+            Paste System After
+          </button>
+        ) : null}
+
+        {onInsertEmptyAfter ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-insert-empty-after"
+            onClick={() => {
+              onInsertEmptyAfter();
+              onClose();
+            }}
+          >
+            Insert Empty System After
+          </button>
+        ) : null}
+
+        {onInsertRestAfter ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-insert-rest"
+            onClick={() => {
+              onInsertRestAfter();
+              onClose();
+            }}
+          >
+            Insert Rest After System
+          </button>
+        ) : null}
+
+        {onExploreAlternative ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-explore-alternative"
+            onClick={() => {
+              onExploreAlternative();
+              onClose();
+            }}
+          >
+            Explore Alternative from System
+          </button>
+        ) : null}
+
+        <div className="score-system-menu-separator" role="separator" />
+
+        {/* 3. Pitch, Voicing & Articulation */}
+        {onOctaveUp ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!canShiftOctaveUp}
+            data-testid="score-system-octave-up"
+            onClick={() => {
+              onOctaveUp();
+              onClose();
+            }}
+          >
+            Octave Up (+1 8va)
+          </button>
+        ) : null}
+
+        {onOctaveDown ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!canShiftOctaveDown}
+            data-testid="score-system-octave-down"
+            onClick={() => {
+              onOctaveDown();
+              onClose();
+            }}
+          >
+            Octave Down (-1 8vb)
+          </button>
+        ) : null}
+
+        {onResetPerformance ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-testid="score-system-reset-performance"
+            onClick={() => {
+              onResetPerformance();
+              onClose();
+            }}
+          >
+            Reset Performance & Voicings
+          </button>
+        ) : null}
+
+        {onSetArticulation ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-has-submenu="articulation"
+            data-testid="score-system-open-articulation"
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu("articulation");
+            }}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu((prev) => (prev === "articulation" ? null : "articulation"));
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>Set Articulation</span>
+              <span className="score-system-submenu-arrow">▸</span>
+            </span>
+          </button>
+        ) : null}
+
+        <div className="score-system-menu-separator" role="separator" />
+
+        {/* 4. Melody Layer */}
+        {onApplyMelodyContour ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-has-submenu="melody"
+            data-testid="score-system-open-melody"
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu("melody");
+            }}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu((prev) => (prev === "melody" ? null : "melody"));
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>Apply Melody Contour</span>
+              <span className="score-system-submenu-arrow">▸</span>
+            </span>
+          </button>
+        ) : null}
+
+        {onSetMelodyGrid ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            data-has-submenu="grid"
+            data-testid="score-system-open-grid"
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu("grid");
+            }}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuTop(rect.top);
+              setActiveSubmenu((prev) => (prev === "grid" ? null : "grid"));
+            }}
+          >
+            <span className="score-system-menu-item-row">
+              <span>Set Melody Grid</span>
+              <span className="score-system-submenu-arrow">▸</span>
+            </span>
+          </button>
+        ) : null}
+
+        {onClearMelody ? (
+          <button
+            ref={registerRef(btnIndex++)}
+            type="button"
+            role="menuitem"
+            disabled={!hasMelody}
+            data-testid="score-system-clear-melody"
+            onClick={() => {
+              onClearMelody();
+              onClose();
+            }}
+          >
+            Clear Melody
+          </button>
+        ) : null}
+
+        {onToggleSuzukiColors ? (
+          <>
+            <div className="score-system-menu-separator" role="separator" />
+            <div className="score-system-menu-group-header" role="presentation">
+              View Options
+            </div>
+            <button
+              ref={registerRef(btnIndex++)}
+              type="button"
+              role="menuitem"
+              data-testid="score-system-toggle-suzuki-colors"
+              onClick={() => {
+                onToggleSuzukiColors();
+                onClose();
+              }}
+            >
+              <span className="score-system-menu-item-row">
+                <span>Suzuki Note Colors</span>
+                {suzukiColors ? <span className="score-system-menu-check">✓</span> : null}
+              </span>
+            </button>
+          </>
+        ) : null}
+
+        {/* 5. Destruction */}
+        {onDelete ? (
+          <>
+            <div className="score-system-menu-separator" role="separator" />
+            <button
+              ref={registerRef(btnIndex)}
+              type="button"
+              role="menuitem"
+              className="danger"
+              data-testid="score-system-delete"
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              Delete System
+            </button>
+          </>
+        ) : null}
       </div>
 
       {/* Submenu for Articulation */}
@@ -734,7 +691,13 @@ export function ScoreSystemContextMenu({
           onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
-            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 190)),
+            top: Math.max(
+              8,
+              Math.min(
+                submenuTop,
+                (typeof window !== "undefined" ? window.innerHeight : 800) - 190,
+              ),
+            ),
           }}
           data-testid="score-system-articulation-submenu"
         >
@@ -766,14 +729,24 @@ export function ScoreSystemContextMenu({
           onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
-            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)),
+            top: Math.max(
+              8,
+              Math.min(
+                submenuTop,
+                (typeof window !== "undefined" ? window.innerHeight : 800) - 340,
+              ),
+            ),
           }}
           data-testid="score-system-melody-submenu"
         >
           {MELODY_CONTOUR_GROUPS.map((group, groupIdx) => (
             <Fragment key={group.id}>
-              {groupIdx > 0 ? <div className="score-system-menu-separator" role="separator" /> : null}
-              <div className="score-system-menu-group-header" role="presentation">{group.label}</div>
+              {groupIdx > 0 ? (
+                <div className="score-system-menu-separator" role="separator" />
+              ) : null}
+              <div className="score-system-menu-group-header" role="presentation">
+                {group.label}
+              </div>
               {group.items.map((contour) => (
                 <button
                   key={contour.id}
@@ -809,7 +782,13 @@ export function ScoreSystemContextMenu({
           onKeyDownCapture={handleSubmenuKeyDown}
           style={{
             left: submenuX,
-            top: Math.max(8, Math.min(submenuTop, (typeof window !== "undefined" ? window.innerHeight : 800) - 180)),
+            top: Math.max(
+              8,
+              Math.min(
+                submenuTop,
+                (typeof window !== "undefined" ? window.innerHeight : 800) - 180,
+              ),
+            ),
           }}
           data-testid="score-system-grid-submenu"
         >
@@ -834,7 +813,6 @@ export function ScoreSystemContextMenu({
         </div>
       ) : null}
     </>,
-    document.body
+    document.body,
   );
 }
-

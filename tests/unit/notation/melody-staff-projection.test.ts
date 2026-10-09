@@ -1,3 +1,4 @@
+import type { Meter } from "../../../src/domain/timing/meter";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PIANO_PERFORMANCE,
@@ -11,25 +12,35 @@ import {
   createMelodyTimeline,
   melodyClefForInstrument,
 } from "../../../src/notation/melodyStaffProjection";
+import {
+  snapshotChordMelody,
+  type ChordMelody,
+  type MelodyRecipeInput,
+} from "../../../src/domain/melody/types";
 
+// Callers pass a bare recipe literal; `ChordStep.melody` needs the `{ mode: "generated" as const, recipe }`
+// wrapper, so the helper normalizes rather than making every call site do it.
 function chordStep(
   id: string,
   duration: ReturnType<typeof musicalDuration>,
-  melody?: ChordStep["melody"],
+  melody?: ChordMelody | MelodyRecipeInput,
 ): ChordStep {
   return {
     id,
     kind: "chord",
-    harmonicFunction: { moduleId: "progressions", functionId: "I" },
+    harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration,
     performance: DEFAULT_PIANO_PERFORMANCE,
     cardView: "staff",
-    ...(melody ? { melody } : {}),
+    ...(melody ? { melody: snapshotChordMelody(melody) } : {}),
   };
 }
 
-function withSteps(steps: readonly ProgressionStep[], meter: [number, number] = [4, 4]) {
+function withSteps(
+  steps: readonly ProgressionStep[],
+  meter: [number, Meter["denominator"]] = [4, 4],
+) {
   const base = createDefaultProject("melody-staff", "Melody Staff");
   return {
     ...base,
@@ -51,9 +62,11 @@ function withSteps(steps: readonly ProgressionStep[], meter: [number, number] = 
 describe("T171 — Melody Staff projection", () => {
   it("derives upper-voicing notes only and leaves the project immutable", () => {
     const step = chordStep("source-c", musicalDuration(rational(2)), {
-      pattern: "up",
+      pitchMotion: "up",
       grid: "quarter",
       octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
     });
     const project = withSteps([step]);
     const before = JSON.stringify(project);
@@ -79,9 +92,11 @@ describe("T171 — Melody Staff projection", () => {
         duration: musicalDuration(rational(1)),
       },
       chordStep("melody-chord", musicalDuration(rational(1)), {
-        pattern: "up",
+        pitchMotion: "up",
         grid: "quarter",
         octaveOffset: 0,
+        rhythm: "even",
+        connection: "retrigger",
       }),
     ];
     const result = createMelodyTimeline(withSteps(steps));
@@ -126,16 +141,18 @@ describe("T171 — Melody Staff projection", () => {
       withSteps([
         chordStep("lead-in", musicalDuration(rational(7, 2))),
         chordStep("cross-bar-source", musicalDuration(rational(1)), {
-          pattern: "up",
+          pitchMotion: "up",
           grid: "quarter",
           octaveOffset: 0,
+          rhythm: "even",
+          connection: "retrigger",
         }),
       ]),
     );
     const fragments = result.measures.flatMap((measure) =>
-      measure.entries.filter(
-        (entry) => entry.kind === "note" && entry.eventKey === "cross-bar-source:0",
-      ),
+      measure.entries
+        .filter((entry) => entry.kind === "note")
+        .filter((entry) => entry.eventKey === "cross-bar-source:0"),
     );
 
     expect(fragments).toHaveLength(2);
@@ -157,9 +174,11 @@ describe("T171 — Melody Staff projection", () => {
 
   it("preserves exact triplet timing in 3/4 and 7/8 measures", () => {
     const triplet = chordStep("triplets", musicalDuration(rational(1)), {
-      pattern: "up",
+      pitchMotion: "up",
       grid: "eighth-triplet",
       octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
     });
     const threeFour = createMelodyTimeline(withSteps([triplet], [3, 4]));
     expect(threeFour.measures[0]?.entries).toHaveLength(4);
@@ -177,9 +196,11 @@ describe("T171 — Melody Staff projection", () => {
       withSteps(
         [
           chordStep("seven-eight", musicalDuration(rational(1)), {
-            pattern: "up",
+            pitchMotion: "up",
             grid: "sixteenth-triplet",
             octaveOffset: 0,
+            rhythm: "even",
+            connection: "retrigger",
           }),
         ],
         [7, 8],

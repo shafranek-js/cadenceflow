@@ -22,8 +22,10 @@ import type {
   StepPerformance,
 } from "../../domain/progression/step";
 import { formatChordSymbol } from "../../domain/harmony/chord";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
 import type { ExactPitch } from "../../domain/harmony/pitch";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
+import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import {
   realizeProgressionStepChord,
@@ -150,6 +152,7 @@ import { canShiftPerformanceOctave } from "../staff/staffOctave";
 import type { FunctionalPreset, PresetApplyMode } from "../../domain/progression/presets";
 import { GuidedStart } from "./GuidedStart";
 import { formatProgressionChordLabel, type LabelHierarchyMode } from "./labelHierarchy";
+import { useMeasureDrag } from "./useMeasureDrag";
 import {
   createDurationResizeSnapshot,
   durationForResizeEndpoint,
@@ -320,6 +323,8 @@ export function ProgressionTrack({
   onStopPianoRollMidiAudition,
   midiSessionKey = 0,
   midiStartupReady = true,
+  keyboardVisible = false,
+  onToggleKeyboard,
   transportStatus = "stopped",
   onRemoveMelodyRecipe,
   activeMelodyEventKey,
@@ -342,8 +347,7 @@ export function ProgressionTrack({
   onToggleLoopSystem,
   onToggleMuteSystem,
   onToggleSoloSystem,
-  onMoveSystemUp,
-  onMoveSystemDown,
+  onMoveSystemBlock,
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
@@ -360,6 +364,7 @@ export function ProgressionTrack({
   onDeleteMeasure,
   onDuplicateMeasure,
   onInsertMeasureAfter,
+  onMoveMeasure,
   onLoopMeasure,
   onToggleSuzukiColors,
   onApplyPreset,
@@ -470,6 +475,8 @@ export function ProgressionTrack({
   readonly onStopPianoRollMidiAudition?: () => void;
   readonly midiSessionKey?: number;
   readonly midiStartupReady?: boolean;
+  readonly keyboardVisible?: boolean;
+  readonly onToggleKeyboard?: () => void;
   readonly transportStatus?: "stopped" | "playing" | "paused";
   readonly onRemoveMelodyRecipe?: (stepId: string) => void;
   readonly onMelodyTrackSettingsChange?: (patch: Partial<MelodyTrackSettings>) => void;
@@ -498,8 +505,13 @@ export function ProgressionTrack({
   readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
-  readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemBlock?:
+    | ((
+        system: ScoreSystem,
+        toInsertMeasureIndex: number,
+        sourceProject: Project,
+      ) => string | undefined)
+    | undefined;
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
@@ -519,6 +531,9 @@ export function ProgressionTrack({
   readonly onDeleteMeasure?: ((measureIndex: number) => string | undefined) | undefined;
   readonly onDuplicateMeasure?: ((measureIndex: number) => string | undefined) | undefined;
   readonly onInsertMeasureAfter?: ((measureIndex: number) => string | undefined) | undefined;
+  /** Moves a Measure; returns a refusal message instead of applying it when it cannot be moved. */
+  readonly onMoveMeasure?:
+    ((fromMeasureIndex: number, toInsertIndex: number) => string | undefined) | undefined;
   readonly onLoopMeasure?: ((measureIndex: number) => void) | undefined;
   readonly onToggleSuzukiColors?: (() => void) | undefined;
   readonly onApplyPreset?: ((preset: FunctionalPreset, mode: PresetApplyMode) => void) | undefined;
@@ -735,8 +750,6 @@ export function ProgressionTrack({
   useEffect(() => {
     if (project.presentation.progressionView === "piano-roll") return;
     setPianoRollEmptyCursor(null);
-    setActivePianoRollSystemIndex(null);
-    setPianoRollSelectionScope({ kind: "progression" });
     setPianoRollChordSelection(null);
     setSelectedPianoNoteIdentities((current) => (current.size === 0 ? current : new Set()));
     if (selectedPianoNote) onSelectedPianoNoteChange?.(null);
@@ -772,6 +785,13 @@ export function ProgressionTrack({
     readonly startY: number;
     readonly currentX: number;
     readonly currentY: number;
+    readonly trackLeft: number;
+    readonly trackTop: number;
+  } | null>(null);
+  const pendingMarqueeRef = useRef<{
+    readonly pointerId: number;
+    readonly startX: number;
+    readonly startY: number;
     readonly trackLeft: number;
     readonly trackTop: number;
   } | null>(null);
@@ -819,14 +839,19 @@ export function ProgressionTrack({
     currentPlayingStepIndex === null || currentPlayingStepIndex === undefined
       ? undefined
       : project.progression.steps[currentPlayingStepIndex]?.id;
-  const layout = createProgressionMeasureLayout(
-    project.progression.steps,
-    project.globalTiming.meter,
+  // Memoized: this layout is a dependency of the score-system projection below, and a new
+  // identity on every render defeats that projection's caching. Marquee range selection and
+  // duration-resize previews update state on each pointer move, so an unmemoized layout here
+  // rebuilt every measure's realization and re-rendered the whole staff on every frame.
+  // `ProgressionGlobalInspector` already memoizes the identical call.
+  const layout = useMemo(
+    () => createProgressionMeasureLayout(project.progression.steps, project.globalTiming.meter),
+    [project.progression.steps, project.globalTiming.meter],
   );
   useEffect(() => {
-    if (project.presentation.progressionView === "piano-roll")
-      setPianoRollSelectionScope({ kind: "progression" });
-  }, [pianoRollSelectionScopeResetVersion, project.presentation.progressionView]);
+    setPianoRollSelectionScope({ kind: "progression" });
+    setActivePianoRollSystemIndex(null);
+  }, [pianoRollSelectionScopeResetVersion]);
   useEffect(() => {
     if (project.presentation.progressionView !== "piano-roll") return;
     const measureCount = layout.measures.length;
@@ -997,6 +1022,11 @@ export function ProgressionTrack({
     setActivePianoRollSystemIndex(systemIndex);
     setPianoRollSelectionScope({ kind: "system", systemIndex });
   };
+
+  const currentMeasureIndex =
+    pianoRollSelectionScope.kind === "measure" ? pianoRollSelectionScope.measureIndex : undefined;
+  const currentSystemIndex =
+    pianoRollSelectionScope.kind === "system" ? pianoRollSelectionScope.systemIndex : undefined;
 
   const pianoRollSelectionScopeLabel =
     pianoRollSelectionScope.kind === "progression"
@@ -1282,10 +1312,49 @@ export function ProgressionTrack({
   }, [project.progression.steps]);
 
   const removeStepAndRestoreFocus = (stepId: string) => {
-    const step = project.progression.steps.find((candidate) => candidate.id === stepId);
-    if (!step || step.kind === "rest") return;
-    pendingFocusStepIdRef.current = stepId;
+    const stepIndex = project.progression.steps.findIndex((candidate) => candidate.id === stepId);
+    const step = project.progression.steps[stepIndex];
+    if (!step) return;
+
+    // Focus a NEIGHBOUR rather than the step acted on: the step may not survive the command, and
+    // the layout effect above refuses to focus a step that is not in the progression.
+    //
+    // Placement matters here. `pendingFocusStepIdRef` alone is not enough, because that effect only
+    // runs when `project.progression.steps` changes identity — and the remove command does not
+    // always change it: acting on an already-empty (rest) step returns the same progression, so
+    // the effect never fired and focus ended on `<body>` once the button unmounted. Focusing inside
+    // the click handler is also not enough, because the re-render that follows replaces the card
+    // and jsdom drops focus to `<body>` when the focused node leaves the document. Focusing on the
+    // next frame, after that render, is what makes it stick in both cases.
+    const neighbour =
+      project.progression.steps[stepIndex + 1] ?? project.progression.steps[stepIndex - 1];
+    pendingFocusStepIdRef.current = neighbour?.id ?? null;
+
+    const focusNeighbour = (): boolean => {
+      if (!neighbour) return false;
+      const pianoRollTarget = Array.from(
+        trackRef.current?.querySelectorAll<HTMLButtonElement>(
+          ".piano-roll-chord[data-source-step-id]",
+        ) ?? [],
+      ).find((candidate) => candidate.dataset.sourceStepId === neighbour.id);
+      const cardTarget = Array.from(
+        trackRef.current?.querySelectorAll<HTMLElement>("[data-progression-step-select]") ?? [],
+      ).find((candidate) => candidate.dataset.stepId === neighbour.id);
+      const target = pianoRollTarget ?? cardTarget;
+      if (!target) return false;
+      target.focus({ preventScroll: true });
+      return true;
+    };
+
     onRemove(stepId);
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (focusNeighbour()) pendingFocusStepIdRef.current = null;
+      });
+    } else {
+      focusNeighbour();
+    }
   };
 
   const applyPianoRollChordTie = (stepIds: readonly string[]): void => {
@@ -1465,7 +1534,7 @@ export function ProgressionTrack({
     if (!(target instanceof Element)) return false;
     if (
       target.closest(
-        "button, input, select, textarea, a, [contenteditable], [data-progression-step-drag], [data-duration-resize-handle], .progression-step-card, .progression-rest-card, .progression-step-continuation, .measure-staff-event, .piano-roll-grid, .piano-roll-note-layer, .piano-roll-note, .piano-roll-toolbar, [role=menu], [role=dialog]",
+        "button, input, select, textarea, a, [contenteditable], [data-progression-step-drag], [data-duration-resize-handle], .progression-step-card, .progression-rest-card, .progression-step-continuation, .measure-staff-event, .score-system-header, .progression-heading, .piano-roll-grid, .piano-roll-measure-header, .piano-roll-note-layer, .piano-roll-note, .piano-roll-toolbar, [role=menu], [role=dialog]",
       )
     ) {
       return false;
@@ -1478,22 +1547,41 @@ export function ProgressionTrack({
   };
 
   const handleMarqueePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    pendingMarqueeRef.current = null;
     if (project.presentation.progressionView === "piano-roll") return;
     if (event.button !== 0 || !isMarqueeBackground(event.target)) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setMarquee({
+    const bounds = event.currentTarget.getBoundingClientRect();
+    pendingMarqueeRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      currentX: event.clientX,
-      currentY: event.clientY,
-      trackLeft: event.currentTarget.getBoundingClientRect().left,
-      trackTop: event.currentTarget.getBoundingClientRect().top,
-    });
+      trackLeft: bounds.left,
+      trackTop: bounds.top,
+    };
   };
 
   const handleMarqueePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const pending = pendingMarqueeRef.current;
+    if (
+      (!marquee || marquee.pointerId !== event.pointerId) &&
+      pending?.pointerId === event.pointerId
+    ) {
+      if (
+        Math.abs(event.clientX - pending.startX) <= 3 &&
+        Math.abs(event.clientY - pending.startY) <= 3
+      )
+        return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      pendingMarqueeRef.current = null;
+      ignoreNextClickRef.current = true;
+      setMarquee({
+        ...pending,
+        currentX: event.clientX,
+        currentY: event.clientY,
+      });
+      return;
+    }
     if (!marquee || marquee.pointerId !== event.pointerId) return;
     if (
       Math.abs(event.clientX - marquee.startX) > 3 ||
@@ -1509,6 +1597,10 @@ export function ProgressionTrack({
   };
 
   const finishMarquee = (event: PointerEvent<HTMLDivElement>) => {
+    if (pendingMarqueeRef.current?.pointerId === event.pointerId) {
+      pendingMarqueeRef.current = null;
+      return;
+    }
     if (!marquee || marquee.pointerId !== event.pointerId) return;
     const finalRect = {
       left: Math.min(marquee.startX, event.clientX),
@@ -1676,7 +1768,7 @@ export function ProgressionTrack({
     if (selectedIndex < 0) throw new RangeError("The selected Step no longer exists.");
     const selected = project.progression.steps[selectedIndex]!;
     const starts = stepTimelineStarts(project.progression.steps);
-    const snapQuantum = pianoRollSnapBeats(pianoRollSnap);
+    const snapQuantum = pianoRollSnapBeats(pianoRollSnap, project.globalTiming.meter);
     const minimumDuration = rational(1, 24);
     if (edge === "left" && selectedIndex === 0) {
       if (selected.kind !== "chord")
@@ -2308,6 +2400,12 @@ export function ProgressionTrack({
     }
   };
 
+  // Step resizing belongs where it can be done directly: the piano-roll drags a boundary on the
+  // Measure itself. In the Staff and Tablature views the handle sat as a stray control beside every
+  // chord, so it is not offered there.
+  const showsStepResizeHandle =
+    project.presentation.progressionView !== "staff" &&
+    project.presentation.progressionView !== "tablature";
   const renderDurationResizeHandle = (
     fragment: Pick<ProgressionMeasureFragment, "step" | "stepId" | "stepIndex" | "continuesToNext">,
     measure: (typeof layout.measures)[number],
@@ -2376,11 +2474,6 @@ export function ProgressionTrack({
     if (!step) return;
     const rect = anchor.getBoundingClientRect();
     melodyInvokerRef.current = anchor;
-    if (
-      project.presentation.progressionView !== "piano-roll" &&
-      project.progression.selectedStepId !== stepId
-    )
-      onSelectStep(stepId);
     setMelodyMenu({
       stepId,
       invoker: anchor,
@@ -2468,71 +2561,99 @@ export function ProgressionTrack({
     setMelodyEditorStepId(stepId);
   };
 
-  const staffItemsForMeasure = (measure: (typeof layout.measures)[number]): MeasureStaffItem[] =>
-    measure.items.map((item, itemIndex) => {
-      const duration = musicalDuration(item.durationBeats);
-      const startOffsetBeats = subtractRational(item.startBeats, measure.startBeats);
-      if (item.kind === "gap") {
-        return {
-          key: `gap-${measure.measureIndex}-${itemIndex}`,
-          kind: "gap",
-          duration,
-          startOffsetBeats,
-        };
-      }
-      if (item.step.kind === "rest") {
+  // Memoized so the identity is stable across renders. `ScoreSystemView` caches each system's
+  // projection against this callback; a fresh closure per render invalidated that cache, so a
+  // pointer move during marquee selection or a duration drag rebuilt every measure's chord
+  // realization and re-rendered the whole staff.
+  const staffItemsForMeasure = useCallback(
+    (measure: (typeof layout.measures)[number]): MeasureStaffItem[] =>
+      measure.items.map((item, itemIndex) => {
+        const duration = musicalDuration(item.durationBeats);
+        const startOffsetBeats = subtractRational(item.startBeats, measure.startBeats);
+        if (item.kind === "gap") {
+          return {
+            key: `gap-${measure.measureIndex}-${itemIndex}`,
+            kind: "gap",
+            duration,
+            startOffsetBeats,
+          };
+        }
+        if (item.step.kind === "rest") {
+          return {
+            key: `${item.step.id}-${item.fragmentIndex}`,
+            kind: "rest",
+            stepId: item.step.id,
+            label: "Rest",
+            duration,
+            startOffsetBeats,
+          };
+        }
+        const realization = realizeProgressionStepRealization(item.step, project.tonic);
+        const chord = realizeProgressionStepChord(item.step, project.tonic);
+        const separateBassPitch = project.independentBassEnabled
+          ? realization.bassPitch
+          : undefined;
+        const isTablature = project.presentation.progressionView === "tablature";
+        const displayBassPitch = separateBassPitch ?? realization.pitches[0];
+        const guitarChord = withGuitarStepBass(chord, item.step, "concert");
+        const effectiveChord = isTablature
+          ? guitarChord
+          : withEffectiveBass(chord, displayBassPitch);
+        const label = formatProgressionChordLabel(
+          labelMode,
+          harmonicFunctionLabel(item.step.harmonicFunction),
+          formatChordSymbol(effectiveChord),
+        );
+        const transpositionSemitones = stepTranspositionSemitones(item.step);
+        const transpositionLabel =
+          transpositionSemitones === 0
+            ? ""
+            : ` · local transposition ${transpositionSemitones > 0 ? "+" : ""}${transpositionSemitones} semitones`;
         return {
           key: `${item.step.id}-${item.fragmentIndex}`,
-          kind: "rest",
+          kind: "chord",
           stepId: item.step.id,
-          label: "Rest",
+          label: `${label}${transpositionLabel}`,
+          pitches: realization.pitches,
+          ...(!isTablature &&
+          project.independentBassEnabled &&
+          project.presentation.showBassInStaff &&
+          separateBassPitch
+            ? { bassPitch: separateBassPitch }
+            : {}),
+          chordPitches: realization.pitches,
           duration,
           startOffsetBeats,
+          startsHere: item.startsHere,
+          continuesFromPrevious: item.continuesFromPrevious,
+          continuesToNext: item.continuesToNext,
+          canShiftUp: canShiftPerformanceOctave(item.step.performance, 1),
+          canShiftDown: canShiftPerformanceOctave(item.step.performance, -1),
         };
-      }
-      const realization = realizeProgressionStepRealization(item.step, project.tonic);
-      const chord = realizeProgressionStepChord(item.step, project.tonic);
-      const effectiveChord = withEffectiveBass(
-        {
-          ...chord,
-        },
-        realization.bassPitch,
-      );
-      const label = formatProgressionChordLabel(
-        labelMode,
-        item.step.harmonicFunction.functionId,
-        formatChordSymbol(effectiveChord),
-      );
-      const transpositionSemitones = stepTranspositionSemitones(item.step);
-      const transpositionLabel =
-        transpositionSemitones === 0
-          ? ""
-          : ` · local transposition ${transpositionSemitones > 0 ? "+" : ""}${transpositionSemitones} semitones`;
-      const isInvertedBass =
-        realization.bassPitch !== undefined &&
-        realization.bassPitch.pitchClassIdentity !== chord.rootPitchClass;
-      return {
-        key: `${item.step.id}-${item.fragmentIndex}`,
-        kind: "chord",
-        stepId: item.step.id,
-        label: `${label}${transpositionLabel}`,
-        pitches: realization.pitches,
-        ...((project.presentation.showBassInStaff ||
-          project.presentation.progressionView === "tablature" ||
-          isInvertedBass) &&
-        realization.bassPitch
-          ? { bassPitch: realization.bassPitch }
-          : {}),
-        chordPitches: realization.pitches,
-        duration,
-        startOffsetBeats,
-        startsHere: item.startsHere,
-        continuesFromPrevious: item.continuesFromPrevious,
-        continuesToNext: item.continuesToNext,
-        canShiftUp: canShiftPerformanceOctave(item.step.performance, 1),
-        canShiftDown: canShiftPerformanceOctave(item.step.performance, -1),
-      };
-    });
+      }),
+    [
+      // `layout` is memoized on steps + meter, so this identity only changes when the measures
+      // can actually differ.
+      layout,
+      project.tonic,
+      labelMode,
+      project.presentation.showBassInStaff,
+      project.presentation.progressionView,
+      project.independentBassEnabled,
+    ],
+  );
+
+  // Click-and-drag reordering of whole Measures. Only the piano-roll renders Measures as discrete
+  // grid cells, so the gesture is enabled there alone.
+  const [measureMoveMessage, setMeasureMoveMessage] = useState<string | null>(null);
+  const measureDrag = useMeasureDrag({
+    containerRef: trackRef,
+    enabled: project.presentation.progressionView === "piano-roll",
+    onCommit: (fromMeasureIndex, toInsertIndex) => {
+      const refusal = onMoveMeasure?.(fromMeasureIndex, toInsertIndex);
+      setMeasureMoveMessage(refusal ?? null);
+    },
+  });
 
   const dragStart = (event: DragEvent<HTMLElement>, stepId: string) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
@@ -2572,21 +2693,36 @@ export function ProgressionTrack({
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (isAppShortcutProtectedTarget(event.target) || event.key !== "Escape") return;
     if (project.presentation.progressionView === "piano-roll") return;
-    if (!selectedStepId || !onClearSelection) return;
+    if (!onClearSelection) return;
+    // Read the selection from the Project, not from the local `selectedStepId`.
+    //
+    // Regression context: this guarded on the local state variable, which only the piano-roll
+    // selection logic writes. In the card layouts the selection lives in
+    // `project.progression.selectedStepId`, so the guard was always true and Escape never dismissed
+    // the selection there. The focused step is remembered before clearing so focus can be put back
+    // on it, since the clear command re-renders the card that currently holds focus.
+    const selected = project.progression.selectedStepId;
+    if (!selected) return;
     event.preventDefault();
     event.stopPropagation();
     onClearSelection();
-    restoreSelectedStepFocus(selectedStepId);
+    restoreSelectedStepFocus(selected);
   };
   const handleBackgroundClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (isAppShortcutProtectedTarget(target)) return;
     const clickedInteractive = target.closest(
-      ".progression-step-card, .progression-rest-card, .progression-step-continuation, .progression-measure-header, .progression-measure-gap, .progression-view-control, .progression-gap-hint, .piano-roll-grid, .piano-roll-measure-header, .score-system-header, button, select, input, textarea, label",
+      ".progression-step-card, .progression-rest-card, .progression-step-continuation, .progression-measure-header, .progression-measure-gap, .progression-view-control, .progression-gap-hint, .piano-roll-grid, .piano-roll-measure-header, .score-system-header, .score-system-paper, .measure-staff-event, .measure-staff-gap, button, select, input, textarea, label",
     );
     if (clickedInteractive) return;
+    setPianoRollSelectionScope({ kind: "progression" });
+    setActivePianoRollSystemIndex(null);
     if (project.presentation.progressionView === "piano-roll") {
-      setPianoRollSelectionScope({ kind: "progression" });
+      setPianoRollEmptyCursor(null);
+      clearTransientPianoRollNoteSelection();
+      setRangeSelection(EMPTY_RANGE_SELECTION);
+      onClearSelection?.();
       return;
     }
     if (event.currentTarget.classList.contains("progression-step-cards")) {
@@ -2696,7 +2832,7 @@ export function ProgressionTrack({
       return (
         <div
           key={`${fragment.stepId}-continuation-${fragment.fragmentIndex}`}
-          className={`progression-step-continuation measure-step-segment ${!fragment.continuesToNext && isChordFragment ? "has-duration-resize-handle" : ""}`.trim()}
+          className={`progression-step-continuation measure-step-segment ${showsStepResizeHandle && !fragment.continuesToNext && isChordFragment ? "has-duration-resize-handle" : ""}`.trim()}
           style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
           data-testid="progression-step-continuation"
           data-step-id={fragment.stepId}
@@ -2728,7 +2864,7 @@ export function ProgressionTrack({
         >
           <span aria-hidden="true">↪</span>
           <span>{formatMusicalDuration(musicalDuration(fragment.durationBeats))}</span>
-          {renderDurationResizeHandle(fragment, measure)}
+          {showsStepResizeHandle ? renderDurationResizeHandle(fragment, measure) : null}
         </div>
       );
     }
@@ -2741,7 +2877,7 @@ export function ProgressionTrack({
     return (
       <div
         key={step.id}
-        className={`progression-drag-item measure-step-segment ${dropTargetIndex === index ? "is-drop-target" : ""} ${!fragment.continuesToNext ? "has-duration-resize-handle" : ""}`.trim()}
+        className={`progression-drag-item measure-step-segment ${dropTargetIndex === index ? "is-drop-target" : ""} ${showsStepResizeHandle && !fragment.continuesToNext ? "has-duration-resize-handle" : ""}`.trim()}
         style={segmentStyle(fragment.durationBeats, layout.barLengthBeats)}
         draggable
         data-progression-step-drag
@@ -2766,6 +2902,7 @@ export function ProgressionTrack({
           playing={isPlaying}
           inLoop={isInLoop}
           showBassInStaff={project.presentation.showBassInStaff}
+          independentBassEnabled={project.independentBassEnabled}
           noteColorMode={project.presentation.noteColorMode}
           activeModule={project.activeModule}
           nextStep={project.progression.steps
@@ -2783,7 +2920,7 @@ export function ProgressionTrack({
               }
             : {})}
         />
-        {renderDurationResizeHandle(fragment, measure)}
+        {showsStepResizeHandle ? renderDurationResizeHandle(fragment, measure) : null}
       </div>
     );
   };
@@ -2858,6 +2995,7 @@ export function ProgressionTrack({
           selectedChordStepIds={pianoRollChordStepIdSet}
           onSelectMeasureNotes={() => selectPianoRollNotesInMeasures([measure.measureIndex])}
           selectionScopeLabel={pianoRollSelectionScopeLabel}
+          isCurrentContext={currentMeasureIndex === measure.measureIndex}
           renderBoundaryResizeHandle={renderPianoRollBoundaryResizeHandle}
           boundaryResizePreview={pianoRollBoundaryResizeDraft?.previewBoundary ?? null}
           onHarmonySelected={(stepId, displaySystemIndex, additive) => {
@@ -2898,6 +3036,16 @@ export function ProgressionTrack({
             onSelectedPianoChordChange?.(null);
           }}
           {...(onAuditionPianoRollMeasure ? { onAuditionMeasure: onAuditionPianoRollMeasure } : {})}
+          onMeasureDragStart={measureDrag.begin}
+          draggingMeasureIndex={measureDrag.draggingMeasureIndex}
+          measureDropBefore={
+            measureDrag.dropSystemIndex === systemIndex &&
+            measureDrag.dropSlot === measure.measureIndex
+          }
+          measureDropAfter={
+            measureDrag.dropSystemIndex === systemIndex &&
+            measureDrag.dropSlot === measure.measureIndex + 1
+          }
           onOpenMeasureMenu={(measureIndex, invoker, position) =>
             openMeasureMenu(measureIndex, invoker, position)
           }
@@ -3147,7 +3295,12 @@ export function ProgressionTrack({
       onPointerDown={handleMarqueePointerDown}
       onPointerMove={handleMarqueePointerMove}
       onPointerUp={finishMarquee}
-      onPointerCancel={() => setMarquee(null)}
+      onPointerCancel={(event) => {
+        if (pendingMarqueeRef.current?.pointerId === event.pointerId)
+          pendingMarqueeRef.current = null;
+        if (marquee?.pointerId === event.pointerId) setMarquee(null);
+        ignoreNextClickRef.current = false;
+      }}
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
@@ -3241,6 +3394,25 @@ export function ProgressionTrack({
           }}
         />
       ) : null}
+      {/*
+        Drag preview: the label that follows the pointer while a Measure is being moved. Fixed
+        positioning keeps it with the cursor however the track scrolls underneath.
+      */}
+      {measureDrag.draggingMeasureIndex !== null && measureDrag.cursor !== null ? (
+        <div
+          className="progression-measure-drag-preview"
+          data-testid="progression-measure-drag-preview"
+          aria-hidden="true"
+          style={{
+            left: `${measureDrag.cursor.x}px`,
+            top: `${measureDrag.cursor.y}px`,
+          }}
+        >
+          Measure{" "}
+          {layout.measures[measureDrag.draggingMeasureIndex]?.number ??
+            measureDrag.draggingMeasureIndex + 1}
+        </div>
+      ) : null}
       <div
         className="progression-step-cards"
         data-view={project.presentation.progressionView}
@@ -3251,6 +3423,15 @@ export function ProgressionTrack({
           <p className="progression-gap-hint" role="status" data-testid="progression-gap-hint">
             Choose a chord in Matrix; it will be added after the authored content in measure{" "}
             {matrixGapHint}.
+          </p>
+        ) : null}
+        {measureMoveMessage !== null ? (
+          <p
+            className="progression-gap-hint"
+            role="status"
+            data-testid="progression-measure-move-message"
+          >
+            {measureMoveMessage}
           </p>
         ) : null}
         {project.progression.steps.length === 0 ? (
@@ -3341,7 +3522,15 @@ export function ProgressionTrack({
                           setChordCardVisibility((value) => ({ ...value, piano: !value.piano }))
                         }
                       >
-                        Show piano
+                        Show piano chord
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={keyboardVisible}
+                        title="Show the playback piano keyboard below the workspace"
+                        onClick={onToggleKeyboard}
+                      >
+                        Show keyboard
                       </button>
                       <button
                         type="button"
@@ -3417,7 +3606,9 @@ export function ProgressionTrack({
                   },
                 }
               : {})}
-            renderDurationResizeHandle={renderDurationResizeHandleForStaffItem}
+            {...(showsStepResizeHandle
+              ? { renderDurationResizeHandle: renderDurationResizeHandleForStaffItem }
+              : {})}
             onOpenMeasureMenu={(measureIndex, invoker, position) =>
               openMeasureMenu(measureIndex, invoker, position)
             }
@@ -3437,17 +3628,30 @@ export function ProgressionTrack({
             {...(project.presentation.progressionView === "piano-roll" && onAuditionPianoRollSystem
               ? { onAuditionSystem: onAuditionPianoRollSystem }
               : {})}
-            {...(project.presentation.progressionView === "piano-roll"
-              ? { onSetPianoRollSystemScope: setPianoRollSystemScope }
-              : {})}
+            onSetPianoRollSystemScope={setPianoRollSystemScope}
+            onSetCurrentMeasureScope={(measureIndex, systemIndex) =>
+              handlePianoRollActiveMeasureChange(measureIndex, systemIndex)
+            }
+            currentMeasureIndex={currentMeasureIndex}
+            currentSystemIndex={currentSystemIndex}
             {...(project.presentation.progressionView === "piano-roll"
               ? { pianoRollSelectionScopeLabel }
               : {})}
             {...(onToggleLoopSystem ? { onToggleLoopSystem } : {})}
             {...(onToggleMuteSystem ? { onToggleMuteSystem } : {})}
             {...(onToggleSoloSystem ? { onToggleSoloSystem } : {})}
-            {...(onMoveSystemUp ? { onMoveSystemUp } : {})}
-            {...(onMoveSystemDown ? { onMoveSystemDown } : {})}
+            {...(onMoveSystemBlock
+              ? {
+                  onMoveSystemBlock: (system, toInsertMeasureIndex, sourceProject) => {
+                    const refusal = onMoveSystemBlock(system, toInsertMeasureIndex, sourceProject);
+                    if (refusal === undefined) {
+                      setActivePianoRollSystemIndex(null);
+                      setPianoRollSelectionScope({ kind: "progression" });
+                    }
+                    return refusal;
+                  },
+                }
+              : {})}
             {...(onCopySystem ? { onCopySystem } : {})}
             {...(onPasteSystemAfter ? { onPasteSystemAfter } : {})}
             {...(onInsertEmptySystemAfter ? { onInsertEmptySystemAfter } : {})}

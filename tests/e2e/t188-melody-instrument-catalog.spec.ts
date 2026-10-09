@@ -9,6 +9,7 @@ async function openCreateMelodyDialog(page: Page) {
     .getByTestId("chord-card-I")
     .locator(".chord-main")
     .click({ modifiers: ["Control"] });
+  await setProgressionView(page, "staff");
   await page.locator("[data-progression-step-select]").last().click({ button: "right" });
   await page
     .getByRole("menu", { name: /Melody actions/ })

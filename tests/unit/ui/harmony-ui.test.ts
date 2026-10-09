@@ -1,3 +1,4 @@
+import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../../../src/domain/harmony/track";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -26,7 +27,13 @@ describe("Harmony Track controls", () => {
     const onChange = vi.fn();
     const mounted = mount(
       el(HarmonyTrackControls, {
-        settings: { instrument: "piano", muted: false, solo: false, volume: 100 },
+        settings: {
+          ...DEFAULT_HARMONY_TRACK_SETTINGS,
+          instrument: "piano",
+          muted: false,
+          solo: false,
+          volume: 100,
+        },
         onChange,
       }),
     );
@@ -63,7 +70,13 @@ describe("Harmony Track controls", () => {
     const onChange = vi.fn();
     const mounted = mount(
       el(HarmonyTrackControls, {
-        settings: { instrument: "piano", muted: false, solo: false, volume: 100 },
+        settings: {
+          ...DEFAULT_HARMONY_TRACK_SETTINGS,
+          instrument: "piano",
+          muted: false,
+          solo: false,
+          volume: 100,
+        },
         onChange,
       }),
     );
@@ -121,5 +134,48 @@ describe("Harmony Track controls", () => {
       mounted.container.querySelector('[data-testid="guitar-soundfont-instrument-select"]'),
     ).toBeNull();
     mounted.unmount();
+  });
+
+  it("folds the Harmony Track section through the shared disclosure toggle", () => {
+    window.localStorage.clear();
+    const mounted = mount(
+      el(HarmonyTrackControls, {
+        settings: {
+          ...DEFAULT_HARMONY_TRACK_SETTINGS,
+          instrument: "piano",
+          muted: false,
+          solo: false,
+          volume: 100,
+        },
+        onChange: vi.fn(),
+      }),
+    );
+
+    const toggle = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="harmony-track-disclosure-btn"]',
+    );
+    expect(toggle?.tagName).toBe("BUTTON");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(mounted.container.querySelector('[aria-label="Harmony Track Volume"]')).not.toBeNull();
+
+    act(() => toggle?.click());
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(mounted.container.querySelector('[aria-label="Harmony Track Volume"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Mute Harmony Track"]')).toBeNull();
+    expect(
+      window.localStorage.getItem("cadenceflow.ui.track-controls-harmony-disclosure-open"),
+    ).toBe("false");
+    // The collapsed section keeps its accessible region and title.
+    expect(mounted.container.querySelector('[aria-label="Harmony Track controls"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain("Harmony Track");
+
+    act(() => toggle?.click());
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(mounted.container.querySelector('[aria-label="Harmony Track Volume"]')).not.toBeNull();
+
+    mounted.unmount();
+    window.localStorage.clear();
   });
 });

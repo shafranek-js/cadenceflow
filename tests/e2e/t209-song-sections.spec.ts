@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
 const screenshotRoot =
-  "C:/Users/pavel/.codex/visualizations/2026/09/30/01a0f347-e185-73f0-b31b-15c06a188033/t209-song-sections";
+  process.env.CADENCEFLOW_T209_SCREENSHOT_ROOT ??
+  "C:/Users/pavel/.codex/visualizations/2026/10/02/01a0fd4f-d564-7612-8b29-cb59c92804cc/t209-song-sections";
 
 async function runEditAction(page: import("@playwright/test").Page, action: "Undo" | "Redo") {
   await page.getByTestId("edit-menu-toggle").click();
@@ -36,47 +37,6 @@ async function placeBelowAppHeader(
   expect(position.top).toBeGreaterThanOrEqual(position.headerBottom);
 }
 
-async function readTimelineGeometry(page: import("@playwright/test").Page) {
-  return page.evaluate(() => {
-    const relativeRect = (element: Element, parent: Element) => {
-      const bounds = element.getBoundingClientRect();
-      const parentBounds = parent.getBoundingClientRect();
-      return {
-        start: Math.round(((bounds.left - parentBounds.left) / parentBounds.width) * 10000) / 10000,
-        width: Math.round((bounds.width / parentBounds.width) * 10000) / 10000,
-      };
-    };
-    return Array.from(document.querySelectorAll<HTMLElement>("[data-testid='progression-measure']"))
-      .map((measure) => {
-        const grid = measure.querySelector<HTMLElement>("[data-testid='progression-measure-grid']");
-        const melodyTrack = measure.querySelector<HTMLElement>("[data-testid='melody-lane-track']");
-        if (!grid || !melodyTrack) return null;
-        return {
-          measureIndex: measure.dataset.measureIndex,
-          segments: Array.from(
-            grid.querySelectorAll<HTMLElement>(
-              ":scope > .measure-item-wrapper > .measure-step-segment[data-step-id]",
-            ),
-          ).map((segment) => ({
-            stepId: segment.dataset.stepId,
-            startBeats: segment.dataset.startBeats,
-            durationBeats: segment.dataset.durationBeats,
-            ...relativeRect(segment, grid),
-          })),
-          melodyColumns: Array.from(
-            melodyTrack.querySelectorAll<HTMLElement>(".inline-melody-lane-column[data-step-id]"),
-          ).map((column) => ({
-            stepId: column.dataset.stepId,
-            startBeats: column.dataset.startBeats,
-            durationBeats: column.dataset.durationBeats,
-            ...relativeRect(column, melodyTrack),
-          })),
-        };
-      })
-      .filter((measure): measure is NonNullable<typeof measure> => measure !== null);
-  });
-}
-
 async function expectReadableColors(
   element: import("@playwright/test").Locator,
   description: string,
@@ -101,7 +61,7 @@ async function expectReadableColors(
   expect(contrast, `${description} contrast ratio`).toBeGreaterThanOrEqual(4.5);
 }
 
-test("T209 creates, edits, persists, and undoes Song Sections across all views and sizes", async ({
+test("T209 creates, edits, persists, and undoes Song Sections across supported views and sizes", async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -122,6 +82,7 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
     .getByTestId("chord-card-V")
     .locator(".chord-main")
     .click({ modifiers: ["Control"] });
+  await page.getByTestId("progression-view-btn-staff").click();
   const step = page.locator("[data-progression-step-select]").first();
   await step.click();
   await page.getByTestId("quick-edit-duration").selectOption("1/4");
@@ -137,32 +98,21 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await melodyDialog.getByLabel("Authored duration denominator").fill("4");
   await melodyDialog.getByRole("button", { name: "Add note" }).click();
   await melodyDialog.getByRole("button", { name: "Apply Melody" }).click();
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(1);
+  const melodyNote = page.locator(".score-system .melody-staff-note");
+  await expect(melodyNote).toHaveCount(1);
+  const melodyOwnerStepId = await melodyNote.getAttribute("data-step-id");
+  expect(melodyOwnerStepId).toBeTruthy();
 
-  const timelineBaselines: Record<string, Awaited<ReturnType<typeof readTimelineGeometry>>> = {};
-  for (const view of ["tablature"] as const) {
+  for (const view of ["staff", "tablature"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
-    timelineBaselines[view] = await readTimelineGeometry(page);
-    expect(timelineBaselines[view].length).toBeGreaterThan(0);
-    for (const measure of timelineBaselines[view]) {
-      const segmentTimeline = measure.segments.map(
-        ({ stepId, startBeats, durationBeats }) => `${stepId}:${startBeats}:${durationBeats}`,
-      );
-      const melodyTimeline = measure.melodyColumns.map(
-        ({ stepId, startBeats, durationBeats }) => `${stepId}:${startBeats}:${durationBeats}`,
-      );
-      expect(melodyTimeline).toEqual(segmentTimeline);
-    }
+    const visibleNotes = page.locator(".score-system .melody-staff-note");
+    await expect(visibleNotes).toHaveCount(1);
+    await expect(visibleNotes.first()).toHaveAttribute("data-step-id", melodyOwnerStepId!);
   }
-  expect(timelineBaselines.harmonic[0]?.segments.map((segment) => segment.durationBeats)).toEqual([
-    "1/4",
-    "1/4",
-    "7/2",
-  ]);
-  expect(timelineBaselines.harmonic[1]?.segments.map((segment) => segment.durationBeats)).toContain(
-    "1/2",
-  );
-  await page.getByTestId("progression-view-btn-tablature").click();
+  await page.getByTestId("progression-view-btn-staff").click();
+  const firstProgressionStep = page.locator("[data-progression-step-select]").first();
+  await firstProgressionStep.click();
+  await expect(firstProgressionStep).toHaveAttribute("aria-pressed", "true");
 
   const createAtStep1 = page.getByLabel(/New section name at Step 1/);
   await createAtStep1.fill("Verse A");
@@ -193,8 +143,12 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await expect(page.getByTestId("song-section-boundary")).toHaveCount(2);
   await createAtStep2.fill("After Chorus Review With A Long Name");
   await createAtStep2.press("Enter");
-  await expect(page.locator(".song-section-boundaries")).toHaveCount(2);
-  await expect(page.getByTestId("song-section-boundary")).toHaveCount(3);
+  await expect(
+    page.locator(".song-section-score-marker").filter({
+      hasText: "After Chorus Review With A Long Name",
+    }),
+  ).toHaveCount(1);
+  await expect(page.getByTestId("song-section-boundary")).toHaveCount(2);
 
   for (const view of ["staff", "tablature"] as const) {
     await page.getByTestId(`progression-view-btn-${view}`).click();
@@ -231,58 +185,45 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
           return bounds.width > 0 && bounds.height > 0;
         });
         const markerRects = markers.map(rect);
-        const textRects = chordAndNoteText.map(rect);
+        const visibleTextRects = chordAndNoteText.flatMap((element) => {
+          const svg = element.closest("svg");
+          const scrollViewport = element.closest(".score-system-scroll");
+          if (!svg || !scrollViewport) return [];
+          const textBounds = rect(element);
+          const svgBounds = rect(svg);
+          const scrollBounds = rect(scrollViewport);
+          const visibleBounds = {
+            left: Math.max(textBounds.left, svgBounds.left, scrollBounds.left),
+            right: Math.min(textBounds.right, svgBounds.right, scrollBounds.right),
+            top: Math.max(textBounds.top, svgBounds.top, scrollBounds.top),
+            bottom: Math.min(textBounds.bottom, svgBounds.bottom, scrollBounds.bottom),
+          };
+          return visibleBounds.left < visibleBounds.right &&
+            visibleBounds.top < visibleBounds.bottom
+            ? [visibleBounds]
+            : [];
+        });
         const controlRects = chordControls.map(rect);
+        const svg = document.querySelector(".score-system-canvas > svg");
         return {
           markerCollisions: markerRects.flatMap((marker, index) =>
             markerRects.slice(index + 1).filter((other) => overlaps(marker, other)),
           ).length,
           notationCollisions: markerRects.flatMap((marker) =>
-            textRects.filter((notation) => overlaps(marker, notation)),
+            visibleTextRects.filter((notation) => overlaps(marker, notation)),
           ).length,
           controlCollisions: markerRects.flatMap((marker) =>
             controlRects.filter((control) => overlaps(marker, control)),
           ).length,
           markerRows: markers.map((marker) => marker.getAttribute("data-section-marker-row")),
+          svgOverflow: svg ? getComputedStyle(svg).overflow : null,
         };
       });
       expect(geometry.markerCollisions).toBe(0);
-      expect(geometry.notationCollisions).toBe(0);
+      expect(geometry.notationCollisions, JSON.stringify(geometry)).toBe(0);
       expect(geometry.controlCollisions).toBe(0);
+      expect(geometry.svgOverflow).toBe("hidden");
       expect(new Set(geometry.markerRows).size).toBe(2);
-    } else {
-      await expect(page.locator(".song-section-boundaries")).toHaveCount(2);
-      await expect(page.getByTestId("song-section-boundary")).toHaveCount(3);
-      const continuation = page.getByTestId("progression-step-continuation");
-      await expect(continuation).toHaveCount(1);
-      await expect(
-        continuation.locator("xpath=..").locator(".song-section-boundaries"),
-      ).toHaveCount(0);
-      const currentGeometry = await readTimelineGeometry(page);
-      expect(currentGeometry).toEqual(timelineBaselines[view]);
-      const badgeGeometry = await page.locator(".song-section-boundaries").evaluateAll((badges) =>
-        badges.map((badge) => {
-          const bounds = badge.getBoundingClientRect();
-          const segment = badge.closest<HTMLElement>(".measure-step-segment");
-          const segmentBounds = segment?.getBoundingClientRect();
-          const card = segment?.querySelector<HTMLElement>(
-            ".progression-step-card, .progression-rest-card",
-          );
-          const cardTop = card?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-          return {
-            height: bounds.height,
-            withinSegment: Boolean(
-              segmentBounds &&
-              bounds.left >= segmentBounds.left - 1 &&
-              bounds.right <= segmentBounds.right + 1,
-            ),
-            beforeCard: bounds.bottom <= cardTop + 0.5,
-          };
-        }),
-      );
-      expect(badgeGeometry.every((badge) => badge.height <= 24.5)).toBe(true);
-      expect(badgeGeometry.every((badge) => badge.withinSegment)).toBe(true);
-      expect(badgeGeometry.every((badge) => badge.beforeCard)).toBe(true);
     }
     const bounds = await page.evaluate(() => ({
       width: document.documentElement.scrollWidth,
@@ -296,17 +237,20 @@ test("T209 creates, edits, persists, and undoes Song Sections across all views a
   await expect(
     page.getByTestId("song-section-boundary").filter({ hasText: "Opening Verse" }),
   ).toHaveCount(1);
-  await page.getByTestId("progression-view-btn-tablature").click();
+  await page.getByTestId("progression-view-btn-staff").click();
   await page.locator("[data-progression-step-select]").nth(1).press("Enter");
   await page.getByRole("button", { name: "Delete section Chorus" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByLabel("Section name: After Chorus Review With A Long Name")).toBeFocused();
-  await expect(page.locator(".song-section-boundary").filter({ hasText: /^Chorus$/ })).toHaveCount(
-    0,
+  const step2Boundary = page.getByLabel(/section boundary at Step 2, Measure 1/);
+  await expect(step2Boundary).toHaveAttribute(
+    "aria-label",
+    "After Chorus Review With A Long Name section boundary at Step 2, Measure 1",
   );
   await runEditAction(page, "Undo");
-  await expect(page.locator(".song-section-boundary").filter({ hasText: /^Chorus$/ })).toHaveCount(
-    1,
+  await expect(step2Boundary).toHaveAttribute(
+    "aria-label",
+    /(?:Chorus.*After Chorus Review With A Long Name|After Chorus Review With A Long Name.*Chorus) section boundary at Step 2, Measure 1/,
   );
 
   for (const viewport of [

@@ -3,6 +3,7 @@ import {
   applyMeterChange,
   computeMeterAccents,
   globalTiming,
+  isMeterPulse,
   meter,
   pulseToBeats,
   reflowProgression,
@@ -12,7 +13,7 @@ import { addRational, equalRational, rational } from "../../../src/domain/timing
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 
-const DEFAULT_TEST_PERFORMANCE: StepPerformance = Object.freeze({
+const DEFAULT_TEST_PERFORMANCE: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -31,13 +32,10 @@ function createCanonicalChordStep(
   beatsDenominator = 1,
   functionId = "I",
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({
-      moduleId: "progressions",
-      functionId,
-    }),
+    harmonicFunction: Object.freeze({ category: "core", moduleId: "progressions", functionId }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(beatsNumerator, beatsDenominator)),
     cardView: "harmonic",
@@ -50,7 +48,7 @@ function createCanonicalRestStep(
   beatsNumerator: number,
   beatsDenominator = 1,
 ): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(beatsNumerator, beatsDenominator)),
@@ -182,31 +180,31 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
 
       expect(accents).toHaveLength(7);
       // Group beginnings in pulse indices: 0 (primary downbeat), 0+2=2 (secondary), 2+2=4 (secondary)
-      expect(accents[0].pulseIndex).toBe(0);
-      expect(accents[0].accent).toBe("primary");
+      expect(accents[0]!.pulseIndex).toBe(0);
+      expect(accents[0]!.accent).toBe("primary");
 
-      expect(accents[1].pulseIndex).toBe(1);
-      expect(accents[1].accent).toBe("subdivision");
+      expect(accents[1]!.pulseIndex).toBe(1);
+      expect(accents[1]!.accent).toBe("subdivision");
 
-      expect(accents[2].pulseIndex).toBe(2);
-      expect(accents[2].accent).toBe("secondary");
+      expect(accents[2]!.pulseIndex).toBe(2);
+      expect(accents[2]!.accent).toBe("secondary");
 
-      expect(accents[3].pulseIndex).toBe(3);
-      expect(accents[3].accent).toBe("subdivision");
+      expect(accents[3]!.pulseIndex).toBe(3);
+      expect(accents[3]!.accent).toBe("subdivision");
 
-      expect(accents[4].pulseIndex).toBe(4);
-      expect(accents[4].accent).toBe("secondary");
+      expect(accents[4]!.pulseIndex).toBe(4);
+      expect(accents[4]!.accent).toBe("secondary");
 
-      expect(accents[5].pulseIndex).toBe(5);
-      expect(accents[5].accent).toBe("subdivision");
+      expect(accents[5]!.pulseIndex).toBe(5);
+      expect(accents[5]!.accent).toBe("subdivision");
 
-      expect(accents[6].pulseIndex).toBe(6);
-      expect(accents[6].accent).toBe("subdivision");
+      expect(accents[6]!.pulseIndex).toBe(6);
+      expect(accents[6]!.accent).toBe("subdivision");
 
       // Verify hierarchical weight ordering without locking arbitrary float constants
-      if (accents[0].weight !== undefined) {
-        expect(accents[0].weight).toBeGreaterThan(accents[2].weight!);
-        expect(accents[2].weight!).toBeGreaterThan(accents[1].weight!);
+      if (accents[0]!.weight !== undefined) {
+        expect(accents[0]!.weight).toBeGreaterThan(accents[2]!.weight!);
+        expect(accents[2]!.weight!).toBeGreaterThan(accents[1]!.weight!);
       }
     });
 
@@ -215,21 +213,21 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       const accents = computeMeterAccents(m78);
 
       expect(accents).toHaveLength(7);
-      expect(accents[0].pulseIndex).toBe(0);
-      expect(accents[0].accent).toBe("primary");
+      expect(accents[0]!.pulseIndex).toBe(0);
+      expect(accents[0]!.accent).toBe("primary");
 
-      expect(accents[1].accent).toBe("subdivision");
-      expect(accents[2].accent).toBe("subdivision");
+      expect(accents[1]!.accent).toBe("subdivision");
+      expect(accents[2]!.accent).toBe("subdivision");
 
-      expect(accents[3].pulseIndex).toBe(3);
-      expect(accents[3].accent).toBe("secondary");
+      expect(accents[3]!.pulseIndex).toBe(3);
+      expect(accents[3]!.accent).toBe("secondary");
 
-      expect(accents[4].accent).toBe("subdivision");
+      expect(accents[4]!.accent).toBe("subdivision");
 
-      expect(accents[5].pulseIndex).toBe(5);
-      expect(accents[5].accent).toBe("secondary");
+      expect(accents[5]!.pulseIndex).toBe(5);
+      expect(accents[5]!.accent).toBe("secondary");
 
-      expect(accents[6].accent).toBe("subdivision");
+      expect(accents[6]!.accent).toBe("subdivision");
     });
 
     it("projects accents for 4/4 with primary at pulse 0 and secondary at pulse 2", () => {
@@ -237,17 +235,17 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       const accents = computeMeterAccents(m44);
 
       expect(accents).toHaveLength(4);
-      expect(accents[0].pulseIndex).toBe(0);
-      expect(accents[0].accent).toBe("primary");
+      expect(accents[0]!.pulseIndex).toBe(0);
+      expect(accents[0]!.accent).toBe("primary");
 
-      expect(accents[1].pulseIndex).toBe(1);
-      expect(accents[1].accent).toBe("subdivision");
+      expect(accents[1]!.pulseIndex).toBe(1);
+      expect(accents[1]!.accent).toBe("subdivision");
 
-      expect(accents[2].pulseIndex).toBe(2);
-      expect(accents[2].accent).toBe("secondary");
+      expect(accents[2]!.pulseIndex).toBe(2);
+      expect(accents[2]!.accent).toBe("secondary");
 
-      expect(accents[3].pulseIndex).toBe(3);
-      expect(accents[3].accent).toBe("subdivision");
+      expect(accents[3]!.pulseIndex).toBe(3);
+      expect(accents[3]!.accent).toBe("subdivision");
     });
 
     it("projects accents for 6/8 compound feel with primary at pulse 0 and secondary at pulse 3", () => {
@@ -255,17 +253,17 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       const accents = computeMeterAccents(m68);
 
       expect(accents).toHaveLength(6);
-      expect(accents[0].pulseIndex).toBe(0);
-      expect(accents[0].accent).toBe("primary");
+      expect(accents[0]!.pulseIndex).toBe(0);
+      expect(accents[0]!.accent).toBe("primary");
 
-      expect(accents[1].accent).toBe("subdivision");
-      expect(accents[2].accent).toBe("subdivision");
+      expect(accents[1]!.accent).toBe("subdivision");
+      expect(accents[2]!.accent).toBe("subdivision");
 
-      expect(accents[3].pulseIndex).toBe(3);
-      expect(accents[3].accent).toBe("secondary");
+      expect(accents[3]!.pulseIndex).toBe(3);
+      expect(accents[3]!.accent).toBe("secondary");
 
-      expect(accents[4].accent).toBe("subdivision");
-      expect(accents[5].accent).toBe("subdivision");
+      expect(accents[4]!.accent).toBe("subdivision");
+      expect(accents[5]!.accent).toBe("subdivision");
     });
 
     it("produces deterministic output without random variation", () => {
@@ -301,11 +299,11 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
 
       // In 3/4 (3 beats/bar):
       // Step 1 (was 1 bar = 4 beats) reflows to 1 bar = 3 beats
-      expect(reflowed[0].duration.beats).toEqual(rational(3, 1));
+      expect(reflowed[0]!.duration.beats).toEqual(rational(3, 1));
       // Step 2 (was 1/2 bar = 2 beats) reflows to 1/2 bar = 3/2 beats
-      expect(reflowed[1].duration.beats).toEqual(rational(3, 2));
+      expect(reflowed[1]!.duration.beats).toEqual(rational(3, 2));
       // Step 3 (was 1/2 bar = 2 beats) reflows to 1/2 bar = 3/2 beats
-      expect(reflowed[2].duration.beats).toEqual(rational(3, 2));
+      expect(reflowed[2]!.duration.beats).toEqual(rational(3, 2));
 
       // Total duration in 3/4 is 6 beats = exactly 2 bars (bar boundaries align with steps)
       const totalBeats = reflowed.reduce(
@@ -315,8 +313,8 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect(equalRational(totalBeats, rational(6, 1))).toBe(true);
 
       // Crucially preserves step identity, order, kind, and non-timing data
-      expect(reflowed[0].id).toBe("s1");
-      expect(reflowed[0].kind).toBe("chord");
+      expect(reflowed[0]!.id).toBe("s1");
+      expect(reflowed[0]!.kind).toBe("chord");
       expect((reflowed[0] as ChordStep).harmonicFunction.functionId).toBe("I");
       expect((reflowed[0] as ChordStep).harmonicVariant).toEqual(EMPTY_HARMONIC_VARIANT);
       expect((reflowed[0] as ChordStep).performance.masterVelocity).toBe(80);
@@ -325,11 +323,11 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect(reflowed.map((step) => step.id)).toEqual(steps.map((step) => step.id));
       expect(reflowed.map((step) => step.kind)).toEqual(steps.map((step) => step.kind));
 
-      expect(reflowed[1].id).toBe("s2");
-      expect(reflowed[1].kind).toBe("rest");
+      expect(reflowed[1]!.id).toBe("s2");
+      expect(reflowed[1]!.kind).toBe("rest");
 
-      expect(reflowed[2].id).toBe("s3");
-      expect(reflowed[2].kind).toBe("chord");
+      expect(reflowed[2]!.id).toBe("s3");
+      expect(reflowed[2]!.kind).toBe("chord");
       expect((reflowed[2] as ChordStep).harmonicFunction.functionId).toBe("IV");
     });
 
@@ -346,8 +344,8 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect(reflowed.map((step) => step.kind)).toEqual(incompleteSteps.map((step) => step.kind));
 
       // In 3/4: newDuration = 1 * (3 / 4) = 3/4 beat each
-      expect(reflowed[0].duration.beats).toEqual(rational(3, 4));
-      expect(reflowed[1].duration.beats).toEqual(rational(3, 4));
+      expect(reflowed[0]!.duration.beats).toEqual(rational(3, 4));
+      expect(reflowed[1]!.duration.beats).toEqual(rational(3, 4));
 
       // No padding RestStep added; total is 3/2 beats
       const totalBeats = reflowed.reduce(
@@ -363,9 +361,9 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
 
     it("never mutates input steps array or step objects during meter change", () => {
       const steps = createMultiStepBarFixture();
-      const origStep0Duration = steps[0].duration.beats;
+      const origStep0Duration = steps[0]!.duration.beats;
       applyMeterChange(steps, oldMeter44, newMeter34, "reflow");
-      expect(steps[0].duration.beats).toBe(origStep0Duration);
+      expect(steps[0]!.duration.beats).toBe(origStep0Duration);
     });
 
     it("policy 'preserve-beat-lengths': preserves exact beat count and shifts bar boundaries relative to steps", () => {
@@ -375,9 +373,9 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       expect(preserved).toHaveLength(3);
 
       // Durations remain bit-for-bit identical: 4, 2, 2 beats
-      expect(preserved[0].duration.beats).toEqual(rational(4, 1));
-      expect(preserved[1].duration.beats).toEqual(rational(2, 1));
-      expect(preserved[2].duration.beats).toEqual(rational(2, 1));
+      expect(preserved[0]!.duration.beats).toEqual(rational(4, 1));
+      expect(preserved[1]!.duration.beats).toEqual(rational(2, 1));
+      expect(preserved[2]!.duration.beats).toEqual(rational(2, 1));
 
       // Total beats remain 8 beats.
       // Under 3/4 (3 beats/bar), 8 beats spans 2 bars and 2/3 of bar 3:
@@ -386,17 +384,54 @@ describe("T098 — Meter Validation and Beat Projection Contract", () => {
       // Thus bar boundaries have shifted relative to the preserved steps!
 
       // Preserves step identity, order, kind, and harmonic data without mutation
-      expect(preserved[0].id).toBe("s1");
-      expect(preserved[0].kind).toBe("chord");
+      expect(preserved[0]!.id).toBe("s1");
+      expect(preserved[0]!.kind).toBe("chord");
       expect((preserved[0] as ChordStep).harmonicFunction.functionId).toBe("I");
       expect((preserved[0] as ChordStep).harmonicVariant).toEqual(EMPTY_HARMONIC_VARIANT);
 
-      expect(preserved[1].id).toBe("s2");
-      expect(preserved[1].kind).toBe("rest");
+      expect(preserved[1]!.id).toBe("s2");
+      expect(preserved[1]!.kind).toBe("rest");
 
-      expect(preserved[2].id).toBe("s3");
-      expect(preserved[2].kind).toBe("chord");
+      expect(preserved[2]!.id).toBe("s3");
+      expect(preserved[2]!.kind).toBe("chord");
       expect((preserved[2] as ChordStep).harmonicFunction.functionId).toBe("IV");
     });
+  });
+});
+
+describe("isMeterPulse", () => {
+  it("counts one pulse per unit of the meter's denominator", () => {
+    // A pulse is a denominator unit, so 6/8 has six of them and 5/4 has five, even though 6/8 is only
+    // three quarter beats long.
+    const cases: readonly [ReturnType<typeof meter>, number][] = [
+      [meter(4, 4), 4],
+      [meter(5, 4), 5],
+      [meter(3, 4), 3],
+      [meter(6, 8), 6],
+      [meter(7, 8), 7],
+      [meter(3, 2), 2],
+    ];
+    for (const [value, expected] of cases) {
+      const pulse = rational(4, value.denominator);
+      const found: string[] = [];
+      let offset = rational(0);
+      for (let index = 0; index <= expected; index += 1) {
+        if (isMeterPulse(offset, value)) found.push(`${offset.numerator}/${offset.denominator}`);
+        offset = addRational(offset, pulse);
+      }
+      expect(found.length, `${value.numerator}/${value.denominator}`).toBe(expected + 1);
+    }
+  });
+
+  it("rejects positions between pulses", () => {
+    expect(isMeterPulse(rational(1, 2), meter(4, 4))).toBe(false);
+    expect(isMeterPulse(rational(1, 4), meter(6, 8))).toBe(false);
+    expect(isMeterPulse(rational(1), meter(3, 2))).toBe(false);
+    expect(isMeterPulse(rational(3, 2), meter(6, 8))).toBe(true);
+  });
+
+  it("treats the bar line as a pulse", () => {
+    expect(isMeterPulse(rational(0), meter(6, 8))).toBe(true);
+    expect(isMeterPulse(rational(0), meter(3, 2))).toBe(true);
   });
 });

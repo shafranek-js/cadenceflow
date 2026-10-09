@@ -11,7 +11,7 @@ import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/p
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 
-const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
   tonic: 0,
   mode: "major",
   moduleId: "progressions",
@@ -22,7 +22,7 @@ const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
 });
 
 function createDefaultPerformance(overrides?: Partial<StepPerformance>): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     articulation: "block",
     register: "auto",
     voicingMode: "auto",
@@ -42,13 +42,10 @@ function createStep(
   functionId: string,
   performance?: Partial<StepPerformance>,
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({
-      moduleId: "progressions",
-      functionId,
-    }),
+    harmonicFunction: Object.freeze({ category: "core", moduleId: "progressions", functionId }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(4, 1)), // 4 beats
     performance: createDefaultPerformance(performance),
@@ -98,7 +95,7 @@ describe("T089 — Canonical performance-event realization", () => {
   it("chains progression steps with chronological start times and contextual voice leading", () => {
     const step1 = createStep("step-1", "I"); // C Major
     const step2 = createStep("step-2", "IV"); // F Major
-    const restStep: RestStep = Object.freeze({
+    const restStep: RestStep = Object.freeze<RestStep>({
       id: "rest-1",
       kind: "rest",
       duration: musicalDuration(rational(2, 1)), // 2 beats
@@ -153,10 +150,41 @@ describe("T089 — Canonical performance-event realization", () => {
     // Step 2 Auto bass chooses E (4) because previous bass was F (5)
     expect(step2BassEvent!.pitch % 12).toBe(4); // E
   });
+
+  it("suppresses only the separate Piano bass event and preserves the inverted upper chord", () => {
+    const step = createStep("bass-toggle-step", "I", { inversion: 1 });
+    const enabled = realizeStepAudioEvents({
+      step,
+      tonic: 0,
+      context: C_MAJOR_CONTEXT,
+      tempoBpm: 120,
+      independentBassEnabled: true,
+    });
+    const disabled = realizeStepAudioEvents({
+      step,
+      tonic: 0,
+      context: C_MAJOR_CONTEXT,
+      tempoBpm: 120,
+      independentBassEnabled: false,
+    });
+
+    expect(enabled.events.filter((event) => event.channelRole === "bass")).toHaveLength(1);
+    expect(disabled.events.every((event) => event.channelRole === "upper")).toBe(true);
+    expect(disabled.events.map((event) => event.pitch)).toEqual(
+      enabled.events.filter((event) => event.channelRole === "upper").map((event) => event.pitch),
+    );
+    expect(disabled.upperPitches.map((pitch) => pitch.midiNumber)).toEqual(
+      enabled.upperPitches.map((pitch) => pitch.midiNumber),
+    );
+    expect(disabled.bassPitch?.midiNumber).toBe(enabled.bassPitch?.midiNumber);
+  });
 });
 
 describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont realization", () => {
-  const cMajorChord = realizeChord({ moduleId: "progressions", functionId: "I" }, 0);
+  const cMajorChord = realizeChord(
+    { moduleId: "progressions", functionId: "I", category: "core" },
+    0,
+  );
 
   it("realizes block articulation with natural guitar downstrum stagger", () => {
     const step = createStep("g-1", "I", { articulation: "block", masterVelocity: 85 });
@@ -262,6 +290,26 @@ describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont reali
     }
   });
 
+  it("keeps the lowest fretted chord tone for every Guitar articulation", () => {
+    for (const articulation of [
+      "block",
+      "arp-up",
+      "arp-down",
+      "broken-chord",
+      "humanized",
+    ] as const) {
+      const result = realizeGuitarStepAudioEvents({
+        chord: cMajorChord,
+        step: createStep(`g-lowest-${articulation}`, "I", { articulation }),
+        tempoBpm: 120,
+      });
+      const lowestFrettedPitch = result.pitches[0]?.midiNumber;
+
+      expect(lowestFrettedPitch).toBeDefined();
+      expect(result.events.some((event) => event.pitch === lowestFrettedPitch)).toBe(true);
+    }
+  });
+
   it("respects per-note velocity overrides and master velocity", () => {
     const cVoicing = realizeGuitarStepAudioEvents({
       chord: cMajorChord,
@@ -282,5 +330,26 @@ describe("realizeGuitarStepAudioEvents — Guitar articulation & soundfont reali
     const targetNote = result.events.find((e) => e.pitch === firstPitch);
     expect(targetNote).toBeDefined();
     expect(targetNote!.velocity).toBe(115);
+  });
+
+  it("does not substitute a stale or piano voicing when a seven-tone chord has no guitar fingering", () => {
+    const extended = {
+      ...cMajorChord,
+      variant: {
+        seventh: "minor7" as const,
+        extensions: [9, 11, 13] as const,
+        suspensions: [],
+        alterations: [],
+      },
+    };
+    const result = realizeGuitarStepAudioEvents({
+      chord: extended,
+      step: createStep("g-no-fingering", "I"),
+      tempoBpm: 120,
+    });
+
+    expect(result.pitches).toEqual([]);
+    expect(result.events).toEqual([]);
+    expect(result.totalDurationSeconds).toBe(2);
   });
 });

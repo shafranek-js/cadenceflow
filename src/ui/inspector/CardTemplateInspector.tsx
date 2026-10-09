@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { useState } from "react";
+import { useId } from "react";
 import { resolveStepCreationDefaults } from "../../domain/project/defaults";
 import {
   matrixCardOverrideCount,
@@ -12,10 +12,11 @@ import { ArticulationControl } from "./ArticulationControl";
 import { RegisterControl } from "./RegisterControl";
 import { StepDurationControl } from "../timing/StepDurationControl";
 import { Icon } from "../common/Icon";
+import { InspectorDisclosureToggle } from "./InspectorDisclosure";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 import { useReorderableSections } from "./useReorderableSections";
 
-export const CARD_TEMPLATE_SECTION_ORDER_STORAGE_KEY =
-  "cadenceflow.ui.card-template-section-order";
+export const CARD_TEMPLATE_SECTION_ORDER_STORAGE_KEY = "cadenceflow.ui.card-template-section-order";
 
 export const DEFAULT_CARD_TEMPLATE_SECTIONS = [
   "register",
@@ -26,30 +27,12 @@ export const DEFAULT_CARD_TEMPLATE_SECTIONS = [
 
 export type CardTemplateSectionId = (typeof DEFAULT_CARD_TEMPLATE_SECTIONS)[number];
 
+const CARD_TEMPLATE_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.card-template-disclosure-open";
 const TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.template-register-disclosure-open";
 const TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.template-articulation-disclosure-open";
 const TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.template-duration-disclosure-open";
 const TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.template-velocity-disclosure-open";
-
-function readDisclosureState(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
-function persistDisclosureState(key: string, open: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, String(open));
-  } catch {
-    // Disclosure preferences are best-effort when storage is unavailable.
-  }
-}
 
 export function CardTemplateInspector({
   project,
@@ -64,18 +47,15 @@ export function CardTemplateInspector({
   readonly onDurationChange: (duration: MusicalDuration) => void;
   readonly onReset: () => void;
 }) {
-  const [registerOpen, setRegisterOpen] = useState(() =>
-    readDisclosureState(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, true),
+  const panelBodyId = useId();
+  const panelDisclosure = useInspectorDisclosure(CARD_TEMPLATE_DISCLOSURE_STORAGE_KEY, true);
+  const registerDisclosure = useInspectorDisclosure(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, true);
+  const articulationDisclosure = useInspectorDisclosure(
+    TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY,
+    true,
   );
-  const [articulationOpen, setArticulationOpen] = useState(() =>
-    readDisclosureState(TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [durationOpen, setDurationOpen] = useState(() =>
-    readDisclosureState(TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [velocityOpen, setVelocityOpen] = useState(() =>
-    readDisclosureState(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, true),
-  );
+  const durationDisclosure = useInspectorDisclosure(TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY, true);
+  const velocityDisclosure = useInspectorDisclosure(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, true);
   const isGlobal = !functionId;
   const card = functionId
     ? project.moduleTemplateStates[project.activeModule].cards[functionId]
@@ -102,12 +82,8 @@ export function CardTemplateInspector({
         return (
           <details
             className="inspector-disclosure template-register-disclosure"
-            open={registerOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setRegisterOpen(open);
-              persistDisclosureState(TEMPLATE_REGISTER_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={registerDisclosure.isOpen}
+            onToggle={(event) => registerDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -140,12 +116,8 @@ export function CardTemplateInspector({
         return (
           <details
             className="inspector-disclosure template-articulation-disclosure"
-            open={articulationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setArticulationOpen(open);
-              persistDisclosureState(TEMPLATE_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={articulationDisclosure.isOpen}
+            onToggle={(event) => articulationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -174,12 +146,8 @@ export function CardTemplateInspector({
         return (
           <details
             className="inspector-disclosure template-duration-disclosure"
-            open={durationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setDurationOpen(open);
-              persistDisclosureState(TEMPLATE_DURATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={durationDisclosure.isOpen}
+            onToggle={(event) => durationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -221,12 +189,8 @@ export function CardTemplateInspector({
         return (
           <details
             className="inspector-disclosure template-velocity-disclosure"
-            open={velocityOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setVelocityOpen(open);
-              persistDisclosureState(TEMPLATE_VELOCITY_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={velocityDisclosure.isOpen}
+            onToggle={(event) => velocityDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -278,24 +242,37 @@ export function CardTemplateInspector({
       data-testid="matrix-template-inspector"
     >
       <header>
-        <div>
-          <span className="inspector-context-kicker">Matrix preview template</span>
-          <h3>{isGlobal ? "All Cards Template" : `${functionId} Template`}</h3>
-          <span
-            className={
+        <div className="inspector-panel-heading">
+          <InspectorDisclosureToggle
+            isOpen={panelDisclosure.isOpen}
+            onToggle={panelDisclosure.toggle}
+            ariaLabel={
               isGlobal
-                ? "template-status is-inherited"
-                : count
-                  ? "template-status is-customized"
-                  : "template-status is-inherited"
+                ? "Toggle All Cards Template section"
+                : `Toggle ${functionId} Template section`
             }
-          >
-            {isGlobal
-              ? "Global defaults · All matrix cards"
-              : count
-                ? `Customized · ${count} overrides`
-                : "Inheriting defaults · Inherited"}
-          </span>
+            controlsId={panelBodyId}
+            testId="matrix-template-disclosure-btn"
+          />
+          <div>
+            <span className="inspector-context-kicker">Matrix preview template</span>
+            <h3>{isGlobal ? "All Cards Template" : `${functionId} Template`}</h3>
+            <span
+              className={
+                isGlobal
+                  ? "template-status is-inherited"
+                  : count
+                    ? "template-status is-customized"
+                    : "template-status is-inherited"
+              }
+            >
+              {isGlobal
+                ? "Global defaults · All matrix cards"
+                : count
+                  ? `Customized · ${count} overrides`
+                  : "Inheriting defaults · Inherited"}
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: "4px" }}>
           {isCustomOrder ? (
@@ -322,23 +299,27 @@ export function CardTemplateInspector({
         </div>
       </header>
 
-      {sectionOrder.map((sectionId) => {
-        const content = renderSectionContent(sectionId);
-        if (!content) return null;
-        return (
-          <div key={sectionId} {...getSectionItemProps(sectionId)}>
-            {content}
-          </div>
-        );
-      })}
+      {panelDisclosure.isOpen ? (
+        <div id={panelBodyId} className="inspector-panel-body">
+          {sectionOrder.map((sectionId) => {
+            const content = renderSectionContent(sectionId);
+            if (!content) return null;
+            return (
+              <div key={sectionId} {...getSectionItemProps(sectionId)}>
+                {content}
+              </div>
+            );
+          })}
 
-      {isGlobal ? (
-        <p>These settings apply globally to all cards in the Harmonic Matrix.</p>
-      ) : keys.length ? (
-        <p>Overrides: {keys.join(", ")}</p>
-      ) : (
-        <p>No explicit overrides. Values follow current Project/Piano Defaults.</p>
-      )}
+          {isGlobal ? (
+            <p>These settings apply globally to all cards in the Harmonic Matrix.</p>
+          ) : keys.length ? (
+            <p>Overrides: {keys.join(", ")}</p>
+          ) : (
+            <p>No explicit overrides. Values follow current Project/Piano Defaults.</p>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

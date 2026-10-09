@@ -165,7 +165,9 @@ export function StepDurationControl({
                 aria-label={`${buttonAriaLabelPrefix ?? ""}Full bar (${formatMusicalDuration(fullBar)} beats)`}
                 aria-pressed={isFullBar}
                 data-testid={
-                  testIdPrefix ? `${testIdPrefix}duration-preset-full-bar` : "duration-preset-full-bar"
+                  testIdPrefix
+                    ? `${testIdPrefix}duration-preset-full-bar`
+                    : "duration-preset-full-bar"
                 }
                 data-duration-value="full-bar"
               >

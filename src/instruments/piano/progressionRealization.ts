@@ -44,6 +44,7 @@ export function realizeOrderedPianoProgression(
       context: input.context,
       chord: { ...chord, variant: step.harmonicVariant },
       performance: step.performance,
+      concertTranspositionSemitones: stepTranspositionSemitones(step),
       ...(previousPitches ? { previousPitches } : {}),
       ...(previousBassPitch ? { previousBassPitch } : {}),
     });
@@ -72,6 +73,7 @@ export function realizeOrderedPianoProgression(
             context: input.context,
             chord: { ...chord, variant: step.harmonicVariant },
             performance: { ...step.performance, register: "auto" },
+            concertTranspositionSemitones: stepTranspositionSemitones(step),
             ...(previousPitches ? { previousPitches } : {}),
             ...(previousBassPitch ? { previousBassPitch } : {}),
           });

@@ -10,6 +10,7 @@ async function waitForStudio(page: Page): Promise<void> {
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "Harmonic Matrix" })).toBeVisible();
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function addChord(page: Page, functionId: string): Promise<void> {
@@ -40,10 +41,10 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
   }) => {
     await waitForStudio(page);
     await expect(page.getByTestId("progression-empty-state")).toContainText(
-      "Choose key → explore Matrix → click to hear → + to add",
+      "Pick one starting point.",
     );
     await expect(page.getByTestId("progression-empty-state")).toContainText(
-      "Preview a chord in the Matrix, then press + to add it.",
+      "Previewing is safe; only an explicit Add or Apply changes your progression.",
     );
 
     await addChord(page, "I");
@@ -66,65 +67,42 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await expect(recommendationCards.first().locator(".chord-main")).toBeVisible();
   });
 
-  test("keeps long progression order, Rest parity, local drop affordances, and view readability", async ({
+  test("keeps long progression order and Rest parity across Staff and Piano Roll", async ({
     page,
   }) => {
     await waitForStudio(page);
     await addProgression(page, 20);
     await addRestToProgression(page);
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(21);
-    await expect(steps.nth(0).getByTestId("progression-step-number")).toHaveText("1");
-    await expect(steps.last()).toContainText("Rest");
-    await expect(steps.last().getByTestId("progression-step-remove")).toBeVisible();
+    await expect(steps.first()).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.last()).toHaveAttribute("aria-label", /Select Rest:/);
 
     const flow = await page.evaluate(() => {
-      const track = document.querySelector<HTMLElement>(".progression-step-cards");
-      const cards = [...document.querySelectorAll<HTMLElement>('[data-testid="progression-step"]')];
+      const track = document.querySelector<HTMLElement>(
+        "[data-testid='progression-score-systems']",
+      );
+      const events = [...document.querySelectorAll<HTMLElement>(".measure-staff-event-select")];
       if (!track) throw new Error("Progression track is missing");
-      const rects = cards.map((card) => {
-        const rect = card.getBoundingClientRect();
-        return { top: Math.round(rect.top), left: Math.round(rect.left), width: rect.width };
-      });
       return {
-        rows: new Set(rects.map((rect) => rect.top)).size,
-        rowMajor: rects.every((rect, index) => {
-          const previous = rects[index - 1];
-          return (
-            !previous ||
-            rect.top > previous.top ||
-            (rect.top === previous.top && rect.left > previous.left)
-          );
-        }),
-        widths: [...new Set(rects.map((rect) => Math.round(rect.width)))],
+        eventCount: events.length,
+        distinctStepIds: new Set(events.map((event) => event.dataset.stepId)).size,
         scrollWidth: track.scrollWidth,
         clientWidth: track.clientWidth,
       };
     });
-    expect(flow.rows).toBeGreaterThan(1);
-    expect(flow.rowMajor).toBe(true);
-    expect(flow.widths.every((width) => width > 0 && width <= flow.clientWidth)).toBe(true);
-    expect(flow.widths.some((width) => width > 170)).toBe(true);
+    expect(flow.eventCount).toBe(21);
+    expect(flow.distinctStepIds).toBe(21);
     expect(flow.scrollWidth).toBeLessThanOrEqual(flow.clientWidth);
 
-    await setProgressionView(page, "piano");
-    await expect(steps.first().locator(".mini-piano")).toBeVisible();
-    await expect(steps.first().locator(".mini-key.is-active")).not.toHaveCount(0);
-
-    const remove = steps.first().getByTestId("progression-step-remove");
-    const dragFromControl = await remove.evaluate((button) => {
-      const transfer = new DataTransfer();
-      const event = new DragEvent("dragstart", {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: transfer,
-      });
-      button.dispatchEvent(event);
-      return { defaultPrevented: event.defaultPrevented, payload: transfer.getData("text/plain") };
-    });
-    expect(dragFromControl.defaultPrevented).toBe(true);
-    expect(dragFromControl.payload).toBe("");
+    await setProgressionView(page, "piano-roll");
+    await page.getByRole("button", { name: "Show piano chord", exact: true }).first().click();
+    const pianoCards = page.getByTestId("piano-roll-piano-cards");
+    await expect(pianoCards.locator(".piano-roll-instrument-card")).toHaveCount(20);
+    const firstPiano = pianoCards.locator(".piano-roll-instrument-card").first();
+    await expect(firstPiano.locator(".mini-piano")).toBeVisible();
+    await expect(firstPiano.locator(".mini-key.is-active")).not.toHaveCount(0);
 
     await setProgressionView(page, "staff");
     await expect(page.getByTestId("progression-score-systems")).toBeVisible();
@@ -146,7 +124,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
   }) => {
     await waitForStudio(page);
     await addProgression(page, 4);
-    const stepCountBeforeBranch = await page.locator('[data-testid="progression-step"]').count();
+    const stepCountBeforeBranch = await page.locator(".measure-staff-event-select").count();
 
     await startBranchAlternative(page, 1);
     await expect(page.getByTestId("branch-controls-active")).toContainText("Temporary branch");
@@ -155,9 +133,7 @@ test.describe("US10 Batch 2 — Matrix and Progression visual system", () => {
     await page.getByTestId("chord-card-ii").locator(".chord-main").click();
     await expect(page.getByRole("region", { name: "Original versus Alternative" })).toBeVisible();
     await expect(page.getByTestId("branch-alternative-path")).toContainText("ii");
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(
-      stepCountBeforeBranch,
-    );
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(stepCountBeforeBranch);
   });
 
   test("keeps the global Matrix card view readable in Piano and Staff modes", async ({ page }) => {

@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { JSDOM } from "jsdom";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
-import { ensureMelodyTrackControlsVisible } from "./test-helpers/progression-settings";
+import {
+  ensureMelodyTrackControlsVisible,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 const VIEWPORTS = [
   { width: 1280, height: 720 },
@@ -34,7 +37,7 @@ async function createMelody(
   page: Page,
   options: { readonly preview: boolean; readonly instrument?: string } = { preview: true },
 ): Promise<void> {
-  await page.getByLabel("Progression Card View").selectOption("staff");
+  await setProgressionView(page, "staff");
   const invoker = page.locator(".measure-staff-event .measure-staff-event-select").last();
   await invoker.focus();
   await page.keyboard.press("Shift+F10");
@@ -307,7 +310,16 @@ function parseMelodyMidi(bytes: Uint8Array): {
     }
     if (active.size > 0) throw new Error("MIDI Melody track has hanging notes");
     if (name === "CadenceFlow Melody") {
-      return Object.freeze({ ...result, name, instrument, channel, program, notes });
+      return Object.freeze<{
+        readonly format: number;
+        readonly tracks: number;
+        readonly ppq: number;
+        readonly name: string;
+        readonly instrument: string;
+        readonly channel: number;
+        readonly program: number;
+        readonly notes: number;
+      }>({ ...result, name, instrument, channel, program, notes });
     }
     offset = end;
   }
@@ -328,7 +340,13 @@ function parseMelodyMusicXml(xml: string): {
   const notes = [...part.querySelectorAll(":scope > measure > note")].filter(
     (note) => !note.querySelector(":scope > rest"),
   );
-  return Object.freeze({
+  return Object.freeze<{
+    readonly instrument: string;
+    readonly channel: number;
+    readonly program: number;
+    readonly clef: string;
+    readonly notes: number;
+  }>({
     instrument: scorePart.querySelector(":scope > score-instrument > instrument-name")!
       .textContent!,
     channel: Number(
@@ -464,9 +482,7 @@ for (const viewport of VIEWPORTS) {
       ).toHaveValue("flute");
       await expect(controls.getByLabel("Melody Track Volume")).toHaveValue("73");
       await expect(page.getByTestId("transport-status")).toContainText("Stopped");
-      await expect(
-        page.locator('[data-testid="progression-step"][data-playing="true"]'),
-      ).toHaveCount(0);
+      await expect(page.locator(".measure-staff-event.is-playing")).toHaveCount(0);
       await assertFreshHistory(page);
       await expect(controls).toContainText("Melody audio ready", { timeout: 60_000 });
 

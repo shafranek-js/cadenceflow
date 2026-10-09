@@ -73,6 +73,7 @@
   @page {
     size: A4 portrait;
     margin: 12mm 11mm 14mm;
+    background: #ffffff;
   }
 
   :root,
@@ -100,6 +101,7 @@
     height: auto !important;
     overflow: visible !important;
     padding: 0 !important;
+    background: #ffffff !important;
   }
 
   .app-shell > * {
@@ -158,7 +160,7 @@
   .printable-project-meta {
     display: grid;
     gap: 1mm;
-    padding-top: 1mm;
+    padding: 1mm 2mm 0 0;
     text-align: right;
     font-size: 8pt;
     font-weight: 600;
@@ -542,6 +544,25 @@
   box-shadow: none;
 }
 
+.score-system.is-current-context {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--focus-ring, #3578c8);
+  outline-offset: -2px;
+}
+
+.score-system.is-current-context > .score-system-header {
+  background: color-mix(in srgb, var(--focus-ring, #3578c8) 13%, var(--score-paper));
+}
+
+.score-system-measure-actions button[data-current-context="true"],
+.measure-staff-event[data-current-context="true"],
+.measure-staff-gap[data-current-context="true"] {
+  outline: 2px solid var(--focus-ring, #3578c8);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 .score-system-header {
   display: flex;
   align-items: center;
@@ -554,7 +575,32 @@
   font-size: 0.68rem;
   line-height: 1.25;
   letter-spacing: 0.02em;
-  cursor: context-menu;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.score-system-drop-marker {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--focus-ring, #3578c8);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring, #3578c8) 24%, transparent);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.score-system.is-system-drag-source {
+  outline: 2px dashed var(--focus-ring, #3578c8);
+  outline-offset: -3px;
+  opacity: 0.62;
+}
+
+.score-system.is-system-drag-source > .score-system-header {
+  cursor: grabbing;
 }
 
 .score-system-header strong {
@@ -1269,6 +1315,12 @@
   color: var(--score-ink);
   background: var(--score-paper);
 }
+.piano-roll-measure.is-current-context {
+  z-index: 1;
+  outline: 2px solid var(--focus-ring, #3578c8);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--focus-ring, #3578c8) 8%, var(--score-paper));
+}
 .piano-roll-measure-header {
   display: flex;
   align-items: center;
@@ -1277,6 +1329,52 @@
   padding: 5px 8px;
   border-bottom: 1px solid var(--score-border);
   font-size: 0.75rem;
+  user-select: none;
+  /* The header is the drag handle for the whole Measure; buttons inside it keep their own cursor. */
+  cursor: grab;
+}
+.piano-roll-measure.is-measure-dragging {
+  opacity: 0.55;
+}
+/* Follows the pointer while a Measure is dragged; fixed so track scrolling cannot displace it. */
+.progression-measure-drag-preview {
+  position: fixed;
+  z-index: 60;
+  transform: translate(12px, 12px);
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--score-paper);
+  color: var(--score-ink);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 35%);
+}
+.piano-roll-measure.is-measure-dragging .piano-roll-measure-header {
+  cursor: grabbing;
+}
+/*
+ * Insertion indicator. Drawn as an overlay bar on the neighbouring Measure rather than an
+ * absolutely positioned caret, because the Measure grid is a CSS grid with its own column maths and
+ * the row that owns the drop is already known.
+ */
+.piano-roll-measure.is-measure-drop-before::before,
+.piano-roll-measure.is-measure-drop-after::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 3px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 2;
+}
+.piano-roll-measure.is-measure-drop-before::before {
+  inset-inline-start: -2px;
+}
+.piano-roll-measure.is-measure-drop-after::after {
+  inset-inline-end: -2px;
 }
 .piano-roll-selection-action {
   position: relative;
@@ -1968,9 +2066,11 @@ button.piano-roll-note > span {
   padding: 2px 6px;
 }
 .progression-step-cards[data-view="piano-roll"] .piano-roll-selection-scope {
+  flex: 0 0 auto;
   color: var(--score-muted-ink);
   font-size: 0.7rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 .progression-step-cards[data-view="piano-roll"] .piano-roll-toolbar label {
   display: flex;
@@ -2298,17 +2398,17 @@ button.piano-roll-note > span {
 .piano-roll-guide-segment.is-chord-tone {
   background: color-mix(
     in srgb,
-    var(--piano-roll-degree-color) 38%,
+    var(--piano-roll-degree-color) 19%,
     var(--piano-roll-palette-surface)
   );
 }
 .piano-roll-grid.is-chromatic .piano-roll-guide-segment.is-chord-tone[data-palette-degrees*="-"] {
   background: repeating-linear-gradient(
     135deg,
-    color-mix(in srgb, var(--piano-roll-degree-color) 38%, var(--piano-roll-palette-surface)) 0 7px,
+    color-mix(in srgb, var(--piano-roll-degree-color) 19%, var(--piano-roll-palette-surface)) 0 7px,
     color-mix(
         in srgb,
-        var(--piano-roll-degree-color-secondary) 38%,
+        var(--piano-roll-degree-color-secondary) 19%,
         var(--piano-roll-palette-surface)
       )
       7px 14px
@@ -3061,6 +3161,16 @@ button.piano-roll-note > span {
   border-radius: 4px;
 }
 
+.score-system-current-measure-frame {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  border: 2px solid var(--focus-ring, #3578c8);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--score-paper) 70%, transparent);
+  pointer-events: none;
+}
+
 /* Vertical Playhead Cursor across all staves - placed behind notation elements */
 .score-system-playhead {
   position: absolute;
@@ -3492,6 +3602,16 @@ button.piano-roll-note > span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
+}
+
+/* Collapsible body of a track section; keeps the wrapped control row layout when expanded. */
+.track-controls-body {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   min-width: 0;
 }
 

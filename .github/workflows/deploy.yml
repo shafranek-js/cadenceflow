@@ -1,7 +1,14 @@
 name: Deploy to GitHub Pages
 
+# Runs on manual dispatch, and automatically once the CI workflow finishes for the same
+# commit. The `workflow_run` path makes deployment conditional on the regression gates, so
+# publishing no longer races ahead of the test suite.
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["master"]
 
 permissions:
   contents: read
@@ -14,10 +21,19 @@ concurrency:
 
 jobs:
   build:
+    # A manual dispatch always builds. A `workflow_run` trigger builds only when CI passed,
+    # so a red test suite cannot publish.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # On `workflow_run`, build exactly the commit CI validated rather than whatever the
+          # branch head happens to be by the time this job starts.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4

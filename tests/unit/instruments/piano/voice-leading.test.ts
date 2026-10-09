@@ -13,14 +13,15 @@ import {
 } from "../../../../src/domain/harmony/chord";
 import type { ExactPitch } from "../../../../src/domain/harmony/pitch";
 
-const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
   tonic: 0, // C
   mode: "major",
-  activeModuleId: "progressions",
+  moduleId: "progressions",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
 });
 
 function createDefaultPerformance(overrides?: Partial<StepPerformance>): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     articulation: "block",
     register: "auto",
     voicingMode: "auto",
@@ -36,13 +37,10 @@ function createDefaultPerformance(overrides?: Partial<StepPerformance>): StepPer
 }
 
 function createStep(id: string, functionId: string, performance: StepPerformance): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({
-      moduleId: "progressions",
-      functionId,
-    }),
+    harmonicFunction: Object.freeze({ category: "core", moduleId: "progressions", functionId }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(1, 1)),
     performance,
@@ -81,8 +79,14 @@ function computeVoiceLeadingDistance(
 
 describe("T077 — Piano contextual voice-leading contract", () => {
   it("retains common tones where musically reasonable", () => {
-    const chordC = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
-    const chordAm = realizeHarmonyChord({ moduleId: "progressions", functionId: "vi" }, 0);
+    const chordC = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
+    const chordAm = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "vi", category: "core" },
+      0,
+    );
 
     const inputC: InstrumentRealizationInput = {
       context: C_MAJOR_CONTEXT,
@@ -116,9 +120,18 @@ describe("T077 — Piano contextual voice-leading contract", () => {
   });
 
   it("prefers bounded/minimal movement over independent root-position jumps between consecutive voicings", () => {
-    const chordC = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
-    const chordF = realizeHarmonyChord({ moduleId: "progressions", functionId: "IV" }, 0);
-    const chordG = realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0);
+    const chordC = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
+    const chordF = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "IV", category: "core" },
+      0,
+    );
+    const chordG = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "V", category: "core" },
+      0,
+    );
 
     const stepCRealization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
@@ -214,7 +227,10 @@ describe("T077 — Piano contextual voice-leading contract", () => {
   });
 
   it("constrains register preference without redefining harmonic identity", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0); // G major: G, B, D
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "V", category: "core" },
+      0,
+    ); // G major: G, B, D
 
     const baseRealization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
@@ -258,7 +274,10 @@ describe("T077 — Piano contextual voice-leading contract", () => {
   });
 
   it("produces deterministic auto-voicing given deterministic input", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "ii" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "ii", category: "core" },
+      0,
+    );
     const input: InstrumentRealizationInput = {
       context: C_MAJOR_CONTEXT,
       chord,
@@ -278,9 +297,12 @@ describe("T077 — Piano contextual voice-leading contract", () => {
   });
 
   it("handles voice-count transitions (triad -> seventh chord) without ignoring unmatched voices", () => {
-    const triadC = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C Major triad (3 voices: C, E, G)
+    const triadC = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C Major triad (3 voices: C, E, G)
     const seventhG7: ChordDefinition = {
-      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0),
+      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "V", category: "core" }, 0),
       baseQuality: "dominant", // 4 voices: G, B, D, F
     };
 
@@ -317,26 +339,26 @@ describe("T077 — Piano contextual voice-leading contract", () => {
   it("realizes supported chord extensions and tensions in contextual auto-voicing", () => {
     // ii7 (Dm7: D, F, A, C) -> V7 (G7: G, B, D, F) using structured HarmonicVariant
     // Common tone F (PC 5) should be retained smoothly without dropping the 7th extension
-    const variantDm7: HarmonicVariant = Object.freeze({
+    const variantDm7: HarmonicVariant = Object.freeze<HarmonicVariant>({
       seventh: "minor7",
       extensions: Object.freeze([]),
       suspensions: Object.freeze([]),
       alterations: Object.freeze([]),
     });
-    const chordDm7: ChordDefinition = Object.freeze({
-      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "ii" }, 0),
+    const chordDm7: ChordDefinition = Object.freeze<ChordDefinition>({
+      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "ii", category: "core" }, 0),
       baseQuality: "minor",
       variant: variantDm7,
     });
 
-    const variantG7: HarmonicVariant = Object.freeze({
+    const variantG7: HarmonicVariant = Object.freeze<HarmonicVariant>({
       seventh: "minor7",
       extensions: Object.freeze([]),
       suspensions: Object.freeze([]),
       alterations: Object.freeze([]),
     });
-    const chordG7: ChordDefinition = Object.freeze({
-      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0),
+    const chordG7: ChordDefinition = Object.freeze<ChordDefinition>({
+      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "V", category: "core" }, 0),
       baseQuality: "dominant",
       variant: variantG7,
     });
@@ -379,14 +401,14 @@ describe("T077 — Piano contextual voice-leading contract", () => {
     expect(g7F!.midiNumber).toBe(dm7F!.midiNumber);
 
     // Also verifies that an extended chord with 9th tension realizes the 9th
-    const variantDm9: HarmonicVariant = Object.freeze({
+    const variantDm9: HarmonicVariant = Object.freeze<HarmonicVariant>({
       seventh: "minor7",
       extensions: Object.freeze([9]),
       suspensions: Object.freeze([]),
       alterations: Object.freeze([]),
     });
-    const chordDm9: ChordDefinition = Object.freeze({
-      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "ii" }, 0),
+    const chordDm9: ChordDefinition = Object.freeze<ChordDefinition>({
+      ...realizeHarmonyChord({ moduleId: "progressions", functionId: "ii", category: "core" }, 0),
       baseQuality: "minor",
       variant: variantDm9,
     });

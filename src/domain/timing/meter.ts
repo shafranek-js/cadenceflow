@@ -1,6 +1,7 @@
 import { divideRational, multiplyRational, rational, type Rational } from "./rational";
 import { musicalDuration } from "./duration";
 import type { ProgressionStep } from "../progression/step";
+import { snapshotAuthoredMelodyPhrase, type AuthoredMelodyPhrase } from "../melody/types";
 
 export interface Meter {
   readonly numerator: number;
@@ -14,6 +15,20 @@ export interface GlobalTiming {
 }
 
 export type MeterChangePolicy = "reflow" | "preserve-beat-lengths";
+
+/**
+ * Whether a position inside a Measure falls on a pulse of its meter.
+ *
+ * A pulse is one unit of the meter's denominator — a quarter in 5/4, an eighth in 6/8 — so 6/8 has six
+ * of them. The piano-roll draws a stronger line on every pulse: classifying instead by whole quarter
+ * beats showed only three in 6/8, because it counted the bar's length in quarters rather than the
+ * meter's own pulses.
+ */
+export function isMeterPulse(offsetBeats: Rational, meter: Meter): boolean {
+  if (offsetBeats.numerator === 0) return true;
+  // offset = k * 4 / denominator  <=>  offset.numerator * denominator is a multiple of 4 * offset.denominator
+  return (offsetBeats.numerator * meter.denominator) % (4 * offsetBeats.denominator) === 0;
+}
 
 const SUPPORTED_DENOMINATORS = new Set<number>([1, 2, 4, 8, 16, 32]);
 
@@ -102,6 +117,31 @@ export function reflowProgression(
   return applyMeterChange(steps, oldMeter, newMeter, "reflow");
 }
 
+/**
+ * Scales an authored melody phrase by the same factor applied to its Step duration.
+ *
+ * A phrase's `onset` and `duration` are expressed in beats *local to their Step*, so the
+ * proportional scaling applied to the Step duration is exactly the right transform for them too.
+ *
+ * Regression context: `applyMeterChange` scaled only `step.duration` and left the notes alone.
+ * After 4/4 -> 3/4 a Step lasted three beats while its melody still occupied four, so notes
+ * spilled past the end of their own chord and sounded over the next one — and the notation drew
+ * them outside the bar. `preserve-beat-lengths` is unaffected because it does not scale at all.
+ */
+function scaleAuthoredPhrase(
+  phrase: AuthoredMelodyPhrase,
+  scaleFactor: Rational,
+): AuthoredMelodyPhrase {
+  return snapshotAuthoredMelodyPhrase({
+    notes: phrase.notes.map((note) => ({
+      ...note,
+      onset: multiplyRational(note.onset, scaleFactor),
+      duration: multiplyRational(note.duration, scaleFactor),
+    })),
+    ...(phrase.sourceRecipe !== undefined ? { sourceRecipe: phrase.sourceRecipe } : {}),
+  });
+}
+
 export function applyMeterChange(
   steps: readonly ProgressionStep[],
   oldMeter: Meter,
@@ -122,6 +162,26 @@ export function applyMeterChange(
     steps.map((step) => {
       const newBeats = multiplyRational(step.duration.beats, scaleFactor);
       const newDuration = musicalDuration(newBeats, step.duration.displayHint);
+
+      // Melody travels with its Step so notes cannot outlive the chord that owns them.
+      // Chord steps carry `melody`; rest steps carry `authoredMelody` directly.
+      if (step.kind === "chord" && step.melody?.mode === "authored") {
+        return Object.freeze({
+          ...step,
+          duration: newDuration,
+          melody: Object.freeze({
+            ...step.melody,
+            phrase: scaleAuthoredPhrase(step.melody.phrase, scaleFactor),
+          }),
+        });
+      }
+      if (step.kind === "rest" && step.authoredMelody !== undefined) {
+        return Object.freeze({
+          ...step,
+          duration: newDuration,
+          authoredMelody: scaleAuthoredPhrase(step.authoredMelody, scaleFactor),
+        });
+      }
       return Object.freeze({
         ...step,
         duration: newDuration,

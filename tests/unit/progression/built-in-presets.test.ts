@@ -1,3 +1,4 @@
+import { requireRecord } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import {
   BUILT_IN_PRESETS,
@@ -76,11 +77,11 @@ describe("T114 — Curated Built-in Preset Catalog Data (US7)", () => {
 
         // Attempting to modify properties throws in strict mode
         expect(() => {
-          (step as Record<string, unknown>).newProp = "mutate";
+          Object.defineProperty(step, "newProp", { value: "mutate" });
         }).toThrow();
 
         expect(() => {
-          (preset as Record<string, unknown>).name = "mutated";
+          Object.defineProperty(preset, "name", { value: "mutated" });
         }).toThrow();
       }
     }
@@ -103,7 +104,7 @@ describe("T114 — Curated Built-in Preset Catalog Data (US7)", () => {
 
     for (const preset of BUILT_IN_PRESETS) {
       for (const step of preset.steps) {
-        const record = step as Record<string, unknown>;
+        const record = requireRecord(step);
         for (const key of forbiddenKeys) {
           expect(record[key]).toBeUndefined();
         }

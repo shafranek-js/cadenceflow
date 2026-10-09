@@ -1,3 +1,5 @@
+import type { Project } from "../../../src/domain/project/project";
+import { snapshotChordMelody } from "../../../src/domain/melody/types";
 import { describe, expect, it } from "vitest";
 import {
   realizeMelodyStepAudition,
@@ -16,7 +18,7 @@ import { musicalDuration } from "../../../src/domain/timing/duration";
 import type { ChordMelodyRecipe, MelodyTrackSettings } from "../../../src/domain/melody/types";
 import type { ChordStep, StepPerformance } from "../../../src/domain/progression/step";
 
-const DEFAULT_PERFORMANCE: StepPerformance = Object.freeze({
+const DEFAULT_PERFORMANCE: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -26,7 +28,7 @@ const DEFAULT_PERFORMANCE: StepPerformance = Object.freeze({
   dynamicsViewPreference: "musical",
 });
 
-const DEFAULT_TRACK: MelodyTrackSettings = Object.freeze({
+const DEFAULT_TRACK: MelodyTrackSettings = Object.freeze<MelodyTrackSettings>({
   instrument: "flute",
   muted: false,
   solo: false,
@@ -37,26 +39,41 @@ function makeChord(
   id: string,
   functionId: string,
   durationBeats = rational(2),
-  melody: ChordMelodyRecipe = { pattern: "up", grid: "eighth", octaveOffset: 0 },
+  melody: ChordMelodyRecipe = {
+    pitchMotion: "up",
+    grid: "eighth",
+    octaveOffset: 0,
+    rhythm: "even",
+    connection: "retrigger",
+  },
   performance: StepPerformance = DEFAULT_PERFORMANCE,
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions" as const,
+      functionId,
+      category: "core" as const,
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(durationBeats),
     cardView: "harmonic",
     performance,
-    melody,
+    melody: snapshotChordMelody(melody),
   });
 }
 
 const baseInput = {
   tonic: 0 as const,
-  context: "major" as const,
+  context: {
+    tonic: 0,
+    moduleId: "progressions",
+    mode: "major",
+    spellingContext: { tonic: 0, mode: "major" },
+  },
   tempoBpm: 120,
-};
+} as const;
 
 describe("T173 — live Melody performance projection", () => {
   it("keeps a Staff octave shift local to its Step and derived Melody projections", () => {
@@ -79,12 +96,22 @@ describe("T173 — live Melody performance projection", () => {
     const beforeRealizations = realizeOrderedPianoProgression({
       steps,
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
     const afterRealizations = realizeOrderedPianoProgression({
       steps: editedSteps,
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
     expect(afterRealizations[0]!.upperPitches).not.toEqual(beforeRealizations[0]!.upperPitches);
     expect(afterRealizations.slice(1)).toEqual(beforeRealizations.slice(1));
@@ -119,7 +146,7 @@ describe("T173 — live Melody performance projection", () => {
       );
     }
 
-    const timelineFor = (candidate: typeof project, sourceStepId: string) =>
+    const timelineFor = (candidate: Project, sourceStepId: string) =>
       createMelodyTimeline(candidate)
         .events.filter((event) => event.sourceStepId === sourceStepId)
         .map((event) => ({
@@ -139,14 +166,25 @@ describe("T173 — live Melody performance projection", () => {
     const sourceRealization = realizeOrderedPianoProgression({
       steps: [sourceStep],
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     })[0]!;
     const sourcePitch = sourceRealization.upperPitches[0]!.midiNumber;
     const step = makeChord(
       "step-1",
       "I",
       rational(1),
-      { pattern: "up", grid: "quarter", octaveOffset: 1 },
+      {
+        pitchMotion: "up",
+        grid: "quarter",
+        octaveOffset: 1,
+        rhythm: "even",
+        connection: "retrigger",
+      },
       Object.freeze({
         ...DEFAULT_PERFORMANCE,
         masterVelocity: 61,
@@ -177,9 +215,11 @@ describe("T173 — live Melody performance projection", () => {
   it("swings straight melody grids but leaves triplet grids unchanged", () => {
     const straightStep = makeChord("straight", "I", rational(2));
     const tripletStep = makeChord("triplet", "I", rational(2), {
-      pattern: "up",
+      pitchMotion: "up",
       grid: "eighth-triplet",
       octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
     });
     const straight = realizeProgressionMelodyPerformance({
       ...baseInput,
@@ -213,7 +253,16 @@ describe("T173 — live Melody performance projection", () => {
 
   it("carries contextual realization through preceding steps and omits muted output", () => {
     const steps = [makeChord("step-1", "I"), makeChord("step-2", "IV")];
-    const expected = realizeOrderedPianoProgression({ steps, tonic: 0, context: "major" })[1]!;
+    const expected = realizeOrderedPianoProgression({
+      steps,
+      tonic: 0,
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
+    })[1]!;
     const projection = realizeProgressionMelodyPerformance({
       ...baseInput,
       steps,

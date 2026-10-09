@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadenceflow.local/schema/project-v10.json",
-  "title": "CadenceFlow Project v10",
-  "$comment": "Schema v10 persists additive Step-local semitone transposition. Stored pitch compensation preserves concert MIDI 0..127 when inverse Step offsets cross the MIDI boundaries. Authored timing is relative Rational; absolute timeline and progression-tail clipping are derived. Generated recipes remain chord-only.",
+  "$id": "https://cadenceflow.local/schema/project-v11.json",
+  "title": "CadenceFlow Project v11",
+  "$comment": "Schema v11 persists reversible Chord Properties origin snapshots, modal-borrow provenance, extended harmonic variants, semantic inversion/bass choices, and the project-wide independent bass voice setting alongside v10 Step-local semitone transposition. Authored timing is relative Rational; absolute timeline and progression-tail clipping are derived. Generated recipes remain chord-only.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,7 @@
     "customPresets"
   ],
   "properties": {
-    "schemaVersion": { "const": 10 },
+    "schemaVersion": { "const": 11 },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -35,15 +35,40 @@
     "groove": { "$ref": "#/$defs/groove" },
     "harmonyTrack": { "$ref": "#/$defs/harmonyTrack" },
     "melodyTrack": { "$ref": "#/$defs/melodyTrack" },
+    "independentBassEnabled": { "type": "boolean" },
     "presentation": {
       "type": "object",
-      "required": ["noteColorMode"],
+      "additionalProperties": false,
+      "required": [
+        "expertiseMode",
+        "theme",
+        "globalMatrixCardView",
+        "showBassInStaff",
+        "noteColorMode"
+      ],
       "properties": {
-        "progressionView": { "enum": ["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"] },
+        "expertiseMode": { "enum": ["beginner", "composer", "expert"] },
+        "theme": { "enum": ["dark", "light"] },
+        "globalMatrixCardView": {
+          "enum": ["harmonic", "piano", "staff", "guitar", "tablature"]
+        },
+        "progressionView": {
+          "enum": ["harmonic", "piano", "staff", "guitar", "tablature", "piano-roll"]
+        },
+        "measuresPerSystem": { "enum": ["auto", 1, 2, 3, 4, 5, 6, 7, 8] },
+        "measureLayoutColumns": {
+          "description": "Pre-v9 alias for measuresPerSystem; decodeMeasuresPerSystem maps it when measuresPerSystem is absent. Accepted so tightened validation does not reject genuine legacy files.",
+          "anyOf": [{ "enum": ["auto", "1", "2", "3", "4", "5", "6", "7", "8"] }, { "type": "integer", "minimum": 1, "maximum": 8 }]
+        },
+        "showBassInStaff": { "type": "boolean" },
         "noteColorMode": { "enum": ["standard", "suzuki", "harmonic-role"] },
-        "guitarChordColorMode": { "enum": ["chord-roles", "fingering"] }
+        "guitarChordColorMode": { "enum": ["chord-roles", "fingering"] },
+        "resolutionArrows": { "type": "boolean" },
+        "genreFocus": { "type": "string", "minLength": 1 },
+        "guitarChordOrientation": { "enum": ["vertical", "horizontal"] },
+        "sidePanelMode": { "enum": ["fixed", "autohide"] }
       },
-      "$comment": "Presentation-only note/guitar marker color modes and existing view preferences."
+      "$comment": "Presentation-only note/guitar marker color modes and existing view preferences. `additionalProperties` is false and the optional keys above are enumerated exhaustively, so a future field added to the encoder fails loudly here instead of being written into files the validator silently tolerates. The `required` list mirrors the non-optional members of PresentationState in src/domain/project/project.ts."
     },
     "defaults": { "type": "object" },
     "moduleTemplateStates": {
@@ -57,6 +82,89 @@
     "customPresets": { "type": "array", "items": { "type": "object" } }
   },
   "$defs": {
+    "harmonicFunction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["moduleId", "functionId", "category"],
+      "properties": {
+        "moduleId": { "enum": ["progressions", "dark-harmony"] },
+        "functionId": { "type": "string", "minLength": 1 },
+        "category": { "enum": ["core", "secondary-dominant", "modal-interchange", "secondary-diminished", "neapolitan", "chromatic-color"] },
+        "targetFunctionId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "mixPolicy": { "enum": ["mix-freely", "must-resolve"] },
+        "bassScaleDegree": { "type": "integer", "minimum": 1, "maximum": 13 },
+        "borrowedFromMode": { "enum": ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"] },
+        "borrowedDegree": { "type": "integer", "minimum": 1, "maximum": 7 }
+      }
+    },
+    "harmonicVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extensions", "suspensions", "alterations"],
+      "properties": {
+        "baseQualityOverride": { "enum": ["major", "minor", "diminished", "augmented", "dominant"] },
+        "seventh": { "enum": ["minor7", "major7", "diminished7", "half-diminished7"] },
+        "extensions": { "type": "array", "uniqueItems": true, "items": { "enum": [9, 11, 13] } },
+        "suspensions": { "type": "array", "uniqueItems": true, "items": { "enum": ["sus2", "sus4"] } },
+        "alterations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["degree", "semitones"],
+            "properties": {
+              "degree": { "enum": [5, 9, 11, 13] },
+              "semitones": { "enum": [-1, 1] }
+            }
+          }
+        },
+        "add9": { "type": "boolean" },
+        "add11": { "type": "boolean" },
+        "add13": { "type": "boolean" },
+        "no3": { "type": "boolean" },
+        "no5": { "type": "boolean" }
+      }
+    },
+    "bassSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["choice", "octaveOffset"],
+      "properties": {
+        "choice": { "enum": ["auto", "root", "second", "third", "fourth", "fifth", "seventh", "ninth", "eleventh", "thirteenth", "custom"] },
+        "octaveOffset": { "enum": ["auto", -1, -2] },
+        "customPitch": { "$ref": "#/$defs/exactPitch" }
+      }
+    },
+    "chordPropertiesFunctionState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["harmonicFunction", "harmonicVariant"],
+      "properties": {
+        "harmonicFunction": { "$ref": "#/$defs/harmonicFunction" },
+        "harmonicVariant": { "$ref": "#/$defs/harmonicVariant" }
+      }
+    },
+    "chordPropertiesOrigin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["harmonicFunction", "harmonicVariant", "bass"],
+          "properties": {
+            "harmonicFunction": { "$ref": "#/$defs/harmonicFunction" },
+            "harmonicVariant": { "$ref": "#/$defs/harmonicVariant" },
+            "inversion": { "enum": ["auto", 0, 1, 2, 3, 4, 5, 6] },
+            "bass": { "$ref": "#/$defs/bassSettings" }
+          }
+        },
+        "secondaryBase": { "$ref": "#/$defs/chordPropertiesFunctionState" },
+        "borrowBase": { "$ref": "#/$defs/chordPropertiesFunctionState" }
+      }
+    },
     "pitchClass": {
       "type": "object",
       "additionalProperties": false,
@@ -170,7 +278,21 @@
           "items": { "$ref": "#/$defs/step" }
         },
         "selectedStepId": { "type": ["string", "null"] },
-        "loopRegion": { "type": ["object", "null"] },
+        "loopRegion": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["startStepId", "endStepId"],
+              "properties": {
+                "startStepId": { "type": "string", "minLength": 1 },
+                "endStepId": { "type": "string", "minLength": 1 }
+              }
+            }
+          ],
+          "$comment": "Both anchors are required. A region missing either one reached validateLoopRegion and threw RangeError during playback, so the schema now rejects it at the boundary."
+        },
         "sections": {
           "type": "array",
           "items": {
@@ -225,8 +347,9 @@
         "id": { "type": "string", "minLength": 1 },
         "kind": { "const": "chord" },
         "transpositionSemitones": { "type": "integer", "minimum": -127, "maximum": 127 },
-        "harmonicFunction": { "type": "object" },
-        "harmonicVariant": { "type": "object" },
+        "harmonicFunction": { "$ref": "#/$defs/harmonicFunction" },
+        "harmonicVariant": { "$ref": "#/$defs/harmonicVariant" },
+        "chordPropertiesOrigin": { "$ref": "#/$defs/chordPropertiesOrigin" },
         "duration": { "$ref": "#/$defs/duration" },
         "performance": {
           "type": "object",
@@ -236,24 +359,15 @@
             "articulation": { "enum": ["block", "arp-up", "arp-down", "broken-chord", "humanized"] },
             "register": { "enum": ["auto", -2, -1, 0, 1, 2] },
             "voicingMode": { "enum": ["auto", "manual"] },
-            "inversion": { "enum": ["auto", 0, 1, 2, 3] },
+            "inversion": { "enum": ["auto", 0, 1, 2, 3, 4, 5, 6] },
             "manualVoicing": { "type": "array", "items": { "$ref": "#/$defs/exactPitch" } },
-            "bass": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["choice", "octaveOffset"],
-              "properties": {
-                "choice": { "enum": ["auto", "root", "third", "fifth", "seventh", "custom"] },
-                "octaveOffset": { "enum": ["auto", -1, -2] },
-                "customPitch": { "$ref": "#/$defs/exactPitch" }
-              }
-            },
+            "bass": { "$ref": "#/$defs/bassSettings" },
             "masterVelocity": { "type": "integer", "minimum": 1, "maximum": 127 },
             "perNoteVelocityOverrides": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 127 } },
             "dynamicsViewPreference": { "enum": ["musical", "midi"] }
           }
         },
-        "cardView": { "enum": ["harmonic", "piano", "staff"] },
+        "cardView": { "enum": ["harmonic", "piano", "staff", "guitar", "tablature"] },
         "explicitSpellingOverrides": { "type": "object" },
         "melody": { "$ref": "#/$defs/chordMelody" },
         "melodyInstrumentOverride": { "$ref": "#/$defs/melodyInstrument" }

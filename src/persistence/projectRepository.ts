@@ -1,6 +1,10 @@
 import type { Project } from "../domain/project/project";
 import { type CadenceFlowDatabase, getActiveDb, type ProjectRecord } from "./db";
-import { decodePortableProject, encodePortableProject } from "./portableProject";
+import {
+  decodePortableProjectWithDiagnostics,
+  encodePortableProject,
+  type PortableProjectDecodeResult,
+} from "./portableProject";
 
 /**
  * Named project repository interface and implementation (T122).
@@ -25,6 +29,10 @@ export interface OpenProjectTabsState {
 export interface ProjectRepository {
   listProjects(): Promise<readonly ProjectMetadata[]>;
   loadProject(id: string): Promise<Project | null>;
+  /** Loads the exact project snapshot together with any migration losses. */
+  loadProjectWithDiagnostics?(id: string): Promise<PortableProjectDecodeResult | null>;
+  /** Atomically deletes the active record, switches its pointer, and writes a fresh fallback if needed. */
+  replaceActiveProject?(activeId: string, replacement: Project): Promise<void>;
   saveProject(project: Project): Promise<void>;
   deleteProject(id: string): Promise<void>;
   getLastActiveProjectId(): Promise<string | null>;
@@ -65,13 +73,18 @@ export class DexieProjectRepository implements ProjectRepository {
   }
 
   async loadProject(id: string): Promise<Project | null> {
+    const result = await this.loadProjectWithDiagnostics(id);
+    return result?.project ?? null;
+  }
+
+  async loadProjectWithDiagnostics(id: string): Promise<PortableProjectDecodeResult | null> {
     const record = await this.db.projects.get(id);
     if (!record) {
       return null;
     }
     const payloadStr =
       typeof record.payload === "string" ? record.payload : JSON.stringify(record.payload);
-    return decodePortableProject(payloadStr);
+    return decodePortableProjectWithDiagnostics(payloadStr);
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -103,6 +116,27 @@ export class DexieProjectRepository implements ProjectRepository {
       if (activeMeta && activeMeta.value === id) {
         await this.db.metadata.delete("lastActiveProjectId");
       }
+    });
+  }
+
+  async replaceActiveProject(activeId: string, replacement: Project): Promise<void> {
+    const payload = encodePortableProject(replacement);
+    await this.db.transaction("rw", [this.db.projects, this.db.metadata], async () => {
+      const existing = await this.db.projects.get(replacement.id);
+      if (!existing) {
+        const record: ProjectRecord = {
+          id: replacement.id,
+          name: replacement.name,
+          createdAt: replacement.createdAt,
+          updatedAt: replacement.updatedAt,
+          schemaVersion: replacement.schemaVersion,
+          revision: 1,
+          payload,
+        };
+        await this.db.projects.put(record);
+      }
+      await this.db.projects.delete(activeId);
+      await this.db.metadata.put({ key: "lastActiveProjectId", value: replacement.id });
     });
   }
 

@@ -16,6 +16,29 @@ async function waitForStudio(page: Page): Promise<void> {
 }
 
 test.describe("Harmonic Matrix Header Context Menu", () => {
+  test("Escape restores a matrix focus target after opening the menu on the toolbar", async ({
+    page,
+  }) => {
+    await waitForStudio(page);
+    const matrix = page.locator(".matrix-panel");
+    const focusToggle = page.getByTestId("matrix-focus-toggle");
+    const toolbar = page.locator(".matrix-toolbar");
+    await focusToggle.click();
+    await expect(focusToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(matrix).toHaveAttribute("data-focus-mode", "true");
+
+    await toolbar.click({ button: "right" });
+    const menu = page.getByTestId("matrix-context-menu");
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(focusToggle).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(matrix).not.toHaveAttribute("data-focus-mode", "true");
+    await expect(focusToggle).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("opens on right click, displays sections, handles submenus, toggles and keyboard escape", async ({
     page,
   }) => {
@@ -50,7 +73,9 @@ test.describe("Harmonic Matrix Header Context Menu", () => {
 
     // Capture screenshot of open matrix context menu with submenu
     await page.screenshot({
-      path: "C:/Users/pavel/.gemini/antigravity/brain/b7baeb67-2bbc-4d13-8a03-ad5f1ee7da84/matrix-header-context-menu.png",
+      path:
+        process.env.CADENCEFLOW_MATRIX_CONTEXT_SCREENSHOT ??
+        "C:/Users/pavel/.gemini/antigravity/brain/b7baeb67-2bbc-4d13-8a03-ad5f1ee7da84/matrix-header-context-menu.png",
     });
 
     // Close on Escape
@@ -95,7 +120,9 @@ test.describe("Harmonic Matrix Header Context Menu", () => {
     // Check that Piano view is active
     await matrixToolbar.click({ button: "right" });
     await page.getByTestId("matrix-menu-open-view").click();
-    await expect(page.getByTestId("matrix-menu-view-piano").locator(".score-system-menu-check")).toBeVisible();
+    await expect(
+      page.getByTestId("matrix-menu-view-piano").locator(".score-system-menu-check"),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
 
     // Toggle Show Bass in Staff
@@ -104,7 +131,9 @@ test.describe("Harmonic Matrix Header Context Menu", () => {
 
     // Reopen and verify checkmark on Show Bass in Staff
     await matrixToolbar.click({ button: "right" });
-    await expect(page.getByTestId("matrix-menu-toggle-bass").locator(".score-system-menu-check")).toBeVisible();
+    await expect(
+      page.getByTestId("matrix-menu-toggle-bass").locator(".score-system-menu-check"),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
   });
 });

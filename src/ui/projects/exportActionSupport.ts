@@ -94,6 +94,21 @@ export function createMusicXmlExportFile(project: Project): MusicXmlBrowserExpor
 }
 
 export function downloadBrowserExport(file: BrowserExportFile): void {
+  downloadBlob(file.data as unknown as BlobPart, file.filename, file.mimeType);
+}
+
+/**
+ * Triggers a browser download for already-serialized bytes.
+ *
+ * Regression context: `PortableProjectActions` had its own copy of this that called
+ * `URL.revokeObjectURL(url)` synchronously right after `link.click()`. Revoking the object URL
+ * before the browser has read it makes the download fail or produce an empty file — the user
+ * loses the backup they just asked for. The URL is now released only after the click has been
+ * dispatched, and on the next macrotask, matching the export path.
+ *
+ * @throws ExportActionError when the browser cannot download
+ */
+export function downloadBlob(data: BlobPart, filename: string, mimeType: string): void {
   if (typeof URL.createObjectURL !== "function" || typeof URL.revokeObjectURL !== "function") {
     throw new ExportActionError(
       "download-unavailable",
@@ -101,13 +116,11 @@ export function downloadBrowserExport(file: BrowserExportFile): void {
     );
   }
 
-  const url = URL.createObjectURL(
-    new Blob([file.data as unknown as BlobPart], { type: file.mimeType }),
-  );
+  const url = URL.createObjectURL(new Blob([data], { type: mimeType }));
   const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
   const link = document.createElement("a");
   link.href = url;
-  link.download = file.filename;
+  link.download = filename;
   link.setAttribute("aria-hidden", "true");
   link.style.display = "none";
   document.body.appendChild(link);

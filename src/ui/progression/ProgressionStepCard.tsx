@@ -2,6 +2,7 @@ import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
+import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import type { ChordStep, StepPerformance } from "../../domain/progression/step";
 import type {
   GuitarChordColorMode,
@@ -29,6 +30,7 @@ import {
 } from "../staff/staffOctave";
 import type { LabelHierarchyMode } from "./labelHierarchy";
 import { ProgressionChordLabel } from "./ProgressionChordLabel";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
 import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
 export function ProgressionStepCard({
@@ -42,6 +44,7 @@ export function ProgressionStepCard({
   playing = false,
   inLoop = false,
   showBassInStaff = false,
+  independentBassEnabled = true,
   suzukiColors = false,
   noteColorMode = suzukiColors ? "suzuki" : "standard",
   activeModule = "progressions",
@@ -65,6 +68,7 @@ export function ProgressionStepCard({
   readonly playing?: boolean;
   readonly inLoop?: boolean;
   readonly showBassInStaff?: boolean;
+  readonly independentBassEnabled?: boolean;
   readonly suzukiColors?: boolean;
   readonly noteColorMode?: NoteColorMode;
   readonly activeModule?: HarmonicModuleId;
@@ -81,32 +85,39 @@ export function ProgressionStepCard({
 }) {
   const realization = realizeProgressionStepRealization(step, tonic);
   const baseChord = realizeProgressionStepChord(step, tonic);
+  const separateBassPitch = independentBassEnabled ? realization.bassPitch : undefined;
+  const displayBassPitch = separateBassPitch ?? realization.pitches[0];
   // Piano Card View is chord-only. The realization's bassPitch remains available to audio.
   const pianoPitches = realization.pitches;
-  const displayedChord = withEffectiveBass(baseChord, realization.bassPitch);
+  const displayedChord = withEffectiveBass(baseChord, displayBassPitch);
+  const guitarChord = withGuitarStepBass(baseChord, step, "concert");
+  const guitarChordLabel = formatChordSymbol(guitarChord);
   const nextRealization = nextStep ? realizeProgressionStepRealization(nextStep, tonic) : undefined;
   const roleContext = createHarmonicNoteRoleContext({
     tonic,
     moduleId: activeModule,
     rootPitchClass: baseChord.rootPitchClass,
-    chordPitches: [...pianoPitches, ...(realization.bassPitch ? [realization.bassPitch] : [])],
+    chordPitches: [...pianoPitches, ...(separateBassPitch ? [separateBassPitch] : [])],
     nextChordPitches: nextRealization
       ? [
           ...nextRealization.pitches,
-          ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
+          ...(independentBassEnabled && nextRealization.bassPitch
+            ? [nextRealization.bassPitch]
+            : []),
         ]
       : [],
   });
   const chordLabel = formatChordSymbol(displayedChord);
   const isInvertedBass =
-    realization.bassPitch !== undefined &&
-    realization.bassPitch.pitchClassIdentity !== baseChord.rootPitchClass;
+    displayBassPitch !== undefined &&
+    displayBassPitch.pitchClassIdentity !== baseChord.rootPitchClass;
   const staffPitches =
-    (showBassInStaff || isInvertedBass) && realization.bassPitch
-      ? Object.freeze([realization.bassPitch, ...pianoPitches])
+    independentBassEnabled && showBassInStaff && separateBassPitch
+      ? Object.freeze([separateBassPitch, ...pianoPitches])
       : pianoPitches;
   const durationLabel = formatMusicalDuration(step.duration);
-  const selectionAriaLabel = `Select progression step ${stepNumber}: ${step.harmonicFunction.functionId}${playing ? ", Playing" : ""}`;
+  const functionLabel = harmonicFunctionLabel(step.harmonicFunction);
+  const selectionAriaLabel = `Select progression step ${stepNumber}: ${functionLabel}${playing ? ", Playing" : ""}`;
   const changeStaffOctave = (direction: StaffOctaveDirection) => {
     const patch = performanceOctaveShiftPatch(step.performance, direction);
     if (patch) onPerformanceChange(patch);
@@ -155,7 +166,7 @@ export function ProgressionStepCard({
         {stepNumber}
       </span>
       <ProgressionStepRemoveButton
-        accessibleName={`Remove progression step ${stepNumber}: ${step.harmonicFunction.functionId}`}
+        accessibleName={`Remove progression step ${stepNumber}: ${functionLabel}`}
         onRemove={onRemove}
       />
       {view === "staff" && !compactStaff ? (
@@ -200,12 +211,12 @@ export function ProgressionStepCard({
                 {labelMode ? (
                   <ProgressionChordLabel
                     mode={labelMode}
-                    functionLabel={step.harmonicFunction.functionId}
+                    functionLabel={harmonicFunctionLabel(step.harmonicFunction)}
                     chordLabel={chordLabel}
                   />
                 ) : (
                   <strong data-testid="step-function">
-                    {step.harmonicFunction.functionId}
+                    {harmonicFunctionLabel(step.harmonicFunction)}
                     {isInvertedBass ? (
                       <span className="step-inversion-badge">
                         /{formatPitchSpelling(realization.bassPitch!.spelling)}
@@ -223,33 +234,27 @@ export function ProgressionStepCard({
             {view === "piano" ? (
               <PianoCardView
                 chordPitches={pianoPitches}
-                bassPitch={isInvertedBass ? realization.bassPitch : undefined}
+                bassPitch={independentBassEnabled ? separateBassPitch : undefined}
                 chordLabel={chordLabel}
-                {...(labelMode
-                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
-                  : {})}
+                {...(labelMode ? { labelMode, functionLabel } : {})}
                 noteColorMode={noteColorMode}
                 roleContext={roleContext}
               />
             ) : null}
             {view === "guitar" ? (
               <GuitarCardView
-                chord={displayedChord}
-                chordLabel={chordLabel}
-                {...(labelMode
-                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
-                  : {})}
+                chord={guitarChord}
+                chordLabel={guitarChordLabel}
+                {...(labelMode ? { labelMode, functionLabel } : {})}
                 orientation={guitarChordOrientation}
                 colorMode={guitarChordColorMode}
               />
             ) : null}
             {view === "tablature" ? (
               <TabCardView
-                chord={displayedChord}
-                chordLabel={chordLabel}
-                {...(labelMode
-                  ? { labelMode, functionLabel: step.harmonicFunction.functionId }
-                  : {})}
+                chord={guitarChord}
+                chordLabel={guitarChordLabel}
+                {...(labelMode ? { labelMode, functionLabel } : {})}
                 duration={step.duration}
                 articulation={step.performance.articulation}
                 playing={playing}
@@ -260,7 +265,7 @@ export function ProgressionStepCard({
                 {labelMode ? (
                   <ProgressionChordLabel
                     mode={labelMode}
-                    functionLabel={step.harmonicFunction.functionId}
+                    functionLabel={harmonicFunctionLabel(step.harmonicFunction)}
                     chordLabel={chordLabel}
                   />
                 ) : (

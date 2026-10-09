@@ -3,9 +3,19 @@ node_modules/
 dist/
 playwright-report/
 test-results/
+# Playwright runs with a suffixed --output directory produce test-results-<name>/.
+test-results*/
 coverage/
 *.tsbuildinfo
 pnpm-lock.yaml
+
+# Generated validation evidence. Handoff workflow writes screenshots, metrics JSON and
+# throwaway scripts here; they are run output, not source, and formatting them is noise.
+artifacts/
+
+# Generated tool caches and reports (graphify). The cache is machine output; the reports
+# are regenerated, so formatting them is not meaningful.
+graphify-out/
 
 # Prototype reference
 reference/

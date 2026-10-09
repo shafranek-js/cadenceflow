@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    // Deliberately no "DOM": domain and command layers must not depend on browser globals.
     "lib": ["ES2022"],
     "strict": true,
     "noEmit": true,
@@ -8,7 +9,9 @@
     "moduleResolution": "Bundler",
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // See tsconfig.domain.json: lets a UI/React import fail with a layering-relevant error.
+    "jsx": "preserve"
   },
   "include": [
     "src/domain/**/*.ts",

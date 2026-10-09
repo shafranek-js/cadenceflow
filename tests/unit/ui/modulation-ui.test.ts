@@ -32,7 +32,7 @@ function mountToDom(element: React.ReactElement) {
 }
 
 describe("ModulationModal UI", () => {
-  const baseProject = createDefaultProject();
+  const baseProject = createDefaultProject("test-project");
 
   it("does not render into DOM when closed", () => {
     const { container, unmount } = mountToDom(
@@ -142,7 +142,9 @@ describe("ModulationModal UI", () => {
       }),
     );
 
-    const activeAuditionBtn = container.querySelector<HTMLButtonElement>(".mod-audition-btn.is-playing");
+    const activeAuditionBtn = container.querySelector<HTMLButtonElement>(
+      ".mod-audition-btn.is-playing",
+    );
     expect(activeAuditionBtn).not.toBeNull();
     expect(activeAuditionBtn?.textContent).toContain("Stop");
 

@@ -60,7 +60,10 @@ describe("T208 keyboard composition pitch helpers", () => {
         ...base.progression,
         steps: base.progression.steps.map((item) =>
           item.id === step.id
-            ? { ...item, melody: snapshotChordMelody({ mode: "authored", phrase: { notes } }) }
+            ? {
+                ...item,
+                melody: snapshotChordMelody({ mode: "authored" as const, phrase: { notes } }),
+              }
             : item,
         ),
       },

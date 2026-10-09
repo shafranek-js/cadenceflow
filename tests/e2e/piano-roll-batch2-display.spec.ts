@@ -13,6 +13,7 @@ interface PortableFixtureProject {
 }
 
 const evidenceRoot =
+  process.env.CADENCEFLOW_BATCH2_EVIDENCE_ROOT ??
   "C:/Users/pavel/.codex/visualizations/2026/09/30/01a0f429-fbf3-7d12-b9b6-eeb5b234239d/piano-roll-batch2";
 
 const settleLayout = async (page: import("@playwright/test").Page) =>
@@ -47,22 +48,23 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
-  await expect(page.getByTestId("progression-step")).toHaveCount(4);
-  await page.locator("[data-progression-step-select]").first().click();
+  const harmonySteps = page.getByTestId("piano-roll-chord");
+  await expect(harmonySteps).toHaveCount(4);
+  await harmonySteps.first().click();
   await page.getByTestId("quick-edit-duration").selectOption("2/1");
   const sectionName = page.getByLabel("New section name at Step 1");
   await sectionName.fill("Opening verse with a deliberately long section title");
   await sectionName.press("Enter");
   await sectionName.fill("Second marker in this measure");
   await sectionName.press("Enter");
-  await page.locator("[data-progression-step-select]").nth(1).click();
+  await harmonySteps.nth(1).click();
   await page.getByTestId("quick-edit-duration").selectOption("2/1");
   const secondSection = page.getByLabel("New section name at Step 2");
   await secondSection.fill("Chorus");
   await secondSection.press("Enter");
-  await page.locator("[data-progression-step-select]").first().click();
-  const firstStep = page.getByTestId("progression-step").first();
-  await firstStep.locator("[data-progression-step-select]").click({ button: "right" });
+  await harmonySteps.first().click();
+  const firstStep = harmonySteps.first();
+  await firstStep.click({ button: "right" });
   await page
     .getByRole("menu", { name: /Melody actions/ })
     .getByRole("menuitem", { name: "Create Melody…" })
@@ -89,7 +91,7 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
     await dialog.getByRole("button", { name: "Add note" }).click();
   }
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
-  await page.locator("[data-progression-step-select]").nth(1).click({ button: "right" });
+  await harmonySteps.nth(1).click({ button: "right" });
   await page
     .getByRole("menu", { name: /Melody actions/ })
     .getByRole("menuitem", { name: "Create Melody…" })
@@ -100,7 +102,7 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
     [2, 76],
     [3, 74],
   ] as const) {
-    await page.locator("[data-progression-step-select]").nth(stepIndex).click({ button: "right" });
+    await harmonySteps.nth(stepIndex).click({ button: "right" });
     await page
       .getByRole("menu", { name: /Melody actions/ })
       .getByRole("menuitem", { name: "Create Melody…" })
@@ -138,9 +140,13 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
   await expect(longNote.first()).toHaveAttribute("data-start-beats", "1/2");
   await expect(longNote.first()).toHaveAttribute("data-duration-beats", "6/1");
   await expect(page.locator('button.piano-roll-note[data-generated="true"]').first()).toBeVisible();
-  for (const stepId of await page
-    .locator("[data-progression-step-select]")
-    .evaluateAll((els) => els.slice(0, 4).map((el) => el.getAttribute("data-step-id")))) {
+  const stepIds = await harmonySteps.evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-source-step-id")),
+  );
+  expect(stepIds).toHaveLength(4);
+  expect(stepIds.every((stepId) => stepId !== null)).toBe(true);
+  for (const stepId of stepIds) {
+    if (stepId === null) throw new Error("Each Piano Roll harmony step must have a source id.");
     await expect(
       page.locator(`button.piano-roll-note[data-source-step-id="${stepId}"]`).first(),
     ).toBeVisible();
@@ -430,12 +436,9 @@ test("Piano Roll display uses the canonical timeline and stays inside its system
   await addRestMenuItem.click();
   await expect(page.locator(".piano-roll-chord.is-rest")).toHaveCount(1);
   await page
-    .getByTestId("progression-view-btn-tablature")
+    .getByTestId("progression-view-btn-staff")
     .evaluate((button) => (button as HTMLButtonElement).click());
-  const authoredRestStep = page
-    .getByTestId("progression-step")
-    .last()
-    .locator("[data-progression-step-select]");
+  const authoredRestStep = page.locator("[data-progression-step-select]").last();
   const authoredRestStepId = await authoredRestStep.getAttribute("data-step-id");
   await authoredRestStep.evaluate((button) => {
     const rect = button.getBoundingClientRect();

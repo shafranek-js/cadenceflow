@@ -312,6 +312,7 @@ export function projectProjectToMidi(project: Project): MidiProjection {
     context: createContext(project),
     tempoBpm: project.globalTiming.tempoBpm,
     groove: project.groove,
+    independentBassEnabled: project.independentBassEnabled,
   });
 
   const rawNotes: RawProjectionNote[] = performance.events.map((event) => {

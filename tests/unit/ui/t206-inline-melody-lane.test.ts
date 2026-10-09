@@ -1,3 +1,4 @@
+import { requireValue, requireChord } from "../../fixtures/assertions";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -5,7 +6,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRichProjectFixture } from "../../fixtures/rich-project.fixture";
-import { snapshotChordMelodyRecipe } from "../../../src/domain/melody/types";
+import { snapshotChordMelody } from "../../../src/domain/melody/types";
 import { createProgressionMeasureLayout } from "../../../src/domain/timing/measureLayout";
 import { createMelodyTimeline } from "../../../src/notation/melodyStaffProjection";
 import { InlineMelodyLane } from "../../../src/ui/melody/InlineMelodyLane";
@@ -33,8 +34,8 @@ afterEach(() => {
 describe("T206 InlineMelodyLane", () => {
   it("uses exact measure segments, preserves ownership, and exposes roles without color", () => {
     const base = createRichProjectFixture();
-    const first = base.progression.steps[0]!;
-    const second = base.progression.steps[1]!;
+    const first = requireChord(base.progression.steps[0]);
+    const second = requireChord(base.progression.steps[1]);
     const project = Object.freeze({
       ...base,
       presentation: Object.freeze({ ...base.presentation, noteColorMode: "standard" as const }),
@@ -44,17 +45,23 @@ describe("T206 InlineMelodyLane", () => {
           Object.freeze({ ...first, melodyInstrumentOverride: "cello" as const }),
           Object.freeze({
             ...second,
-            melody: snapshotChordMelodyRecipe({ pattern: "up", grid: "quarter", octaveOffset: 0 }),
+            melody: snapshotChordMelody({
+              pitchMotion: "up",
+              grid: "quarter",
+              octaveOffset: 0,
+              rhythm: "even",
+              connection: "retrigger",
+            }),
             melodyInstrumentOverride: "violin" as const,
           }),
         ]),
       }),
     });
     const timeline = createMelodyTimeline(project);
-    const measure = createProgressionMeasureLayout(
-      project.progression.steps,
-      project.globalTiming.meter,
-    ).measures[0]!;
+    const measure = requireValue(
+      createProgressionMeasureLayout(project.progression.steps, project.globalTiming.meter)
+        .measures[0],
+    )!;
     const select = vi.fn();
     const openEditor = vi.fn();
     const before = JSON.stringify(project);
@@ -96,7 +103,7 @@ describe("T206 InlineMelodyLane", () => {
           const [numerator, denominator] = (segment.dataset.durationBeats ?? "0/1")
             .split("/")
             .map(Number);
-          return numerator / denominator;
+          return requireValue(numerator) / requireValue(denominator);
         })
         .reduce((sum, value) => sum + value, 0);
       expect(total).toBeCloseTo(3.5, 8);

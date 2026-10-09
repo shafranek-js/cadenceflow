@@ -31,3 +31,33 @@ export function renameProject(project: Project, command: RenameProjectCommand): 
     },
   };
 }
+
+export interface SetIndependentBassPayload {
+  readonly enabled: boolean;
+  readonly nowIso: string;
+}
+
+export type SetIndependentBassCommand = ProjectCommand<SetIndependentBassPayload> & {
+  readonly type: "project/set-independent-bass-enabled";
+};
+
+export function setIndependentBassEnabled(
+  project: Project,
+  command: SetIndependentBassCommand,
+): AppliedCommand {
+  if (command.payload.enabled === project.independentBassEnabled) {
+    return { project, inverse: command, forward: command };
+  }
+  return {
+    project: Object.freeze({
+      ...project,
+      independentBassEnabled: command.payload.enabled,
+      updatedAt: command.payload.nowIso,
+    }),
+    forward: command,
+    inverse: {
+      type: "project/set-independent-bass-enabled",
+      payload: { enabled: project.independentBassEnabled, nowIso: command.payload.nowIso },
+    },
+  };
+}

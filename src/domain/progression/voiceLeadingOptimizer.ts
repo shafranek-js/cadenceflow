@@ -8,11 +8,7 @@ import type { StepPatch } from "../../app/commands/progressionCommands";
 import type { BassChoice } from "./step";
 
 export type VoiceLeadingStrategy =
-  | "smooth-all"
-  | "smooth-upper"
-  | "pedal-tonic"
-  | "pedal-dominant"
-  | "reset-root";
+  "smooth-all" | "smooth-upper" | "pedal-tonic" | "pedal-dominant" | "reset-root";
 
 export interface VoiceLeadingOptimizationResult {
   readonly updates: ReadonlyArray<{
@@ -33,9 +29,7 @@ function getBassCandidates(
   baseQuality: string,
   seventhKind?: string,
 ): readonly BassCandidate[] {
-  const candidates: BassCandidate[] = [
-    { choice: "root", pitchClass: rootPc, inversionIndex: 0 },
-  ];
+  const candidates: BassCandidate[] = [{ choice: "root", pitchClass: rootPc, inversionIndex: 0 }];
 
   // 3rd
   const thirdInterval = baseQuality === "minor" || baseQuality === "diminished" ? 3 : 4;
@@ -99,7 +93,9 @@ export function optimizeProgressionVoiceLeading(
   mode: DerivedMode = "major",
   strategy: VoiceLeadingStrategy = "smooth-all",
 ): VoiceLeadingOptimizationResult {
-  const chordSteps = steps.filter((s): s is Extract<ProgressionStep, { kind: "chord" }> => s.kind === "chord");
+  const chordSteps = steps.filter(
+    (s): s is Extract<ProgressionStep, { kind: "chord" }> => s.kind === "chord",
+  );
   if (chordSteps.length === 0) {
     return { updates: [], description: "No chords to optimize" };
   }

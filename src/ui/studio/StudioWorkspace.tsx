@@ -23,6 +23,7 @@ export interface StudioWorkspaceProps {
   readonly progression: ReactNode;
   readonly printable?: ReactNode;
   readonly statusBar?: ReactNode;
+  readonly bottomPanel?: ReactNode;
   readonly onProgressionBackgroundClick?: () => void;
   readonly onMatrixBackgroundClick?: () => void;
   readonly overlays?: ReactNode;
@@ -47,6 +48,7 @@ export function StudioWorkspace({
   progression,
   printable,
   statusBar,
+  bottomPanel,
   onProgressionBackgroundClick,
   onMatrixBackgroundClick,
   overlays,
@@ -311,7 +313,10 @@ export function StudioWorkspace({
   }, [hasSelectedStep, progression]);
 
   return (
-    <main className="app-shell" aria-label="CadenceFlow Studio">
+    <main
+      className={`app-shell${bottomPanel ? " has-bottom-panel" : ""}`}
+      aria-label="CadenceFlow Studio"
+    >
       <header className="app-header" aria-label="Project and application controls">
         {header}
         <button
@@ -453,6 +458,7 @@ export function StudioWorkspace({
         />
       ) : null}
       {overlays}
+      {bottomPanel}
       <footer className="app-status-bar" role="contentinfo" aria-label="Status bar">
         {statusBar}
         <span id="midi-status-content" className="midi-status-compact" />

@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { decodePortableProject } from "../../src/persistence/portableProject";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+
+async function exportPortableProject(page: import("@playwright/test").Page) {
+  const toggle = page.getByTestId("export-menu-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "true") await toggle.click();
+  const downloadPromise = page.waitForEvent("download");
+  await toggle.click();
+  const menu = page.getByRole("menu", { name: "Export menu" });
+  await expect(menu).toBeVisible();
+  await menu.getByTestId("project-export-btn").click();
+  const download = await downloadPromise;
+  const file = await download.path();
+  if (!file) throw new Error("Portable Project export did not provide a local file");
+  return decodePortableProject(await readFile(file, "utf8"));
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -111,27 +127,71 @@ test("score system context menu structure actions: move, copy/paste, insert empt
 
   const systems = page.locator('[data-testid="progression-score-system"]');
   await expect(systems).toHaveCount(2);
+  const readStepIds = () =>
+    page
+      .locator(".measure-staff-event-select")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+  const originalStepIds = await readStepIds();
+  expect(originalStepIds).toHaveLength(4);
+  const beforeMove = await exportPortableProject(page);
 
   // 1. Move Down System 1
   const header0 = page.locator(".score-system-header").first();
   await header0.click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Move System Up" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "Move System Down" }).click();
+  await expect
+    .poll(readStepIds)
+    .toEqual([...originalStepIds.slice(2), ...originalStepIds.slice(0, 2)]);
+  const afterMove = await exportPortableProject(page);
+  expect(afterMove.progression.steps).toEqual([
+    ...beforeMove.progression.steps.slice(2),
+    ...beforeMove.progression.steps.slice(0, 2),
+  ]);
 
   // Undo move
   await page.keyboard.press("Control+z");
+  await expect.poll(readStepIds).toEqual(originalStepIds);
+  expect((await exportPortableProject(page)).progression).toEqual(beforeMove.progression);
 
   // 2. Insert Empty System After
   await header0.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Insert Empty System After" }).click();
   await expect(systems).toHaveCount(3);
+  await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(2);
+  const insertedRestIds = await page
+    .locator(".measure-staff-event.is-rest .measure-staff-event-select")
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+  expect(insertedRestIds).toHaveLength(2);
+  await expect
+    .poll(readStepIds)
+    .toEqual([...originalStepIds.slice(0, 2), ...insertedRestIds, ...originalStepIds.slice(2)]);
+  const afterInsert = await exportPortableProject(page);
+  const insertedRestSteps = afterInsert.progression.steps.filter((step) =>
+    insertedRestIds.includes(step.id),
+  );
+  expect(insertedRestSteps).toHaveLength(2);
+  expect(
+    insertedRestSteps.map((step) => (step.kind === "rest" ? step.duration.beats : undefined)),
+  ).toEqual([
+    { numerator: 4, denominator: 1 },
+    { numerator: 4, denominator: 1 },
+  ]);
 
   // Undo insert
   await page.keyboard.press("Control+z");
   await expect(systems).toHaveCount(2);
+  await expect.poll(readStepIds).toEqual(originalStepIds);
+  expect((await exportPortableProject(page)).progression).toEqual(beforeMove.progression);
 
   // Redo insert
   await page.keyboard.press("Control+y");
   await expect(systems).toHaveCount(3);
+  await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(2);
+  await expect
+    .poll(readStepIds)
+    .toEqual([...originalStepIds.slice(0, 2), ...insertedRestIds, ...originalStepIds.slice(2)]);
+  expect((await exportPortableProject(page)).progression).toEqual(afterInsert.progression);
 
   // Undo back
   await page.keyboard.press("Control+z");

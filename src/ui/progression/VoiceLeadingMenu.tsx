@@ -86,7 +86,9 @@ export function VoiceLeadingMenu({ onApplyVoiceLeading, disabled = false }: Voic
         data-testid="voice-leading-menu-trigger"
         title="Apply voice leading, smooth inversions, or pedal points across progression"
       >
-        <span className="vl-trigger-icon" aria-hidden="true">✨</span>
+        <span className="vl-trigger-icon" aria-hidden="true">
+          ✨
+        </span>
         <span className="vl-trigger-text">Voice Leading</span>
         <span className="vl-trigger-chevron" aria-hidden="true">
           <Icon name={isOpen ? "arrow-up" : "arrow-down"} />
@@ -117,7 +119,9 @@ export function VoiceLeadingMenu({ onApplyVoiceLeading, disabled = false }: Voic
                   setIsOpen(false);
                 }}
               >
-                <span className="vl-item-icon" aria-hidden="true">{strat.icon}</span>
+                <span className="vl-item-icon" aria-hidden="true">
+                  {strat.icon}
+                </span>
                 <div className="vl-item-content">
                   <span className="vl-item-title">{strat.title}</span>
                   <span className="vl-item-desc">{strat.description}</span>

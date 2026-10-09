@@ -1,5 +1,6 @@
 import { useState, useEffect, useId, type ChangeEvent } from "react";
 import type { GrooveSettings } from "../../domain/timing/swing";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 
 export interface InspectorGrooveSectionProps {
   readonly groove: GrooveSettings;
@@ -9,16 +10,6 @@ export interface InspectorGrooveSectionProps {
   readonly dragHandle?: React.ReactNode;
 }
 
-function readDisclosureState(key?: string, fallback: boolean = true): boolean {
-  if (!key || typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
 export function InspectorGrooveSection({
   groove,
   onSetGroove,
@@ -26,7 +17,7 @@ export function InspectorGrooveSection({
   storageKey,
   dragHandle,
 }: InspectorGrooveSectionProps) {
-  const [isOpen, setIsOpen] = useState(() => readDisclosureState(storageKey, defaultOpen));
+  const disclosure = useInspectorDisclosure(storageKey ?? null, defaultOpen);
   const swingSliderId = useId();
 
   const [cachedSwingAmount, setCachedSwingAmount] = useState(
@@ -61,18 +52,8 @@ export function InspectorGrooveSection({
   return (
     <details
       className="inspector-disclosure global-groove-disclosure"
-      open={isOpen}
-      onToggle={(event) => {
-        const nextOpen = event.currentTarget.open;
-        setIsOpen(nextOpen);
-        if (storageKey && typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(storageKey, String(nextOpen));
-          } catch {
-            // ignore
-          }
-        }
-      }}
+      open={disclosure.isOpen}
+      onToggle={(event) => disclosure.setOpen(event.currentTarget.open)}
     >
       <summary>
         <span>

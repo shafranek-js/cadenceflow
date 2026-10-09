@@ -3,7 +3,7 @@ import { realizeProgressionMelodyPerformance } from "../../../src/audio/melodyPe
 import { modeForModule } from "../../../src/domain/harmony/functions";
 import type { HarmonicContext } from "../../../src/domain/harmony/modules/types";
 import { createRichProjectFixture } from "../../fixtures/rich-project.fixture";
-import { snapshotChordMelodyRecipe } from "../../../src/domain/melody/types";
+import { snapshotChordMelody } from "../../../src/domain/melody/types";
 import type { ChordStep } from "../../../src/domain/progression/step";
 import { projectProjectToMidi } from "../../../src/export/midi/eventProjection";
 import { projectProjectToMusicXml } from "../../../src/export/musicxml/projection";
@@ -14,7 +14,7 @@ import { addRational, type Rational } from "../../../src/domain/timing/rational"
 
 function contextFor(project: ReturnType<typeof createRichProjectFixture>): HarmonicContext {
   const mode = modeForModule(project.activeModule);
-  return Object.freeze({
+  return Object.freeze<HarmonicContext>({
     tonic: project.tonic,
     mode,
     moduleId: project.activeModule,
@@ -60,7 +60,13 @@ describe("T188 effective Melody instrument projection", () => {
     const updatedStep1 = Object.freeze({ ...step1, melodyInstrumentOverride: "cello" as const });
     const updatedStep2 = Object.freeze({
       ...step2,
-      melody: snapshotChordMelodyRecipe({ pattern: "up", grid: "quarter", octaveOffset: 0 }),
+      melody: snapshotChordMelody({
+        pitchMotion: "up",
+        grid: "quarter",
+        octaveOffset: 0,
+        rhythm: "even",
+        connection: "retrigger",
+      }),
     });
     const updated = Object.freeze({
       ...project,
@@ -121,7 +127,13 @@ describe("T188 effective Melody instrument projection", () => {
           Object.freeze({ ...step1, melodyInstrumentOverride: "cello" as const }),
           Object.freeze({
             ...step2,
-            melody: snapshotChordMelodyRecipe({ pattern: "up", grid: "quarter", octaveOffset: 0 }),
+            melody: snapshotChordMelody({
+              pitchMotion: "up",
+              grid: "quarter",
+              octaveOffset: 0,
+              rhythm: "even",
+              connection: "retrigger",
+            }),
             melodyInstrumentOverride: "violin" as const,
           }),
           ...project.progression.steps.slice(2),
@@ -158,7 +170,13 @@ describe("T188 effective Melody instrument projection", () => {
           Object.freeze({ ...step1, melodyInstrumentOverride: "gm-081" as const }),
           Object.freeze({
             ...(project.progression.steps[1] as ChordStep),
-            melody: snapshotChordMelodyRecipe({ pattern: "up", grid: "quarter", octaveOffset: 0 }),
+            melody: snapshotChordMelody({
+              pitchMotion: "up",
+              grid: "quarter",
+              octaveOffset: 0,
+              rhythm: "even",
+              connection: "retrigger",
+            }),
           }),
           ...project.progression.steps.slice(2),
         ]),

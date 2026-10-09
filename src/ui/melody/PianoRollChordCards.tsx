@@ -6,9 +6,11 @@ import { realizeProgressionStepChord } from "../../domain/progression/transposit
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { formatChordSymbol } from "../../domain/harmony/chord";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
 import { PianoCardView } from "../piano/PianoCardView";
 import { GuitarCardView } from "../guitar/GuitarCardView";
 import { createHarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
+import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import type { LabelHierarchyMode } from "../progression/labelHierarchy";
 
 import type { ChordCardVisibility } from "./chordCardPreferences";
@@ -120,7 +122,13 @@ export function PianoRollChordCards({
               const step = item.step;
               const realization = realizeProgressionStepRealization(step, project.tonic);
               const baseChord = realizeProgressionStepChord(step, project.tonic);
-              const chord = withEffectiveBass(baseChord, realization.bassPitch);
+              const separateBassPitch = project.independentBassEnabled
+                ? realization.bassPitch
+                : undefined;
+              const displayBassPitch = separateBassPitch ?? realization.pitches[0];
+              const guitarChord = withGuitarStepBass(baseChord, step, "concert");
+              const chord =
+                kind === "guitar" ? guitarChord : withEffectiveBass(baseChord, displayBassPitch);
               const chordLabel = formatChordSymbol(chord);
               const next =
                 project.progression.steps[
@@ -134,15 +142,19 @@ export function PianoRollChordCards({
                 tonic: project.tonic,
                 moduleId: project.activeModule,
                 rootPitchClass: baseChord.rootPitchClass,
-                chordPitches: [
-                  ...realization.pitches,
-                  ...(realization.bassPitch ? [realization.bassPitch] : []),
-                ],
+                chordPitches:
+                  kind === "guitar"
+                    ? realization.pitches
+                    : [...realization.pitches, ...(separateBassPitch ? [separateBassPitch] : [])],
                 nextChordPitches: nextRealization
-                  ? [
-                      ...nextRealization.pitches,
-                      ...(nextRealization.bassPitch ? [nextRealization.bassPitch] : []),
-                    ]
+                  ? kind === "guitar"
+                    ? nextRealization.pitches
+                    : [
+                        ...nextRealization.pitches,
+                        ...(project.independentBassEnabled && nextRealization.bassPitch
+                          ? [nextRealization.bassPitch]
+                          : []),
+                      ]
                   : [],
               });
               return (
@@ -152,7 +164,7 @@ export function PianoRollChordCards({
                   style={{ flex }}
                   className={`piano-roll-instrument-card ${selectedStepIds.has(step.id) ? "is-selected" : ""} ${playingStepId === step.id ? "is-playing" : ""}`}
                   data-source-step-id={step.id}
-                  aria-label={`${kind === "piano" ? "Piano" : "Guitar"} chord ${chordLabel}, ${step.harmonicFunction.functionId}, measure ${measure.number}`}
+                  aria-label={`${kind === "piano" ? "Piano" : "Guitar"} chord ${chordLabel}, ${harmonicFunctionLabel(step.harmonicFunction)}, measure ${measure.number}`}
                   aria-pressed={selectedStepIds.has(step.id)}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -163,14 +175,10 @@ export function PianoRollChordCards({
                     {kind === "piano" ? (
                       <PianoCardView
                         chordPitches={realization.pitches}
-                        bassPitch={
-                          realization.bassPitch?.pitchClassIdentity !== baseChord.rootPitchClass
-                            ? realization.bassPitch
-                            : undefined
-                        }
+                        bassPitch={project.independentBassEnabled ? separateBassPitch : undefined}
                         chordLabel={chordLabel}
                         labelMode={labelMode}
-                        functionLabel={step.harmonicFunction.functionId}
+                        functionLabel={harmonicFunctionLabel(step.harmonicFunction)}
                         noteColorMode={project.presentation.noteColorMode}
                         roleContext={roleContext}
                       />
@@ -179,7 +187,7 @@ export function PianoRollChordCards({
                         chord={chord}
                         chordLabel={chordLabel}
                         labelMode={labelMode}
-                        functionLabel={step.harmonicFunction.functionId}
+                        functionLabel={harmonicFunctionLabel(step.harmonicFunction)}
                         orientation={project.presentation.guitarChordOrientation ?? "horizontal"}
                         colorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
                       />

@@ -52,6 +52,7 @@ export interface PlaybackSessionParams {
   readonly startingStepIndex?: number | undefined;
   readonly harmonyTrack?: HarmonyTrackSettings | undefined;
   readonly melodyTrack?: MelodyTrackSettings | undefined;
+  readonly independentBassEnabled?: boolean | undefined;
   readonly mutedStepIds?: ReadonlySet<string> | undefined;
 }
 
@@ -273,6 +274,7 @@ export class PlaybackController {
       meter,
       tempoBpm,
       groove,
+      independentBassEnabled,
       tonic,
       context,
       loopState,
@@ -354,6 +356,7 @@ export class PlaybackController {
       context,
       tempoBpm,
       groove,
+      independentBassEnabled,
     });
     const isSoundFontPiano = params.harmonyTrack?.pianoEngine === "soundfont";
     const sfPianoInst = params.harmonyTrack?.pianoSoundfontInstrument ?? "gm-000";
@@ -472,6 +475,10 @@ export class PlaybackController {
         provider: activeProvider,
         lookAheadHorizonSeconds: this.lookAheadHorizonSeconds,
         tickIntervalMs: this.tickIntervalMs,
+        onEventScheduled: (event, time) => {
+          if (this.activeSessionId === sessionId)
+            this.transportStore.recordKeyboardNote(sessionId, event, time, this.clock);
+        },
         onPlaybackEnded: () => {
           if (this.activeSessionId !== sessionId) return;
 

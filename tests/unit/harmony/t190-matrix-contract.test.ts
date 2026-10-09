@@ -1,3 +1,4 @@
+import { requireValue } from "../../fixtures/assertions";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -123,12 +124,14 @@ describe("T190 canonical Matrix topology and harmonic semantic contract", () => 
     expect(cards.get("vii°7/V")?.pole).toBe("dominant");
     expect(cards.get("vii°7/iv")?.pole).toBe("subdominant");
     expect(cards.get("vii°7/VI")?.pole).toBe("subdominant");
-    expect(cards.get("N6")?.targetId).toBe(fixture.n6.targetId);
-    expect(cards.get("N6")?.bassScaleDegree).toBe(fixture.n6.bassScaleDegree);
+    expect(Reflect.get(requireValue(cards.get("N6")), "targetId")).toBe(fixture.n6.targetId);
+    expect(Reflect.get(requireValue(cards.get("N6")), "bassScaleDegree")).toBe(
+      fixture.n6.bassScaleDegree,
+    );
     expect(cards.get("N6")?.position.column).toBe(cards.get("V")?.position.column);
     expect(cards.get("N6")?.pole).toBe("dominant");
     expect(cards.get("vii°")?.baseline).toBe(true);
-    expect(cards.get("vii°")?.auxiliary).toBeUndefined();
+    expect(Reflect.get(requireValue(cards.get("vii°")), "auxiliary")).toBeUndefined();
     expect(cards.get("vii°")?.position.column).toBe(6);
   });
 

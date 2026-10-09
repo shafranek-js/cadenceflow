@@ -3,7 +3,6 @@ import { realizePresetSteps } from "../../domain/progression/presets";
 import type { Project } from "../../domain/project/project";
 import type { MusicalDuration } from "../../domain/timing/duration";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
-import { realizeChord } from "../../domain/harmony/realization";
 import { realizeProgressionStepChord } from "../../domain/progression/transposition";
 import { defaultTonicSpelling, formatPitchSpelling } from "../../domain/harmony/spelling";
 

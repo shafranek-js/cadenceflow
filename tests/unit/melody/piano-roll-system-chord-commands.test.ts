@@ -39,7 +39,7 @@ function withSteps(
   steps: readonly ProgressionStep[],
   selectedStepId?: string,
 ): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({
       ...project.progression,
@@ -56,7 +56,7 @@ function chord(
   duration = rational(1),
 ): ChordStep {
   const base = createMatrixChordStep(project, functionId, id);
-  return Object.freeze({ ...base, duration: musicalDuration(duration) });
+  return Object.freeze<ChordStep>({ ...base, duration: musicalDuration(duration) });
 }
 
 function withNotes(
@@ -70,10 +70,10 @@ function withNotes(
       }[]
     : never,
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     ...step,
     melody: {
-      mode: "authored",
+      mode: "authored" as const,
       phrase: Object.freeze({ notes: Object.freeze([...notes]) }),
     },
   });
@@ -89,7 +89,7 @@ function rest(
     readonly duration: ReturnType<typeof rational>;
   }[] = [],
 ): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(duration),
@@ -240,7 +240,7 @@ describe("Piano Roll System chord commands", () => {
     expect(noopStore.history.undoDepth).toBe(0);
     expect(changeCount).toBe(0);
 
-    const rest: RestStep = Object.freeze({
+    const rest: RestStep = Object.freeze<RestStep>({
       id: "rest-owner",
       kind: "rest",
       duration: musicalDuration(rational(3, 2)),

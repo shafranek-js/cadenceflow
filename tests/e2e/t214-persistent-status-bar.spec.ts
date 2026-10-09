@@ -21,7 +21,7 @@ function withSameMeasureChordPair(project: Project): Project {
     kind: "rest" as const,
     duration: musicalDuration(rational(4)),
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({
       ...project.progression,

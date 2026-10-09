@@ -1,4 +1,9 @@
+import { requireValue } from "../fixtures/assertions";
 import { expect, test } from "@playwright/test";
+
+const screenshotRoot =
+  process.env.CADENCEFLOW_PROGRESSION_VIEWS_SCREENSHOT_ROOT ??
+  "C:/Users/pavel/.codex/visualizations/2026/10/02/01a0fd4f-d564-7612-8b29-bc59c92804cc/progression-views";
 
 test("My Progression defaults to Piano Roll and exposes three views without removing Matrix Harmonic", async ({
   page,
@@ -68,11 +73,11 @@ test("My Progression defaults to Piano Roll and exposes three views without remo
       [1280, 720],
       [1920, 1080],
     ]) {
-      await page.setViewportSize({ width, height });
+      await page.setViewportSize({ width: requireValue(width), height: requireValue(height) });
       await toggle.scrollIntoViewIfNeeded();
       await expect(toggle.getByRole("button")).toHaveCount(3);
       await page.screenshot({
-        path: `C:/Users/pavel/.codex/visualizations/2026/10/02/01a0fd4f-d564-7612-8b29-bc59c92804cc/progression-views/${width}x${height}-${theme}.png`,
+        path: `${screenshotRoot}/${width}x${height}-${theme}.png`,
       });
     }
   }

@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
-import { getCadenceFormulaById } from "../../../src/domain/progression/cadenceFormulas";
 
 const el = React.createElement;
 
@@ -38,6 +37,7 @@ describe("Quick Starters in ProgressionTrack Empty State", () => {
         project,
         onSelectStep: vi.fn(),
         onEditPerformance: vi.fn(),
+        onSetStepDuration: vi.fn(),
         onSetProgressionView: vi.fn(),
         onRemove: vi.fn(),
         onReorder: vi.fn(),
@@ -95,6 +95,7 @@ describe("Quick Starters in ProgressionTrack Empty State", () => {
         project: darkProject,
         onSelectStep: vi.fn(),
         onEditPerformance: vi.fn(),
+        onSetStepDuration: vi.fn(),
         onSetProgressionView: vi.fn(),
         onRemove: vi.fn(),
         onReorder: vi.fn(),

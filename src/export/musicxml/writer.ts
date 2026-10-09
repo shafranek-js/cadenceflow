@@ -3,6 +3,7 @@ import type {
   MusicXmlHarmonyEvent,
   MusicXmlMelodyMeasureEvent,
   MusicXmlMelodyNoteEvent,
+  MusicXmlMelodyTimeModification,
   MusicXmlMelodyInstrument,
   MusicXmlMelodyPart,
   MusicXmlMeasureEvent,
@@ -526,6 +527,33 @@ function writeNotations(event: MusicXmlNoteEvent, level: number): string[] {
   return lines;
 }
 
+/**
+ * Written note value: `<type>`, `<dot>` and `<time-modification>`.
+ *
+ * Shared by the Melody and Piano parts so both always state how long a note is written as. Notation
+ * software needs this to size a bar — a bar that is not one writable value (five quarter beats in
+ * 5/4) is written as tied notes, and without `<type>` the bar reads as incomplete.
+ */
+function writeWrittenValue(
+  event: {
+    readonly type: MusicXmlWrittenNoteType;
+    readonly dots?: 1;
+    readonly timeModification?: MusicXmlMelodyTimeModification;
+  },
+  level: number,
+): string[] {
+  const lines = [element("type", event.type, level)];
+  if (event.dots) lines.push(selfClosingElement("dot", level));
+  if (event.timeModification) {
+    lines.push(emptyElement("time-modification", level));
+    lines.push(element("actual-notes", event.timeModification.actualNotes, level + 1));
+    lines.push(element("normal-notes", event.timeModification.normalNotes, level + 1));
+    lines.push(element("normal-type", event.timeModification.normalType, level + 1));
+    lines.push(closeElement("time-modification", level));
+  }
+  return lines;
+}
+
 function writeNote(event: MusicXmlNoteEvent, level: number): string[] {
   const lines = [emptyElement("note", level)];
   if (event.chord) lines.push(selfClosingElement("chord", level + 1));
@@ -537,6 +565,7 @@ function writeNote(event: MusicXmlNoteEvent, level: number): string[] {
   lines.push(element("duration", event.duration, level + 1));
   lines.push(...writeTies(event, level + 1));
   lines.push(element("voice", event.voice, level + 1));
+  lines.push(...writeWrittenValue(event, level + 1));
   lines.push(element("staff", event.staff, level + 1));
   lines.push(...writeNotations(event, level + 1));
   lines.push(closeElement("note", level));
@@ -750,6 +779,7 @@ function writeRest(event: MusicXmlRestEvent, level: number): string[] {
   lines.push(selfClosingElement("rest", level + 1));
   lines.push(element("duration", event.duration, level + 1));
   lines.push(element("voice", event.voice, level + 1));
+  lines.push(...writeWrittenValue(event, level + 1));
   lines.push(element("staff", event.staff, level + 1));
   lines.push(closeElement("note", level));
   return lines;

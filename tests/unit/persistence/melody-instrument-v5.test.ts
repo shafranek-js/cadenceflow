@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../../src/domain/project/migrations";
 import { createRichProjectFixture } from "../../fixtures/rich-project.fixture";
 import {
   decodePortableProject,
@@ -25,7 +26,7 @@ describe("T188 Melody instrument persistence through schema v6", () => {
     });
     const encoded = encodePortableProject(withOverride);
     const raw = JSON.parse(encoded) as { schemaVersion: number; progression: { steps: unknown[] } };
-    expect(raw.schemaVersion).toBe(6);
+    expect(raw.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     expect(raw.progression.steps[0]).toHaveProperty("melodyInstrumentOverride", "gm-081");
     expect(raw.progression.steps[1]).not.toHaveProperty("melodyInstrumentOverride");
     expect(decodePortableProject(encoded).progression.steps[0]).toHaveProperty(
@@ -39,7 +40,7 @@ describe("T188 Melody instrument persistence through schema v6", () => {
     const v4 = JSON.parse(encodePortableProject(project)) as Record<string, unknown>;
     v4.schemaVersion = 4;
     const migrated = migrateProjectData(v4);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     const steps = (migrated.progression as { steps: Record<string, unknown>[] }).steps;
     expect(
       steps.every(

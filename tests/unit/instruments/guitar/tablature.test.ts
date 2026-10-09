@@ -20,8 +20,7 @@ const cMajorChord: ChordDefinition = {
   harmonicFunction: {
     functionId: "I",
     moduleId: "progressions",
-    category: "tonic",
-    degree: "I",
+    category: "core",
   },
 };
 
@@ -41,12 +40,27 @@ const g7Chord: ChordDefinition = {
   harmonicFunction: {
     functionId: "V7",
     moduleId: "progressions",
-    category: "dominant",
-    degree: "V",
+    category: "core",
   },
 };
 
 describe("resolveGuitarTabEntry", () => {
+  it("retains an explicit unsupported fingering result for an overfull extension chord", () => {
+    const tab = resolveGuitarTabEntry({
+      ...cMajorChord,
+      variant: {
+        seventh: "minor7",
+        extensions: [9, 11, 13],
+        suspensions: [],
+        alterations: [],
+      },
+    });
+
+    expect(tab.voicing.unsupportedReason).toMatch(/six strings/i);
+    expect(tab.voicing.pitches).toEqual([]);
+    expect(tab.fretSummary).toBe("x x x x x x");
+  });
+
   it("resolves C major chord into 6 strings tablature with proper frets and mute states", () => {
     const tab = resolveGuitarTabEntry(cMajorChord);
 

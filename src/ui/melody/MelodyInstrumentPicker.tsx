@@ -104,7 +104,9 @@ export function MelodyInstrumentPicker({
           ? inheritedLabel
           : effectiveValue
             ? (() => {
-                const entry = MELODY_INSTRUMENT_CATALOG.find((candidate) => candidate.id === effectiveValue);
+                const entry = MELODY_INSTRUMENT_CATALOG.find(
+                  (candidate) => candidate.id === effectiveValue,
+                );
                 return entry ? optionLabel(entry) : "Unknown instrument";
               })()
             : inheritedLabel}

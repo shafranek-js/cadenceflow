@@ -1,3 +1,5 @@
+import { EMPTY_HARMONIC_VARIANT } from "../../src/domain/harmony/chord";
+import type { HarmonicModuleId } from "../../src/domain/harmony/functions";
 import { describe, expect, it } from "vitest";
 import { AppStore } from "../../src/app/appStore";
 import {
@@ -10,11 +12,15 @@ import { createDefaultProject, DEFAULT_PIANO_PERFORMANCE } from "../../src/domai
 import { createFunctionalPreset } from "../../src/domain/progression/presets";
 import { musicalDuration } from "../../src/domain/timing/duration";
 import { rational, equalRational } from "../../src/domain/timing/rational";
-import type { ChordStep, RestStep } from "../../src/domain/progression/progression";
+import type { ChordStep, RestStep } from "../../src/domain/progression/step";
 
 const nowIso = "2026-09-05T12:00:00.000Z";
 
-function createTestChord(id: string, functionId: string, moduleId = "progressions"): ChordStep {
+function createTestChord(
+  id: string,
+  functionId: string,
+  moduleId: HarmonicModuleId = "progressions",
+): ChordStep {
   return {
     id,
     kind: "chord",
@@ -23,7 +29,7 @@ function createTestChord(id: string, functionId: string, moduleId = "progression
       functionId,
       category: "core",
     },
-    harmonicVariant: {},
+    harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(1, 1)),
     performance: { ...DEFAULT_PIANO_PERFORMANCE },
     cardView: "harmonic",
@@ -129,8 +135,8 @@ describe("Preset History & Real Dispatch Integration (T115 & T116)", () => {
       expect(equalRational(redonePreset.steps[2]!.duration.beats, rational(1, 1))).toBe(true);
       // 6. No performance/variant leakage
       for (const step of redonePreset.steps) {
-        expect((step as Record<string, unknown>).harmonicVariant).toBeUndefined();
-        expect((step as Record<string, unknown>).performance).toBeUndefined();
+        expect(Reflect.get(step, "harmonicVariant")).toBeUndefined();
+        expect(Reflect.get(step, "performance")).toBeUndefined();
       }
       // 7. History state normal
       expect(store.history.undoDepth).toBe(1);

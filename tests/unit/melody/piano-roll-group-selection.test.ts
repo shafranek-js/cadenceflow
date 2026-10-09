@@ -1,3 +1,4 @@
+import { omitFields } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import {
   applyAuthoredMelodyTransaction,
@@ -52,15 +53,15 @@ function applyPlan(
 
 function withPartialFinalBar(): Project {
   const source = createPianoRollSystemChordFixture();
-  const partial: RestStep = Object.freeze({
+  const partial: RestStep = Object.freeze<RestStep>({
     id: "partial-final-rest",
     kind: "rest",
     duration: musicalDuration(rational(5, 2)),
     melodyInstrumentOverride: "flute",
   });
-  return Object.freeze({
-    ...source,
-    temporaryBranch: undefined,
+  return Object.freeze<Project>({
+    ...omitFields(source, "temporaryBranch"),
+
     progression: Object.freeze({
       steps: Object.freeze([partial]),
       selectedStepId: partial.id,
@@ -522,7 +523,7 @@ describe("Piano Roll global group selection and edits", () => {
             pitch: exactPitch(67, { step: "G", alter: 0 }),
             onset: rational(1, 3),
             duration: rational(1, 3),
-            instrument: "piano",
+            instrument: "gm-0",
           },
         ],
         rational(3),

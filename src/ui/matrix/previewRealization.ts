@@ -59,10 +59,13 @@ export function resolvePreviousHarmonicContext(
         tonic: project.tonic,
         context,
         tempoBpm: project.globalTiming.tempoBpm,
+        independentBassEnabled: project.independentBassEnabled,
       });
       return {
         previousPitches: realized.upperPitches,
-        previousBassPitch: realized.bassPitch,
+        ...(project.independentBassEnabled && realized.bassPitch
+          ? { previousBassPitch: realized.bassPitch }
+          : {}),
       };
     }
   }
@@ -102,12 +105,14 @@ export function realizeMatrixCardPreview(
     tonic: project.tonic,
     context,
     tempoBpm: project.globalTiming.tempoBpm,
+    independentBassEnabled: project.independentBassEnabled,
     ...(previous?.previousPitches ? { previousPitches: previous.previousPitches } : {}),
     ...(previous?.previousBassPitch ? { previousBassPitch: previous.previousBassPitch } : {}),
   });
 
-  const allPitches = realized.bassPitch
-    ? Object.freeze([realized.bassPitch, ...realized.upperPitches])
+  const bassPitch = project.independentBassEnabled ? realized.bassPitch : undefined;
+  const allPitches = bassPitch
+    ? Object.freeze([bassPitch, ...realized.upperPitches])
     : realized.upperPitches;
 
   return Object.freeze({
@@ -117,7 +122,7 @@ export function realizeMatrixCardPreview(
     step,
     pitches: allPitches,
     upperPitches: realized.upperPitches,
-    bassPitch: realized.bassPitch,
+    bassPitch,
     events: realized.events,
   });
 }

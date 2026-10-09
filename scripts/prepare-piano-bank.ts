@@ -190,14 +190,14 @@ export async function verifyBank(_samplesDir?: string) {
   const totalMiB = (totalBytes / (1024 * 1024)).toFixed(2);
   const count = sizes.length;
   const min = sizes[0] ? sizes[0].size : 0;
-  const max = sizes[sizes.length - 1] ? sizes[sizes.length - 1].size : 0;
+  const max = sizes.at(-1)?.size ?? 0;
   const avg = count > 0 ? Math.round(totalBytes / count) : 0;
   const median =
     count === 0
       ? 0
       : count % 2 === 0
-        ? Math.round((sizes[count / 2 - 1].size + sizes[count / 2].size) / 2)
-        : sizes[Math.floor(count / 2)].size;
+        ? Math.round((sizes[count / 2 - 1]!.size + sizes[count / 2]!.size) / 2)
+        : sizes[Math.floor(count / 2)]!.size;
 
   console.log(`Region Count: ${manifest.regions.length}`);
   console.log(`Present Non-Empty Files: ${count}`);

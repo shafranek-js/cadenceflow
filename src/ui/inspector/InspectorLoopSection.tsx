@@ -1,6 +1,6 @@
-import { useState } from "react";
 import type { LoopMode, LoopState } from "../transport/loopState";
 import type { ProgressionStep } from "../../domain/progression/step";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 
 export interface InspectorLoopSectionProps {
   readonly loopState: LoopState;
@@ -12,16 +12,6 @@ export interface InspectorLoopSectionProps {
   readonly dragHandle?: React.ReactNode;
 }
 
-function readDisclosureState(key?: string | undefined, fallback: boolean = true): boolean {
-  if (!key || typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
 export function InspectorLoopSection({
   loopState,
   steps,
@@ -31,23 +21,13 @@ export function InspectorLoopSection({
   storageKey,
   dragHandle,
 }: InspectorLoopSectionProps) {
-  const [isOpen, setIsOpen] = useState(() => readDisclosureState(storageKey, defaultOpen));
+  const disclosure = useInspectorDisclosure(storageKey ?? null, defaultOpen);
 
   return (
     <details
       className="inspector-disclosure loop-disclosure"
-      open={isOpen}
-      onToggle={(e) => {
-        const open = e.currentTarget.open;
-        setIsOpen(open);
-        if (storageKey && typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(storageKey, String(open));
-          } catch {
-            // Disclosure preference persistence is best-effort.
-          }
-        }
-      }}
+      open={disclosure.isOpen}
+      onToggle={(event) => disclosure.setOpen(event.currentTarget.open)}
     >
       <summary>
         <span>

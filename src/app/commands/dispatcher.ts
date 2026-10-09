@@ -1,5 +1,21 @@
 import type { Project } from "../../domain/project/project";
 import type { ProjectCommand } from "./index";
+
+/**
+ * Thrown when an inverse command reaches the dispatcher with no handler.
+ *
+ * This is a programming error, not a user error: every command that can be recorded in
+ * history must have its inverse registered here. Returning the Project unchanged (the
+ * previous behaviour) instead produced an Undo that reported success while leaving the
+ * Project untouched.
+ */
+export class UnhandledInverseCommandError extends Error {
+  constructor(public readonly commandType: string) {
+    super(`No inverse handler registered for command type "${commandType}"`);
+    this.name = "UnhandledInverseCommandError";
+  }
+}
+
 import {
   setTempo,
   setGroove,
@@ -39,7 +55,12 @@ import {
   type SetGlobalCardViewCommand,
   type SetCardViewOverrideCommand,
 } from "./matrixViewCommands";
-import { setTonic, type SetTonicCommand } from "./harmonyContextCommands";
+import {
+  setTonic,
+  switchModule,
+  type SetTonicCommand,
+  type SwitchModuleCommand,
+} from "./harmonyContextCommands";
 import {
   applyModesFormula,
   restoreModesFormulaState,
@@ -47,7 +68,12 @@ import {
   type RestoreModesFormulaStateCommand,
 } from "./modesExplorerCommands";
 import { restoreCustomPresets, type RestoreCustomPresetsCommand } from "./presetCommands";
-import { renameProject, type RenameProjectCommand } from "./projectCommands";
+import {
+  renameProject,
+  setIndependentBassEnabled,
+  type RenameProjectCommand,
+  type SetIndependentBassCommand,
+} from "./projectCommands";
 import {
   setTheme,
   setExpertiseMode,
@@ -123,12 +149,16 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
       return setCardViewOverride(project, command as SetCardViewOverrideCommand).project;
     case "harmony/set-tonic":
       return setTonic(project, command as SetTonicCommand).project;
+    case "harmony/switch-module":
+      return switchModule(project, command as SwitchModuleCommand).project;
     case "modes/apply-formula":
       return applyModesFormula(project, command as ApplyModesFormulaCommand).project;
     case "modes/restore-formula-state":
       return restoreModesFormulaState(project, command as RestoreModesFormulaStateCommand).project;
     case "project/rename":
       return renameProject(project, command as RenameProjectCommand).project;
+    case "project/set-independent-bass-enabled":
+      return setIndependentBassEnabled(project, command as SetIndependentBassCommand).project;
     case "presentation/set-theme":
       return setTheme(project, command as SetThemeCommand).project;
     case "presentation/set-expertise-mode":
@@ -164,7 +194,14 @@ export function applyInverseCommand(project: Project, command: ProjectCommand): 
         .project;
     case "harmony/restore-state":
       return restoreHarmonyState(project, command as RestoreHarmonyStateCommand).project;
-    default:
-      return project;
+    default: {
+      // Regression guard: this default previously returned the Project unchanged, so an
+      // unhandled inverse type made Undo a silent no-op that still reported success.
+      // `harmony/switch-module` was unhandled exactly that way: Undo restored activeModule
+      // while leaving every Step on the new module's harmonic functions.
+      // Failing loudly beats lying to the user about the undo result.
+      const unhandled = command as { type: string };
+      throw new UnhandledInverseCommandError(unhandled.type);
+    }
   }
 }

@@ -1,6 +1,16 @@
+import { RecoveredProjectDialog } from "../ui/projects/RecoveredProjectDialog";
+import {
+  decodePortableProjectWithDiagnostics,
+  type PortableProjectDecodeResult,
+} from "../persistence/portableProject";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppStore } from "./appStore";
-import { formatProjectOperationError, ProjectController } from "./projectController";
+import { setIndependentBassEnabled } from "./commands/projectCommands";
+import {
+  formatProjectOperationError,
+  ProjectController,
+  ProjectRecoveryCancelledError,
+} from "./projectController";
 import {
   addMatrixPreview,
   createMatrixChordStep,
@@ -53,12 +63,16 @@ import {
 } from "../domain/harmony/functions";
 import { realizeChord } from "../domain/harmony/realization";
 import { formatChordSymbol } from "../domain/harmony/chord";
+import type { ChordPropertiesEdit } from "../domain/progression/chordProperties";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import { branchRecommendationPath, type CompositionIntent } from "../domain/progression/branch";
 import {
   planMeasureDeletion,
   planMeasureDuplication,
   planMeasureInsertion,
+  planMeasureBlockMove,
+  planMeasureMove,
+  type MeasureMovePlan,
 } from "../domain/progression/measureDeletion";
 import {
   snapshotStepPerformance,
@@ -108,17 +122,29 @@ import { PrintableProgression } from "../ui/progression/PrintableProgression";
 import { ProgressionContextMenu } from "../ui/progression/ProgressionContextMenu";
 import { MatrixContextMenu } from "../ui/matrix/MatrixContextMenu";
 import { ViewModeToggle } from "../ui/common/ViewModeToggle";
+import { ErrorBoundary } from "../ui/common/ErrorBoundary";
 import { LabelHierarchyControl } from "../ui/progression/LabelHierarchyControl";
 import type { LabelHierarchyMode } from "../ui/progression/labelHierarchy";
 import { CardTemplateInspector } from "../ui/inspector/CardTemplateInspector";
 import { AudioEnginesInspector } from "../ui/inspector/AudioEnginesInspector";
 import { HarmonicStyleInspector } from "../ui/inspector/HarmonicStyleInspector";
 import { PianoPerformanceInspector } from "../ui/inspector/PianoPerformanceInspector";
+import {
+  ChordPropertiesInspector,
+  ChordPropertiesUnavailable,
+} from "../ui/inspector/ChordPropertiesInspector";
 import { RestStepInspector } from "../ui/inspector/RestStepInspector";
 import { ProgressionGlobalInspector } from "../ui/inspector/ProgressionGlobalInspector";
 import { PianoVoicingEditor } from "../ui/piano/PianoVoicingEditor";
 import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
+import { PlaybackKeyboard } from "../ui/piano/PlaybackKeyboard";
+import { KeyboardPreviewStore } from "../ui/piano/keyboardPreviewStore";
+import {
+  compositionKeyboardRange,
+  readKeyboardPreferences,
+  saveKeyboardPreferences,
+} from "../ui/piano/playbackKeyboardModel";
 import { AcousticGuitarProvider } from "../audio/guitar/AcousticGuitarProvider";
 import { guitarStrumOffsetSeconds } from "../audio/guitar/strumTiming";
 import {
@@ -209,6 +235,7 @@ import {
   batchEditStepPerformance,
   batchSetStepDuration,
   editStepPerformance,
+  editChordProperties,
   removeStep,
   reorderStep,
   replaceStep,
@@ -220,7 +247,6 @@ import {
   duplicateSteps,
   removeProgressionRange,
   removeSteps,
-  reorderSteps,
   insertStepsAfter,
   insertStepsBefore,
   appendSteps,
@@ -229,6 +255,7 @@ import {
   type BatchEditStepPerformanceCommand,
   type BatchSetStepDurationCommand,
   type EditStepPerformanceCommand,
+  type EditChordPropertiesCommand,
   type RemoveStepCommand,
   type RemoveProgressionRangeCommand,
   type RemoveStepsCommand,
@@ -239,7 +266,6 @@ import {
   type SelectStepCommand,
   type RepeatChordStepCommand,
   type DuplicateStepsCommand,
-  type ReorderStepsCommand,
   type InsertStepsAfterCommand,
   type InsertStepsBeforeCommand,
   type AppendStepsCommand,
@@ -268,13 +294,13 @@ import {
   transposeRange,
   type RangeTranspositionCommand,
 } from "./commands/rangeTranspositionCommands";
-import { projectScoreSystems, type ScoreSystem } from "../notation/scoreSystemProjection";
-import { durationBars } from "../domain/timing/duration";
 import {
-  generatedMelodyRecipe,
-  snapshotChordMelody,
-  validateChordMelodyRecipe,
-} from "../domain/melody/types";
+  autoMeasuresPerSystemForMeter,
+  projectScoreSystems,
+  type ScoreSystem,
+} from "../notation/scoreSystemProjection";
+import { durationBars } from "../domain/timing/duration";
+import { generatedMelodyRecipe, snapshotChordMelody } from "../domain/melody/types";
 import {
   saveCustomPreset,
   deleteCustomPreset,
@@ -414,8 +440,27 @@ export function App() {
       new AppStore(createDefaultProject("local-dev", "CadenceFlow", "2026-09-04T00:00:00.000Z")),
     [],
   );
+  const keyboardPreviewStore = useMemo(() => new KeyboardPreviewStore(), []);
   const { project, matrixSession } = useStore(store);
   const [projectSessionKey, setProjectSessionKey] = useState(0);
+  const [keyboardPreferences, setKeyboardPreferences] = useState(readKeyboardPreferences);
+  useEffect(() => saveKeyboardPreferences(keyboardPreferences), [keyboardPreferences]);
+  const keyboardPreviewRef = useRef<PreviewAuditionController | null>(null);
+  const keyboardPreviewToken = useRef(0);
+  const stopKeyboardPreview = useCallback(() => {
+    keyboardPreviewToken.current += 1;
+    keyboardPreviewRef.current?.stop();
+    keyboardPreviewStore.clearPreview("keyboard");
+  }, [keyboardPreviewStore]);
+  useEffect(
+    () => stopKeyboardPreview,
+    [
+      stopKeyboardPreview,
+      projectSessionKey,
+      project.presentation.progressionView,
+      keyboardPreferences.visible,
+    ],
+  );
   const [pendingSwitch, setPendingSwitch] = useState<ModuleSwitchPlan | null>(null);
   const [pendingRouteWarning, setPendingRouteWarning] = useState<{
     readonly functionId: string;
@@ -492,6 +537,17 @@ export function App() {
 
   const transportStore = useMemo(() => new TransportStore(), []);
   const [transportState, setTransportState] = useState<TransportState>(transportStore.getState());
+  const [keyboardAutoRange, setKeyboardAutoRange] = useState(() =>
+    compositionKeyboardRange(project),
+  );
+  const keyboardRangeSessionRef = useRef(projectSessionKey);
+  useLayoutEffect(() => {
+    const sessionChanged = keyboardRangeSessionRef.current !== projectSessionKey;
+    keyboardRangeSessionRef.current = projectSessionKey;
+    if (transportState.status === "stopped" || sessionChanged) {
+      setKeyboardAutoRange(compositionKeyboardRange(project));
+    }
+  }, [project, projectSessionKey, transportState.status]);
   const [loopState, setLoopState] = useState<LoopState>(INITIAL_LOOP_STATE);
   const measureLoopSnapshotsRef = useRef(new WeakMap<Project["progression"], LoopState>());
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
@@ -570,8 +626,21 @@ export function App() {
   const stepPreviewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const melodyHighlightTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [projectReady, setProjectReady] = useState(false);
+  const [startupRecoveryBlocked, setStartupRecoveryBlocked] = useState(false);
+  const [startupAttempt, setStartupAttempt] = useState(0);
   const [projectBusy, setProjectBusy] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
+  /** Non-null while the most recent autosave write has failed. */
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const [recoveredProjectPrompt, setRecoveredProjectPrompt] = useState<{
+    result: PortableProjectDecodeResult;
+    resolve: (open: boolean) => void;
+  } | null>(null);
+  const requestRecoveryConfirmation = useCallback(
+    (result: PortableProjectDecodeResult) =>
+      new Promise<boolean>((resolve) => setRecoveredProjectPrompt({ result, resolve })),
+    [],
+  );
   const [globalSettingsVisibility, setGlobalSettingsVisibility] =
     useState<GlobalSettingsVisibility>(readGlobalSettingsVisibility);
   const [projectList, setProjectList] = useState<
@@ -635,10 +704,22 @@ export function App() {
       melodyPreviewAuditionControllerRef.current = new PreviewAuditionController({
         provider,
         clock: provider.clock,
+        onActivityChange: (activity) => {
+          if (activity) {
+            keyboardPreviewStore.setScheduledPreview(
+              "melody",
+              activity.events,
+              activity.playback,
+              activity.clock,
+            );
+          } else {
+            keyboardPreviewStore.clearPreview("melody");
+          }
+        },
       });
     }
     return melodyPreviewAuditionControllerRef.current;
-  }, [ensureMelodyProvider]);
+  }, [ensureMelodyProvider, keyboardPreviewStore]);
 
   const ensureGuitarProvider = useCallback(() => {
     if (!guitarProviderRef.current) {
@@ -763,13 +844,26 @@ export function App() {
       !previewAuditionControllerRef.current ||
       previewAuditionControllerRef.current.getProvider() !== provider
     ) {
+      previewAuditionControllerRef.current?.stop();
       previewAuditionControllerRef.current = new PreviewAuditionController({
         provider,
         clock: provider.clock,
+        onActivityChange: (activity) => {
+          if (activity) {
+            keyboardPreviewStore.setScheduledPreview(
+              "harmony",
+              activity.events,
+              activity.playback,
+              activity.clock,
+            );
+          } else {
+            keyboardPreviewStore.clearPreview("harmony");
+          }
+        },
       });
     }
     return previewAuditionControllerRef.current;
-  }, [getActiveHarmonyProvider]);
+  }, [getActiveHarmonyProvider, keyboardPreviewStore]);
 
   const getGuitarPreviewAuditionController = useCallback(() => {
     const provider = getActiveGuitarProvider();
@@ -778,13 +872,26 @@ export function App() {
       !guitarPreviewAuditionControllerRef.current ||
       guitarPreviewAuditionControllerRef.current.getProvider() !== provider
     ) {
+      guitarPreviewAuditionControllerRef.current?.stop();
       guitarPreviewAuditionControllerRef.current = new PreviewAuditionController({
         provider,
         clock: provider.clock,
+        onActivityChange: (activity) => {
+          if (activity) {
+            keyboardPreviewStore.setScheduledPreview(
+              "guitar",
+              activity.events,
+              activity.playback,
+              activity.clock,
+            );
+          } else {
+            keyboardPreviewStore.clearPreview("guitar");
+          }
+        },
       });
     }
     return guitarPreviewAuditionControllerRef.current;
-  }, [getActiveGuitarProvider]);
+  }, [getActiveGuitarProvider, keyboardPreviewStore]);
 
   const retryMelodyAudio = useCallback(() => {
     const provider = ensureMelodyProvider();
@@ -893,6 +1000,34 @@ export function App() {
   }, [clearStepPreviewHighlights, clearPianoRollAuditionPlayhead, transportStore]);
 
   const projectController = useMemo(() => new ProjectController({ store }), [store]);
+
+  /**
+   * Reports autosave failures and attempts best-effort persistence on pagehide.
+   *
+   * Before this, a rejected autosave write was an unhandled promise rejection: the user saw
+   * nothing, the engine discarded its pending state, and edits made inside the 300 ms
+   * debounce window were lost when the tab closed. The handlers are registered through
+   * setters rather than the constructor so they can close over fresh UI state.
+   */
+  useEffect(() => {
+    projectController.setAutosaveErrorHandler((error) => {
+      const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
+      setAutosaveError(`Your latest changes could not be saved.${detail}`);
+    });
+    projectController.setAutosaveCompleteHandler(() => {
+      setAutosaveError(null);
+    });
+
+    const flushOnHide = () => {
+      projectController.flushPendingAutosave();
+    };
+    window.addEventListener("pagehide", flushOnHide);
+    return () => {
+      window.removeEventListener("pagehide", flushOnHide);
+      projectController.setAutosaveErrorHandler(() => {});
+      projectController.setAutosaveCompleteHandler(() => {});
+    };
+  }, [projectController]);
 
   const loadPersistedOpenProjectTabs =
     useCallback(async (): Promise<OpenProjectTabsState | null> => {
@@ -1167,20 +1302,37 @@ export function App() {
     setProjectReady(false);
     void (async () => {
       try {
-        await projectController.initializeSession("CadenceFlow");
-        projectController.startAutosave();
-        await projectController.flush();
-        if (!cancelled) await refreshProjectList();
+        await projectController.initializeSession("CadenceFlow", requestRecoveryConfirmation);
       } catch (error) {
-        if (!cancelled) setProjectError(formatProjectOperationError(error));
-      } finally {
-        if (!cancelled) setProjectReady(true);
+        if (!cancelled) {
+          store.setEditingSuspended(true);
+          setStartupRecoveryBlocked(true);
+          setProjectError(
+            error instanceof ProjectRecoveryCancelledError
+              ? "Recovery was cancelled. Your saved project remains unchanged."
+              : formatProjectOperationError(error),
+          );
+        }
+        return;
+      }
+      if (cancelled) return;
+      projectController.startAutosave();
+      try {
+        await projectController.flush();
+        await refreshProjectList();
+      } catch (error) {
+        setProjectError(formatProjectOperationError(error));
+      }
+      if (!cancelled) {
+        store.setEditingSuspended(false);
+        setStartupRecoveryBlocked(false);
+        setProjectReady(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [projectController, refreshProjectList]);
+  }, [projectController, refreshProjectList, requestRecoveryConfirmation, startupAttempt, store]);
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = project.presentation.theme;
@@ -1198,6 +1350,10 @@ export function App() {
     : undefined;
   const selectedChordStep: ChordStep | undefined =
     selectedProgressionStep?.kind === "chord" ? selectedProgressionStep : undefined;
+  const showChordPropertiesInspector =
+    project.presentation.progressionView === "piano-roll" ||
+    project.presentation.progressionView === "staff" ||
+    project.presentation.progressionView === "tablature";
   const selectedStepIndex = selectedProgressionStep
     ? project.progression.steps.findIndex((step) => step.id === selectedProgressionStep.id)
     : -1;
@@ -1746,7 +1902,12 @@ export function App() {
       const inspector = document.querySelector<HTMLElement>('[data-context="selected-step"]');
       if (!inspector) return;
       inspector.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      inspector.querySelector<HTMLElement>("button, input, select, textarea")?.focus();
+      // Section disclosure toggles are skipped so "Open inspector" still lands on the first control.
+      inspector
+        .querySelector<HTMLElement>(
+          "button:not(.inspector-disclosure-toggle), input, select, textarea",
+        )
+        ?.focus();
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
     else focus();
@@ -1785,6 +1946,7 @@ export function App() {
         spellingContext: { tonic: currentProject.tonic, mode },
       },
       tempoBpm: currentProject.globalTiming.tempoBpm,
+      independentBassEnabled: currentProject.independentBassEnabled,
     });
     const isGuitar =
       isGuitarProgressionView(currentProject.presentation.progressionView) ||
@@ -1928,6 +2090,7 @@ export function App() {
         context,
         tempoBpm: currentProject.globalTiming.tempoBpm,
         ...(currentProject.groove ? { groove: currentProject.groove } : {}),
+        independentBassEnabled: currentProject.independentBassEnabled,
       });
 
       const controller = getPreviewAuditionController();
@@ -2005,6 +2168,7 @@ export function App() {
         tonic: currentProject.tonic,
         context,
         tempoBpm: currentProject.globalTiming.tempoBpm,
+        independentBassEnabled: currentProject.independentBassEnabled,
       });
 
       const scheduled = getPreviewAuditionController()?.audition(realization.events);
@@ -2038,6 +2202,25 @@ export function App() {
       payload: { stepId, performance, nowIso: new Date().toISOString() },
     };
     store.dispatch(command, editStepPerformance);
+  };
+  const editSelectedChordProperties = (stepId: string, edit: ChordPropertiesEdit) => {
+    const command: EditChordPropertiesCommand = {
+      type: "progression/edit-chord-properties",
+      payload: {
+        projectId: project.id,
+        stepId,
+        edit,
+        nowIso: new Date().toISOString(),
+      },
+    };
+    store.dispatch(command, editChordProperties);
+  };
+  const changeIndependentBassEnabled = (enabled: boolean) => {
+    const command = {
+      type: "project/set-independent-bass-enabled" as const,
+      payload: { enabled, nowIso: new Date().toISOString() },
+    };
+    store.dispatch(command, setIndependentBassEnabled);
   };
   const changeProgressionView = (view: ProgressionView) => {
     if (view !== "piano-roll") {
@@ -2260,6 +2443,7 @@ export function App() {
           context,
           tempoBpm,
           stepStartSeconds: i * stepDurationSeconds,
+          independentBassEnabled: currentProject.independentBassEnabled,
         });
         allEvents.push(...realization.events);
       }
@@ -2481,6 +2665,7 @@ export function App() {
             context,
             tempoBpm,
             stepStartSeconds: i * stepDurationSeconds,
+            independentBassEnabled: currentProject.independentBassEnabled,
           });
           allEvents.push(...realization.events);
         }
@@ -2692,6 +2877,9 @@ export function App() {
     expectedUpdatedAt?: string,
     appendSteps: readonly RestStep[] = [],
   ): string | null => {
+    if (store.editingSuspended) {
+      return "The project is being saved or switched. Try again when it is ready.";
+    }
     try {
       const current = store.project;
       const nowIso = new Date().toISOString();
@@ -2730,6 +2918,9 @@ export function App() {
         );
       } else {
         store.dispatch(melodyCommand, applyMelodyCommand);
+      }
+      if (store.project === current) {
+        return "The note edit could not be committed. The project was not changed.";
       }
       setDurationResizeStatus(null);
       return null;
@@ -2977,54 +3168,64 @@ export function App() {
     setSoloSystemIndex((prev) => (prev === system.index ? null : system.index));
   };
 
-  const moveSystem = (system: ScoreSystem, direction: -1 | 1) => {
-    const targetIndex = system.index + direction;
-    const layout = createProgressionMeasureLayout(
-      project.progression.steps,
-      project.globalTiming.meter,
+  const moveSystem = (
+    system: ScoreSystem,
+    toInsertMeasureIndex: number,
+    sourceProject: Project,
+  ): string | undefined => {
+    const current = store.project;
+    const sourceMeasures = system.measures.map((projected) => projected.measure);
+    const fromMeasureIndex = sourceMeasures[0]?.measureIndex;
+    if (current !== sourceProject || current.id !== sourceProject.id)
+      return "The project changed during the drag. No system was moved.";
+    if (fromMeasureIndex === undefined || sourceMeasures.length === 0)
+      return "This system is no longer available.";
+
+    const currentLayout = createProgressionMeasureLayout(
+      current.progression.steps,
+      current.globalTiming.meter,
     );
-    const projection = projectScoreSystems(layout, {
-      availableWidthPx: 960,
-      measuresPerSystem: project.presentation.measuresPerSystem,
-    });
-    if (targetIndex < 0 || targetIndex >= projection.systems.length) return;
+    const matchingMeasures = currentLayout.measures.slice(
+      fromMeasureIndex,
+      fromMeasureIndex + sourceMeasures.length,
+    );
+    if (
+      matchingMeasures.length !== sourceMeasures.length ||
+      sourceMeasures.some((rendered, index) => {
+        const currentMeasure = matchingMeasures[index];
+        return (
+          !currentMeasure ||
+          rendered.measureIndex !== currentMeasure.measureIndex ||
+          compareRational(rendered.startBeats, currentMeasure.startBeats) !== 0 ||
+          compareRational(rendered.endBeats, currentMeasure.endBeats) !== 0 ||
+          rendered.fragments.length !== currentMeasure.fragments.length ||
+          rendered.fragments.some((fragment, fragmentIndex) => {
+            const currentFragment = currentMeasure.fragments[fragmentIndex];
+            return (
+              !currentFragment ||
+              fragment.stepId !== currentFragment.stepId ||
+              fragment.stepIndex !== currentFragment.stepIndex ||
+              fragment.fragmentIndex !== currentFragment.fragmentIndex ||
+              compareRational(fragment.startBeats, currentFragment.startBeats) !== 0 ||
+              compareRational(fragment.endBeats, currentFragment.endBeats) !== 0 ||
+              compareRational(fragment.durationBeats, currentFragment.durationBeats) !== 0
+            );
+          })
+        );
+      })
+    )
+      return "This system changed during the drag. No system was moved.";
 
-    const currentSystem = projection.systems[system.index]!;
-    const targetSystem = projection.systems[targetIndex]!;
-    const currentStepIds = new Set(getSystemStepIds(currentSystem));
-    const targetStepIds = new Set(getSystemStepIds(targetSystem));
-
-    const currentSteps = project.progression.steps.filter((s) => currentStepIds.has(s.id));
-    const targetSteps = project.progression.steps.filter((s) => targetStepIds.has(s.id));
-
-    let newSteps: ProgressionStep[];
-    if (direction === -1) {
-      const targetFirstIndex = project.progression.steps.findIndex((s) => targetStepIds.has(s.id));
-      const before = project.progression.steps
-        .slice(0, targetFirstIndex)
-        .filter((s) => !currentStepIds.has(s.id));
-      const after = project.progression.steps
-        .slice(targetFirstIndex)
-        .filter((s) => !targetStepIds.has(s.id) && !currentStepIds.has(s.id));
-      newSteps = [...before, ...currentSteps, ...targetSteps, ...after];
-    } else {
-      const currentFirstIndex = project.progression.steps.findIndex((s) =>
-        currentStepIds.has(s.id),
-      );
-      const before = project.progression.steps
-        .slice(0, currentFirstIndex)
-        .filter((s) => !targetStepIds.has(s.id));
-      const after = project.progression.steps
-        .slice(currentFirstIndex)
-        .filter((s) => !currentStepIds.has(s.id) && !targetStepIds.has(s.id));
-      newSteps = [...before, ...targetSteps, ...currentSteps, ...after];
-    }
-
-    const command: ReorderStepsCommand = {
-      type: "progression/reorder-steps",
-      payload: { steps: newSteps, nowIso: new Date().toISOString() },
-    };
-    store.dispatch(command, reorderSteps);
+    const plan = planMeasureBlockMove(
+      current,
+      fromMeasureIndex,
+      sourceMeasures.length,
+      toInsertMeasureIndex,
+      { padPartialFinalMeasure: true },
+    );
+    if ("reason" in plan) return plan.reason;
+    applyMeasureMovePlan(current, plan);
+    return undefined;
   };
 
   const copySystem = (system: ScoreSystem) => {
@@ -3206,7 +3407,14 @@ export function App() {
       project.progression.steps[project.progression.steps.length - 1]?.id;
     if (!afterStepId) return;
 
-    const measureCount = Math.max(1, system.measures.length);
+    // A System is derived by packing Measures, so an "empty System" only becomes its own row when it
+    // holds a full row of Measures. Inserting exactly the System's own count merged into the current
+    // row whenever that row was not already full; insert a whole row instead.
+    const perSystem =
+      project.presentation.measuresPerSystem === "auto"
+        ? autoMeasuresPerSystemForMeter(project.globalTiming.meter.denominator)
+        : project.presentation.measuresPerSystem;
+    const measureCount = Math.max(1, system.measures.length, perSystem);
     const restDuration = durationBars(1, project.globalTiming.meter);
     const restSteps: RestStep[] = Array.from({ length: measureCount }, () =>
       Object.freeze({
@@ -3320,16 +3528,18 @@ export function App() {
     const stepIds = getSystemStepIds(system);
     const existingStepWithMelody = stepIds
       .map((id) => project.progression.steps.find((s) => s.id === id))
-      .find((s): s is ChordStep => Boolean(s && s.kind === "chord" && s.melody !== undefined));
-    const fallbackGrid = existingStepWithMelody?.melody
-      ? validateChordMelodyRecipe(existingStepWithMelody.melody).grid
-      : "eighth";
+      .find((s): s is ChordStep =>
+        Boolean(s && s.kind === "chord" && generatedMelodyRecipe(s.melody)),
+      );
+    const fallbackGrid = generatedMelodyRecipe(existingStepWithMelody?.melody)?.grid ?? "eighth";
 
     const updates = stepIds.flatMap((id) => {
       const step = project.progression.steps.find((s) => s.id === id);
       if (step && step.kind === "chord") {
-        const newMelody: ChordMelodyRecipe = step.melody
-          ? { ...validateChordMelodyRecipe(step.melody), pitchMotion: motion }
+        const recipe = generatedMelodyRecipe(step.melody);
+        if (step.melody && !recipe) return [];
+        const newMelody: ChordMelodyRecipe = recipe
+          ? { ...recipe, pitchMotion: motion }
           : {
               pitchMotion: motion,
               rhythm: "even",
@@ -3354,8 +3564,10 @@ export function App() {
     const updates = stepIds.flatMap((id) => {
       const step = project.progression.steps.find((s) => s.id === id);
       if (step && step.kind === "chord") {
-        const newMelody: ChordMelodyRecipe = step.melody
-          ? { ...validateChordMelodyRecipe(step.melody), grid }
+        const recipe = generatedMelodyRecipe(step.melody);
+        if (step.melody && !recipe) return [];
+        const newMelody: ChordMelodyRecipe = recipe
+          ? { ...recipe, grid }
           : {
               pitchMotion: "up",
               rhythm: "even",
@@ -3424,16 +3636,16 @@ export function App() {
 
   const applyMelodyContourAll = (motion: MelodyPitchMotion) => {
     const existingStepWithMelody = project.progression.steps.find((s): s is ChordStep =>
-      Boolean(s && s.kind === "chord" && s.melody !== undefined),
+      Boolean(s && s.kind === "chord" && generatedMelodyRecipe(s.melody)),
     );
-    const fallbackGrid = existingStepWithMelody?.melody
-      ? validateChordMelodyRecipe(existingStepWithMelody.melody).grid
-      : "eighth";
+    const fallbackGrid = generatedMelodyRecipe(existingStepWithMelody?.melody)?.grid ?? "eighth";
 
     const updates = project.progression.steps.flatMap((step) => {
       if (step.kind === "chord") {
-        const newMelody: ChordMelodyRecipe = step.melody
-          ? { ...validateChordMelodyRecipe(step.melody), pitchMotion: motion }
+        const recipe = generatedMelodyRecipe(step.melody);
+        if (step.melody && !recipe) return [];
+        const newMelody: ChordMelodyRecipe = recipe
+          ? { ...recipe, pitchMotion: motion }
           : {
               pitchMotion: motion,
               rhythm: "even",
@@ -3456,16 +3668,17 @@ export function App() {
 
   const setMelodyGridAll = (grid: MelodyGrid) => {
     const existingStepWithMelody = project.progression.steps.find((s): s is ChordStep =>
-      Boolean(s && s.kind === "chord" && s.melody !== undefined),
+      Boolean(s && s.kind === "chord" && generatedMelodyRecipe(s.melody)),
     );
-    const fallbackMotion = existingStepWithMelody?.melody
-      ? validateChordMelodyRecipe(existingStepWithMelody.melody).pitchMotion
-      : "up";
+    const fallbackMotion =
+      generatedMelodyRecipe(existingStepWithMelody?.melody)?.pitchMotion ?? "up";
 
     const updates = project.progression.steps.flatMap((step) => {
       if (step.kind === "chord") {
-        const newMelody: ChordMelodyRecipe = step.melody
-          ? { ...validateChordMelodyRecipe(step.melody), grid }
+        const recipe = generatedMelodyRecipe(step.melody);
+        if (step.melody && !recipe) return [];
+        const newMelody: ChordMelodyRecipe = recipe
+          ? { ...recipe, grid }
           : {
               pitchMotion: fallbackMotion,
               rhythm: "even",
@@ -3908,7 +4121,30 @@ export function App() {
     project.presentation.measuresPerSystem,
   ]);
 
-  const handlePlay = () => {
+  /**
+   * Resumes the shared AudioContext from inside a user gesture.
+   *
+   * Regression context: the context is created during mount, before any gesture, so browsers
+   * leave it `suspended`. Nothing on the transport path resumed it — only the Matrix-card and
+   * keyboard auditions did. Because the transport clock *is* `ctx.currentTime`, a suspended
+   * context meant pressing Play produced no sound and no advancing position, and the events
+   * the look-ahead scheduler had already queued all fired at once once the context was later
+   * resumed by an unrelated gesture.
+   *
+   * Never rejects: a refused resume must not surface as an unhandled rejection.
+   */
+  const resumeSharedAudioContext = async (): Promise<void> => {
+    const context = sharedAudioContextRef.current;
+    if (!context || context.state !== "suspended") return;
+    try {
+      await context.resume();
+    } catch {
+      // The context stays suspended and playback is silent rather than broken, so this must
+      // not abort the transport.
+    }
+  };
+
+  const handlePlay = async () => {
     clearPianoRollAuditionPlayhead();
     clearStepPreviewHighlights();
     previewAuditionControllerRef.current?.stop();
@@ -3916,6 +4152,9 @@ export function App() {
     closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
+    // Resume before starting so the scheduler's first events land in a running context
+    // rather than being batched against a frozen clock.
+    await resumeSharedAudioContext();
     controller.start({
       steps: project.progression.steps,
       meter: project.globalTiming.meter,
@@ -3936,11 +4175,12 @@ export function App() {
       countInEnabled,
       harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
+      independentBassEnabled: project.independentBassEnabled,
       mutedStepIds,
     });
   };
 
-  const handlePlayFromHere = (stepId: string) => {
+  const handlePlayFromHere = async (stepId: string) => {
     clearPianoRollAuditionPlayhead();
     clearStepPreviewHighlights();
     previewAuditionControllerRef.current?.stop();
@@ -3948,6 +4188,7 @@ export function App() {
     closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
+    await resumeSharedAudioContext();
     controller.playFromHere(stepId, {
       steps: project.progression.steps,
       meter: project.globalTiming.meter,
@@ -3968,6 +4209,7 @@ export function App() {
       countInEnabled,
       harmonyTrack: project.harmonyTrack,
       melodyTrack: project.melodyTrack,
+      independentBassEnabled: project.independentBassEnabled,
       mutedStepIds,
     });
   };
@@ -3988,6 +4230,39 @@ export function App() {
     playbackControllerRef.current?.stop();
   };
 
+  /**
+   * Runs an Undo/Redo request and reports a failure instead of letting it escape.
+   *
+   * `applyInverseCommand` throws `UnhandledInverseCommandError` when a history entry
+   * carries an inverse type that has no handler. That is a programming error, but losing
+   * the session over it would be worse than reporting it: the Project is left untouched
+   * only when the throw happens before any mutation, which is the case for an unhandled
+   * type. The entry has already been moved between the undo/redo stacks, so the message
+   * tells the user the action was not applied.
+   */
+  /**
+   * Reports an error caught by an error boundary through the existing status channel.
+   *
+   * The boundary keeps the studio mounted, so the failure must still be visible rather than
+   * only logged to the console.
+   */
+  const reportBoundaryError = useCallback((error: Error) => {
+    setProjectError(`A panel failed to render: ${error.message}`);
+  }, []);
+
+  const runHistoryCommand = useCallback(
+    (action: "undo" | "redo"): void => {
+      try {
+        if (action === "undo") store.undo();
+        else store.redo();
+        setProjectError(null);
+      } catch (error) {
+        setProjectError(formatProjectOperationError(error));
+      }
+    },
+    [store],
+  );
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const shortcutProtected = isAppShortcutProtectedTarget(e.target);
@@ -3996,6 +4271,9 @@ export function App() {
         "[data-testid='piano-roll-select-all-notes']",
       );
       if (e.key === "Escape" && isPianoRollSelectionHelpOpenTarget(e.target)) return;
+      if (e.key === "Escape" && targetElement?.closest('[role="dialog"], [aria-modal="true"]')) {
+        return;
+      }
       if (focusedPianoRollSelectAll && !shortcutProtected) {
         pianoRollSelectionKeyDownRef.current?.(e);
         if (e.defaultPrevented) return;
@@ -4021,6 +4299,14 @@ export function App() {
           savePresetDialogOpen ||
           Boolean(pendingSwitch)
         ) {
+          return;
+        }
+        if (
+          e.target instanceof Element &&
+          e.target.closest('.matrix-panel[data-focus-mode="true"]')
+        ) {
+          // Focus Mode owns Escape while focus is in the Matrix. Its local handler restores focus
+          // to the toggle; clearing the Matrix preview here would schedule a competing refocus.
           return;
         }
         if (
@@ -4069,8 +4355,7 @@ export function App() {
         const canApply = undoShortcut ? store.canUndo : store.canRedo;
         if (canApply) {
           e.preventDefault();
-          if (undoShortcut) store.undo();
-          else store.redo();
+          runHistoryCommand(undoShortcut ? "undo" : "redo");
         }
         return;
       }
@@ -4081,7 +4366,7 @@ export function App() {
         if (getPianoRollGesture()) setPianoRollGesture(null);
         if (store.canUndo) {
           e.preventDefault();
-          store.undo();
+          runHistoryCommand("undo");
         }
         return;
       }
@@ -4093,7 +4378,7 @@ export function App() {
         if (getPianoRollGesture()) setPianoRollGesture(null);
         if (store.canRedo) {
           e.preventDefault();
-          store.redo();
+          runHistoryCommand("redo");
         }
         return;
       }
@@ -4238,31 +4523,60 @@ export function App() {
     openTabsUserChangedRef.current = true;
     await runProjectAction(() => projectController.createNewProject(name));
   };
+  const openProject = async (id: string): Promise<Project | null> => {
+    const result: { project: Project | null } = { project: null };
+    await runProjectAction(async () => {
+      result.project = await projectController.openNamedProject(id, requestRecoveryConfirmation);
+    });
+    return result.project?.id === id ? result.project : null;
+  };
   const handleOpenProject = async (id: string) => {
-    openTabsUserChangedRef.current = true;
-    await runProjectAction(() => projectController.openNamedProject(id));
-    setOpenProjectIds((current) => (current.includes(id) ? current : [...current, id]));
+    if (await openProject(id)) {
+      openTabsUserChangedRef.current = true;
+      setOpenProjectIds((current) => (current.includes(id) ? current : [...current, id]));
+    }
   };
   const handleRenameProject = (name: string) =>
     runProjectAction(() => projectController.renameActiveProject(name));
   const handleDeleteProject = (id: string) =>
-    runProjectAction(() => projectController.deleteProject(id));
+    runProjectAction(() => projectController.deleteProject(id, requestRecoveryConfirmation));
   const handleSaveProjectAs = (name: string) =>
     runProjectAction(() => projectController.saveProjectAs(name));
   const handleOpenProjectFile = async (text: string) => {
-    openTabsUserChangedRef.current = true;
-    await runProjectAction(() => projectController.openPortableProject(text));
+    try {
+      const result = decodePortableProjectWithDiagnostics(text);
+      if (result.diagnostics.length > 0) {
+        const open = await requestRecoveryConfirmation(result);
+        if (!open) return;
+      }
+      openTabsUserChangedRef.current = true;
+      await runProjectAction(() => projectController.openPreparedPortableProject(result, true));
+    } catch (error) {
+      setProjectError(formatProjectOperationError(error));
+      throw error;
+    }
   };
   const handleCloseProjectTab = (id: string) => {
     if (openProjectIds.length <= 1) return;
     const index = openProjectIds.indexOf(id);
     if (index < 0) return;
-    openTabsUserChangedRef.current = true;
     const nextIds = openProjectIds.filter((tabId) => tabId !== id);
-    setOpenProjectIds(nextIds);
     if (id === project.id) {
       const fallbackId = nextIds[Math.min(index, nextIds.length - 1)];
-      if (fallbackId) void handleOpenProject(fallbackId);
+      if (fallbackId) {
+        // Keep the current tab until its unsaved work is safely persisted and the
+        // replacement is confirmed and active. runProjectAction publishes failures.
+        void openProject(fallbackId)
+          .then((openedProject) => {
+            if (openedProject?.id !== fallbackId || store.project.id !== fallbackId) return;
+            openTabsUserChangedRef.current = true;
+            setOpenProjectIds((current) => current.filter((tabId) => tabId !== id));
+          })
+          .catch(() => {});
+      }
+    } else {
+      openTabsUserChangedRef.current = true;
+      setOpenProjectIds(nextIds);
     }
   };
 
@@ -4371,6 +4685,52 @@ export function App() {
     setLoopState(nextLoopState);
   };
 
+  const applyMeasureMovePlan = (current: Project, plan: MeasureMovePlan) => {
+    clearPianoRollAuditionPlayhead();
+    playbackControllerRef.current?.stop();
+    previewAuditionControllerRef.current?.stop();
+    guitarPreviewAuditionControllerRef.current?.stop();
+    melodyPreviewAuditionControllerRef.current?.stop();
+    stopMelodyPreview();
+    clearStepPreviewHighlights();
+    transportStore.stop();
+
+    store.dispatch(
+      {
+        type: "progression/restore",
+        payload: { progression: plan.progression, nowIso: new Date().toISOString() },
+      },
+      restoreProgression,
+    );
+    // Measures moved between Systems, so per-System mute/solo no longer refers to the same music.
+    setMutedSystemIndices(new Set());
+    setSoloSystemIndex(null);
+    const nextLoopState = (() => {
+      const previous = loopState;
+      if (!previous.enabled) return previous;
+      if (previous.mode === "all") return setLoopMode(previous, "all", plan.progression.steps);
+      if (previous.mode !== "range" || !previous.region) return INITIAL_LOOP_STATE;
+      const startId = plan.reanchoredStepIds.get(previous.region.startStepId);
+      const endId = plan.reanchoredStepIds.get(previous.region.endStepId);
+      if (!startId || !endId) return INITIAL_LOOP_STATE;
+      try {
+        return setLoopRange(startId, endId, plan.progression.steps);
+      } catch {
+        return INITIAL_LOOP_STATE;
+      }
+    })();
+    measureLoopSnapshotsRef.current.set(current.progression, loopState);
+    measureLoopSnapshotsRef.current.set(plan.progression, nextLoopState);
+    setLoopState(nextLoopState);
+  };
+
+  const moveMeasure = (fromMeasureIndex: number, toInsertIndex: number) => {
+    const current = store.project;
+    const plan = planMeasureMove(current, fromMeasureIndex, toInsertIndex);
+    if ("reason" in plan) return plan.reason;
+    applyMeasureMovePlan(current, plan);
+  };
+
   const insertMeasureAfter = (measureIndex: number) => {
     const current = store.project;
     const plan = planMeasureInsertion(current, measureIndex);
@@ -4441,17 +4801,129 @@ export function App() {
     setLoopState(loopState);
   };
 
+  const auditionKeyboardKey = useCallback(
+    (midi: number) => {
+      const provider = audioProviderRef.current;
+      if (!provider || transportStore.getState().status === "playing") return;
+      const token = ++keyboardPreviewToken.current;
+      keyboardPreviewRef.current?.stop();
+      void sharedAudioContextRef.current?.resume();
+      void provider
+        .prepare()
+        .then(() => {
+          if (
+            token !== keyboardPreviewToken.current ||
+            transportStore.getState().status === "playing"
+          )
+            return;
+          provider.setVolume(store.project.harmonyTrack.volume);
+          if (keyboardPreviewRef.current?.getProvider() !== provider)
+            keyboardPreviewRef.current = new PreviewAuditionController({
+              provider,
+              clock: provider.clock,
+              onActivityChange: (activity) => {
+                if (activity) {
+                  keyboardPreviewStore.setScheduledPreview(
+                    "keyboard",
+                    activity.events,
+                    activity.playback,
+                    activity.clock,
+                  );
+                } else {
+                  keyboardPreviewStore.clearPreview("keyboard");
+                }
+              },
+            });
+          keyboardPreviewRef.current!.audition([
+            {
+              pitch: midi,
+              startSeconds: 0,
+              durationSeconds: 0.25,
+              velocity: 80,
+              channelRole: "upper",
+            },
+          ]);
+        })
+        .catch(() => {
+          /* Provider audio status exposes preparation failures. */
+        });
+    },
+    [keyboardPreviewStore, store, transportStore],
+  );
+
   if (!projectReady) {
     return (
       <main className="app-shell">
         <header className="app-header">
           <strong>CadenceFlow</strong>
-          <span>Restoring last project…</span>
+          <span>
+            {startupRecoveryBlocked ? "Project recovery paused" : "Restoring last project…"}
+          </span>
         </header>
         <section className="bootstrap-panel" aria-live="polite">
-          <h1>Opening your studio</h1>
-          <p>Checking the last active project and preparing a fresh session history.</p>
+          {startupRecoveryBlocked ? (
+            <>
+              <h1>Choose how to continue</h1>
+              <p>{projectError ?? "The saved project has not been opened."}</p>
+              <p>Your saved project and recovery pointer remain unchanged until you choose.</p>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => {
+                    setProjectError(null);
+                    setStartupRecoveryBlocked(false);
+                    setStartupAttempt((attempt) => attempt + 1);
+                  }}
+                >
+                  Review saved project
+                </button>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => {
+                    void (async () => {
+                      setProjectError(null);
+                      try {
+                        await projectController.createNewProject("CadenceFlow");
+                        projectController.startAutosave();
+                        setStartupRecoveryBlocked(false);
+                        setProjectReady(true);
+                        store.setEditingSuspended(false);
+                        try {
+                          await projectController.flush();
+                          await refreshProjectList();
+                        } catch (error) {
+                          setProjectError(formatProjectOperationError(error));
+                        }
+                      } catch (error) {
+                        store.setEditingSuspended(true);
+                        setStartupRecoveryBlocked(true);
+                        setProjectError(formatProjectOperationError(error));
+                      }
+                    })();
+                  }}
+                >
+                  Start a fresh project
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1>Opening your studio</h1>
+              <p>Checking the last active project and preparing a fresh session history.</p>
+            </>
+          )}
         </section>
+        {recoveredProjectPrompt ? (
+          <RecoveredProjectDialog
+            result={recoveredProjectPrompt.result}
+            onDecision={(open) => {
+              recoveredProjectPrompt.resolve(open);
+              setRecoveredProjectPrompt(null);
+            }}
+          />
+        ) : null}
       </main>
     );
   }
@@ -4522,6 +4994,7 @@ export function App() {
           context,
           tempoBpm: tempo,
           groove: current.groove,
+          independentBassEnabled: current.independentBassEnabled,
         })
           .filter((event) => {
             const start = event.startSeconds / secondsPerBeat;
@@ -4578,6 +5051,9 @@ export function App() {
           .prepareForInstruments(instruments)
           .then((result) => {
             if (pianoRollAuditionRequestRef.current !== requestId) return;
+            // Surface the reason. Without this the Melody silently disappears from a Measure or
+            // System audition whenever its sample is unavailable or failed to load.
+            applyMelodyPreparationResult(result);
             if (!result.ready.length) return;
             events
               .filter((event) => result.ready.includes(event.instrument))
@@ -4589,7 +5065,9 @@ export function App() {
               onScheduled,
             );
           })
-          .catch(() => undefined);
+          .catch((error) => {
+            setMelodyAudioError(error instanceof Error ? error.message : String(error));
+          });
       }
     }
   };
@@ -4647,14 +5125,17 @@ export function App() {
         void ensureHarmonySoundFontProvider()
           .prepareForInstruments([instrument])
           .then((result) => {
-            if (
-              pianoRollAuditionRequestRef.current !== requestId ||
-              !result.ready.includes(instrument)
-            )
-              return;
+            if (pianoRollAuditionRequestRef.current !== requestId) return;
+            // Report *why* nothing will sound instead of returning silently. A failed or missing
+            // SoundFont used to drop the audition with no feedback at all, which reads as "clicking
+            // a chord does nothing".
+            applyHarmonyPreparationResult(result);
+            if (!result.ready.includes(instrument)) return;
             getPreviewAuditionController()?.audition(events, onScheduled);
           })
-          .catch(() => undefined);
+          .catch((error) => {
+            setHarmonySoundFontError(error instanceof Error ? error.message : String(error));
+          });
         return;
       }
     }
@@ -4787,1107 +5268,1209 @@ export function App() {
   };
 
   return (
-    <StudioWorkspace
-      sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
-      onSidePanelModeChange={changeSidePanelMode}
-      header={
-        <>
-          <div className="app-header-project-area">
-            {globalSettingsVisibility.showProjectTabs ? (
-              <ProjectTabs
-                activeProjectId={project.id}
-                activeProjectName={project.name}
-                projects={projectList.filter((item) => openProjectIds.includes(item.id))}
-                busy={projectBusy}
-                onOpenProject={handleOpenProject}
-                onCloseProject={handleCloseProjectTab}
-              />
-            ) : null}
-            <div className="app-header-controls" role="group" aria-label="Application controls">
-              <AppMenuBar
-                projectMenu={
-                  <ProjectManager
-                    project={project}
-                    projects={projectList}
-                    busy={projectBusy}
-                    error={projectError}
-                    onNewProject={handleNewProject}
-                    onOpenProject={handleOpenProject}
-                    onRenameProject={handleRenameProject}
-                    onDeleteProject={handleDeleteProject}
-                  >
-                    <PortableProjectActions
-                      project={project}
-                      busy={projectBusy}
-                      onSaveProjectAs={handleSaveProjectAs}
-                      onOpenProjectFile={handleOpenProjectFile}
-                    />
-                  </ProjectManager>
-                }
-                exportMenu={
-                  <>
-                    <PortableProjectExportAction
-                      busy={projectBusy}
-                      onExport={() => projectController.exportProject()}
-                    />
-                    <ExportActions project={project} busy={projectBusy} />
-                  </>
-                }
-                canUndo={store.canUndo}
-                onUndo={() => store.undo()}
-                canRedo={store.canRedo}
-                onRedo={() => store.redo()}
-                cardView={project.presentation.globalMatrixCardView}
-                onCardViewChange={globalView}
-                progressionView={project.presentation.progressionView}
-                onProgressionViewChange={changeProgressionView}
-                showBassInStaff={project.presentation.showBassInStaff}
-                onShowBassInStaffChange={changeStaffBassVisibility}
-                suzukiColors={project.presentation.noteColorMode === "suzuki"}
-                onSuzukiColorsChange={changeSuzukiColors}
-                resolutionArrows={project.presentation.resolutionArrows !== false}
-                onResolutionArrowsChange={changeResolutionArrows}
-                guitarChordOrientation={project.presentation.guitarChordOrientation ?? "horizontal"}
-                onGuitarChordOrientationChange={changeGuitarChordOrientation}
-                guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
-                onGuitarChordColorModeChange={changeGuitarChordColorMode}
-                sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
-                onSidePanelModeChange={changeSidePanelMode}
-                onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
-                onOpenHelp={() => {
-                  setIsHelpOpen(true);
-                  setHelpInitialTab("overview");
-                }}
-                onOpenFingeringLegend={() => setIsFingeringLegendOpen(true)}
-                onOpenShortcutsHelp={() => {
-                  setIsHelpOpen(true);
-                  setHelpInitialTab("shortcuts");
-                }}
-              />
-              {globalSettingsVisibility.showThemeControl ? (
-                <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
-              ) : null}
-              {globalSettingsVisibility.showExpertiseControl ? (
-                <ExpertiseModeControl
-                  value={project.presentation.expertiseMode}
-                  onChange={changeExpertiseMode}
-                />
-              ) : null}
-            </div>
-          </div>
-          {project.temporaryBranch ? (
-            <span className="branch-status app-header-status" role="status">
-              What-if branch active
-            </span>
-          ) : null}
-          <div className="app-header-actions">
-            <GlobalSettingsControl
-              value={globalSettingsVisibility}
-              onChange={setGlobalSettingsVisibility}
-            />
-          </div>
-        </>
-      }
-      transport={
-        globalSettingsVisibility.showHistoryControls ? (
-          <HistoryControls
-            onUndo={() => store.undo()}
-            canUndo={store.canUndo}
-            onRedo={() => store.redo()}
-            canRedo={store.canRedo}
-          />
-        ) : null
-      }
-      statusBar={
-        <>
-          {alternativesStatus ? (
-            <span
-              className="app-status-message"
-              role="status"
-              aria-live="polite"
-              data-testid="alternatives-status"
-            >
-              {alternativesStatus}
-            </span>
-          ) : null}
-          {durationResizeStatus ? (
-            <span
-              id="duration-resize-status"
-              className="app-status-message"
-              role="status"
-              aria-live="polite"
-              data-testid="duration-resize-status"
-            >
-              {durationResizeStatus}
-            </span>
-          ) : null}
-          {recommendations &&
-          !recommendations.bestMatch &&
-          recommendations.alternatives.length === 0 ? (
-            <span
-              className="app-status-message"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              data-testid="matrix-recommendation-status"
-            >
-              {recommendations.blockedCandidates.length > 0
-                ? "Strict route requires confirmation. Visible choices remain available."
-                : "No strong recommendation for this context. Passive choices remain available."}
-            </span>
-          ) : null}
-          <PianoAudioStatus
-            instrument={
-              isGuitarProgressionView(project.presentation.progressionView) ||
-              project.presentation.globalMatrixCardView === "guitar"
-                ? "guitar"
-                : "piano"
-            }
-            engine={
-              isGuitarProgressionView(project.presentation.progressionView) ||
-              project.presentation.globalMatrixCardView === "guitar"
-                ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
-                : (project.harmonyTrack.pianoEngine ?? "hq-samples")
-            }
-            state={
-              isGuitarProgressionView(project.presentation.progressionView) ||
-              project.presentation.globalMatrixCardView === "guitar"
-                ? project.harmonyTrack.guitarEngine === "soundfont"
-                  ? guitarSoundFontState
-                  : guitarAudioState
-                : project.harmonyTrack.instrument === "piano" ||
-                    project.harmonyTrack.instrument === "gm-000"
-                  ? project.harmonyTrack.pianoEngine === "soundfont"
-                    ? harmonySoundFontState
-                    : audioState
-                  : harmonySoundFontState
-            }
-            onRetry={retryAudio}
-          />
-        </>
-      }
-      printable={<PrintableProgression project={project} />}
-      matrix={
-        <HarmonicMatrix
-          project={project}
-          {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
-          playingFunctionId={currentPlayingFunctionId}
-          recommendations={recommendations}
-          contextualFunctionIds={contextualFunctions}
-          onPreview={preview}
-          onAdd={add}
-          onGlobalView={globalView}
-          onModuleChange={requestModuleSwitch}
-          onTonicChange={changeTonic}
-          onTemplateOpen={(functionId) => setSettingsFunctionId(functionId)}
-          onTemplateReset={resetCard}
-          onStaffOctaveChange={changeMatrixStaffOctave}
-          onClearSelection={clearMatrixSelection}
-          onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
-          onGenreFocusChange={changeGenreFocus}
-          onOpenPresets={() => setPresetsPanelOpen(true)}
-          onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
-          onOpenQuickChord={openQuickChordPalette}
-          onOpenAlternatives={() => openAlternativesForStep(selectedChordStep?.id)}
-          canOpenAlternatives={Boolean(selectedChordStep)}
+    <ErrorBoundary label="The studio workspace" onError={reportBoundaryError}>
+      {recoveredProjectPrompt ? (
+        <RecoveredProjectDialog
+          result={recoveredProjectPrompt.result}
+          onDecision={(open) => {
+            recoveredProjectPrompt.resolve(open);
+            setRecoveredProjectPrompt(null);
+          }}
         />
-      }
-      inspector={
-        <>
-          {globalSettingsVisibility.showRecommendationContext ? (
-            <RecommendationInspector
-              candidate={inspected}
-              blockedCandidates={recommendations?.blockedCandidates ?? []}
-              mode={project.presentation.expertiseMode}
+      ) : null}
+      {projectBusy && !recoveredProjectPrompt ? (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="project-operation-busy"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10000,
+            background: "rgba(0, 0, 0, 0.3)",
+            display: "grid",
+            placeItems: "center",
+            cursor: "wait",
+          }}
+        >
+          <span className="app-status-message">Saving or switching project...</span>
+        </div>
+      ) : null}
+      <StudioWorkspace
+        bottomPanel={
+          keyboardPreferences.visible && project.presentation.progressionView === "piano-roll" ? (
+            <PlaybackKeyboard
+              transport={transportStore}
+              previewStore={keyboardPreviewStore}
+              autoRange={keyboardAutoRange}
+              preferences={keyboardPreferences}
+              onChange={setKeyboardPreferences}
+              onAudition={auditionKeyboardKey}
+              onStopPreview={stopKeyboardPreview}
             />
-          ) : null}
-          {project.temporaryBranch ? (
-            <CompositionIntentControl
-              value={project.temporaryBranch.compositionIntent}
-              onChange={changeIntent}
-            />
-          ) : null}
-          {globalSettingsVisibility.showPreviewHarmony ? (
-            <HarmonyDetails chord={previewChord} />
-          ) : null}
-          <HarmonicStyleInspector
-            value={project.presentation.genreFocus ?? "all"}
-            onChange={changeGenreFocus}
-          />
-          <CardTemplateInspector
-            project={project}
-            functionId={settingsFunctionId}
-            onPerformancePatch={patchTemplatePerformance}
-            onDurationChange={patchTemplateDuration}
-            onReset={resetTemplate}
-          />
-          <AudioEnginesInspector
-            settings={project.harmonyTrack}
-            onChange={changeHarmonyTrackSettings}
-            globalMatrixCardView={project.presentation.globalMatrixCardView}
-            progressionView={project.presentation.progressionView}
-          />
-        </>
-      }
-      selectedStepQuickEdit={
-        selectedProgressionStep ? (
+          ) : null
+        }
+        sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
+        onSidePanelModeChange={changeSidePanelMode}
+        header={
           <>
-            {selectedChordStep ? (
-              <ProgressionQuickEdit
-                step={selectedChordStep}
-                tonic={project.tonic}
-                labelMode={labelHierarchyMode}
-                onReplaceChord={replaceProgressionStep}
-                onDurationChange={(stepId, duration) => changeStepDuration(stepId, duration)}
-                onPerformanceChange={(stepId, performance) =>
-                  editProgressionPerformance(stepId, performance)
-                }
-                onOpenInspector={focusSelectedStepInspector}
-              />
-            ) : null}
-            <SongSectionControls
-              stepId={selectedProgressionStep.id}
-              stepNumber={selectedStepIndex + 1}
-              sections={(project.progression.sections ?? []).filter(
-                (section) => section.startStepId === selectedProgressionStep.id,
-              )}
-              onCreate={(name) => {
-                const command: SetSongSectionsCommand = {
-                  type: "progression/set-sections",
-                  payload: {
-                    sections: [
-                      ...(project.progression.sections ?? []),
-                      {
-                        id: crypto.randomUUID(),
-                        name,
-                        startStepId: selectedProgressionStep.id,
-                      },
-                    ],
-                    nowIso: new Date().toISOString(),
-                  },
-                };
-                store.dispatch(command, setSongSections);
-              }}
-              onRename={(sectionId, name) => {
-                const command: SetSongSectionsCommand = {
-                  type: "progression/set-sections",
-                  payload: {
-                    sections: (project.progression.sections ?? []).map((section) =>
-                      section.id === sectionId ? { ...section, name } : section,
-                    ),
-                    nowIso: new Date().toISOString(),
-                  },
-                };
-                store.dispatch(command, setSongSections);
-              }}
-              onDelete={(sectionId) => {
-                const command: SetSongSectionsCommand = {
-                  type: "progression/set-sections",
-                  payload: {
-                    sections: (project.progression.sections ?? []).filter(
-                      (section) => section.id !== sectionId,
-                    ),
-                    nowIso: new Date().toISOString(),
-                  },
-                };
-                store.dispatch(command, setSongSections);
-              }}
-            />
-          </>
-        ) : undefined
-      }
-      selectedStepInspector={
-        selectedChordStep ? (
-          <PianoPerformanceInspector
-            step={selectedChordStep}
-            tonic={project.tonic}
-            meter={project.globalTiming.meter}
-            context={{
-              tonic: project.tonic,
-              mode: getHarmonicModule(project.activeModule).mode,
-              moduleId: project.activeModule,
-              spellingContext: {
-                tonic: project.tonic,
-                mode: getHarmonicModule(project.activeModule).mode,
-              },
-            }}
-            onPerformanceChange={(perf) => editProgressionPerformance(selectedChordStep.id, perf)}
-            onDurationChange={(duration) => changeStepDuration(selectedChordStep.id, duration)}
-            canReplace={Boolean(activePreviewId)}
-            onReplace={() => {
-              if (activePreviewId) replaceProgressionStep(selectedChordStep.id, activePreviewId);
-            }}
-            onReset={() => resetProgressionStep(selectedChordStep.id)}
-            onRemove={() => removeProgressionStep(selectedChordStep.id)}
-            onMoveLeft={() =>
-              reorderSelectedProgressionStep(
-                selectedChordStep.id,
-                Math.max(0, selectedStepIndex - 1),
-              )
-            }
-            onMoveRight={() =>
-              reorderSelectedProgressionStep(
-                selectedChordStep.id,
-                Math.min(project.progression.steps.length - 1, selectedStepIndex + 1),
-              )
-            }
-            onOpenVoicingEditor={() => setVoicingEditorOpen(true)}
-            melodyTrack={project.melodyTrack}
-            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
-            melodyAudioState={melodyAudioState}
-            melodyAudioError={melodyAudioError}
-            onRetryMelodyAudio={retryMelodyAudio}
-            hasMelodyRecipe={project.progression.steps.some(
-              (step) => step.kind === "chord" && step.melody !== undefined,
-            )}
-            onSetMeter={changeMeter}
-            groove={project.groove}
-            onSetGroove={changeGroove}
-            loopState={loopState}
-            steps={project.progression.steps}
-            onSetLoopMode={handleSetLoopMode}
-            onSetLoopRange={handleSetLoopRange}
-            onApplySubstitution={(sub) => handleApplySubstitution(selectedChordStep.id, sub)}
-            onAuditionSubstitution={handleAuditionSubstitution}
-            auditioningSubstitutionId={auditioningSubId}
-          />
-        ) : selectedProgressionStep?.kind === "rest" ? (
-          <RestStepInspector
-            step={selectedProgressionStep}
-            meter={project.globalTiming.meter}
-            onDurationChange={(duration) =>
-              changeStepDuration(selectedProgressionStep.id, duration)
-            }
-            onRemove={() => removeProgressionStep(selectedProgressionStep.id)}
-            onMoveLeft={() =>
-              reorderSelectedProgressionStep(
-                selectedProgressionStep.id,
-                Math.max(0, selectedStepIndex - 1),
-              )
-            }
-            onMoveRight={() =>
-              reorderSelectedProgressionStep(
-                selectedProgressionStep.id,
-                Math.min(project.progression.steps.length - 1, selectedStepIndex + 1),
-              )
-            }
-            onSetMeter={changeMeter}
-            groove={project.groove}
-            onSetGroove={changeGroove}
-            loopState={loopState}
-            steps={project.progression.steps}
-            onSetLoopMode={handleSetLoopMode}
-            onSetLoopRange={handleSetLoopRange}
-          />
-        ) : (
-          <ProgressionGlobalInspector
-            project={project}
-            selectedPianoNote={selectedPianoNote}
-            onEditSelectedPianoNote={() => {
-              if (!selectedPianoNote) return;
-              setPianoRollInspectorRequest((current) => ({
-                ...selectedPianoNote,
-                requestId: (current?.requestId ?? 0) + 1,
-              }));
-            }}
-            onBatchPerformanceChange={batchEditProgressionPerformance}
-            onBatchDurationChange={batchSetProgressionDuration}
-            onResetAll={resetAllProgressionPerformance}
-            onSetProgressionView={changeProgressionView}
-            onSetMeasuresPerSystem={changeMeasuresPerSystem}
-            onSetMeter={changeMeter}
-            onSetGroove={changeGroove}
-            onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
-            harmonyAudioState={
-              isGuitarProgressionView(project.presentation.progressionView) ||
-              project.presentation.globalMatrixCardView === "guitar"
-                ? project.harmonyTrack.guitarEngine === "soundfont"
-                  ? guitarSoundFontState
-                  : guitarAudioState
-                : project.harmonyTrack.instrument === "piano" ||
-                    project.harmonyTrack.instrument === "gm-000"
-                  ? project.harmonyTrack.pianoEngine === "soundfont"
-                    ? harmonySoundFontState
-                    : audioState
-                  : harmonySoundFontState
-            }
-            harmonyAudioError={
-              isGuitarProgressionView(project.presentation.progressionView) ||
-              project.presentation.globalMatrixCardView === "guitar"
-                ? project.harmonyTrack.guitarEngine === "soundfont"
-                  ? harmonySoundFontError
-                  : null
-                : project.harmonyTrack.instrument === "piano" ||
-                    project.harmonyTrack.instrument === "gm-000"
-                  ? project.harmonyTrack.pianoEngine === "soundfont"
-                    ? harmonySoundFontError
-                    : null
-                  : harmonySoundFontError
-            }
-            onRetryHarmonyAudio={() => {
-              if (
-                isGuitarProgressionView(project.presentation.progressionView) ||
-                project.presentation.globalMatrixCardView === "guitar"
-              ) {
-                if (project.harmonyTrack.guitarEngine === "soundfont") {
-                  const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
-                  const provider = ensureGuitarSoundFontProvider();
-                  void provider
-                    .prepareForInstruments([inst])
-                    .then(applyHarmonyPreparationResult)
-                    .catch((err) => {
-                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                    });
-                } else {
-                  const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
-                  void gProvider.prepare();
-                }
-              } else if (
-                project.harmonyTrack.instrument === "piano" ||
-                project.harmonyTrack.instrument === "gm-000"
-              ) {
-                if (project.harmonyTrack.pianoEngine === "soundfont") {
-                  const provider = ensureHarmonySoundFontProvider();
-                  void provider
-                    .prepareForInstruments([
-                      project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
-                    ])
-                    .then(applyHarmonyPreparationResult)
-                    .catch((err) => {
-                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                    });
-                } else {
-                  const provider = audioProviderRef.current;
-                  if (provider) void provider.prepare();
-                }
-              } else {
-                const provider = ensureHarmonySoundFontProvider();
-                void provider
-                  .prepareForInstruments([project.harmonyTrack.instrument])
-                  .then(applyHarmonyPreparationResult)
-                  .catch((err) => {
-                    setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                  });
-              }
-            }}
-            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
-            melodyAudioState={melodyAudioState}
-            melodyAudioError={melodyAudioError}
-            onRetryMelodyAudio={retryMelodyAudio}
-            loopState={loopState}
-            onSetLoopMode={handleSetLoopMode}
-            onSetLoopRange={handleSetLoopRange}
-            onOpenPresets={() => setPresetsPanelOpen(true)}
-            onSaveAsPreset={() => setSavePresetDialogOpen(true)}
-            onSetNoteColorMode={changeNoteColorMode}
-          />
-        )
-      }
-      onProgressionBackgroundClick={() => {
-        if (project.presentation.progressionView === "piano-roll")
-          setPianoRollSelectionScopeResetVersion((version) => version + 1);
-        else setProgressionSelection();
-      }}
-      onMatrixBackgroundClick={clearMatrixSelection}
-      progression={
-        <>
-          <div
-            className={`progression-heading${
-              project.presentation.progressionView === "piano-roll"
-                ? " progression-heading-piano-roll"
-                : ""
-            }`}
-            data-testid="progression-heading"
-            tabIndex={project.presentation.progressionView === "piano-roll" ? 0 : undefined}
-            aria-label={
-              project.presentation.progressionView === "piano-roll"
-                ? "My Progression. Focus or click empty space here to set Ctrl+A scope to Progression."
-                : undefined
-            }
-            aria-keyshortcuts={
-              project.presentation.progressionView === "piano-roll" ? "Enter Space" : undefined
-            }
-            onFocus={(event) => {
-              if (
-                project.presentation.progressionView === "piano-roll" &&
-                event.target === event.currentTarget
-              )
-                setPianoRollSelectionScopeResetVersion((version) => version + 1);
-            }}
-            onClick={(event) => {
-              if (project.presentation.progressionView !== "piano-roll") return;
-              const target = event.target instanceof Element ? event.target : null;
-              if (
-                target?.closest(".progression-heading") === event.currentTarget &&
-                !target.closest(
-                  "button, input, select, textarea, [contenteditable], [role=button], [role=slider], [role=menu], [role^=menuitem], label",
-                )
-              )
-                setPianoRollSelectionScopeResetVersion((version) => version + 1);
-            }}
-            onKeyDown={(event) => {
-              if (
-                project.presentation.progressionView === "piano-roll" &&
-                event.target === event.currentTarget &&
-                (event.key === "Enter" || event.key === " ")
-              ) {
-                event.preventDefault();
-                event.stopPropagation();
-                setPianoRollSelectionScopeResetVersion((version) => version + 1);
-              }
-            }}
-            onContextMenu={handleProgressionHeadingContextMenu}
-          >
-            <div className="progression-title-group">
-              <h2>My Progression</h2>
-              <div className="progression-heading-transport-cluster">
-                <ProgressionTransportControls
-                  selectedStepId={project.progression.selectedStepId}
-                  transportState={transportState}
-                  onPlay={handlePlay}
-                  onPlayFromHere={handlePlayFromHere}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  onStop={handleStop}
+            <div className="app-header-project-area">
+              {globalSettingsVisibility.showProjectTabs ? (
+                <ProjectTabs
+                  activeProjectId={project.id}
+                  activeProjectName={project.name}
+                  projects={projectList.filter((item) => openProjectIds.includes(item.id))}
+                  busy={projectBusy}
+                  onOpenProject={handleOpenProject}
+                  onCloseProject={handleCloseProjectTab}
                 />
-                <nav className="progression-playback-nav" aria-label="Playback Transport">
-                  <div className="transport-timing" role="group" aria-label="Timing Controls">
-                    <TempoControls
-                      tempoBpm={project.globalTiming.tempoBpm}
-                      onSetTempo={changeTempo}
-                      className="progression-heading-tempo"
-                    />
-                    <PlaybackSupportControls
-                      loopState={loopState}
-                      metronomeEnabled={metronomeEnabled}
-                      countInEnabled={countInEnabled}
-                      onSetLoopMode={handleSetLoopMode}
-                      onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
-                      onToggleCountIn={() => setCountInEnabled((v) => !v)}
-                    />
-                  </div>
-                </nav>
+              ) : null}
+              <div className="app-header-controls" role="group" aria-label="Application controls">
+                <AppMenuBar
+                  projectMenu={
+                    <ProjectManager
+                      project={project}
+                      projects={projectList}
+                      busy={projectBusy}
+                      error={projectError}
+                      onNewProject={handleNewProject}
+                      onOpenProject={handleOpenProject}
+                      onRenameProject={handleRenameProject}
+                      onDeleteProject={handleDeleteProject}
+                    >
+                      <PortableProjectActions
+                        project={project}
+                        busy={projectBusy}
+                        onSaveProjectAs={handleSaveProjectAs}
+                        onOpenProjectFile={handleOpenProjectFile}
+                      />
+                    </ProjectManager>
+                  }
+                  exportMenu={
+                    <>
+                      <PortableProjectExportAction
+                        busy={projectBusy}
+                        onExport={() => projectController.exportProject()}
+                      />
+                      <ExportActions project={project} busy={projectBusy} />
+                    </>
+                  }
+                  canUndo={store.canUndo}
+                  onUndo={() => runHistoryCommand("undo")}
+                  canRedo={store.canRedo}
+                  onRedo={() => runHistoryCommand("redo")}
+                  cardView={project.presentation.globalMatrixCardView}
+                  onCardViewChange={globalView}
+                  progressionView={project.presentation.progressionView}
+                  onProgressionViewChange={changeProgressionView}
+                  showBassInStaff={project.presentation.showBassInStaff}
+                  onShowBassInStaffChange={changeStaffBassVisibility}
+                  suzukiColors={project.presentation.noteColorMode === "suzuki"}
+                  onSuzukiColorsChange={changeSuzukiColors}
+                  resolutionArrows={project.presentation.resolutionArrows !== false}
+                  onResolutionArrowsChange={changeResolutionArrows}
+                  guitarChordOrientation={
+                    project.presentation.guitarChordOrientation ?? "horizontal"
+                  }
+                  onGuitarChordOrientationChange={changeGuitarChordOrientation}
+                  guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
+                  onGuitarChordColorModeChange={changeGuitarChordColorMode}
+                  sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
+                  onSidePanelModeChange={changeSidePanelMode}
+                  onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
+                  onOpenHelp={() => {
+                    setIsHelpOpen(true);
+                    setHelpInitialTab("overview");
+                  }}
+                  onOpenFingeringLegend={() => setIsFingeringLegendOpen(true)}
+                  onOpenShortcutsHelp={() => {
+                    setIsHelpOpen(true);
+                    setHelpInitialTab("shortcuts");
+                  }}
+                />
+                {globalSettingsVisibility.showThemeControl ? (
+                  <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
+                ) : null}
+                {globalSettingsVisibility.showExpertiseControl ? (
+                  <ExpertiseModeControl
+                    value={project.presentation.expertiseMode}
+                    onChange={changeExpertiseMode}
+                  />
+                ) : null}
               </div>
             </div>
-            <div className="progression-heading-actions">
-              {project.presentation.progressionView === "piano-roll" &&
-              project.progression.steps.length > 0 ? (
-                <div
-                  className="piano-roll-progression-selection"
-                  data-testid="piano-roll-progression-selection"
-                  role="group"
-                  aria-label="Progression Melody selection"
-                >
-                  <PianoRollSelectionAction
-                    accessibleName="Select all effective Melody notes in Progression"
-                    title="Select all effective Melody notes in Progression"
-                    testId="piano-roll-select-all-notes"
-                    selectionScopeLabel={pianoRollSelectionScopeLabel}
-                    onSelect={() => pianoRollSelectAllActionRef.current?.()}
-                  >
-                    Select All
-                  </PianoRollSelectionAction>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className="btn-print-progression"
-                onClick={() => window.print()}
-                title="Open the system print dialog; choose Save as PDF to export"
-                data-testid="print-progression"
-              >
-                <span aria-hidden="true">⎙</span>
-                <span>Print / Save as PDF</span>
-              </button>
-              <button
-                type="button"
-                className="btn-modulation-trigger"
-                onClick={() => setIsModulationModalOpen(true)}
-                title="Modulation Master & Key Transitions"
-                data-testid="progression-modulate-trigger"
-              >
-                <span className="btn-modulation-icon" aria-hidden="true">
-                  🧭
-                </span>
-                <span>Modulate</span>
-              </button>
-              <VoiceLeadingMenu
-                onApplyVoiceLeading={handleApplyVoiceLeading}
-                disabled={project.progression.steps.length === 0}
+            {project.temporaryBranch ? (
+              <span className="branch-status app-header-status" role="status">
+                What-if branch active
+              </span>
+            ) : null}
+            <div className="app-header-actions">
+              <GlobalSettingsControl
+                value={globalSettingsVisibility}
+                onChange={setGlobalSettingsVisibility}
               />
-              <BranchControls
-                project={project}
-                selectedBranchStepIds={selectedBranchStepIds}
-                onStart={startExploration}
-                onRejoin={setRejoin}
-                onCommitWhole={commitWhole}
-                onCommitSelected={commitSelected}
-                onDiscard={discard}
-              />
-              <ViewModeToggle
-                currentView={project.presentation.progressionView}
-                onChangeView={changeProgressionView}
-                selectAriaLabel="Progression Card View"
-                testIdPrefix="progression-view"
-                availableViews={["staff", "tablature", "piano-roll"]}
-              />
-              <LabelHierarchyControl value={labelHierarchyMode} onChange={setLabelHierarchyMode} />
             </div>
-          </div>
-          <ProgressionTrack
+          </>
+        }
+        transport={
+          globalSettingsVisibility.showHistoryControls ? (
+            <HistoryControls
+              onUndo={() => runHistoryCommand("undo")}
+              canUndo={store.canUndo}
+              onRedo={() => runHistoryCommand("redo")}
+              canRedo={store.canRedo}
+            />
+          ) : null
+        }
+        statusBar={
+          <>
+            {autosaveError ? (
+              <span
+                className="app-status-message is-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="autosave-error-status"
+              >
+                {autosaveError}
+                <button type="button" onClick={() => projectController.flushPendingAutosave()}>
+                  Retry save
+                </button>
+              </span>
+            ) : null}
+            {alternativesStatus ? (
+              <span
+                className="app-status-message"
+                role="status"
+                aria-live="polite"
+                data-testid="alternatives-status"
+              >
+                {alternativesStatus}
+              </span>
+            ) : null}
+            {durationResizeStatus ? (
+              <span
+                id="duration-resize-status"
+                className="app-status-message"
+                role="status"
+                aria-live="polite"
+                data-testid="duration-resize-status"
+              >
+                {durationResizeStatus}
+              </span>
+            ) : null}
+            {recommendations &&
+            !recommendations.bestMatch &&
+            recommendations.alternatives.length === 0 ? (
+              <span
+                className="app-status-message"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                data-testid="matrix-recommendation-status"
+              >
+                {recommendations.blockedCandidates.length > 0
+                  ? "Strict route requires confirmation. Visible choices remain available."
+                  : "No strong recommendation for this context. Passive choices remain available."}
+              </span>
+            ) : null}
+            <PianoAudioStatus
+              instrument={
+                isGuitarProgressionView(project.presentation.progressionView) ||
+                project.presentation.globalMatrixCardView === "guitar"
+                  ? "guitar"
+                  : "piano"
+              }
+              engine={
+                isGuitarProgressionView(project.presentation.progressionView) ||
+                project.presentation.globalMatrixCardView === "guitar"
+                  ? (project.harmonyTrack.guitarEngine ?? "hq-samples")
+                  : (project.harmonyTrack.pianoEngine ?? "hq-samples")
+              }
+              state={
+                isGuitarProgressionView(project.presentation.progressionView) ||
+                project.presentation.globalMatrixCardView === "guitar"
+                  ? project.harmonyTrack.guitarEngine === "soundfont"
+                    ? guitarSoundFontState
+                    : guitarAudioState
+                  : project.harmonyTrack.instrument === "piano" ||
+                      project.harmonyTrack.instrument === "gm-000"
+                    ? project.harmonyTrack.pianoEngine === "soundfont"
+                      ? harmonySoundFontState
+                      : audioState
+                    : harmonySoundFontState
+              }
+              onRetry={retryAudio}
+            />
+          </>
+        }
+        printable={<PrintableProgression project={project} />}
+        matrix={
+          <HarmonicMatrix
             project={project}
-            pianoRollSelectionScopeResetVersion={pianoRollSelectionScopeResetVersion}
-            pianoRollSelectionKeyDownRef={pianoRollSelectionKeyDownRef}
-            pianoRollSelectAllActionRef={pianoRollSelectAllActionRef}
-            onPianoRollSelectionScopeLabelChange={reportPianoRollSelectionScopeLabel}
-            selectedPianoNote={selectedPianoNote}
-            onSelectedPianoNoteChange={setSelectedPianoNote}
-            onSelectedPianoChordChange={(stepId) => {
-              setActivePianoRollChordStepId(stepId);
-              if (pianoRollMatrixReplacementTargetRef.current) {
+            {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
+            playingFunctionId={currentPlayingFunctionId}
+            recommendations={recommendations}
+            contextualFunctionIds={contextualFunctions}
+            onPreview={preview}
+            onAdd={add}
+            onGlobalView={globalView}
+            onModuleChange={requestModuleSwitch}
+            onTonicChange={changeTonic}
+            onTemplateOpen={(functionId) => setSettingsFunctionId(functionId)}
+            onTemplateReset={resetCard}
+            onStaffOctaveChange={changeMatrixStaffOctave}
+            onClearSelection={clearMatrixSelection}
+            onOpenMatrixMenu={(anchor, pos) => setMatrixMenu({ anchor, position: pos })}
+            onGenreFocusChange={changeGenreFocus}
+            onOpenPresets={() => setPresetsPanelOpen(true)}
+            onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
+            onOpenQuickChord={openQuickChordPalette}
+            onOpenAlternatives={() => openAlternativesForStep(selectedChordStep?.id)}
+            canOpenAlternatives={Boolean(selectedChordStep)}
+          />
+        }
+        inspector={
+          <>
+            {globalSettingsVisibility.showRecommendationContext ? (
+              <RecommendationInspector
+                candidate={inspected}
+                blockedCandidates={recommendations?.blockedCandidates ?? []}
+                mode={project.presentation.expertiseMode}
+              />
+            ) : null}
+            {project.temporaryBranch ? (
+              <CompositionIntentControl
+                value={project.temporaryBranch.compositionIntent}
+                onChange={changeIntent}
+              />
+            ) : null}
+            {globalSettingsVisibility.showPreviewHarmony ? (
+              <HarmonyDetails chord={previewChord} />
+            ) : null}
+            <HarmonicStyleInspector
+              value={project.presentation.genreFocus ?? "all"}
+              onChange={changeGenreFocus}
+            />
+            <CardTemplateInspector
+              project={project}
+              functionId={settingsFunctionId}
+              onPerformancePatch={patchTemplatePerformance}
+              onDurationChange={patchTemplateDuration}
+              onReset={resetTemplate}
+            />
+            <AudioEnginesInspector
+              settings={project.harmonyTrack}
+              onChange={changeHarmonyTrackSettings}
+              globalMatrixCardView={project.presentation.globalMatrixCardView}
+              progressionView={project.presentation.progressionView}
+            />
+          </>
+        }
+        selectedStepQuickEdit={
+          selectedProgressionStep ? (
+            <>
+              {selectedChordStep ? (
+                <ProgressionQuickEdit
+                  step={selectedChordStep}
+                  tonic={project.tonic}
+                  independentBassEnabled={project.independentBassEnabled}
+                  labelMode={labelHierarchyMode}
+                  onReplaceChord={replaceProgressionStep}
+                  onDurationChange={(stepId, duration) => changeStepDuration(stepId, duration)}
+                  onPerformanceChange={(stepId, performance) =>
+                    editProgressionPerformance(stepId, performance)
+                  }
+                  onOpenInspector={focusSelectedStepInspector}
+                />
+              ) : null}
+              <SongSectionControls
+                stepId={selectedProgressionStep.id}
+                stepNumber={selectedStepIndex + 1}
+                sections={(project.progression.sections ?? []).filter(
+                  (section) => section.startStepId === selectedProgressionStep.id,
+                )}
+                onCreate={(name) => {
+                  const command: SetSongSectionsCommand = {
+                    type: "progression/set-sections",
+                    payload: {
+                      sections: [
+                        ...(project.progression.sections ?? []),
+                        {
+                          id: crypto.randomUUID(),
+                          name,
+                          startStepId: selectedProgressionStep.id,
+                        },
+                      ],
+                      nowIso: new Date().toISOString(),
+                    },
+                  };
+                  store.dispatch(command, setSongSections);
+                }}
+                onRename={(sectionId, name) => {
+                  const command: SetSongSectionsCommand = {
+                    type: "progression/set-sections",
+                    payload: {
+                      sections: (project.progression.sections ?? []).map((section) =>
+                        section.id === sectionId ? { ...section, name } : section,
+                      ),
+                      nowIso: new Date().toISOString(),
+                    },
+                  };
+                  store.dispatch(command, setSongSections);
+                }}
+                onDelete={(sectionId) => {
+                  const command: SetSongSectionsCommand = {
+                    type: "progression/set-sections",
+                    payload: {
+                      sections: (project.progression.sections ?? []).filter(
+                        (section) => section.id !== sectionId,
+                      ),
+                      nowIso: new Date().toISOString(),
+                    },
+                  };
+                  store.dispatch(command, setSongSections);
+                }}
+              />
+            </>
+          ) : undefined
+        }
+        selectedStepInspector={
+          selectedChordStep ? (
+            <>
+              {showChordPropertiesInspector ? (
+                <ChordPropertiesInspector
+                  key={`${project.id}:${project.tonic}:${selectedChordStep.id}`}
+                  step={selectedChordStep}
+                  tonic={project.tonic}
+                  independentBassEnabled={project.independentBassEnabled}
+                  context={{
+                    tonic: project.tonic,
+                    mode: getHarmonicModule(project.activeModule).mode,
+                    moduleId: project.activeModule,
+                    spellingContext: {
+                      tonic: project.tonic,
+                      mode: getHarmonicModule(project.activeModule).mode,
+                    },
+                  }}
+                  onEdit={(edit) => editSelectedChordProperties(selectedChordStep.id, edit)}
+                />
+              ) : null}
+              <PianoPerformanceInspector
+                step={selectedChordStep}
+                tonic={project.tonic}
+                independentBassEnabled={project.independentBassEnabled}
+                onSetIndependentBassEnabled={changeIndependentBassEnabled}
+                meter={project.globalTiming.meter}
+                context={{
+                  tonic: project.tonic,
+                  mode: getHarmonicModule(project.activeModule).mode,
+                  moduleId: project.activeModule,
+                  spellingContext: {
+                    tonic: project.tonic,
+                    mode: getHarmonicModule(project.activeModule).mode,
+                  },
+                }}
+                onPerformanceChange={(perf) =>
+                  editProgressionPerformance(selectedChordStep.id, perf)
+                }
+                onDurationChange={(duration) => changeStepDuration(selectedChordStep.id, duration)}
+                canReplace={Boolean(activePreviewId)}
+                onReplace={() => {
+                  if (activePreviewId)
+                    replaceProgressionStep(selectedChordStep.id, activePreviewId);
+                }}
+                onReset={() => resetProgressionStep(selectedChordStep.id)}
+                onRemove={() => removeProgressionStep(selectedChordStep.id)}
+                onMoveLeft={() =>
+                  reorderSelectedProgressionStep(
+                    selectedChordStep.id,
+                    Math.max(0, selectedStepIndex - 1),
+                  )
+                }
+                onMoveRight={() =>
+                  reorderSelectedProgressionStep(
+                    selectedChordStep.id,
+                    Math.min(project.progression.steps.length - 1, selectedStepIndex + 1),
+                  )
+                }
+                onOpenVoicingEditor={() => setVoicingEditorOpen(true)}
+                melodyTrack={project.melodyTrack}
+                onMelodyTrackSettingsChange={changeMelodyTrackSettings}
+                melodyAudioState={melodyAudioState}
+                melodyAudioError={melodyAudioError}
+                onRetryMelodyAudio={retryMelodyAudio}
+                hasMelodyRecipe={project.progression.steps.some(
+                  (step) => step.kind === "chord" && step.melody !== undefined,
+                )}
+                onSetMeter={changeMeter}
+                groove={project.groove}
+                onSetGroove={changeGroove}
+                loopState={loopState}
+                steps={project.progression.steps}
+                onSetLoopMode={handleSetLoopMode}
+                onSetLoopRange={handleSetLoopRange}
+                onApplySubstitution={(sub) => handleApplySubstitution(selectedChordStep.id, sub)}
+                onAuditionSubstitution={handleAuditionSubstitution}
+                auditioningSubstitutionId={auditioningSubId}
+              />
+            </>
+          ) : selectedProgressionStep?.kind === "rest" ? (
+            <>
+              {showChordPropertiesInspector ? (
+                <ChordPropertiesUnavailable message="Chord Properties are unavailable for a Rest. Select a chord Step to edit its harmony." />
+              ) : null}
+              <RestStepInspector
+                step={selectedProgressionStep}
+                meter={project.globalTiming.meter}
+                onDurationChange={(duration) =>
+                  changeStepDuration(selectedProgressionStep.id, duration)
+                }
+                onRemove={() => removeProgressionStep(selectedProgressionStep.id)}
+                onMoveLeft={() =>
+                  reorderSelectedProgressionStep(
+                    selectedProgressionStep.id,
+                    Math.max(0, selectedStepIndex - 1),
+                  )
+                }
+                onMoveRight={() =>
+                  reorderSelectedProgressionStep(
+                    selectedProgressionStep.id,
+                    Math.min(project.progression.steps.length - 1, selectedStepIndex + 1),
+                  )
+                }
+                onSetMeter={changeMeter}
+                groove={project.groove}
+                onSetGroove={changeGroove}
+                loopState={loopState}
+                steps={project.progression.steps}
+                onSetLoopMode={handleSetLoopMode}
+                onSetLoopRange={handleSetLoopRange}
+                independentBassEnabled={project.independentBassEnabled}
+                onSetIndependentBassEnabled={changeIndependentBassEnabled}
+              />
+            </>
+          ) : (
+            <>
+              {showChordPropertiesInspector ? (
+                <ChordPropertiesUnavailable message="Select a chord Step to edit its harmonic properties." />
+              ) : null}
+              <ProgressionGlobalInspector
+                project={project}
+                selectedPianoNote={selectedPianoNote}
+                onEditSelectedPianoNote={() => {
+                  if (!selectedPianoNote) return;
+                  setPianoRollInspectorRequest((current) => ({
+                    ...selectedPianoNote,
+                    requestId: (current?.requestId ?? 0) + 1,
+                  }));
+                }}
+                onBatchPerformanceChange={batchEditProgressionPerformance}
+                onBatchDurationChange={batchSetProgressionDuration}
+                onResetAll={resetAllProgressionPerformance}
+                onSetProgressionView={changeProgressionView}
+                onSetIndependentBassEnabled={changeIndependentBassEnabled}
+                onSetMeasuresPerSystem={changeMeasuresPerSystem}
+                onSetMeter={changeMeter}
+                onSetGroove={changeGroove}
+                onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
+                harmonyAudioState={
+                  isGuitarProgressionView(project.presentation.progressionView) ||
+                  project.presentation.globalMatrixCardView === "guitar"
+                    ? project.harmonyTrack.guitarEngine === "soundfont"
+                      ? guitarSoundFontState
+                      : guitarAudioState
+                    : project.harmonyTrack.instrument === "piano" ||
+                        project.harmonyTrack.instrument === "gm-000"
+                      ? project.harmonyTrack.pianoEngine === "soundfont"
+                        ? harmonySoundFontState
+                        : audioState
+                      : harmonySoundFontState
+                }
+                harmonyAudioError={
+                  isGuitarProgressionView(project.presentation.progressionView) ||
+                  project.presentation.globalMatrixCardView === "guitar"
+                    ? project.harmonyTrack.guitarEngine === "soundfont"
+                      ? harmonySoundFontError
+                      : null
+                    : project.harmonyTrack.instrument === "piano" ||
+                        project.harmonyTrack.instrument === "gm-000"
+                      ? project.harmonyTrack.pianoEngine === "soundfont"
+                        ? harmonySoundFontError
+                        : null
+                      : harmonySoundFontError
+                }
+                onRetryHarmonyAudio={() => {
+                  if (
+                    isGuitarProgressionView(project.presentation.progressionView) ||
+                    project.presentation.globalMatrixCardView === "guitar"
+                  ) {
+                    if (project.harmonyTrack.guitarEngine === "soundfont") {
+                      const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
+                      const provider = ensureGuitarSoundFontProvider();
+                      void provider
+                        .prepareForInstruments([inst])
+                        .then(applyHarmonyPreparationResult)
+                        .catch((err) => {
+                          setHarmonySoundFontError(
+                            err instanceof Error ? err.message : String(err),
+                          );
+                        });
+                    } else {
+                      const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
+                      void gProvider.prepare();
+                    }
+                  } else if (
+                    project.harmonyTrack.instrument === "piano" ||
+                    project.harmonyTrack.instrument === "gm-000"
+                  ) {
+                    if (project.harmonyTrack.pianoEngine === "soundfont") {
+                      const provider = ensureHarmonySoundFontProvider();
+                      void provider
+                        .prepareForInstruments([
+                          project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
+                        ])
+                        .then(applyHarmonyPreparationResult)
+                        .catch((err) => {
+                          setHarmonySoundFontError(
+                            err instanceof Error ? err.message : String(err),
+                          );
+                        });
+                    } else {
+                      const provider = audioProviderRef.current;
+                      if (provider) void provider.prepare();
+                    }
+                  } else {
+                    const provider = ensureHarmonySoundFontProvider();
+                    void provider
+                      .prepareForInstruments([project.harmonyTrack.instrument])
+                      .then(applyHarmonyPreparationResult)
+                      .catch((err) => {
+                        setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                      });
+                  }
+                }}
+                onMelodyTrackSettingsChange={changeMelodyTrackSettings}
+                melodyAudioState={melodyAudioState}
+                melodyAudioError={melodyAudioError}
+                onRetryMelodyAudio={retryMelodyAudio}
+                loopState={loopState}
+                onSetLoopMode={handleSetLoopMode}
+                onSetLoopRange={handleSetLoopRange}
+                onOpenPresets={() => setPresetsPanelOpen(true)}
+                onSaveAsPreset={() => setSavePresetDialogOpen(true)}
+                onSetNoteColorMode={changeNoteColorMode}
+              />
+            </>
+          )
+        }
+        onProgressionBackgroundClick={() => {
+          setPianoRollSelectionScopeResetVersion((version) => version + 1);
+          if (project.presentation.progressionView === "piano-roll") return;
+          setProgressionSelection();
+        }}
+        onMatrixBackgroundClick={clearMatrixSelection}
+        progression={
+          <>
+            <div
+              className={`progression-heading${
+                project.presentation.progressionView === "piano-roll"
+                  ? " progression-heading-piano-roll"
+                  : ""
+              }`}
+              data-testid="progression-heading"
+              tabIndex={0}
+              aria-label={`My Progression. Focus or click empty space here to clear the current Measure or System context${project.presentation.progressionView === "piano-roll" ? " and set Ctrl+A scope to Progression" : ""}.`}
+              aria-keyshortcuts="Enter Space"
+              onFocus={(event) => {
+                if (event.target === event.currentTarget)
+                  setPianoRollSelectionScopeResetVersion((version) => version + 1);
+              }}
+              onClick={(event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                if (
+                  target?.closest(".progression-heading") === event.currentTarget &&
+                  !target.closest(
+                    "button, input, select, textarea, [contenteditable], [role=button], [role=slider], [role=menu], [role^=menuitem], label",
+                  )
+                )
+                  setPianoRollSelectionScopeResetVersion((version) => version + 1);
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.target === event.currentTarget &&
+                  (event.key === "Enter" || event.key === " ")
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setPianoRollSelectionScopeResetVersion((version) => version + 1);
+                }
+              }}
+              onContextMenu={handleProgressionHeadingContextMenu}
+            >
+              <div className="progression-title-group">
+                <h2>My Progression</h2>
+                <div className="progression-heading-transport-cluster">
+                  <ProgressionTransportControls
+                    selectedStepId={project.progression.selectedStepId}
+                    transportState={transportState}
+                    onPlay={() => void handlePlay()}
+                    onPlayFromHere={(stepId) => void handlePlayFromHere(stepId)}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onStop={handleStop}
+                  />
+                  <nav className="progression-playback-nav" aria-label="Playback Transport">
+                    <div className="transport-timing" role="group" aria-label="Timing Controls">
+                      <TempoControls
+                        tempoBpm={project.globalTiming.tempoBpm}
+                        onSetTempo={changeTempo}
+                        className="progression-heading-tempo"
+                      />
+                      <PlaybackSupportControls
+                        loopState={loopState}
+                        metronomeEnabled={metronomeEnabled}
+                        countInEnabled={countInEnabled}
+                        onSetLoopMode={handleSetLoopMode}
+                        onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
+                        onToggleCountIn={() => setCountInEnabled((v) => !v)}
+                      />
+                    </div>
+                  </nav>
+                </div>
+              </div>
+              <div className="progression-heading-actions">
+                {project.presentation.progressionView === "piano-roll" &&
+                project.progression.steps.length > 0 ? (
+                  <div
+                    className="piano-roll-progression-selection"
+                    data-testid="piano-roll-progression-selection"
+                    role="group"
+                    aria-label="Progression Melody selection"
+                  >
+                    <PianoRollSelectionAction
+                      accessibleName="Select all effective Melody notes in Progression"
+                      title="Select all effective Melody notes in Progression"
+                      testId="piano-roll-select-all-notes"
+                      selectionScopeLabel={pianoRollSelectionScopeLabel}
+                      onSelect={() => pianoRollSelectAllActionRef.current?.()}
+                    >
+                      Select All
+                    </PianoRollSelectionAction>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-print-progression"
+                  onClick={() => window.print()}
+                  title="Open the system print dialog; choose Save as PDF to export"
+                  data-testid="print-progression"
+                >
+                  <span aria-hidden="true">⎙</span>
+                  <span>Print / Save as PDF</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-modulation-trigger"
+                  onClick={() => setIsModulationModalOpen(true)}
+                  title="Modulation Master & Key Transitions"
+                  data-testid="progression-modulate-trigger"
+                >
+                  <span className="btn-modulation-icon" aria-hidden="true">
+                    🧭
+                  </span>
+                  <span>Modulate</span>
+                </button>
+                <VoiceLeadingMenu
+                  onApplyVoiceLeading={handleApplyVoiceLeading}
+                  disabled={project.progression.steps.length === 0}
+                />
+                <BranchControls
+                  project={project}
+                  selectedBranchStepIds={selectedBranchStepIds}
+                  onStart={startExploration}
+                  onRejoin={setRejoin}
+                  onCommitWhole={commitWhole}
+                  onCommitSelected={commitSelected}
+                  onDiscard={discard}
+                />
+                <ViewModeToggle
+                  currentView={project.presentation.progressionView}
+                  onChangeView={changeProgressionView}
+                  selectAriaLabel="Progression Card View"
+                  testIdPrefix="progression-view"
+                  availableViews={["staff", "tablature", "piano-roll"]}
+                />
+                <LabelHierarchyControl
+                  value={labelHierarchyMode}
+                  onChange={setLabelHierarchyMode}
+                />
+              </div>
+            </div>
+            <ProgressionTrack
+              keyboardVisible={keyboardPreferences.visible}
+              onToggleKeyboard={() =>
+                setKeyboardPreferences((current) => ({ ...current, visible: !current.visible }))
+              }
+              project={project}
+              pianoRollSelectionScopeResetVersion={pianoRollSelectionScopeResetVersion}
+              pianoRollSelectionKeyDownRef={pianoRollSelectionKeyDownRef}
+              pianoRollSelectAllActionRef={pianoRollSelectAllActionRef}
+              onPianoRollSelectionScopeLabelChange={reportPianoRollSelectionScopeLabel}
+              selectedPianoNote={selectedPianoNote}
+              onSelectedPianoNoteChange={setSelectedPianoNote}
+              onSelectedPianoChordChange={(stepId) => {
+                setActivePianoRollChordStepId(stepId);
+                if (pianoRollMatrixReplacementTargetRef.current) {
+                  pianoRollMatrixReplacementTargetRef.current = null;
+                  setPianoRollMatrixReplacement(null);
+                  store.clearMatrixPreview();
+                }
+              }}
+              pianoRollInspectorRequest={pianoRollInspectorRequest}
+              pianoRollAuditionPlayhead={pianoRollAuditionPlayhead}
+              onPianoRollAuditionFinished={finishPianoRollAuditionPlayhead}
+              onAuditionPianoRollMeasure={auditionPianoRollMeasure}
+              onDeleteMeasure={deleteMeasure}
+              onDuplicateMeasure={duplicateMeasureToEnd}
+              onInsertMeasureAfter={insertMeasureAfter}
+              onMoveMeasure={moveMeasure}
+              onLoopMeasure={toggleMeasureLoop}
+              onAuditionPianoRollChord={auditionPianoRollChord}
+              onAuditionPianoRollNote={auditionPianoRollNote}
+              onInsertPianoRollMidiNote={insertPianoRollMidiNote}
+              onAuditionPianoRollMidiNote={auditionPianoRollMidiNote}
+              onStopPianoRollMidiAudition={stopPianoRollMidiAudition}
+              midiSessionKey={projectSessionKey}
+              midiStartupReady={projectReady}
+              transportStatus={transportState.status}
+              onAuditionPianoRollSystem={auditionPianoRollSystem}
+              currentPlayingStepIndex={currentPlayingStepIndex}
+              activeMelodyEventKey={
+                transportState.activeMelodyEventKey ?? previewActiveMelodyEventKey
+              }
+              activeEventStartedAt={transportState.currentStepStartedAt}
+              playbackClockSnapshot={transportState.playbackClockSnapshot}
+              transportPlaying={transportState.status === "playing"}
+              melodyAudioState={melodyAudioState}
+              melodyAudioError={melodyAudioError}
+              harmonyAudioState={
+                isGuitarProgressionView(project.presentation.progressionView)
+                  ? project.harmonyTrack.guitarEngine === "soundfont"
+                    ? guitarSoundFontState
+                    : guitarAudioState
+                  : project.harmonyTrack.instrument === "piano" ||
+                      project.harmonyTrack.instrument === "gm-000"
+                    ? project.harmonyTrack.pianoEngine === "soundfont"
+                      ? harmonySoundFontState
+                      : audioState
+                    : harmonySoundFontState
+              }
+              onRetryHarmonyAudio={() => {
+                if (isGuitarProgressionView(project.presentation.progressionView)) {
+                  if (project.harmonyTrack.guitarEngine === "soundfont") {
+                    const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
+                    const provider = ensureGuitarSoundFontProvider();
+                    void provider
+                      .prepareForInstruments([inst])
+                      .then(applyHarmonyPreparationResult)
+                      .catch((err) => {
+                        setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                      });
+                  } else {
+                    const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
+                    void gProvider.prepare();
+                  }
+                } else if (
+                  project.harmonyTrack.instrument === "piano" ||
+                  project.harmonyTrack.instrument === "gm-000"
+                ) {
+                  if (project.harmonyTrack.pianoEngine === "soundfont") {
+                    const provider = ensureHarmonySoundFontProvider();
+                    void provider
+                      .prepareForInstruments([
+                        project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
+                      ])
+                      .then(applyHarmonyPreparationResult)
+                      .catch((err) => {
+                        setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                      });
+                  } else {
+                    const provider = audioProviderRef.current;
+                    if (provider) void provider.prepare();
+                  }
+                } else {
+                  const provider = ensureHarmonySoundFontProvider();
+                  void provider
+                    .prepareForInstruments([project.harmonyTrack.instrument])
+                    .then(applyHarmonyPreparationResult)
+                    .catch((err) => {
+                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
+                    });
+                }
+              }}
+              onRetryMelodyAudio={retryMelodyAudio}
+              isMelodyPreviewPlaying={isMelodyPreviewPlaying}
+              onPlayMelodyPreview={playMelodyPreview}
+              onStopMelodyPreview={stopMelodyPreview}
+              loopState={loopState}
+              onSelectStep={selectProgressionStep}
+              onClearSelection={() => setProgressionSelection()}
+              onEditPerformance={editProgressionPerformance}
+              onSetStepDuration={
+                project.presentation.progressionView === "piano-roll"
+                  ? resizeProgressionChordDuration
+                  : changeStepDuration
+              }
+              onDurationResizeStatusChange={setDurationResizeStatus}
+              labelMode={labelHierarchyMode}
+              onSetProgressionView={changeProgressionView}
+              onRemove={removeProgressionStep}
+              onDuplicateStep={duplicateProgressionStep}
+              onInsertStepBefore={insertMatrixChordBefore}
+              onInsertStepAfter={insertMatrixChordAfter}
+              activeMatrixFunctionId={activePreviewId}
+              matrixReplacementFunctionId={matrixSession.previewFunctionId}
+              pianoRollMatrixReplacement={pianoRollMatrixReplacement}
+              selectedMatrixChordName={selectedMatrixChordName}
+              onReorder={reorderProgressionStep}
+              onPlayRange={playProgressionRange}
+              onToggleLoopRange={toggleProgressionRangeLoop}
+              isLoopRangeActive={isLoopingProgressionRange}
+              onCopyRange={copyProgressionRange}
+              onDuplicateRange={duplicateProgressionRange}
+              onDeleteRange={deleteProgressionRange}
+              onResetPerformanceRange={resetPerformanceProgressionRange}
+              onTransposeRange={transposeProgressionRange}
+              onExploreRange={openAlternativesForRange}
+              onAddRest={addRest}
+              onReplacePianoRollChord={replacePianoRollChord}
+              onSetPianoRollRest={setPianoRollRest}
+              onSetPianoRollStepDuration={setPianoRollStepDuration}
+              onSplitPianoRollStep={splitPianoRollStep}
+              onTiePianoRollSteps={tiePianoRollSteps}
+              onTransferPianoRollBoundary={transferPianoRollBoundary}
+              onFocusMatrix={() => {
+                const matrix = document.querySelector<HTMLElement>(
+                  '[aria-label="Harmonic Matrix"]',
+                );
+                matrix
+                  ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
+                  ?.focus();
+              }}
+              onFocusMatrixChord={(stepId) => {
+                pianoRollMatrixReplacementTargetRef.current = stepId;
+                setPianoRollMatrixReplacement({ stepId, functionId: null });
+                store.clearMatrixPreview();
+                const matrix = document.querySelector<HTMLElement>(
+                  '[aria-label="Harmonic Matrix"]',
+                );
+                matrix
+                  ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
+                  ?.focus();
+              }}
+              onCancelMatrixChordChoice={() => {
                 pianoRollMatrixReplacementTargetRef.current = null;
                 setPianoRollMatrixReplacement(null);
                 store.clearMatrixPreview();
-              }
-            }}
-            pianoRollInspectorRequest={pianoRollInspectorRequest}
-            pianoRollAuditionPlayhead={pianoRollAuditionPlayhead}
-            onPianoRollAuditionFinished={finishPianoRollAuditionPlayhead}
-            onAuditionPianoRollMeasure={auditionPianoRollMeasure}
-            onDeleteMeasure={deleteMeasure}
-            onDuplicateMeasure={duplicateMeasureToEnd}
-            onInsertMeasureAfter={insertMeasureAfter}
-            onLoopMeasure={toggleMeasureLoop}
-            onAuditionPianoRollChord={auditionPianoRollChord}
-            onAuditionPianoRollNote={auditionPianoRollNote}
-            onInsertPianoRollMidiNote={insertPianoRollMidiNote}
-            onAuditionPianoRollMidiNote={auditionPianoRollMidiNote}
-            onStopPianoRollMidiAudition={stopPianoRollMidiAudition}
-            midiSessionKey={projectSessionKey}
-            midiStartupReady={projectReady}
-            transportStatus={transportState.status}
-            onAuditionPianoRollSystem={auditionPianoRollSystem}
-            currentPlayingStepIndex={currentPlayingStepIndex}
-            activeMelodyEventKey={
-              transportState.activeMelodyEventKey ?? previewActiveMelodyEventKey
-            }
-            activeEventStartedAt={transportState.currentStepStartedAt}
-            playbackClockSnapshot={transportState.playbackClockSnapshot}
-            transportPlaying={transportState.status === "playing"}
-            melodyAudioState={melodyAudioState}
-            melodyAudioError={melodyAudioError}
-            harmonyAudioState={
-              isGuitarProgressionView(project.presentation.progressionView)
-                ? project.harmonyTrack.guitarEngine === "soundfont"
-                  ? guitarSoundFontState
-                  : guitarAudioState
-                : project.harmonyTrack.instrument === "piano" ||
-                    project.harmonyTrack.instrument === "gm-000"
-                  ? project.harmonyTrack.pianoEngine === "soundfont"
-                    ? harmonySoundFontState
-                    : audioState
-                  : harmonySoundFontState
-            }
-            onRetryHarmonyAudio={() => {
-              if (isGuitarProgressionView(project.presentation.progressionView)) {
-                if (project.harmonyTrack.guitarEngine === "soundfont") {
-                  const inst = project.harmonyTrack.guitarSoundfontInstrument ?? "gm-025";
-                  const provider = ensureGuitarSoundFontProvider();
-                  void provider
-                    .prepareForInstruments([inst])
-                    .then(applyHarmonyPreparationResult)
-                    .catch((err) => {
-                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                    });
-                } else {
-                  const gProvider = guitarProviderRef.current ?? ensureGuitarProvider();
-                  void gProvider.prepare();
-                }
-              } else if (
-                project.harmonyTrack.instrument === "piano" ||
-                project.harmonyTrack.instrument === "gm-000"
-              ) {
-                if (project.harmonyTrack.pianoEngine === "soundfont") {
-                  const provider = ensureHarmonySoundFontProvider();
-                  void provider
-                    .prepareForInstruments([
-                      project.harmonyTrack.pianoSoundfontInstrument ?? "gm-000",
-                    ])
-                    .then(applyHarmonyPreparationResult)
-                    .catch((err) => {
-                      setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                    });
-                } else {
-                  const provider = audioProviderRef.current;
-                  if (provider) void provider.prepare();
-                }
-              } else {
-                const provider = ensureHarmonySoundFontProvider();
-                void provider
-                  .prepareForInstruments([project.harmonyTrack.instrument])
-                  .then(applyHarmonyPreparationResult)
-                  .catch((err) => {
-                    setHarmonySoundFontError(err instanceof Error ? err.message : String(err));
-                  });
-              }
-            }}
-            onRetryMelodyAudio={retryMelodyAudio}
-            isMelodyPreviewPlaying={isMelodyPreviewPlaying}
-            onPlayMelodyPreview={playMelodyPreview}
-            onStopMelodyPreview={stopMelodyPreview}
-            loopState={loopState}
-            onSelectStep={selectProgressionStep}
-            onClearSelection={() => setProgressionSelection()}
-            onEditPerformance={editProgressionPerformance}
-            onSetStepDuration={
-              project.presentation.progressionView === "piano-roll"
-                ? resizeProgressionChordDuration
-                : changeStepDuration
-            }
-            onDurationResizeStatusChange={setDurationResizeStatus}
-            labelMode={labelHierarchyMode}
-            onSetProgressionView={changeProgressionView}
-            onRemove={removeProgressionStep}
-            onDuplicateStep={duplicateProgressionStep}
-            onInsertStepBefore={insertMatrixChordBefore}
-            onInsertStepAfter={insertMatrixChordAfter}
-            activeMatrixFunctionId={activePreviewId}
-            matrixReplacementFunctionId={matrixSession.previewFunctionId}
-            pianoRollMatrixReplacement={pianoRollMatrixReplacement}
-            selectedMatrixChordName={selectedMatrixChordName}
-            onReorder={reorderProgressionStep}
-            onPlayRange={playProgressionRange}
-            onToggleLoopRange={toggleProgressionRangeLoop}
-            isLoopRangeActive={isLoopingProgressionRange}
-            onCopyRange={copyProgressionRange}
-            onDuplicateRange={duplicateProgressionRange}
-            onDeleteRange={deleteProgressionRange}
-            onResetPerformanceRange={resetPerformanceProgressionRange}
-            onTransposeRange={transposeProgressionRange}
-            onExploreRange={openAlternativesForRange}
-            onAddRest={addRest}
-            onReplacePianoRollChord={replacePianoRollChord}
-            onSetPianoRollRest={setPianoRollRest}
-            onSetPianoRollStepDuration={setPianoRollStepDuration}
-            onSplitPianoRollStep={splitPianoRollStep}
-            onTiePianoRollSteps={tiePianoRollSteps}
-            onTransferPianoRollBoundary={transferPianoRollBoundary}
-            onFocusMatrix={() => {
-              const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
-              matrix
-                ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
-                ?.focus();
-            }}
-            onFocusMatrixChord={(stepId) => {
-              pianoRollMatrixReplacementTargetRef.current = stepId;
-              setPianoRollMatrixReplacement({ stepId, functionId: null });
-              store.clearMatrixPreview();
-              const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
-              matrix
-                ?.querySelector<HTMLButtonElement>('[data-testid^="chord-card-"] button')
-                ?.focus();
-            }}
-            onCancelMatrixChordChoice={() => {
-              pianoRollMatrixReplacementTargetRef.current = null;
-              setPianoRollMatrixReplacement(null);
-              store.clearMatrixPreview();
-            }}
-            onFocusMatrixKey={() => {
-              const matrix = document.querySelector<HTMLElement>('[aria-label="Harmonic Matrix"]');
-              matrix?.querySelector<HTMLButtonElement>('[aria-label^="Set key "]')?.focus();
-            }}
-            onFillGapWithRest={fillProgressionGapWithRest}
-            onExtendFinalChord={extendFinalChordToBar}
-            onRepeatFinalChord={repeatFinalChordToBar}
-            onSetMelodyRecipe={setMelodyRecipeForStep}
-            onSetAuthoredMelody={setAuthoredMelodyForStep}
-            onApplyPianoRollMelodyEdits={applyPianoRollMelodyEdits}
-            onRemoveMelodyRecipe={removeMelodyRecipeForStep}
-            onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
-            onMelodyTrackSettingsChange={changeMelodyTrackSettings}
-            onSetMeasuresPerSystem={changeMeasuresPerSystem}
-            onDuplicateSystem={duplicateSystem}
-            onDeleteSystem={deleteSystem}
-            isSystemLooping={isSystemLooping}
-            isSystemMuted={isSystemMuted}
-            isSystemSolo={isSystemSolo}
-            canPasteSystem={Boolean(copiedSystemSteps && copiedSystemSteps.length > 0)}
-            onPlayFromSystem={playFromSystem}
-            onToggleLoopSystem={toggleLoopSystem}
-            onToggleMuteSystem={toggleMuteSystem}
-            onToggleSoloSystem={toggleSoloSystem}
-            onMoveSystemUp={(sys) => moveSystem(sys, -1)}
-            onMoveSystemDown={(sys) => moveSystem(sys, 1)}
-            onCopySystem={copySystem}
-            onPasteSystemAfter={pasteSystemAfter}
-            onInsertEmptySystemAfter={insertEmptySystemAfter}
-            onInsertRestAfterSystem={insertRestAfterSystem}
-            onExploreAlternativeFromSystem={exploreAlternativeFromSystem}
-            onOctaveUpSystem={(sys) => shiftOctaveSystem(sys, 1)}
-            onOctaveDownSystem={(sys) => shiftOctaveSystem(sys, -1)}
-            onResetPerformanceSystem={resetPerformanceSystem}
-            onSetArticulationSystem={setArticulationSystem}
-            onApplyMelodyContourSystem={applyMelodyContourSystem}
-            onSetMelodyGridSystem={setMelodyGridSystem}
-            onClearMelodySystem={clearMelodySystem}
-            onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
-            onToggleSuzukiColors={() =>
-              changeSuzukiColors(project.presentation.noteColorMode !== "suzuki")
-            }
-            onApplyPreset={handleApplyPreset}
-            onOpenPresets={() => setPresetsPanelOpen(true)}
-            onApplySubstitution={handleApplySubstitution}
-            onOpenModulation={() => setIsModulationModalOpen(true)}
-          />
-          <BranchComparison
-            project={project}
-            selectedStepIds={selectedBranchStepIds}
-            onSelectedStepIdsChange={(ids) => setSelectedBranchStepIds(Object.freeze(ids))}
-          />
-        </>
-      }
-      overlays={
-        <>
-          {alternativesSession ? (
-            <AlternativesTray
-              snapshot={alternativesSession.snapshot}
-              mode={project.presentation.expertiseMode}
-              originLabel={alternativesOriginLabel}
-              applyError={alternativesSession.applyError}
-              onAudition={auditionAlternative}
-              onApply={applyAlternative}
-              onClose={closeAlternatives}
-            />
-          ) : null}
-          {quickChordPaletteOpen ? (
-            <QuickChordPalette
-              candidates={quickChordCandidates}
-              onPreview={previewQuickChord}
-              onApply={applyQuickChord}
-              onClose={() => closeQuickChordPalette(true)}
-              isTopmost={!pendingRouteWarning}
-            />
-          ) : null}
-          {pendingRouteWarning ? (
-            <RouteWarningDialog
-              decision={pendingRouteWarning.decision}
-              onCancel={cancelPendingRoute}
-              onConfirm={confirmPendingRoute}
-              restoreFocusRef={routeRestoreFocusRef}
-            />
-          ) : null}
-          {pendingSwitch ? (
-            <ModuleSwitchDialog
-              plan={pendingSwitch}
-              onCancel={() => setPendingSwitch(null)}
-              onConfirm={(resolutions) =>
-                applyModuleSwitch(pendingSwitch.destinationModule, resolutions)
-              }
-            />
-          ) : null}
-          {voicingEditorOpen && selectedChordStep && (
-            <PianoVoicingEditor
-              isOpen={voicingEditorOpen}
-              stepLabel={selectedChordStep.harmonicFunction.functionId}
-              initialPitches={
-                selectedChordStep.performance.manualVoicing?.length
-                  ? selectedChordStep.performance.manualVoicing.map((pitch) =>
-                      pitchToConcertFrame(pitch, selectedChordStep),
-                    )
-                  : realizeProgressionStepPitches(selectedChordStep, project.tonic)
-              }
-              onClose={() => setVoicingEditorOpen(false)}
-              onSave={(pitches) => {
-                const remaining = [...(selectedChordStep.performance.manualVoicing ?? [])];
-                const sourcePitches = pitches.map((pitch) => {
-                  const sameConcertIndex = remaining.findIndex(
-                    (original) =>
-                      pitchToConcertFrame(original, selectedChordStep).midiNumber ===
-                      pitch.midiNumber,
-                  );
-                  if (sameConcertIndex >= 0) return remaining.splice(sameConcertIndex, 1)[0]!;
-                  return pitchToSourceFrame(pitch, selectedChordStep);
-                });
-                editProgressionPerformance(selectedChordStep.id, {
-                  voicingMode: "manual",
-                  manualVoicing: sourcePitches,
-                });
               }}
-              onResetToAuto={() => {
-                editProgressionPerformance(selectedChordStep.id, {
-                  voicingMode: "auto",
-                });
-                setVoicingEditorOpen(false);
+              onFocusMatrixKey={() => {
+                const matrix = document.querySelector<HTMLElement>(
+                  '[aria-label="Harmonic Matrix"]',
+                );
+                matrix?.querySelector<HTMLButtonElement>('[aria-label^="Set key "]')?.focus();
               }}
-            />
-          )}
-          <PresetsPanel
-            isOpen={presetsPanelOpen}
-            isTopmost={!applyDialogPreset && !savePresetDialogOpen}
-            project={project}
-            onClose={() => {
-              stopAuditionPreset();
-              setPresetsPanelOpen(false);
-            }}
-            onOpenApplyDialog={(preset) => {
-              stopAuditionPreset();
-              setApplyDialogPreset(preset);
-            }}
-            onOpenSaveDialog={() => {
-              stopAuditionPreset();
-              setSavePresetDialogOpen(true);
-            }}
-            onDeleteCustomPreset={handleDeleteCustomPreset}
-            onAuditionPreset={auditionPreset}
-            onStopAudition={stopAuditionPreset}
-            auditioningPresetId={auditioningPresetId}
-          />
-          <PresetApplyDialog
-            isOpen={Boolean(applyDialogPreset)}
-            preset={applyDialogPreset}
-            project={project}
-            onClose={() => setApplyDialogPreset(null)}
-            onApply={handleApplyPreset}
-          />
-          <SavePresetDialog
-            isOpen={savePresetDialogOpen}
-            project={project}
-            onClose={() => setSavePresetDialogOpen(false)}
-            onSave={handleSaveCustomPreset}
-          />
-          <ModulationModal
-            isOpen={isModulationModalOpen}
-            project={project}
-            onClose={() => {
-              stopAuditioningModulation();
-              setIsModulationModalOpen(false);
-            }}
-            onAuditionPath={handleAuditionModulationPath}
-            onStopAudition={stopAuditioningModulation}
-            auditioningPathId={auditioningModPathId}
-            onApplyBridge={handleApplyModulationBridge}
-            selectedStepId={project.progression.selectedStepId}
-          />
-          <ModesExplorerModal
-            isOpen={isModesExplorerOpen}
-            project={project}
-            onClose={() => {
-              stopAuditioningModes();
-              setIsModesExplorerOpen(false);
-            }}
-            onAuditionScaleNotes={handleAuditionScaleNotes}
-            onAuditionChord={handleAuditionModalChord}
-            onAuditionFormula={handleAuditionModalFormula}
-            onStopAudition={stopAuditioningModes}
-            onApplyFormulaToProgression={handleApplyModalFormulaToProgression}
-            onApplyKeyToProject={handleApplyModalKeyToProject}
-          />
-          {progressionMenu ? (
-            <ProgressionContextMenu
-              position={progressionMenu.position}
-              invoker={progressionMenu.anchor}
-              measureCount={progressionMeasureCount}
-              stepCount={project.progression.steps.length}
-              chordStepCount={chordStepsAll.length}
-              isLooping={loopState.enabled && loopState.mode === "all"}
-              hasMutedSystems={mutedSystemIndices.size > 0}
-              hasSoloSystems={soloSystemIndex !== null}
-              canShiftOctaveUp={canShiftOctaveUpAll}
-              canShiftOctaveDown={canShiftOctaveDownAll}
-              currentArticulation={currentArticulationAll}
-              currentPitchMotion={currentPitchMotionAll}
-              currentGrid={currentGridAll}
-              hasMelody={hasMelodyAll}
-              measuresPerSystem={project.presentation.measuresPerSystem}
-              steps={project.progression.steps}
-              onStartBranch={startExploration}
-              isBranchActive={Boolean(project.temporaryBranch)}
-              onCommitBranch={commitWhole}
-              onDiscardBranch={discard}
-              onPlayFromBeginning={handlePlay}
-              onToggleLoop={toggleLoopProgression}
-              onUnmuteAll={unmuteAllSystems}
-              onClearSolos={clearAllSolos}
-              onOctaveUp={() => shiftOctaveAll(1)}
-              onOctaveDown={() => shiftOctaveAll(-1)}
-              onResetPerformance={resetAllProgressionPerformance}
-              onSetArticulation={setArticulationAll}
-              onApplyMelodyContour={applyMelodyContourAll}
-              onSetMelodyGrid={setMelodyGridAll}
-              onClearMelody={clearMelodyAll}
+              onFillGapWithRest={fillProgressionGapWithRest}
+              onExtendFinalChord={extendFinalChordToBar}
+              onRepeatFinalChord={repeatFinalChordToBar}
+              onSetMelodyRecipe={setMelodyRecipeForStep}
+              onSetAuthoredMelody={setAuthoredMelodyForStep}
+              onApplyPianoRollMelodyEdits={applyPianoRollMelodyEdits}
+              onRemoveMelodyRecipe={removeMelodyRecipeForStep}
+              onHarmonyTrackSettingsChange={changeHarmonyTrackSettings}
+              onMelodyTrackSettingsChange={changeMelodyTrackSettings}
               onSetMeasuresPerSystem={changeMeasuresPerSystem}
-              onDuplicateAllSteps={duplicateAllSteps}
-              onAddRest={() => addRest()}
-              onOpenPresets={() => setPresetsPanelOpen(true)}
-              onSaveAsPreset={() => setSavePresetDialogOpen(true)}
-              onClearAllSteps={clearAllProgressionSteps}
-              onClose={() => setProgressionMenu(null)}
-            />
-          ) : null}
-          {matrixMenu ? (
-            <MatrixContextMenu
-              position={matrixMenu.position}
-              invoker={matrixMenu.anchor}
-              activeModule={project.activeModule}
-              tonic={project.tonic}
-              globalView={project.presentation.globalMatrixCardView}
-              showBassInStaff={project.presentation.showBassInStaff}
-              currentArticulation={project.defaults.piano.performance.articulation}
-              currentRegister={project.defaults.piano.performance.register}
-              hasPreviewSelection={Boolean(activePreviewId)}
-              isRecommendationsActive={globalSettingsVisibility.showRecommendationContext}
-              onResetCurrentModule={() => resetMatrix("current-module")}
-              onResetAllModules={() => resetMatrix("all-modules")}
-              onResetTemplateDefaults={() => resetTemplate()}
-              onSetModule={requestModuleSwitch}
-              onTranspose={(semitones) =>
-                changeTonic((((project.tonic + semitones) % 12) + 12) % 12)
-              }
-              onSetTonic={changeTonic}
-              onSetView={globalView}
-              onToggleBassInStaff={() =>
-                changeStaffBassVisibility(!project.presentation.showBassInStaff)
-              }
-              suzukiColors={project.presentation.noteColorMode === "suzuki"}
+              onDuplicateSystem={duplicateSystem}
+              onDeleteSystem={deleteSystem}
+              isSystemLooping={isSystemLooping}
+              isSystemMuted={isSystemMuted}
+              isSystemSolo={isSystemSolo}
+              canPasteSystem={Boolean(copiedSystemSteps && copiedSystemSteps.length > 0)}
+              onPlayFromSystem={playFromSystem}
+              onToggleLoopSystem={toggleLoopSystem}
+              onToggleMuteSystem={toggleMuteSystem}
+              onToggleSoloSystem={toggleSoloSystem}
+              onMoveSystemBlock={moveSystem}
+              onCopySystem={copySystem}
+              onPasteSystemAfter={pasteSystemAfter}
+              onInsertEmptySystemAfter={insertEmptySystemAfter}
+              onInsertRestAfterSystem={insertRestAfterSystem}
+              onExploreAlternativeFromSystem={exploreAlternativeFromSystem}
+              onOctaveUpSystem={(sys) => shiftOctaveSystem(sys, 1)}
+              onOctaveDownSystem={(sys) => shiftOctaveSystem(sys, -1)}
+              onResetPerformanceSystem={resetPerformanceSystem}
+              onSetArticulationSystem={setArticulationSystem}
+              onApplyMelodyContourSystem={applyMelodyContourSystem}
+              onSetMelodyGridSystem={setMelodyGridSystem}
+              onClearMelodySystem={clearMelodySystem}
+              onOpenProgressionMenu={(anchor, pos) => setProgressionMenu({ anchor, position: pos })}
               onToggleSuzukiColors={() =>
                 changeSuzukiColors(project.presentation.noteColorMode !== "suzuki")
               }
-              resolutionArrows={project.presentation.resolutionArrows !== false}
-              onToggleResolutionArrows={() =>
-                changeResolutionArrows(!(project.presentation.resolutionArrows !== false))
-              }
-              onSetArticulation={(articulation) => patchTemplatePerformance({ articulation })}
-              onSetRegister={(register) => patchTemplatePerformance({ register })}
-              onToggleRecommendations={() =>
-                setGlobalSettingsVisibility((prev) => ({
-                  ...prev,
-                  showRecommendationContext: !prev.showRecommendationContext,
-                }))
-              }
-              onClearSelection={clearMatrixSelection}
-              onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
-              onClose={() => setMatrixMenu(null)}
+              onApplyPreset={handleApplyPreset}
+              onOpenPresets={() => setPresetsPanelOpen(true)}
+              onApplySubstitution={handleApplySubstitution}
+              onOpenModulation={() => setIsModulationModalOpen(true)}
             />
-          ) : null}
-          {isHelpOpen ? (
-            <HelpCenterModal
-              initialTab={helpInitialTab}
-              onClose={() => setIsHelpOpen(false)}
-              onOpenFingeringLegend={() => {
-                setIsHelpOpen(false);
-                setIsFingeringLegendOpen(true);
+            <BranchComparison
+              project={project}
+              selectedStepIds={selectedBranchStepIds}
+              onSelectedStepIdsChange={(ids) => setSelectedBranchStepIds(Object.freeze(ids))}
+            />
+          </>
+        }
+        overlays={
+          <>
+            {alternativesSession ? (
+              <AlternativesTray
+                snapshot={alternativesSession.snapshot}
+                mode={project.presentation.expertiseMode}
+                originLabel={alternativesOriginLabel}
+                applyError={alternativesSession.applyError}
+                onAudition={auditionAlternative}
+                onApply={applyAlternative}
+                onClose={closeAlternatives}
+              />
+            ) : null}
+            {quickChordPaletteOpen ? (
+              <QuickChordPalette
+                candidates={quickChordCandidates}
+                onPreview={previewQuickChord}
+                onApply={applyQuickChord}
+                onClose={() => closeQuickChordPalette(true)}
+                isTopmost={!pendingRouteWarning}
+              />
+            ) : null}
+            {pendingRouteWarning ? (
+              <RouteWarningDialog
+                decision={pendingRouteWarning.decision}
+                onCancel={cancelPendingRoute}
+                onConfirm={confirmPendingRoute}
+                restoreFocusRef={routeRestoreFocusRef}
+              />
+            ) : null}
+            {pendingSwitch ? (
+              <ModuleSwitchDialog
+                plan={pendingSwitch}
+                onCancel={() => setPendingSwitch(null)}
+                onConfirm={(resolutions) =>
+                  applyModuleSwitch(pendingSwitch.destinationModule, resolutions)
+                }
+              />
+            ) : null}
+            {voicingEditorOpen && selectedChordStep && (
+              <PianoVoicingEditor
+                isOpen={voicingEditorOpen}
+                stepLabel={selectedChordStep.harmonicFunction.functionId}
+                initialPitches={
+                  selectedChordStep.performance.manualVoicing?.length
+                    ? selectedChordStep.performance.manualVoicing.map((pitch) =>
+                        pitchToConcertFrame(pitch, selectedChordStep),
+                      )
+                    : realizeProgressionStepPitches(selectedChordStep, project.tonic)
+                }
+                onClose={() => setVoicingEditorOpen(false)}
+                onSave={(pitches) => {
+                  const remaining = [...(selectedChordStep.performance.manualVoicing ?? [])];
+                  const sourcePitches = pitches.map((pitch) => {
+                    const sameConcertIndex = remaining.findIndex(
+                      (original) =>
+                        pitchToConcertFrame(original, selectedChordStep).midiNumber ===
+                        pitch.midiNumber,
+                    );
+                    if (sameConcertIndex >= 0) return remaining.splice(sameConcertIndex, 1)[0]!;
+                    return pitchToSourceFrame(pitch, selectedChordStep);
+                  });
+                  editProgressionPerformance(selectedChordStep.id, {
+                    voicingMode: "manual",
+                    manualVoicing: sourcePitches,
+                  });
+                }}
+                onResetToAuto={() => {
+                  editProgressionPerformance(selectedChordStep.id, {
+                    voicingMode: "auto",
+                  });
+                  setVoicingEditorOpen(false);
+                }}
+              />
+            )}
+            <PresetsPanel
+              isOpen={presetsPanelOpen}
+              isTopmost={!applyDialogPreset && !savePresetDialogOpen}
+              project={project}
+              onClose={() => {
+                stopAuditionPreset();
+                setPresetsPanelOpen(false);
               }}
+              onOpenApplyDialog={(preset) => {
+                stopAuditionPreset();
+                setApplyDialogPreset(preset);
+              }}
+              onOpenSaveDialog={() => {
+                stopAuditionPreset();
+                setSavePresetDialogOpen(true);
+              }}
+              onDeleteCustomPreset={handleDeleteCustomPreset}
+              onAuditionPreset={auditionPreset}
+              onStopAudition={stopAuditionPreset}
+              auditioningPresetId={auditioningPresetId}
             />
-          ) : null}
-          {isFingeringLegendOpen ? (
-            <GuitarHandLegendModal
-              fingeringStyle="badge"
-              onClose={() => setIsFingeringLegendOpen(false)}
-              onSetFingeringStyle={() => {}}
+            <PresetApplyDialog
+              isOpen={Boolean(applyDialogPreset)}
+              preset={applyDialogPreset}
+              project={project}
+              onClose={() => setApplyDialogPreset(null)}
+              onApply={handleApplyPreset}
             />
-          ) : null}
-        </>
-      }
-    />
+            <SavePresetDialog
+              isOpen={savePresetDialogOpen}
+              project={project}
+              onClose={() => setSavePresetDialogOpen(false)}
+              onSave={handleSaveCustomPreset}
+            />
+            <ModulationModal
+              isOpen={isModulationModalOpen}
+              project={project}
+              onClose={() => {
+                stopAuditioningModulation();
+                setIsModulationModalOpen(false);
+              }}
+              onAuditionPath={handleAuditionModulationPath}
+              onStopAudition={stopAuditioningModulation}
+              auditioningPathId={auditioningModPathId}
+              onApplyBridge={handleApplyModulationBridge}
+              selectedStepId={project.progression.selectedStepId}
+            />
+            <ModesExplorerModal
+              isOpen={isModesExplorerOpen}
+              project={project}
+              onClose={() => {
+                stopAuditioningModes();
+                setIsModesExplorerOpen(false);
+              }}
+              onAuditionScaleNotes={handleAuditionScaleNotes}
+              onAuditionChord={handleAuditionModalChord}
+              onAuditionFormula={handleAuditionModalFormula}
+              onStopAudition={stopAuditioningModes}
+              onApplyFormulaToProgression={handleApplyModalFormulaToProgression}
+              onApplyKeyToProject={handleApplyModalKeyToProject}
+            />
+            {progressionMenu ? (
+              <ProgressionContextMenu
+                position={progressionMenu.position}
+                invoker={progressionMenu.anchor}
+                measureCount={progressionMeasureCount}
+                stepCount={project.progression.steps.length}
+                chordStepCount={chordStepsAll.length}
+                isLooping={loopState.enabled && loopState.mode === "all"}
+                hasMutedSystems={mutedSystemIndices.size > 0}
+                hasSoloSystems={soloSystemIndex !== null}
+                canShiftOctaveUp={canShiftOctaveUpAll}
+                canShiftOctaveDown={canShiftOctaveDownAll}
+                currentArticulation={currentArticulationAll}
+                currentPitchMotion={currentPitchMotionAll}
+                currentGrid={currentGridAll}
+                hasMelody={hasMelodyAll}
+                measuresPerSystem={project.presentation.measuresPerSystem}
+                steps={project.progression.steps}
+                onStartBranch={startExploration}
+                isBranchActive={Boolean(project.temporaryBranch)}
+                onCommitBranch={commitWhole}
+                onDiscardBranch={discard}
+                onPlayFromBeginning={() => void handlePlay()}
+                onToggleLoop={toggleLoopProgression}
+                onUnmuteAll={unmuteAllSystems}
+                onClearSolos={clearAllSolos}
+                onOctaveUp={() => shiftOctaveAll(1)}
+                onOctaveDown={() => shiftOctaveAll(-1)}
+                onResetPerformance={resetAllProgressionPerformance}
+                onSetArticulation={setArticulationAll}
+                onApplyMelodyContour={applyMelodyContourAll}
+                onSetMelodyGrid={setMelodyGridAll}
+                onClearMelody={clearMelodyAll}
+                onSetMeasuresPerSystem={changeMeasuresPerSystem}
+                onDuplicateAllSteps={duplicateAllSteps}
+                onAddRest={() => addRest()}
+                onOpenPresets={() => setPresetsPanelOpen(true)}
+                onSaveAsPreset={() => setSavePresetDialogOpen(true)}
+                onClearAllSteps={clearAllProgressionSteps}
+                onClose={() => setProgressionMenu(null)}
+              />
+            ) : null}
+            {matrixMenu ? (
+              <MatrixContextMenu
+                position={matrixMenu.position}
+                invoker={matrixMenu.anchor}
+                activeModule={project.activeModule}
+                tonic={project.tonic}
+                globalView={project.presentation.globalMatrixCardView}
+                showBassInStaff={project.presentation.showBassInStaff}
+                currentArticulation={project.defaults.piano.performance.articulation}
+                currentRegister={project.defaults.piano.performance.register}
+                hasPreviewSelection={Boolean(activePreviewId)}
+                isRecommendationsActive={globalSettingsVisibility.showRecommendationContext}
+                onResetCurrentModule={() => resetMatrix("current-module")}
+                onResetAllModules={() => resetMatrix("all-modules")}
+                onResetTemplateDefaults={() => resetTemplate()}
+                onSetModule={requestModuleSwitch}
+                onTranspose={(semitones) =>
+                  changeTonic((((project.tonic + semitones) % 12) + 12) % 12)
+                }
+                onSetTonic={changeTonic}
+                onSetView={globalView}
+                onToggleBassInStaff={() =>
+                  changeStaffBassVisibility(!project.presentation.showBassInStaff)
+                }
+                suzukiColors={project.presentation.noteColorMode === "suzuki"}
+                onToggleSuzukiColors={() =>
+                  changeSuzukiColors(project.presentation.noteColorMode !== "suzuki")
+                }
+                resolutionArrows={project.presentation.resolutionArrows !== false}
+                onToggleResolutionArrows={() =>
+                  changeResolutionArrows(!(project.presentation.resolutionArrows !== false))
+                }
+                onSetArticulation={(articulation) => patchTemplatePerformance({ articulation })}
+                onSetRegister={(register) => patchTemplatePerformance({ register })}
+                onToggleRecommendations={() =>
+                  setGlobalSettingsVisibility((prev) => ({
+                    ...prev,
+                    showRecommendationContext: !prev.showRecommendationContext,
+                  }))
+                }
+                onClearSelection={clearMatrixSelection}
+                onOpenModesExplorer={() => setIsModesExplorerOpen(true)}
+                onClose={() => setMatrixMenu(null)}
+              />
+            ) : null}
+            {isHelpOpen ? (
+              <HelpCenterModal
+                initialTab={helpInitialTab}
+                onClose={() => setIsHelpOpen(false)}
+                onOpenFingeringLegend={() => {
+                  setIsHelpOpen(false);
+                  setIsFingeringLegendOpen(true);
+                }}
+              />
+            ) : null}
+            {isFingeringLegendOpen ? (
+              <GuitarHandLegendModal
+                fingeringStyle="badge"
+                onClose={() => setIsFingeringLegendOpen(false)}
+                onSetFingeringStyle={() => {}}
+              />
+            ) : null}
+          </>
+        }
+      />
+    </ErrorBoundary>
   );
 }

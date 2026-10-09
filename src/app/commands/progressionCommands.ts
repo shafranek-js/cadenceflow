@@ -1,4 +1,5 @@
 import type { Project } from "../../domain/project/project";
+import { createEntityId } from "../../domain/runtime/ids";
 import type { Progression } from "../../domain/progression/progression";
 import { normalizeSongSections } from "../../domain/progression/sections";
 import { deleteStepsAndReanchorSections } from "./sectionCommands";
@@ -14,6 +15,10 @@ import { snapshotStepPerformance } from "../../domain/progression/step";
 import { musicalDuration, type MusicalDuration } from "../../domain/timing/duration";
 import { rational } from "../../domain/timing/rational";
 import { resetChordStepPerformance } from "../../domain/progression/reset";
+import {
+  applyChordPropertiesEdit as applyChordPropertiesEditToStep,
+  type ChordPropertiesEdit,
+} from "../../domain/progression/chordProperties";
 import { createMatrixChordStep } from "./matrixCommands";
 import {
   snapshotAuthoredMelodyPhrase,
@@ -126,6 +131,62 @@ export function editStepPerformance(
     return Object.freeze({ ...step, performance });
   });
   if (!found) throw new RangeError(`Unknown chord step: ${command.payload.stepId}`);
+  return withInverse(
+    project,
+    Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
+    command.payload.nowIso,
+  );
+}
+
+export interface EditChordPropertiesPayload {
+  readonly projectId: string;
+  readonly stepId: string;
+  readonly edit: ChordPropertiesEdit;
+  readonly nowIso: string;
+}
+export type EditChordPropertiesCommand = ProjectCommand<EditChordPropertiesPayload> & {
+  readonly type: "progression/edit-chord-properties";
+};
+export function editChordProperties(
+  project: Project,
+  command: EditChordPropertiesCommand,
+): AppliedCommand {
+  if (command.payload.projectId !== project.id) {
+    return {
+      project,
+      inverse: {
+        type: "progression/restore",
+        payload: { progression: project.progression, nowIso: command.payload.nowIso },
+      },
+    };
+  }
+  let found = false;
+  let changed = false;
+  const steps = project.progression.steps.map((step) => {
+    if (step.id !== command.payload.stepId) return step;
+    if (step.kind !== "chord") {
+      throw new Error("Chord Properties can only be edited on chord steps");
+    }
+    found = true;
+    const updated = applyChordPropertiesEditToStep(
+      step,
+      project.tonic,
+      project.activeModule,
+      command.payload.edit,
+    );
+    changed = updated !== step;
+    return updated;
+  });
+  if (!found) throw new RangeError(`Unknown chord step: ${command.payload.stepId}`);
+  if (!changed) {
+    return {
+      project,
+      inverse: {
+        type: "progression/restore",
+        payload: { progression: project.progression, nowIso: command.payload.nowIso },
+      },
+    };
+  }
   return withInverse(
     project,
     Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
@@ -310,7 +371,11 @@ export function replaceStep(project: Project, command: ReplaceStepCommand): Appl
     if (step.id !== command.payload.stepId) return step;
     if (step.kind !== "chord") throw new Error("Replace Step currently targets chord steps");
     found = true;
-    const { explicitSpellingOverrides: _oldSpelling, ...withoutSpelling } = step;
+    const {
+      explicitSpellingOverrides: _oldSpelling,
+      chordPropertiesOrigin: _oldChordPropertiesOrigin,
+      ...withoutSpelling
+    } = step;
     const next: ChordStep = Object.freeze({
       ...withoutSpelling,
       harmonicFunction: replacement.harmonicFunction,
@@ -501,7 +566,7 @@ function cloneStepMelody(
     ...melody,
     phrase: snapshotAuthoredMelodyPhrase({
       ...melody.phrase,
-      notes: melody.phrase.notes.map((note) => ({ ...note, id: crypto.randomUUID() })),
+      notes: melody.phrase.notes.map((note) => ({ ...note, id: createEntityId() })),
     }),
   });
 }
@@ -510,7 +575,7 @@ function cloneRestAuthoredMelody(step: RestStep): RestStep["authoredMelody"] {
   if (!step.authoredMelody) return undefined;
   return snapshotAuthoredMelodyPhrase({
     ...step.authoredMelody,
-    notes: step.authoredMelody.notes.map((note) => ({ ...note, id: crypto.randomUUID() })),
+    notes: step.authoredMelody.notes.map((note) => ({ ...note, id: createEntityId() })),
   });
 }
 
@@ -528,7 +593,7 @@ export type DuplicateStepsCommand = ProjectCommand<DuplicateStepsPayload> & {
 export function duplicateSteps(project: Project, command: DuplicateStepsCommand): AppliedCommand {
   const newStepIds = command.payload.newStepIds;
   const newSteps = command.payload.steps.map((source, index) => {
-    const id = newStepIds?.[index] ?? crypto.randomUUID();
+    const id = newStepIds?.[index] ?? createEntityId();
     if (source.kind === "rest") {
       const rest: RestStep = Object.freeze({
         ...source,

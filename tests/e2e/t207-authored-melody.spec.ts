@@ -1,11 +1,20 @@
 import { expect, test } from "@playwright/test";
-
+import { setProgressionView } from "./test-helpers/progression-settings";
 async function runEditAction(page: import("@playwright/test").Page, action: "Undo" | "Redo") {
   await page.getByTestId("edit-menu-toggle").click();
   await page
     .getByRole("menu", { name: "Edit menu" })
     .getByRole("menuitem", { name: new RegExp(action) })
     .click();
+}
+
+async function openEditMelodyDialog(page: import("@playwright/test").Page) {
+  await page.locator(".measure-staff-event-select").first().click({ button: "right" });
+  await page
+    .getByRole("menu", { name: /Melody actions/ })
+    .getByRole("menuitem", { name: "Edit Melody…" })
+    .click();
+  return page.getByRole("dialog", { name: "Edit Melody" });
 }
 
 test("T207 authored notes create, persist, edit, undo, redo, and delete", async ({ page }) => {
@@ -16,11 +25,8 @@ test("T207 authored notes create, persist, edit, undo, redo, and delete", async 
     .getByTestId("chord-card-I")
     .locator(".chord-main")
     .click({ modifiers: ["Control"] });
-  await page
-    .getByTestId("progression-step")
-    .first()
-    .locator("[data-progression-step-select]")
-    .click({ button: "right" });
+  await setProgressionView(page, "staff");
+  await page.locator(".measure-staff-event-select").first().click({ button: "right" });
   const menu = page.getByRole("menu", { name: /Melody actions/ });
   await menu.getByRole("menuitem", { name: "Create Melody…" }).click();
   let dialog = page.getByRole("dialog", { name: "Create Melody" });
@@ -33,22 +39,19 @@ test("T207 authored notes create, persist, edit, undo, redo, and delete", async 
   await dialog.getByRole("button", { name: "Add note" }).click();
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
   await expect(dialog).toHaveCount(0);
-
-  let note = page.getByTestId("melody-lane-note").first();
-  await expect(note).toHaveAttribute("data-start-beats", "0/1");
-  await expect(note).toHaveAttribute("data-duration-beats", "3/2");
+  let note = page.locator(".melody-staff-note").first();
+  await expect(note).toHaveAttribute("aria-label", /G4, onset 0\/1 beats, duration 3\/2 beats/);
   const stableNoteId = await note.getAttribute("data-melody-event-key");
   await page.waitForTimeout(750);
   await page.reload({ waitUntil: "domcontentloaded" });
-  note = page.getByTestId("melody-lane-note").first();
+  note = page.locator(".melody-staff-note").first();
   await expect(note).toHaveAttribute("data-melody-event-key", stableNoteId!);
-  await expect(note).toHaveAttribute("data-duration-beats", "3/2");
+  await expect(note).toHaveAttribute("aria-label", /duration 3\/2 beats/);
 
   await note.click();
   await note.focus();
   await page.keyboard.press("Enter");
-  await note.dblclick();
-  dialog = page.getByRole("dialog", { name: "Edit Melody" });
+  dialog = await openEditMelodyDialog(page);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Authored notes" })).toHaveAttribute(
     "aria-pressed",
@@ -59,19 +62,18 @@ test("T207 authored notes create, persist, edit, undo, redo, and delete", async 
   await dialog.getByLabel("Authored pitch MIDI").fill("68");
   await dialog.getByRole("button", { name: "Update note" }).click();
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("G#4");
+  await expect(page.locator(".melody-staff-note").first()).toHaveAttribute("aria-label", /G#4/);
 
   await runEditAction(page, "Undo");
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("G4");
+  await expect(page.locator(".melody-staff-note").first()).toHaveAttribute("aria-label", /G4/);
   await runEditAction(page, "Redo");
-  await expect(page.getByTestId("melody-lane-note").first()).toContainText("G#4");
+  await expect(page.locator(".melody-staff-note").first()).toHaveAttribute("aria-label", /G#4/);
 
-  await page.getByTestId("melody-lane-note").first().dblclick();
-  dialog = page.getByRole("dialog", { name: "Edit Melody" });
+  dialog = await openEditMelodyDialog(page);
   await dialog.getByRole("button", { name: /Edit MIDI 68/ }).click();
   await dialog.getByRole("button", { name: /^Delete authored note/ }).click();
   await dialog.getByRole("button", { name: "Apply Melody" }).click();
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(0);
+  await expect(page.locator(".melody-staff-note")).toHaveCount(0);
   await runEditAction(page, "Undo");
-  await expect(page.getByTestId("melody-lane-note")).toHaveCount(1);
+  await expect(page.locator(".melody-staff-note")).toHaveCount(1);
 });

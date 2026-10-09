@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -12,6 +13,22 @@ async function addChord(page: Page, functionId = "I"): Promise<void> {
     .getByTestId(`chord-card-${functionId}`)
     .locator(".chord-main")
     .click({ modifiers: ["Control"] });
+}
+
+async function preparePianoRollChordPair(page: Page) {
+  await addChord(page, "I");
+  await addChord(page, "IV");
+  await setProgressionView(page, "piano-roll");
+  const selectedChord = page.locator(".piano-roll-chord").last();
+  await selectedChord.click();
+  await expect(selectedChord).toHaveAttribute("aria-pressed", "true");
+  const selectedStepId = await selectedChord.getAttribute("data-source-step-id");
+  if (!selectedStepId) throw new Error("The selected Piano Roll chord has no stable Step ID");
+  const handle = page.locator(
+    `.piano-roll-chord-boundary-handle[data-boundary-step-id="${selectedStepId}"][data-boundary-edge="right"]`,
+  );
+  await expect(handle).toBeVisible();
+  return handle;
 }
 
 async function setSelectedDuration(page: Page, value: string): Promise<void> {
@@ -37,194 +54,207 @@ test.describe("T201 — direct duration resize", () => {
   }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
-    await addChord(page);
-
-    const handle = page.locator("[data-duration-resize-handle]").first();
-    await expect(handle).toHaveCount(1);
+    const handle = await preparePianoRollChordPair(page);
     await expect(handle).toHaveAttribute("role", "slider");
     await expect(handle).toHaveAttribute("aria-valuetext", /beats/);
     await expect(handle).toHaveAttribute("title", /Arrow Left\/Right/);
-    const beforePointerPreview = await page
-      .locator("[data-progression-step-select]")
-      .first()
-      .textContent();
+    const beforeKeyboardPreview = await handle.getAttribute("aria-valuenow");
 
     await handle.focus();
     await page.keyboard.press("ArrowLeft");
-    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview:");
-    await expect(handle).toHaveAttribute("data-resize-preview", "true");
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    await expect(handle).toHaveClass(/is-previewing/);
+    const keyboardPreview = await handle.getAttribute("aria-valuenow");
+    expect(keyboardPreview).not.toBe(beforeKeyboardPreview);
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
     await expect(handle).toBeFocused();
-    await expect(page.locator("[data-progression-step-select]").first()).toHaveText(
-      beforePointerPreview ?? "",
-    );
+    await expect(handle).not.toHaveClass(/is-previewing/);
+    await expect(handle).toHaveAttribute("aria-valuenow", beforeKeyboardPreview!);
 
+    await handle.focus();
+    await page.keyboard.press("ArrowLeft");
+    const committedValue = await handle.getAttribute("aria-valuenow");
+    expect(committedValue).not.toBe(beforeKeyboardPreview);
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+    await expect(handle).toBeFocused();
+    await expect(handle).toHaveAttribute("aria-valuenow", committedValue!);
+
+    const beforePointerPreview = await handle.getAttribute("aria-valuenow");
     const box = await handle.boundingBox();
-    expect(box).toBeTruthy();
+    expect(box).not.toBeNull();
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box!.x + box!.width / 2 + 32, box!.y + box!.height / 2);
-    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview:");
+    await page.mouse.move(box!.x + box!.width / 2 - 32, box!.y + box!.height / 2);
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    await expect(handle).toHaveClass(/is-previewing/);
     await page.keyboard.press("Escape");
     await page.mouse.up();
     await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
     await expect(handle).toBeFocused();
-
-    await handle.focus();
-    await page.keyboard.press("ArrowRight");
-    const previewValue = await handle.getAttribute("aria-valuetext");
-    expect(previewValue).toMatch(/beats/);
-    await page.keyboard.press("Enter");
-    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-    await expect(handle).toBeFocused();
-    await expect(handle).toHaveAttribute("aria-valuetext", previewValue!);
+    await expect(handle).not.toHaveClass(/is-previewing/);
+    await expect(handle).toHaveAttribute("aria-valuenow", beforePointerPreview!);
   });
 
   test("commits a pointer drag once without moving the score during preview", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
-    await addChord(page);
-
-    const handle = page.locator("[data-duration-resize-handle]").first();
+    const handle = await preparePianoRollChordPair(page);
     const before = await handle.getAttribute("aria-valuenow");
     await handle.scrollIntoViewIfNeeded();
     const box = await handle.boundingBox();
-    expect(box).toBeTruthy();
+    expect(box).not.toBeNull();
     const x = box!.x + box!.width / 2;
     const y = box!.y + box!.height / 2;
+    const measureBox = await page.locator(".piano-roll-measure").first().boundingBox();
+    expect(measureBox).not.toBeNull();
     await page.mouse.move(x, y);
     await page.mouse.down();
-    await expect(page.getByTestId("duration-resize-status")).toBeVisible();
-    await page.mouse.move(x - 120, y, { steps: 4 });
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    await page.mouse.move(x - 32, y, { steps: 4 });
     await expect(page.getByTestId("duration-resize-status")).toBeVisible();
     expect((await handle.boundingBox())!.y).toBe(box!.y);
+    expect((await page.locator(".piano-roll-measure").first().boundingBox())!.y).toBe(
+      measureBox!.y,
+    );
+    const previewValue = await handle.getAttribute("aria-valuenow");
+    expect(previewValue).not.toBe(before);
     await page.mouse.up();
     await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-    await expect(handle).not.toHaveAttribute("aria-valuenow", before!);
+    await expect(handle).toHaveAttribute("aria-valuenow", previewValue!);
   });
 
-  test("clicking the resize handle only focuses it and leaves the duration unchanged", async ({
+  test("clicking a Piano Roll boundary only focuses it and leaves the boundary unchanged", async ({
     page,
   }) => {
     await openStudio(page);
-    await addChord(page);
-
-    for (const view of ["staff", "tablature"] as const) {
-      await page.getByLabel("Progression Card View").selectOption(view);
-      const handle = page.locator("[data-duration-resize-handle]").first();
-      const before = await handle.getAttribute("aria-valuenow");
-      await handle.click();
-      await expect(handle).toBeFocused();
-      await expect(handle).toHaveAttribute("aria-valuenow", before!);
-      await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-    }
+    const handle = await preparePianoRollChordPair(page);
+    const before = await handle.getAttribute("aria-valuenow");
+    await handle.click();
+    await expect(handle).toBeFocused();
+    await expect(handle).toHaveAttribute("aria-valuenow", before!);
+    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
   });
 
-  test("dragging left shortens a Staff step", async ({ page }) => {
+  test("dragging the Piano Roll right boundary left shortens the preceding Step", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
-    await addChord(page);
-    await page.getByLabel("Progression Card View").selectOption("staff");
-
-    const handle = page.locator("[data-duration-resize-handle]").first();
+    const handle = await preparePianoRollChordPair(page);
     await handle.scrollIntoViewIfNeeded();
     const before = Number(await handle.getAttribute("aria-valuenow"));
     const box = await handle.boundingBox();
-    expect(box).toBeTruthy();
+    expect(box).not.toBeNull();
     const x = box!.x + box!.width / 2;
     const y = box!.y + box!.height / 2;
     await page.mouse.move(x, y);
     await page.mouse.down();
     await page.mouse.move(x - 50, y, { steps: 4 });
-    await expect(page.getByTestId("duration-resize-status")).toBeVisible();
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
     expect(Number(await handle.getAttribute("aria-valuenow"))).toBeLessThan(before);
     await page.mouse.up();
     expect(Number(await handle.getAttribute("aria-valuenow"))).toBeLessThan(before);
   });
 
-  test("places one handle only on a continuation's final visible fragment and excludes Rest", async ({
+  test("places one Piano Roll handle on a long Step's final fragment and excludes Rest", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
     await addChord(page);
-    await page
-      .locator('[data-progression-step-select="true"]')
-      .first()
-      .click()
-      .catch(() => undefined);
-    await page.locator("[data-progression-step-select]").first().click();
+    await setProgressionView(page, "piano-roll");
+    const chord = page.locator(".piano-roll-chord").first();
+    const stepId = await chord.getAttribute("data-source-step-id");
+    if (!stepId) throw new Error("The long Piano Roll Step has no stable ID");
+    await chord.click();
     await setSelectedDuration(page, "6");
 
-    await expect(page.locator(".measure-staff-event.is-continuation")).toHaveCount(1);
+    const rightHandle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="${stepId}"][data-boundary-edge="right"]`,
+    );
     await expect(
-      page.locator(".measure-staff-event.is-continuation [data-duration-resize-handle]"),
+      page
+        .getByRole("region", { name: "Measure 1" })
+        .locator(
+          `.piano-roll-chord-boundary-handle[data-boundary-step-id="${stepId}"][data-boundary-edge="right"]`,
+        ),
+    ).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("region", { name: "Measure 2" })
+        .locator(
+          `.piano-roll-chord-boundary-handle[data-boundary-step-id="${stepId}"][data-boundary-edge="right"]`,
+        ),
     ).toHaveCount(1);
-    await expect(page.locator(".progression-step-card [data-duration-resize-handle]")).toHaveCount(
-      0,
-    );
-
-    const continuationHandle = page.locator(
-      ".measure-staff-event.is-continuation [data-duration-resize-handle]",
-    );
-    await continuationHandle.focus();
+    await rightHandle.focus();
     await page.keyboard.press("ArrowLeft");
-    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview:");
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
     await page.keyboard.press("Escape");
-    await expect(continuationHandle).toBeFocused();
+    await expect(rightHandle).toBeFocused();
 
     const heading = page.getByTestId("progression-heading");
     await heading.getByRole("heading", { name: "My Progression" }).click({ button: "right" });
     await page.getByTestId("progression-menu-add-rest").click();
-    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(1);
+    const rest = page.locator(".piano-roll-chord.is-rest").last();
+    await expect(rest).toBeVisible();
+    const restStepId = await rest.getAttribute("data-source-step-id");
+    if (!restStepId) throw new Error("The Rest Step has no stable ID");
     await expect(
-      page.locator(".measure-staff-event.is-rest [data-duration-resize-handle]"),
+      page.locator(`.piano-roll-chord-boundary-handle[data-boundary-step-id="${restStepId}"]`),
     ).toHaveCount(0);
   });
 
-  test("keeps the same final-fragment handle in Staff and Tablature overlays", async ({ page }) => {
+  test("keeps Step-resize controls in Piano Roll, not Staff or Tablature", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
-    await addChord(page);
+    await addChord(page, "I");
+    await addChord(page, "IV");
 
     for (const view of ["staff", "tablature"] as const) {
-      await page.getByLabel("Progression Card View").selectOption(view);
-      const handle = page.locator("[data-duration-resize-handle]").first();
-      await expect(handle).toBeVisible();
-      await handle.focus();
-      await page.keyboard.press("ArrowLeft");
-      await expect(page.getByTestId("duration-resize-status")).toContainText("Preview:");
-      await page.keyboard.press("Escape");
-      await expect(handle).toBeFocused();
+      await setProgressionView(page, view);
+      await expect(page.locator("[data-duration-resize-handle]")).toHaveCount(0);
+      await expect(page.locator(".piano-roll-chord-boundary-handle")).toHaveCount(0);
     }
+    await setProgressionView(page, "piano-roll");
+    const selectedChord = page.locator(".piano-roll-chord").last();
+    await selectedChord.click();
+    await expect(selectedChord).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".piano-roll-chord-boundary-handle").first()).toBeVisible();
   });
 
-  test("commits pointer resize on Staff and Tablature without moving the score", async ({
-    page,
-  }) => {
+  test("commits a left-edge Piano Roll resize without moving the score", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
-    await addChord(page);
-
-    for (const view of ["staff", "tablature"] as const) {
-      await page.getByLabel("Progression Card View").selectOption(view);
-      const handle = page.locator("[data-duration-resize-handle]").first();
-      await handle.scrollIntoViewIfNeeded();
-      const before = await handle.getAttribute("aria-valuenow");
-      const box = await handle.boundingBox();
-      expect(box).toBeTruthy();
-      const x = box!.x + box!.width / 2;
-      const y = box!.y + box!.height / 2;
-      await page.mouse.move(x, y);
-      await page.mouse.down();
-      await page.mouse.move(x - 50, y, { steps: 4 });
-      await expect(page.getByTestId("duration-resize-status")).toBeVisible();
-      expect((await handle.boundingBox())!.y).toBe(box!.y);
-      await page.mouse.up();
-      await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
-      expect(Number(await handle.getAttribute("aria-valuenow"))).toBeLessThan(Number(before));
-    }
+    await addChord(page, "I");
+    await addChord(page, "IV");
+    await setProgressionView(page, "piano-roll");
+    const secondChord = page.locator(".piano-roll-chord").nth(1);
+    await secondChord.click();
+    await expect(secondChord).toHaveAttribute("aria-pressed", "true");
+    const secondStepId = await secondChord.getAttribute("data-source-step-id");
+    if (!secondStepId) throw new Error("The second Piano Roll Step has no stable ID");
+    const handle = page.locator(
+      `.piano-roll-chord-boundary-handle[data-boundary-step-id="${secondStepId}"][data-boundary-edge="left"]`,
+    );
+    await expect(handle).toBeVisible();
+    await handle.scrollIntoViewIfNeeded();
+    const before = Number(await handle.getAttribute("aria-valuenow"));
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const x = box!.x + box!.width / 2;
+    const y = box!.y + box!.height / 2;
+    const measureY = (await page.locator(".piano-roll-measure").nth(1).boundingBox())!.y;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 32, y, { steps: 4 });
+    await expect(page.getByTestId("duration-resize-status")).toContainText("Preview boundary");
+    expect((await handle.boundingBox())!.y).toBe(box!.y);
+    expect((await page.locator(".piano-roll-measure").nth(1).boundingBox())!.y).toBe(measureY);
+    await page.mouse.up();
+    await expect(page.getByTestId("duration-resize-status")).toHaveCount(0);
+    expect(Number(await handle.getAttribute("aria-valuenow"))).toBeGreaterThan(before);
   });
 
   test("keeps Staff renderable after a triplet-length Rest before a chord", async ({ page }) => {
@@ -282,8 +312,7 @@ test.describe("T201 — direct duration resize", () => {
     }) => {
       await page.setViewportSize(viewport);
       await openStudio(page);
-      await addChord(page);
-      const handle = page.locator("[data-duration-resize-handle]").first();
+      const handle = await preparePianoRollChordPair(page);
       await expect(handle).toBeVisible();
 
       for (const theme of ["Dark theme", "Light theme"] as const) {

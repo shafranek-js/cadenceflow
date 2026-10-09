@@ -5,6 +5,7 @@ async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function addChord(page: Page, functionId: string): Promise<void> {
@@ -298,11 +299,11 @@ test.describe("US12 — melody editor and derived staff", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openStudio(page);
     await addChord(page, "I");
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(1);
     await addChord(page, "V");
-    await expect(page.getByTestId("progression-step")).toHaveCount(2);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(2);
     await addChord(page, "vi");
-    await expect(page.getByTestId("progression-step")).toHaveCount(3);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(3);
     await setProgressionView(page, "staff");
     await expect(page.getByTestId("progression-staff-step-grids")).toHaveCount(0);
     await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(

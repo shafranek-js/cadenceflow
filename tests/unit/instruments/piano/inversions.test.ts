@@ -6,14 +6,15 @@ import type { HarmonicContext } from "../../../../src/domain/harmony/modules/typ
 import type { StepPerformance } from "../../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../../src/domain/harmony/chord";
 
-const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
   tonic: 0,
   mode: "major",
-  activeModuleId: "progressions",
+  moduleId: "progressions",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
 });
 
 function createPerformance(overrides?: Partial<StepPerformance>): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     articulation: "block",
     register: "auto",
     voicingMode: "auto",
@@ -30,7 +31,10 @@ function createPerformance(overrides?: Partial<StepPerformance>): StepPerformanc
 
 describe("Piano Inversions and Seventh Bass Support", () => {
   it("realizes Root Position (inversion 0) with root in the lowest upper voice", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C Major
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C Major
     const realization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
       chord: { ...chord, variant: EMPTY_HARMONIC_VARIANT },
@@ -43,7 +47,10 @@ describe("Piano Inversions and Seventh Bass Support", () => {
   });
 
   it("realizes 1st Inversion (inversion 1) with 3rd in the lowest upper voice", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C Major
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C Major
     const realization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
       chord: { ...chord, variant: EMPTY_HARMONIC_VARIANT },
@@ -56,7 +63,10 @@ describe("Piano Inversions and Seventh Bass Support", () => {
   });
 
   it("realizes 2nd Inversion (inversion 2) with 5th in the lowest upper voice", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C Major
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C Major
     const realization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
       chord: { ...chord, variant: EMPTY_HARMONIC_VARIANT },
@@ -69,7 +79,10 @@ describe("Piano Inversions and Seventh Bass Support", () => {
   });
 
   it("realizes 3rd Inversion (inversion 3) for seventh chord with 7th in the lowest upper voice", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "V7" }, 0); // G7
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "V7", category: "core" },
+      0,
+    ); // G7
     const realization = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
       chord: {
@@ -86,7 +99,10 @@ describe("Piano Inversions and Seventh Bass Support", () => {
   });
 
   it("resolves Seventh in the bass for G7 (dominant chord)", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "V7" }, 0); // G7
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "V7", category: "core" },
+      0,
+    ); // G7
     const bass = resolveBassPitch(
       { ...chord, variant: { ...EMPTY_HARMONIC_VARIANT, seventh: "minor7" } },
       { choice: "seventh", octaveOffset: "auto" },
@@ -98,7 +114,10 @@ describe("Piano Inversions and Seventh Bass Support", () => {
   });
 
   it("resolves Seventh in the bass for Cmaj7", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C
     const bass = resolveBassPitch(
       { ...chord, variant: { ...EMPTY_HARMONIC_VARIANT, seventh: "major7" } },
       { choice: "seventh", octaveOffset: "auto" },
@@ -107,5 +126,28 @@ describe("Piano Inversions and Seventh Bass Support", () => {
     // Major 7th of C is B (pitch class 11)
     expect(bass.pitchClassIdentity).toBe(11);
     expect(bass.spelling.step).toBe("B");
+  });
+
+  it("resolves authored eleventh and thirteenth as semantic bass choices", () => {
+    const base = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
+    const chord = {
+      ...base,
+      variant: {
+        ...EMPTY_HARMONIC_VARIANT,
+        no3: true,
+        no5: true,
+        add11: true,
+        add13: true,
+      },
+    };
+
+    const eleventh = resolveBassPitch(chord, { choice: "eleventh", octaveOffset: "auto" });
+    const thirteenth = resolveBassPitch(chord, { choice: "thirteenth", octaveOffset: "auto" });
+
+    expect([eleventh.pitchClassIdentity, eleventh.spelling.step]).toEqual([5, "F"]);
+    expect([thirteenth.pitchClassIdentity, thirteenth.spelling.step]).toEqual([9, "A"]);
   });
 });

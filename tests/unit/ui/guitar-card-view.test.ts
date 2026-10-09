@@ -1,3 +1,5 @@
+import { omitFields } from "../../fixtures/assertions";
+import { requireValue } from "../../fixtures/assertions";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -49,8 +51,7 @@ const mockCChord: ChordDefinition = {
   harmonicFunction: {
     functionId: "I",
     moduleId: "progressions",
-    category: "tonic",
-    degree: "I",
+    category: "core",
   },
 };
 
@@ -69,12 +70,30 @@ const mockFChord: ChordDefinition = {
   harmonicFunction: {
     functionId: "IV",
     moduleId: "progressions",
-    category: "subdominant",
-    degree: "IV",
+    category: "core",
   },
 };
 
 describe("GuitarCardView & GuitarFretboard", () => {
+  it("explains when an authored seven-tone chord has no six-string fingering", () => {
+    const chord: ChordDefinition = {
+      ...mockCChord,
+      variant: {
+        seventh: "minor7",
+        extensions: [9, 11, 13],
+        suspensions: [],
+        alterations: [],
+      },
+    };
+    const mounted = mount(el(GuitarCardView, { chord, chordLabel: "C7(9,11,13)" }));
+
+    expect(mounted.container.querySelector('[role="status"]')?.textContent).toMatch(
+      /No matching fingering/i,
+    );
+    expect(mounted.container.querySelector('[data-testid="guitar-fretboard-svg"]')).toBeNull();
+    mounted.unmount();
+  });
+
   it("renders open C major chord with nut, mute on 6th string, and root dot", () => {
     const mounted = mount(
       el(GuitarCardView, {
@@ -260,7 +279,7 @@ describe("GuitarCardView & GuitarFretboard", () => {
         if (item.fret <= 0) return item;
         frettedIndex += 1;
         if (frettedIndex === 1) return { ...item, finger: 7 };
-        if (frettedIndex === 2) return { ...item, finger: undefined };
+        if (frettedIndex === 2) return omitFields(item, "finger");
         return item;
       }),
     };
@@ -356,7 +375,7 @@ describe("GuitarCardView & GuitarFretboard", () => {
     // In horizontal mode, HORIZ_STRING_Y = [95, 80, 65, 50, 35, 20]
     // String 0 (Low E) is at y=95 (bottom), String 5 (High E) is at y=20 (top)
     const yValues = Array.from(fretNumbers).map((el) => parseFloat(el.getAttribute("y") ?? "0"));
-    expect(yValues[0]).toBeGreaterThan(yValues[5]); // string 0 is below string 5
+    expect(yValues[0]).toBeGreaterThan(requireValue(yValues[5])); // string 0 is below string 5
 
     mounted.unmount();
   });

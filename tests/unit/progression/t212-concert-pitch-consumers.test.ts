@@ -22,7 +22,7 @@ describe("T212 concert-pitch consumers", () => {
       ...first,
       transpositionSemitones: 3,
       melody: snapshotChordMelody({
-        mode: "authored",
+        mode: "authored" as const,
         phrase: snapshotAuthoredMelodyPhrase({
           notes: [
             {
@@ -78,7 +78,8 @@ describe("T212 concert-pitch consumers", () => {
       .sort((left, right) => left - right);
     const xmlChordPitches = musicXml.measures
       .flatMap((measure) => measure.events)
-      .filter((event) => event.kind === "note" && event.stepId === step.id)
+      .filter((event) => event.kind === "note")
+      .filter((event) => event.stepId === step.id)
       .map((event) => event.sourceMidi)
       .sort((left, right) => left - right);
     expect(midiChordPitches).toEqual(playbackChordPitches);
@@ -102,7 +103,8 @@ describe("T212 concert-pitch consumers", () => {
     const xmlMelody = musicXml
       .melodyParts!.flatMap((part) => part.measures)
       .flatMap((measure) => measure.events)
-      .filter((event) => event.kind === "note" && event.eventKey === "t212-concert-note");
+      .filter((event) => event.kind === "note")
+      .filter((event) => event.eventKey === "t212-concert-note");
 
     expect(melodyPlayback.map((event) => event.pitch)).toEqual([70]);
     expect(staff.map((event) => event.pitch.midiNumber)).toEqual([70]);

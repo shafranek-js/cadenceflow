@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -149,7 +150,8 @@ test.describe("US10 Batch 4 — global UI system", () => {
     test.slow();
     await waitForStudio(page);
     await addSteps(page, 20);
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(20);
+    await setProgressionView(page, "staff");
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(20);
     const theme = page.getByRole("group", { name: "Theme" });
 
     for (const viewport of [
@@ -226,16 +228,19 @@ test.describe("US10 Batch 4 — global UI system", () => {
               height: bounds.height,
             };
           };
-          const stack = document.querySelector<HTMLElement>(".progression-measures-stack");
+          const stack = document.querySelector<HTMLElement>(
+            '[data-testid="progression-score-systems"]',
+          );
           const noteColorSelect = document.querySelector<HTMLElement>(
             '[aria-label="Note color mode"]',
           );
           const noteColorLabel = noteColorSelect?.closest("label") ?? null;
-          const measures = Array.from(
-            document.querySelectorAll<HTMLElement>(
-              '.progression-measures-stack [data-testid="progression-measure"]',
-            ),
+          const systems = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-testid="progression-score-system"]'),
           ).map((measure) => rect(measure));
+          const representedMeasureCount = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-testid="progression-score-system"]'),
+          ).reduce((count, system) => count + Number(system.dataset.measureCount ?? 0), 0);
           const visibleControls = Array.from(
             document.querySelectorAll<HTMLElement>("button, select, input"),
           )
@@ -268,7 +273,8 @@ test.describe("US10 Batch 4 — global UI system", () => {
             stack: rect(stack),
             noteColorLabel: rect(noteColorLabel),
             noteColorSelect: rect(noteColorSelect),
-            measures,
+            systems,
+            representedMeasureCount,
             visibleControls,
           };
         });
@@ -288,13 +294,14 @@ test.describe("US10 Batch 4 — global UI system", () => {
         expect(snapshot.noteColorSelect).not.toBeNull();
         expect(snapshot.noteColorSelect!.left).toBeGreaterThanOrEqual(-1);
         expect(snapshot.noteColorSelect!.right).toBeLessThanOrEqual(viewport.width + 1);
-        expect(snapshot.measures).toHaveLength(3);
-        for (const [index, measure] of snapshot.measures.entries()) {
-          expect(measure).not.toBeNull();
-          expect(measure!.left).toBeGreaterThanOrEqual(snapshot.stack!.left - 2);
-          expect(measure!.right).toBeLessThanOrEqual(snapshot.stack!.right + 2);
+        expect(snapshot.representedMeasureCount).toBe(3);
+        expect(snapshot.systems.length).toBeGreaterThan(0);
+        for (const [index, system] of snapshot.systems.entries()) {
+          expect(system).not.toBeNull();
+          expect(system!.left).toBeGreaterThanOrEqual(snapshot.stack!.left - 2);
+          expect(system!.right).toBeLessThanOrEqual(snapshot.stack!.right + 2);
           if (index > 0) {
-            expect(measure!.top).toBeGreaterThan(snapshot.measures[index - 1]!.bottom!);
+            expect(system!.top).toBeGreaterThanOrEqual(snapshot.systems[index - 1]!.bottom! - 1);
           }
         }
         measurements.push({

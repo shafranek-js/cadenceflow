@@ -1,4 +1,5 @@
 import type { AppliedCommand, ProjectCommand } from ".";
+import { createEntityId } from "../../domain/runtime/ids";
 import type { AuthoredMelodyNote, AuthoredMelodyPhrase } from "../../domain/melody/types";
 import { snapshotAuthoredMelodyPhrase, snapshotChordMelody } from "../../domain/melody/types";
 import { validateMelodyInstrumentId } from "../../domain/melody/instrumentCatalog";
@@ -139,7 +140,7 @@ function applyState(project: Project, states: readonly StepMelodyState[], nowIso
 export function restoreAuthoredMelodyTransaction(
   project: Project,
   command: RestoreAuthoredMelodyCommand,
-): AppliedCommand {
+): AppliedCommand & { readonly inverse: RestoreAuthoredMelodyCommand } {
   const previous = command.payload.states.map((state) => {
     const step = project.progression.steps.find((candidate) => candidate.id === state.stepId);
     if (!step)
@@ -154,7 +155,7 @@ export function restoreAuthoredMelodyTransaction(
 export function applyAuthoredMelodyTransaction(
   project: Project,
   command: AuthoredMelodyTransactionCommand,
-): AppliedCommand {
+): AppliedCommand & { readonly inverse: RestoreAuthoredMelodyCommand } {
   if (
     command.payload.expectedUpdatedAt !== undefined &&
     command.payload.expectedUpdatedAt !== project.updatedAt
@@ -193,7 +194,7 @@ export function applyAuthoredMelodyTransaction(
         effective
           .filter((note) => note.sourceStepId === stepId)
           .map((note) => ({
-            id: crypto.randomUUID(),
+            id: createEntityId(),
             pitch: note.pitch,
             sourcePitchMidi: note.sourcePitchMidi,
             onset: subtractRational(note.startBeats, start),

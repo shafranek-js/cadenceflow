@@ -1,3 +1,4 @@
+import { omitFields } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { AppStore } from "../../../src/app/appStore";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
@@ -42,7 +43,7 @@ function chord(
   duration: ReturnType<typeof rational>,
   patch: Partial<Extract<ProgressionStep, { kind: "chord" }>> = {},
 ): Extract<ProgressionStep, { kind: "chord" }> {
-  return Object.freeze({
+  return Object.freeze<Extract<ProgressionStep, { kind: "chord" }>>({
     ...createMatrixChordStep(project, functionId, id),
     duration: musicalDuration(duration),
     ...patch,
@@ -54,7 +55,12 @@ function rest(
   duration: ReturnType<typeof rational>,
   patch: Partial<RestStep> = {},
 ): RestStep {
-  return Object.freeze({ id, kind: "rest", duration: musicalDuration(duration), ...patch });
+  return Object.freeze<RestStep>({
+    id,
+    kind: "rest",
+    duration: musicalDuration(duration),
+    ...patch,
+  });
 }
 
 function projectWith(
@@ -62,7 +68,7 @@ function projectWith(
   progressionPatch: Partial<Project["progression"]> = {},
   projectPatch: Partial<Project> = {},
 ): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     ...projectPatch,
     progression: Object.freeze({
@@ -183,9 +189,17 @@ describe("T215 measure deletion model", () => {
     const source = chord(base, "source", "I", rational(4), {
       transpositionSemitones: 2,
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
-          notes: [{ id: "crossing-shifted", pitch: G4, sourcePitchMidi: 65, onset: rational(1), duration: rational(6) }],
+          notes: [
+            {
+              id: "crossing-shifted",
+              pitch: G4,
+              sourcePitchMidi: 65,
+              onset: rational(1),
+              duration: rational(6),
+            },
+          ],
         },
       },
     });
@@ -200,7 +214,8 @@ describe("T215 measure deletion model", () => {
     expect(actualTimeline(after)).toEqual(expectedTimelineAfterDeletion(before, plan));
     const owner = plan.progression.steps.find((step) => step.id === "destination");
     expect(owner?.kind).toBe("chord");
-    if (owner?.kind !== "chord" || owner.melody?.mode !== "authored") throw new Error("Expected a materialized destination chord");
+    if (owner?.kind !== "chord" || owner.melody?.mode !== "authored")
+      throw new Error("Expected a materialized destination chord");
     const transferred = owner.melody.phrase.notes.find((note) => note.id === "crossing-shifted");
     expect(transferred).toMatchObject({ pitch: { midiNumber: 71 }, sourcePitchMidi: 65 });
     expect(createEffectiveMelodyTimeline(after)[0]?.pitch.midiNumber).toBe(69);
@@ -262,7 +277,7 @@ describe("T215 measure deletion model", () => {
     const a = chord(base, "a", "I", rational(4), {
       melodyInstrumentOverride: "flute",
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [
             { id: "same", pitch: E4, onset: rational(3), duration: rational(7) },
@@ -279,7 +294,7 @@ describe("T215 measure deletion model", () => {
     });
     const c = chord(base, "c", "V", rational(4), {
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [
             { id: "same", pitch: C4, onset: rational(1), duration: rational(1) },
@@ -347,13 +362,13 @@ describe("T215 measure deletion model", () => {
       octaveOffset: 0 as const,
       targetNextPitchClass: 2,
     };
-    const stableRecipe = { ...targetRecipe, targetNextPitchClass: undefined };
+    const stableRecipe = { ...omitFields(targetRecipe, "targetNextPitchClass") };
     const a = chord(base, "a", "I", rational(4), {
-      melody: { mode: "generated", recipe: targetRecipe },
+      melody: { mode: "generated" as const, recipe: targetRecipe },
     });
     const b = chord(base, "b", "V", rational(4));
     const c = chord(base, "c", "I", rational(4), {
-      melody: { mode: "generated", recipe: stableRecipe },
+      melody: { mode: "generated" as const, recipe: stableRecipe },
     });
     const d = chord(base, "d", "IV", rational(4));
     const project = projectWith([a, b, c, d]);
@@ -471,7 +486,7 @@ describe("T215 measure deletion model", () => {
     const violin = chord(base, "a", "I", rational(4), {
       melodyInstrumentOverride: "violin",
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [{ id: "violin-tail", pitch: E4, onset: rational(3), duration: rational(6) }],
         },

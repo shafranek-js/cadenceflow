@@ -1,3 +1,5 @@
+import { snapshotChordMelody } from "../../../src/domain/melody/types";
+import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../../../src/domain/harmony/track";
 import { describe, expect, it, vi } from "vitest";
 import type {
   AudioClock,
@@ -50,7 +52,7 @@ class ThrowingProvider extends RecordingProvider {
   }
 }
 
-const PERFORMANCE: StepPerformance = Object.freeze({
+const PERFORMANCE: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -61,15 +63,25 @@ const PERFORMANCE: StepPerformance = Object.freeze({
 });
 
 function chord(id: string, functionId: string): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions" as const,
+      functionId,
+      category: "core" as const,
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(1)),
     cardView: "harmonic",
     performance: PERFORMANCE,
-    melody: Object.freeze({ pattern: "up", grid: "eighth", octaveOffset: 0 }),
+    melody: snapshotChordMelody({
+      pitchMotion: "up",
+      grid: "eighth",
+      octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
+    }),
   });
 }
 
@@ -96,8 +108,14 @@ describe("T173 — Melody playback routing and active event state", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         harmonyTrack: Object.freeze({
+          ...DEFAULT_HARMONY_TRACK_SETTINGS,
           instrument: "piano",
           muted: true,
           solo: false,
@@ -113,6 +131,8 @@ describe("T173 — Melody playback routing and active event state", () => {
     ).toBe(true);
 
     expect(piano.batches.flat().filter((event) => event.channelRole === "upper")).toHaveLength(0);
+    expect(transport.getKeyboardNotes().length).toBeGreaterThan(0);
+    expect(transport.getKeyboardNotes().every((note) => note.part === "melody")).toBe(true);
     expect(melody.batches.flat().length).toBeGreaterThan(0);
     controller.stop();
   });
@@ -141,7 +161,12 @@ describe("T173 — Melody playback routing and active event state", () => {
           tempoBpm: 120,
           groove: groove("straight"),
           tonic: 0,
-          context: "major",
+          context: {
+            tonic: 0,
+            moduleId: "progressions",
+            mode: "major",
+            spellingContext: { tonic: 0, mode: "major" },
+          },
           melodyTrack: Object.freeze({
             instrument: "flute",
             muted: false,
@@ -154,7 +179,12 @@ describe("T173 — Melody playback routing and active event state", () => {
       const expectedFull = realizeProgressionMelodyPerformance({
         steps,
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         tempoBpm: 120,
         groove: groove("straight"),
         melodyTrack: Object.freeze({
@@ -215,7 +245,12 @@ describe("T173 — Melody playback routing and active event state", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         metronomeEnabled: true,
         melodyTrack: Object.freeze({
           instrument: "flute",

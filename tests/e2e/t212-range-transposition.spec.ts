@@ -1,3 +1,4 @@
+import { requireValue } from "../fixtures/assertions";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -26,7 +27,9 @@ async function createFourStepProgression(page: Page): Promise<void> {
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
+  await setProgressionView(page, "staff");
   await expect(page.locator("[data-progression-step-select]")).toHaveCount(4);
+  await setProgressionView(page, "piano-roll");
 }
 
 async function setProgressionView(page: Page, view: (typeof VIEWS)[number]): Promise<void> {
@@ -72,7 +75,7 @@ function projectWithOwnerOffsets(
   offsets: Readonly<Record<string, number>>,
 ): Project {
   const source = createPianoRollSystemChordFixture(projectId);
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...source,
     progression: Object.freeze({
       ...source.progression,
@@ -80,7 +83,7 @@ function projectWithOwnerOffsets(
         source.progression.steps.map((step) =>
           offsets[step.id] === undefined
             ? step
-            : Object.freeze({ ...step, transpositionSemitones: offsets[step.id] }),
+            : Object.freeze({ ...step, transpositionSemitones: requireValue(offsets[step.id]) }),
         ),
       ),
     }),
@@ -127,7 +130,7 @@ function withoutProjectSelectionAndTimestamp(text: string): unknown {
   delete project.updatedAt;
   const progression = project.progression;
   if (progression && typeof progression === "object" && !Array.isArray(progression))
-    delete (progression as Record<string, unknown>).selectedStepId;
+    Reflect.deleteProperty(progression, "selectedStepId");
   return project;
 }
 
@@ -331,10 +334,11 @@ test.describe("T212 selected-range transposition", () => {
     page,
   }) => {
     await createFourStepProgression(page);
-    await selectFirstTwoSteps(page, "harmonic");
-    const originalText = await page
-      .locator("[data-progression-step-select]")
-      .evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim()));
+    await selectFirstTwoSteps(page, "piano-roll");
+    const pianoRollChords = page.getByTestId("piano-roll-chord");
+    const originalText = await pianoRollChords.evaluateAll((buttons) =>
+      buttons.map((button) => button.textContent?.trim()),
+    );
 
     await page.getByTestId("range-toolbar-transpose").click();
     const input = page.getByTestId("range-transposition-semitones");
@@ -343,11 +347,10 @@ test.describe("T212 selected-range transposition", () => {
     await expect(page.getByTestId("range-transposition-preview")).toContainText("+2 semitones");
     await page.getByTestId("range-transposition-cancel").click();
     await expect(page.getByTestId("range-transposition-dialog")).toHaveCount(0);
-    await expect(page.locator("[data-progression-step-select]")).toHaveCount(4);
     expect(
-      await page
-        .locator("[data-progression-step-select]")
-        .evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim())),
+      await pianoRollChords.evaluateAll((buttons) =>
+        buttons.map((button) => button.textContent?.trim()),
+      ),
     ).toEqual(originalText);
 
     await page.getByTestId("range-toolbar-transpose").click();
@@ -356,9 +359,9 @@ test.describe("T212 selected-range transposition", () => {
     await expect(page.getByTestId("range-transposition-dialog")).toHaveCount(0);
     await expect(page.getByTestId("range-toolbar-transpose")).toBeFocused();
     expect(
-      await page
-        .locator("[data-progression-step-select]")
-        .evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim())),
+      await pianoRollChords.evaluateAll((buttons) =>
+        buttons.map((button) => button.textContent?.trim()),
+      ),
     ).toEqual(originalText);
 
     await page.getByTestId("range-toolbar-transpose").click();
@@ -367,10 +370,10 @@ test.describe("T212 selected-range transposition", () => {
     await expect(page.getByTestId("range-transposition-dialog")).toHaveCount(0);
     await expect(page.getByTestId("range-toolbar-transpose")).toBeFocused();
     await expect(page.getByRole("alert")).toHaveCount(0);
-    const selectedSteps = page.locator("[data-progression-step-select][aria-pressed='true']");
+    const selectedSteps = page.locator("[data-testid='piano-roll-chord'][aria-pressed='true']");
     await expect(selectedSteps).toHaveCount(2);
     await expect(selectedSteps.filter({ hasText: "+2 st" })).toHaveCount(2);
-    await expect(page.locator("[data-progression-step-select]").nth(2)).not.toContainText("+2 st");
+    await expect(page.getByTestId("piano-roll-chord").nth(2)).not.toContainText("+2 st");
     await page.getByTestId("edit-menu-toggle").click();
     await page
       .getByRole("menu", { name: "Edit menu" })
@@ -385,7 +388,7 @@ test.describe("T212 selected-range transposition", () => {
     await expect(selectedSteps.filter({ hasText: "+2 st" })).toHaveCount(2);
   });
 
-  test("uses the same selected range and local pitch marker in all six progression views", async ({
+  test("uses the same selected range and local pitch marker in all supported progression views", async ({
     page,
   }) => {
     await createFourStepProgression(page);
@@ -416,7 +419,7 @@ test.describe("T212 selected-range transposition", () => {
   test("captures the open range editor at normal sizes in both themes", async ({ page }) => {
     test.setTimeout(120_000);
     await createFourStepProgression(page);
-    await selectFirstTwoSteps(page, "harmonic");
+    await selectFirstTwoSteps(page, "piano-roll");
     await page.getByTestId("range-toolbar-transpose").click();
     await page.getByTestId("range-transposition-semitones").fill("2");
     await mkdir(SCREENSHOT_DIRECTORY, { recursive: true });

@@ -7,7 +7,10 @@ import type {
   InstrumentRealizationInput,
   ValidationResult,
 } from "../contracts";
-import { resolveGuitarChordVoicing } from "../../domain/instruments/guitar/voicings";
+import {
+  resolveGuitarChordVoicing,
+  withGuitarBassSettings,
+} from "../../domain/instruments/guitar/voicings";
 
 export const GUITAR_CARD_VIEWS: readonly CardViewDescriptor[] = Object.freeze([
   Object.freeze({ id: "guitar", label: "Guitar" }),
@@ -62,19 +65,15 @@ export const guitarProfile: InstrumentProfile = Object.freeze({
     return validateGuitarVoicing(pitches);
   },
   realizeChord(input: InstrumentRealizationInput): InstrumentRealization {
-    const isSeventh =
-      input.chord.baseQuality === "dominant" || input.chord.variant?.seventh !== undefined;
-    const isMajor7 = input.chord.variant?.seventh === "major7";
-    const voicing = resolveGuitarChordVoicing({
-      rootPitchClass: input.chord.rootPitchClass,
-      baseQuality: input.chord.baseQuality,
-      spelling: input.chord.spelling,
-      ...(input.chord.bassPitchClass !== undefined
-        ? { bassPitchClass: input.chord.bassPitchClass }
-        : {}),
-      isSeventh,
-      isMajor7,
-    });
+    // InstrumentRealizationInput is realized in its source frame; callers apply any
+    // concert transposition after the voicing, matching the explicit helper frame.
+    const sourceFrameChord = withGuitarBassSettings(
+      input.chord,
+      input.performance,
+      input.performance.bass.customPitch,
+    );
+    const voicing = resolveGuitarChordVoicing(sourceFrameChord);
+    if (voicing.unsupportedReason) return Object.freeze({ pitches: Object.freeze([]) });
 
     const pitches = voicing.pitches;
     const bassPitch = pitches[0];

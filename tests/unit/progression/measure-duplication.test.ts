@@ -31,7 +31,7 @@ function chord(
   duration: ReturnType<typeof rational>,
   patch: Partial<Extract<ProgressionStep, { kind: "chord" }>> = {},
 ): Extract<ProgressionStep, { kind: "chord" }> {
-  return Object.freeze({
+  return Object.freeze<Extract<ProgressionStep, { kind: "chord" }>>({
     ...createMatrixChordStep(project, functionId, id),
     duration: musicalDuration(duration),
     ...patch,
@@ -43,14 +43,19 @@ function rest(
   duration: ReturnType<typeof rational>,
   patch: Partial<RestStep> = {},
 ): RestStep {
-  return Object.freeze({ id, kind: "rest", duration: musicalDuration(duration), ...patch });
+  return Object.freeze<RestStep>({
+    id,
+    kind: "rest",
+    duration: musicalDuration(duration),
+    ...patch,
+  });
 }
 
 function projectWith(
   steps: readonly ProgressionStep[],
   progressionPatch: Partial<Project["progression"]> = {},
 ): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     progression: Object.freeze({
       ...base.progression,
@@ -80,7 +85,7 @@ describe("T217 Duplicate Measure model", () => {
       transpositionSemitones: 2,
       melodyInstrumentOverride: "flute",
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [
             {
@@ -228,7 +233,7 @@ describe("T217 Duplicate Measure model", () => {
     const flute = chord(base, "flute-owner", "I", rational(4), {
       melodyInstrumentOverride: "flute",
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [{ id: "held", pitch: G4, onset: rational(3), duration: rational(2) }],
         },
@@ -270,7 +275,7 @@ describe("T217 Duplicate Measure model", () => {
     const project = projectWith([
       chord(base, "first", "V", rational(4)),
       chord(base, "generated", "I", rational(4), {
-        melody: { mode: "generated", recipe },
+        melody: { mode: "generated" as const, recipe },
       }),
       chord(base, "next", "V", rational(4)),
     ]);

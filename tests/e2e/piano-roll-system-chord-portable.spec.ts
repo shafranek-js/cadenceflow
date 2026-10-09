@@ -1,3 +1,5 @@
+import { generatedMelodyRecipe } from "../../src/domain/melody/types";
+import { requireChord } from "../fixtures/assertions";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import type { LookAheadScheduler } from "../../src/audio/scheduler";
@@ -578,8 +580,8 @@ test("Delete on a selected chord preserves its Rest interval, Melody and portabl
   expect(rest.melodyInstrumentOverride).toBe("flute");
   expect(rest.authoredMelody?.sourceRecipe).toEqual(
     step(beforeProject, "generated-e").kind === "chord" &&
-      step(beforeProject, "generated-e").melody?.mode === "generated"
-      ? step(beforeProject, "generated-e").melody.recipe
+      requireChord(step(beforeProject, "generated-e")).melody?.mode === "generated"
+      ? generatedMelodyRecipe(requireChord(step(beforeProject, "generated-e")).melody)
       : undefined,
   );
   expect(fullMelodySignature(afterProject)).toEqual(fullMelodySignature(beforeProject));
@@ -668,7 +670,7 @@ test("Matrix replacement transfers its selected nonstandard variant onto an auth
   page,
 }) => {
   await openStudio(page);
-  const variant: HarmonicVariant = Object.freeze({
+  const variant: HarmonicVariant = Object.freeze<HarmonicVariant>({
     seventh: "minor7",
     extensions: Object.freeze([9]),
     suspensions: Object.freeze([]),
@@ -1009,8 +1011,12 @@ test("normal pointer resize transfers exact time between different same-measure 
     expect(stepStart(updated, "chord-c")).toEqual(rational(8));
     expect(sumDuration(updated)).toEqual(sumDuration(fixture));
     for (const id of ["chord-a", "chord-b"] as const) {
-      expect(step(updated, id).harmonicFunction).toEqual(step(fixture, id).harmonicFunction);
-      expect(step(updated, id).harmonicVariant).toEqual(step(fixture, id).harmonicVariant);
+      expect(requireChord(step(updated, id)).harmonicFunction).toEqual(
+        requireChord(step(fixture, id)).harmonicFunction,
+      );
+      expect(requireChord(step(updated, id)).harmonicVariant).toEqual(
+        requireChord(step(fixture, id)).harmonicVariant,
+      );
       expect(step(updated, id).id).toBe(step(fixture, id).id);
     }
     expect(
@@ -1186,11 +1192,11 @@ test("Alt pointer shrink isolates the selected chord and Alt+Arrow offers the ke
     expect(stepStart(updated, "chord-c")).toEqual(rational(8));
     expect(sumDuration(updated)).toEqual(sumDuration(fixture));
     expect(fullMelodySignature(updated)).toEqual(fullMelodySignature(fixture));
-    expect(step(updated, "chord-a").harmonicFunction).toEqual(
-      step(fixture, "chord-a").harmonicFunction,
+    expect(requireChord(step(updated, "chord-a")).harmonicFunction).toEqual(
+      requireChord(step(fixture, "chord-a")).harmonicFunction,
     );
-    expect(step(updated, "chord-b").harmonicFunction).toEqual(
-      step(fixture, "chord-b").harmonicFunction,
+    expect(requireChord(step(updated, "chord-b")).harmonicFunction).toEqual(
+      requireChord(step(fixture, "chord-b")).harmonicFunction,
     );
     if (!leftEdge) expect(await capturedAudioEvents(page)).toEqual([]);
     await page.screenshot({
@@ -1945,13 +1951,16 @@ test("editable Piano Roll chord edges expose an ew-resize cursor and keep short 
     '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-a"][data-boundary-edge="right"]',
   );
   await expect(rightHandle).toBeVisible();
+  await rightHandle.scrollIntoViewIfNeeded();
   const handleBox = await rightHandle.boundingBox();
   expect(handleBox).not.toBeNull();
-  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await rightHandle.hover();
   const hoverState = await rightHandle.evaluate((element) => ({
     cursor: getComputedStyle(element).cursor,
     marker: getComputedStyle(element, "::after").backgroundColor,
+    hovered: element.matches(":hover"),
   }));
+  expect(hoverState.hovered).toBe(true);
   expect(hoverState.cursor).toBe("ew-resize");
   expect(hoverState.marker).not.toBe("rgba(0, 0, 0, 0)");
 
@@ -1966,7 +1975,10 @@ test("editable Piano Roll chord edges expose an ew-resize cursor and keep short 
   expect(shortChordBox).not.toBeNull();
   const bodyTarget = await page.evaluate(
     ({ x, y }) =>
-      document.elementFromPoint(x, y)?.closest(".piano-roll-chord")?.dataset.sourceStepId,
+      document
+        .elementFromPoint(x, y)
+        ?.closest(".piano-roll-chord")
+        ?.getAttribute("data-source-step-id"),
     {
       x: shortChordBox!.x + shortChordBox!.width / 2,
       y: shortChordBox!.y + shortChordBox!.height / 2,
@@ -1984,13 +1996,16 @@ test("editable Piano Roll chord edges expose an ew-resize cursor and keep short 
     '.piano-roll-chord-boundary-handle[data-boundary-step-id="chord-b"][data-boundary-edge="left"]',
   );
   await expect(leftHandle).toBeVisible();
+  await leftHandle.scrollIntoViewIfNeeded();
   const leftBox = await leftHandle.boundingBox();
   expect(leftBox).not.toBeNull();
-  await page.mouse.move(leftBox!.x + leftBox!.width / 2, leftBox!.y + leftBox!.height / 2);
+  await leftHandle.hover();
   const leftHoverState = await leftHandle.evaluate((element) => ({
     cursor: getComputedStyle(element).cursor,
     marker: getComputedStyle(element, "::after").backgroundColor,
+    hovered: element.matches(":hover"),
   }));
+  expect(leftHoverState.hovered).toBe(true);
   expect(leftHoverState.cursor).toBe("ew-resize");
   expect(leftHoverState.marker).not.toBe("rgba(0, 0, 0, 0)");
 });

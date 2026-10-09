@@ -14,9 +14,13 @@ export function GlobalSettingsControl({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
+  const closeFromKeyboard = useCallback(() => {
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
   const panelRef = useModalFocus<HTMLElement>({
     isOpen: open,
-    onClose: close,
+    onClose: closeFromKeyboard,
     restoreFocusRef: triggerRef,
   });
 

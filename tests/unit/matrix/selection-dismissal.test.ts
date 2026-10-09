@@ -27,7 +27,9 @@ function renderHarness(): Harness {
 
     return createElement(HarmonicMatrix, {
       project: store.project,
-      previewFunctionId: store.matrixSession.previewFunctionId,
+      ...(store.matrixSession.previewFunctionId
+        ? { previewFunctionId: store.matrixSession.previewFunctionId }
+        : {}),
       recommendations: null,
       contextualFunctionIds: [],
       onPreview: (functionId: string) => {

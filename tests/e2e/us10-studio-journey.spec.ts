@@ -57,7 +57,8 @@ test.describe("T149 — complete Studio journey", () => {
 
       await addChord(page, "I", "Control");
       await addChord(page, "V", "Control");
-      await expect(page.getByTestId("progression-step")).toHaveCount(2);
+      await setProgressionView(page, "staff");
+      await expect(page.locator(".measure-staff-event-select")).toHaveCount(2);
 
       await startBranchAlternative(page, 0);
       await expect(page.getByTestId("branch-controls-active")).toBeVisible();

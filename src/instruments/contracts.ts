@@ -74,6 +74,8 @@ export interface InstrumentRealizationInput {
   readonly context: HarmonicContext;
   readonly chord: ChordDefinition;
   readonly performance: StepPerformance;
+  /** Additive offset applied after source-frame realization; used for concert-range checks. */
+  readonly concertTranspositionSemitones?: number;
   readonly previousPitches?: readonly ExactPitch[];
   readonly previousBassPitch?: ExactPitch;
   readonly nextPitches?: readonly ExactPitch[];

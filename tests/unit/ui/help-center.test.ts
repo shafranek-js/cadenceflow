@@ -54,7 +54,9 @@ describe("HelpCenterModal component", () => {
       }),
     );
 
-    const guitarTabBtn = document.body.querySelector<HTMLButtonElement>('[data-testid="help-tab-guitar"]');
+    const guitarTabBtn = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="help-tab-guitar"]',
+    );
     expect(guitarTabBtn).not.toBeNull();
 
     act(() => {
@@ -119,7 +121,9 @@ describe("AppMenuBar with Help dropdown", () => {
       }),
     );
 
-    const helpTrigger = mounted.container.querySelector<HTMLButtonElement>('[data-testid="help-menu-toggle"]');
+    const helpTrigger = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="help-menu-toggle"]',
+    );
     expect(helpTrigger).not.toBeNull();
     expect(helpTrigger?.textContent?.trim()).toBe("Help");
 
@@ -131,7 +135,9 @@ describe("AppMenuBar with Help dropdown", () => {
     const helpMenu = mounted.container.querySelector("#help-menu");
     expect(helpMenu).not.toBeNull();
 
-    const helpCenterItem = mounted.container.querySelector<HTMLButtonElement>('[data-testid="menu-open-help-center"]');
+    const helpCenterItem = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="menu-open-help-center"]',
+    );
     expect(helpCenterItem).not.toBeNull();
     expect(helpCenterItem?.textContent).toContain("Справочный центр");
 

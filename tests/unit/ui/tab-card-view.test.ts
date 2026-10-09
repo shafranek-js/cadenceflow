@@ -37,12 +37,30 @@ const mockCChord: ChordDefinition = {
   harmonicFunction: {
     functionId: "I",
     moduleId: "progressions",
-    category: "tonic",
-    degree: "I",
+    category: "core",
   },
 };
 
 describe("TabCardView", () => {
+  it("shows a clear message instead of an empty fingering for unsupported seven-tone chords", () => {
+    const chord: ChordDefinition = {
+      ...mockCChord,
+      variant: {
+        seventh: "minor7",
+        extensions: [9, 11, 13],
+        suspensions: [],
+        alterations: [],
+      },
+    };
+    const { container, unmount } = mount(el(TabCardView, { chord, chordLabel: "C7(9,11,13)" }));
+
+    expect(container.querySelector('[role="status"]')?.textContent).toMatch(
+      /No matching fingering/i,
+    );
+    expect(container.querySelector(".guitar-tab-svg")).toBeNull();
+    unmount();
+  });
+
   it("renders 6 string lines, TAB clef, chord symbol, and fret badges", () => {
     const { container, unmount } = mount(
       el(TabCardView, {

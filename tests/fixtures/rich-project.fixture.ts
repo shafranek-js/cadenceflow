@@ -17,35 +17,37 @@ import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrati
  * Used by portable project, autosave recovery, and melody persistence tests.
  */
 export function createRichProjectFixture(): Project {
-  const step1: ChordStep = Object.freeze({
+  const step1: ChordStep = Object.freeze<ChordStep>({
     id: "step-1",
     kind: "chord",
     harmonicFunction: Object.freeze({
       moduleId: "progressions",
       functionId: "I",
-      category: "tonic",
+      category: "core",
     }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
     performance: DEFAULT_PIANO_PERFORMANCE,
     cardView: "harmonic",
     melody: Object.freeze({
-      mode: "generated",
+      mode: "generated" as const,
       recipe: snapshotChordMelodyRecipe({
-        pattern: "outside-in",
+        pitchMotion: "outside-in",
         grid: "eighth-triplet",
         octaveOffset: 1,
+        rhythm: "even",
+        connection: "retrigger",
       }),
     }),
   });
 
-  const step2: ChordStep = Object.freeze({
+  const step2: ChordStep = Object.freeze<ChordStep>({
     id: "step-2",
     kind: "chord",
     harmonicFunction: Object.freeze({
       moduleId: "progressions",
       functionId: "I", // Repeated harmonic function
-      category: "tonic",
+      category: "core",
     }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(3, 2), { kind: "beats", label: "3/2 beats" }),
@@ -54,10 +56,30 @@ export function createRichProjectFixture(): Project {
       register: 1,
       voicingMode: "manual",
       manualVoicing: Object.freeze([
-        { midiNumber: 60, pitchClassIdentity: 0, octave: 4, spelling: { step: "C", alter: 0 } },
-        { midiNumber: 64, pitchClassIdentity: 4, octave: 4, spelling: { step: "E", alter: 0 } },
-        { midiNumber: 67, pitchClassIdentity: 7, octave: 4, spelling: { step: "G", alter: 0 } },
-        { midiNumber: 72, pitchClassIdentity: 0, octave: 5, spelling: { step: "C", alter: 0 } },
+        {
+          midiNumber: 60,
+          pitchClassIdentity: 0,
+          octave: 4,
+          spelling: { step: "C" as const, alter: 0 },
+        },
+        {
+          midiNumber: 64,
+          pitchClassIdentity: 4,
+          octave: 4,
+          spelling: { step: "E" as const, alter: 0 },
+        },
+        {
+          midiNumber: 67,
+          pitchClassIdentity: 7,
+          octave: 4,
+          spelling: { step: "G" as const, alter: 0 },
+        },
+        {
+          midiNumber: 72,
+          pitchClassIdentity: 0,
+          octave: 5,
+          spelling: { step: "C" as const, alter: 0 },
+        },
       ]),
       bass: Object.freeze({
         choice: "custom",
@@ -66,7 +88,7 @@ export function createRichProjectFixture(): Project {
           midiNumber: 36,
           pitchClassIdentity: 0,
           octave: 2,
-          spelling: { step: "C", alter: 0 },
+          spelling: { step: "C" as const, alter: 0 },
         },
       }),
       masterVelocity: 95,
@@ -79,7 +101,7 @@ export function createRichProjectFixture(): Project {
     cardView: "piano",
   });
 
-  const step3: RestStep = Object.freeze({
+  const step3: RestStep = Object.freeze<RestStep>({
     id: "step-3",
     kind: "rest",
     duration: musicalDuration(rational(2, 3), {
@@ -88,13 +110,13 @@ export function createRichProjectFixture(): Project {
     }),
   });
 
-  const step4: ChordStep = Object.freeze({
+  const step4: ChordStep = Object.freeze<ChordStep>({
     id: "step-4",
     kind: "chord",
     harmonicFunction: Object.freeze({
       moduleId: "progressions",
       functionId: "IV",
-      category: "subdominant",
+      category: "core",
     }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(1, 3)),
@@ -105,13 +127,13 @@ export function createRichProjectFixture(): Project {
     cardView: "staff",
   });
 
-  const step5: ChordStep = Object.freeze({
+  const step5: ChordStep = Object.freeze<ChordStep>({
     id: "step-5",
     kind: "chord",
     harmonicFunction: Object.freeze({
       moduleId: "progressions",
       functionId: "V",
-      category: "dominant",
+      category: "core",
     }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(7, 2), {
@@ -122,7 +144,7 @@ export function createRichProjectFixture(): Project {
     cardView: "harmonic",
   });
 
-  const temporaryBranch: TemporaryBranch = Object.freeze({
+  const temporaryBranch: TemporaryBranch = Object.freeze<TemporaryBranch>({
     id: "branch-active-whatif-01",
     originStepId: "step-2",
     originAtEnd: false,
@@ -135,7 +157,7 @@ export function createRichProjectFixture(): Project {
         harmonicFunction: Object.freeze({
           moduleId: "progressions",
           functionId: "ii",
-          category: "predominant",
+          category: "core",
         }),
         harmonicVariant: EMPTY_HARMONIC_VARIANT,
         duration: musicalDuration(rational(2, 1)),
@@ -148,7 +170,7 @@ export function createRichProjectFixture(): Project {
         harmonicFunction: Object.freeze({
           moduleId: "progressions",
           functionId: "V",
-          category: "dominant",
+          category: "core",
         }),
         harmonicVariant: EMPTY_HARMONIC_VARIANT,
         duration: musicalDuration(rational(2, 1)),
@@ -158,7 +180,7 @@ export function createRichProjectFixture(): Project {
     ]),
   });
 
-  const customPreset: FunctionalPreset = Object.freeze({
+  const customPreset: FunctionalPreset = Object.freeze<FunctionalPreset>({
     id: "custom-preset-us8-rich",
     name: "Custom I-vi-IV",
     source: "custom",
@@ -168,7 +190,7 @@ export function createRichProjectFixture(): Project {
         harmonicFunction: Object.freeze({
           moduleId: "progressions",
           functionId: "I",
-          category: "tonic",
+          category: "core",
         }),
         duration: musicalDuration(rational(4, 1)),
       }),
@@ -176,14 +198,14 @@ export function createRichProjectFixture(): Project {
         harmonicFunction: Object.freeze({
           moduleId: "progressions",
           functionId: "vi",
-          category: "tonic-substitute",
+          category: "core",
         }),
         duration: musicalDuration(rational(4, 1)),
       }),
     ]),
   });
 
-  return Object.freeze({
+  return Object.freeze<Project>({
     id: "project-us8-rich-fixture-001",
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     name: "Rich US8 Acceptance Project",
@@ -206,6 +228,7 @@ export function createRichProjectFixture(): Project {
       genreFocus: "all",
     }),
     harmonyTrack: DEFAULT_HARMONY_TRACK_SETTINGS,
+    independentBassEnabled: true,
     melodyTrack: Object.freeze({
       instrument: "violin",
       muted: false,

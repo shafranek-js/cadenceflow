@@ -117,18 +117,12 @@ export function resolveGuitarTabEntry(
   customChordLabel?: string,
   bassPitchClass?: PitchClassIdentity,
 ): GuitarTabEntry {
-  const isSeventh = chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
-  const isMajor7 = chord.variant?.seventh === "major7";
   const resolvedBassPitchClass = bassPitchClass ?? chord.bassPitchClass;
 
-  const voicing: GuitarChordVoicing = resolveGuitarChordVoicing({
-    rootPitchClass: chord.rootPitchClass,
-    baseQuality: chord.baseQuality,
-    spelling: chord.spelling,
-    isSeventh,
-    isMajor7,
-    ...(resolvedBassPitchClass !== undefined ? { bassPitchClass: resolvedBassPitchClass } : {}),
-  });
+  const voicing: GuitarChordVoicing = resolveGuitarChordVoicing(
+    chord,
+    resolvedBassPitchClass !== undefined ? { bassPitchClass: resolvedBassPitchClass } : undefined,
+  );
 
   const strings: GuitarTabStringPosition[] = TAB_STRING_ORDER.map((meta) => {
     const fret = voicing.frets[meta.stringIndex] ?? -1;

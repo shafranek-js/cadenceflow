@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import {
+  enableIndependentBassVoice,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () => {
   test.beforeEach(async ({ page }) => {
@@ -9,6 +13,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
       ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
     });
     await page.goto("/");
+    await setProgressionView(page, "staff");
   });
 
   test("Scenario 1 — repeated chord independence through UI", async ({ page }) => {
@@ -17,12 +22,12 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(2);
 
     // 2. Select Step 1
     await steps.nth(0).click();
-    await expect(steps.nth(0)).toHaveClass(/is-selected/);
+    await expect(steps.nth(0)).toHaveAttribute("aria-pressed", "true");
 
     // 3. Edit manual Piano voicing for Step 1
     await page.getByRole("button", { name: "Open Piano Voicing Editor" }).click();
@@ -44,7 +49,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
 
     // 6. Select Step 2
     await steps.nth(1).click();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
 
     // 7. Verify Step 2 retains independent configuration (defaults: Humanized, 80, Auto voicing, musical view)
     await expect(page.getByLabel("Voicing Mode", { exact: true })).toHaveValue("auto");
@@ -70,7 +75,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     // Add chord 'I' and select it
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
-    const step = page.locator('[data-testid="progression-step"]').first();
+    const step = page.locator(".measure-staff-event-select").first();
     await step.click();
 
     // Switch to manual voicing mode and open editor
@@ -98,8 +103,13 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     await expect(modal).not.toBeVisible();
 
     // Verify Piano view matches saved pitches
-    await page.getByLabel("Progression Card View").selectOption("piano");
-    const miniPiano = step.locator(".mini-piano");
+    await setProgressionView(page, "piano-roll");
+    await page.getByRole("button", { name: "Show piano chord", exact: true }).first().click();
+    const miniPiano = page
+      .getByTestId("piano-roll-piano-cards")
+      .locator(".piano-roll-instrument-card")
+      .first()
+      .locator(".mini-piano");
     await expect(miniPiano).toBeVisible();
     await expect(miniPiano.locator('.mini-key[data-midi="60"]')).toHaveClass(/is-active/);
 
@@ -118,7 +128,7 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     // Add chord and select it
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
-    const step = page.locator('[data-testid="progression-step"]').first();
+    const step = page.locator(".measure-staff-event-select").first();
     await step.click();
 
     // Switch to MIDI view preference
@@ -180,10 +190,12 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
     // Add chord and select it
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
-    const step = page.locator('[data-testid="progression-step"]').first();
+    const step = page.locator(".measure-staff-event-select").first();
     await step.click();
 
-    const bassSelect = page.getByLabel("Bass Note", { exact: true });
+    await enableIndependentBassVoice(page);
+    const chordProperties = page.getByTestId("chord-properties-inspector");
+    const bassSelect = chordProperties.getByLabel("Bass Note", { exact: true });
 
     // Select Root, 3rd, 5th
     await bassSelect.selectOption("root");
@@ -197,19 +209,23 @@ test.describe("US5 — Piano Performance & Voice-Leading Acceptance (T096)", () 
 
     // Select Custom
     await bassSelect.selectOption("custom");
-    const customMidiInput = page.getByRole("spinbutton", { name: "Custom Bass MIDI Number" });
+    const customMidiInput = chordProperties.getByRole("spinbutton", {
+      name: "Custom Bass MIDI number",
+    });
     await expect(customMidiInput).toBeVisible();
 
     // Attempt invalid custom bass
     await customMidiInput.fill("15"); // Below 21
-    const bassError = page.locator('.custom-bass-editor .error-text[role="alert"]');
+    const bassError = chordProperties.getByRole("alert");
     await expect(bassError).toBeVisible();
-    await expect(bassError).toContainText("outside piano range");
+    await expect(bassError).toContainText("21..108");
 
     // Enter valid custom bass F#2 (MIDI 42)
     await customMidiInput.fill("42");
     await expect(bassError).not.toBeVisible();
-    await expect(page.locator(".custom-bass-readout")).toContainText("Pitch: F#2");
+    await expect(chordProperties.locator(".chord-properties-sounding")).toContainText(
+      "Independent bass F#2",
+    );
 
     // Verify upper notes list still exists and has not changed
     const upperNoteRows = page.locator(".per-note-velocity-row:has(.role-upper)");

@@ -1,11 +1,11 @@
 import type {
-  Alteration,
   BaseChordQuality,
   ChordDefinition,
   HarmonicVariant,
   SeventhKind,
   Suspension,
 } from "../../domain/harmony/chord";
+import { effectiveChordQuality } from "../../domain/harmony/chord";
 import type { DerivedMode } from "../../domain/harmony/functions";
 import type { DiatonicStep, PitchSpelling, PitchClassIdentity } from "../../domain/harmony/pitch";
 import type { PianoArticulation } from "../../domain/progression/step";
@@ -73,7 +73,7 @@ export type MusicXmlHarmonyKind =
 export type MusicXmlDegreeType = "add" | "alter" | "subtract";
 
 export interface MusicXmlHarmonyDegree {
-  readonly value: 2 | 4 | 5 | 9 | 11 | 13;
+  readonly value: 3 | 5 | 9 | 11 | 13;
   readonly alter: number;
   readonly type: MusicXmlDegreeType;
 }
@@ -180,30 +180,41 @@ function mapSuspension(suspension: Suspension): MusicXmlHarmonyKind {
   return suspension === "sus2" ? "suspended-second" : "suspended-fourth";
 }
 
-function extensionDegree(value: 9 | 11 | 13): MusicXmlHarmonyDegree {
-  return Object.freeze({ value, alter: 0, type: "add" });
-}
-
-function alterationDegree(alteration: Alteration): MusicXmlHarmonyDegree {
-  return Object.freeze({
-    value: alteration.degree,
-    alter: alteration.semitones,
-    type: "alter",
-  });
-}
-
-function add9Degree(): MusicXmlHarmonyDegree {
-  return Object.freeze({ value: 9, alter: 0, type: "add" });
-}
-
-function degreesForVariant(variant: HarmonicVariant): readonly MusicXmlHarmonyDegree[] {
-  const degrees = [
-    ...variant.extensions.map(extensionDegree),
-    ...(variant.add9 && !variant.extensions.includes(9) ? [add9Degree()] : []),
-    ...[...variant.alterations]
-      .sort((a, b) => a.degree - b.degree || a.semitones - b.semitones)
-      .map(alterationDegree),
-  ];
+function degreesForVariant(
+  variant: HarmonicVariant,
+  quality: BaseChordQuality,
+): readonly MusicXmlHarmonyDegree[] {
+  const alteredByDegree = new Map(variant.alterations.map((item) => [item.degree, item.semitones]));
+  const addedDegrees = new Set<number>([
+    ...variant.extensions,
+    ...(variant.add9 ? [9] : []),
+    ...(variant.add11 ? [11] : []),
+    ...(variant.add13 ? [13] : []),
+  ]);
+  const degrees: MusicXmlHarmonyDegree[] = [...addedDegrees]
+    .sort((a, b) => a - b)
+    .map((value) => ({
+      value: value as 9 | 11 | 13,
+      alter: alteredByDegree.get(value as 9 | 11 | 13) ?? 0,
+      type: "add",
+    }));
+  for (const alteration of [...variant.alterations].sort((a, b) => a.degree - b.degree)) {
+    if (addedDegrees.has(alteration.degree)) continue;
+    // MusicXML degree-alter is relative to the base harmony kind. CadenceFlow stores fifth
+    // alterations relative to a perfect fifth, while diminished and augmented kinds already
+    // supply a flattened or raised fifth. Translate between those two baselines so (for example)
+    // an explicit b5 on Cdim does not become an unintended double-flat fifth on import.
+    const alter =
+      alteration.degree === 5
+        ? 7 +
+          alteration.semitones -
+          (quality === "diminished" ? 6 : quality === "augmented" ? 8 : 7)
+        : alteration.semitones;
+    if (alter === 0) continue;
+    degrees.push({ value: alteration.degree, alter, type: "alter" });
+  }
+  if (variant.no3) degrees.push({ value: 3, alter: 0, type: "subtract" });
+  if (variant.no5) degrees.push({ value: 5, alter: 0, type: "subtract" });
   return Object.freeze(degrees);
 }
 
@@ -213,6 +224,7 @@ export function mapChordToMusicXmlHarmony(
 ): MusicXmlMappingResult<MusicXmlHarmonyMapping> {
   const diagnostics: MusicXmlDiagnostic[] = [];
   const variant = chord.variant;
+  const quality = effectiveChordQuality(chord);
   let kind: MusicXmlHarmonyKind | undefined;
 
   if (variant.suspensions.length > 0) {
@@ -221,32 +233,36 @@ export function mapChordToMusicXmlHarmony(
       variant.seventh ||
       variant.extensions.length > 0 ||
       variant.alterations.length > 0 ||
-      variant.add9
+      variant.add9 ||
+      variant.add11 ||
+      variant.add13 ||
+      variant.no3 ||
+      variant.no5
     ) {
       diagnostics.push(
         musicXmlDiagnostic(
           "unsupported-harmony-variant",
-          "Suspension combined with additional chord extensions is not represented exactly.",
+          "Suspension combined with additional extensions, alterations, or omissions may not be represented exactly.",
           "warning",
           stepId,
         ),
       );
     }
   } else if (variant.seventh) {
-    kind = mapSeventhKind(chord.baseQuality, variant.seventh);
+    kind = mapSeventhKind(quality, variant.seventh);
     if (!kind) {
       diagnostics.push(
         musicXmlDiagnostic(
           "unsupported-harmony-variant",
-          `The ${chord.baseQuality}/${variant.seventh} combination has no exact MusicXML kind.`,
+          `The ${quality}/${variant.seventh} combination has no exact MusicXML kind.`,
           "error",
           stepId,
         ),
       );
-      kind = mapBaseChordQualityToMusicXmlKind(chord.baseQuality);
+      kind = mapBaseChordQualityToMusicXmlKind(quality);
     }
   } else {
-    kind = mapBaseChordQualityToMusicXmlKind(chord.baseQuality);
+    kind = mapBaseChordQualityToMusicXmlKind(quality);
   }
 
   if (variant.add9 && variant.extensions.includes(9)) {
@@ -263,7 +279,7 @@ export function mapChordToMusicXmlHarmony(
   const mapping: MusicXmlHarmonyMapping = Object.freeze({
     root: mapPitchSpellingToMusicXml(chord.spelling.root),
     kind,
-    degrees: degreesForVariant(variant),
+    degrees: degreesForVariant(variant, quality),
   });
 
   return Object.freeze({

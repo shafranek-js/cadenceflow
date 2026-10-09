@@ -93,59 +93,95 @@ export function TabCardView({
       </div>
 
       <div className="mini-tab-fretboard-wrap">
-        <svg
-          className="guitar-tab-svg"
-          viewBox="0 0 120 106"
-          width="120"
-          height="106"
-          role="img"
-          aria-label={`${chordLabel} guitar tablature`}
-          data-testid="guitar-tab-svg"
-        >
-          {/* Card background */}
-          <rect x="8" y="8" width="104" height="90" rx="4" className="guitar-tab-bg" />
+        {tabEntry.voicing.unsupportedReason ? (
+          <p role="status" className="guitar-no-matching-fingering">
+            {tabEntry.voicing.unsupportedReason}
+          </p>
+        ) : (
+          <svg
+            className="guitar-tab-svg"
+            viewBox="0 0 120 106"
+            width="120"
+            height="106"
+            role="img"
+            aria-label={`${chordLabel} guitar tablature`}
+            data-testid="guitar-tab-svg"
+          >
+            {/* Card background */}
+            <rect x="8" y="8" width="104" height="90" rx="4" className="guitar-tab-bg" />
 
-          {/* TAB clef on the left */}
-          {showClef ? (
-            <g className="guitar-tab-clef" aria-hidden="true">
-              <text x="17" y="38" className="guitar-tab-clef-text">
-                T
-              </text>
-              <text x="17" y="58" className="guitar-tab-clef-text">
-                A
-              </text>
-              <text x="17" y="78" className="guitar-tab-clef-text">
-                B
-              </text>
-            </g>
-          ) : null}
+            {/* TAB clef on the left */}
+            {showClef ? (
+              <g className="guitar-tab-clef" aria-hidden="true">
+                <text x="17" y="38" className="guitar-tab-clef-text">
+                  T
+                </text>
+                <text x="17" y="58" className="guitar-tab-clef-text">
+                  A
+                </text>
+                <text x="17" y="78" className="guitar-tab-clef-text">
+                  B
+                </text>
+              </g>
+            ) : null}
 
-          {/* 6 Horizontal String lines */}
-          {STRING_Y.map((y, idx) => (
-            <line
-              key={`string-${idx}`}
-              x1={showClef ? "28" : "14"}
-              y1={y}
-              x2="106"
-              y2={y}
-              className={`guitar-tab-line guitar-tab-string-${idx + 1}`}
-              strokeWidth={STRING_GAUGES[idx]}
-            />
-          ))}
+            {/* 6 Horizontal String lines */}
+            {STRING_Y.map((y, idx) => (
+              <line
+                key={`string-${idx}`}
+                x1={showClef ? "28" : "14"}
+                y1={y}
+                x2="106"
+                y2={y}
+                className={`guitar-tab-line guitar-tab-string-${idx + 1}`}
+                strokeWidth={STRING_GAUGES[idx]}
+              />
+            ))}
 
-          {/* Fret values on each string (strings[0] is high e, strings[5] is low E) */}
-          {tabEntry.strings.map((strPos, idx) => {
-            const y = STRING_Y[idx] ?? 20;
-            const fretX = 66;
+            {/* Fret values on each string (strings[0] is high e, strings[5] is low E) */}
+            {tabEntry.strings.map((strPos, idx) => {
+              const y = STRING_Y[idx] ?? 20;
+              const fretX = 66;
 
-            if (strPos.isMuted) {
+              if (strPos.isMuted) {
+                return (
+                  <g key={`fret-${strPos.stringNumber}`} className="guitar-tab-fret-group is-muted">
+                    <rect
+                      x={fretX - 6}
+                      y={y - 6}
+                      width="12"
+                      height="12"
+                      rx="2"
+                      className="guitar-tab-fret-plate"
+                    />
+                    <text
+                      x={fretX}
+                      y={y + 3.5}
+                      textAnchor="middle"
+                      className="guitar-tab-fret-num is-muted"
+                    >
+                      ×
+                    </text>
+                  </g>
+                );
+              }
+
+              const isDoubleDigit = strPos.fret >= 10;
+              const plateWidth = isDoubleDigit ? 18 : 13;
+              const plateX = fretX - plateWidth / 2;
+
               return (
-                <g key={`fret-${strPos.stringNumber}`} className="guitar-tab-fret-group is-muted">
+                <g
+                  key={`fret-${strPos.stringNumber}`}
+                  className={`guitar-tab-fret-group ${strPos.isOpen ? "is-open" : "is-fretted"}`}
+                  data-string={strPos.stringNumber}
+                  data-fret={strPos.fret}
+                >
                   <rect
-                    x={fretX - 6}
-                    y={y - 6}
-                    width="12"
-                    height="12"
+                    x={plateX}
+                    y={y - 6.5}
+                    width={plateWidth}
+                    height="13"
                     rx="2"
                     className="guitar-tab-fret-plate"
                   />
@@ -153,45 +189,15 @@ export function TabCardView({
                     x={fretX}
                     y={y + 3.5}
                     textAnchor="middle"
-                    className="guitar-tab-fret-num is-muted"
+                    className={`guitar-tab-fret-num ${strPos.isOpen ? "is-open" : "is-fretted"}`}
                   >
-                    ×
+                    {strPos.fret}
                   </text>
                 </g>
               );
-            }
-
-            const isDoubleDigit = strPos.fret >= 10;
-            const plateWidth = isDoubleDigit ? 18 : 13;
-            const plateX = fretX - plateWidth / 2;
-
-            return (
-              <g
-                key={`fret-${strPos.stringNumber}`}
-                className={`guitar-tab-fret-group ${strPos.isOpen ? "is-open" : "is-fretted"}`}
-                data-string={strPos.stringNumber}
-                data-fret={strPos.fret}
-              >
-                <rect
-                  x={plateX}
-                  y={y - 6.5}
-                  width={plateWidth}
-                  height="13"
-                  rx="2"
-                  className="guitar-tab-fret-plate"
-                />
-                <text
-                  x={fretX}
-                  y={y + 3.5}
-                  textAnchor="middle"
-                  className={`guitar-tab-fret-num ${strPos.isOpen ? "is-open" : "is-fretted"}`}
-                >
-                  {strPos.fret}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+            })}
+          </svg>
+        )}
       </div>
     </div>
   );

@@ -2,11 +2,13 @@ import type { AudioNoteEvent } from "./contracts";
 import type { ChordDefinition } from "../domain/harmony/chord";
 import type { HarmonicContext } from "../domain/harmony/modules/types";
 import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
-import { resolveGuitarChordVoicing } from "../domain/instruments/guitar/voicings";
+import {
+  resolveGuitarChordVoicing,
+  withGuitarStepBass,
+} from "../domain/instruments/guitar/voicings";
 import type { ChordStep, ProgressionStep } from "../domain/progression/step";
 import {
   stepTranspositionSemitones,
-  transposeChordDefinition,
   transposeExactPitch,
 } from "../domain/progression/transposition";
 import {
@@ -69,6 +71,8 @@ export interface RealizeProgressionPerformanceInput {
   readonly groove?: GrooveSettings | undefined;
   readonly previousPitches?: readonly ExactPitch[] | undefined;
   readonly previousBassPitch?: ExactPitch | undefined;
+  /** Project-level switch for the separately scheduled lower piano voice. */
+  readonly independentBassEnabled?: boolean | undefined;
   readonly randomSource?: (() => number) | undefined;
 }
 
@@ -235,7 +239,7 @@ export function realizeProgressionPerformanceEvents(
     );
 
     const gatedDuration = multiplyRational(timing.durationBeats, PERFORMANCE_GATE_RATIO);
-    if (realization.bassPitch) {
+    if (input.independentBassEnabled !== false && realization.bassPitch) {
       if (!realization.sourceBassPitch) throw new Error(`Missing source bass pitch for ${step.id}`);
       addEvent(
         step,
@@ -340,6 +344,7 @@ export interface RealizeStepEventsInput {
   readonly stepStartSeconds?: number;
   readonly previousPitches?: readonly ExactPitch[] | undefined;
   readonly previousBassPitch?: ExactPitch | undefined;
+  readonly independentBassEnabled?: boolean | undefined;
   readonly randomSource?: (() => number) | undefined;
 }
 
@@ -364,6 +369,9 @@ export function realizeStepAudioEvents(input: RealizeStepEventsInput): RealizedS
     tempoBpm: input.tempoBpm,
     ...(input.previousPitches ? { previousPitches: input.previousPitches } : {}),
     ...(input.previousBassPitch ? { previousBassPitch: input.previousBassPitch } : {}),
+    ...(input.independentBassEnabled !== undefined
+      ? { independentBassEnabled: input.independentBassEnabled }
+      : {}),
     ...(input.randomSource ? { randomSource: input.randomSource } : {}),
   });
   const secondsPerBeat = 60 / input.tempoBpm;
@@ -396,6 +404,7 @@ export interface RealizeProgressionEventsInput {
   readonly tempoBpm: number;
   readonly groove?: GrooveSettings | undefined;
   readonly initialStartSeconds?: number;
+  readonly independentBassEnabled?: boolean | undefined;
   readonly randomSource?: (() => number) | undefined;
 }
 
@@ -450,21 +459,11 @@ export function realizeGuitarStepAudioEvents(
     throw new RangeError("tempoBpm must be positive");
   }
 
-  const isSeventh =
-    input.chord.baseQuality === "dominant" || input.chord.variant?.seventh !== undefined;
-  const isMajor7 = input.chord.variant?.seventh === "major7";
   const transposition = input.step ? stepTranspositionSemitones(input.step) : 0;
-  const sourceChord = transposeChordDefinition(input.chord, -transposition);
-  const guitarVoicing = resolveGuitarChordVoicing({
-    rootPitchClass: sourceChord.rootPitchClass,
-    baseQuality: sourceChord.baseQuality,
-    spelling: sourceChord.spelling,
-    ...(sourceChord.bassPitchClass !== undefined
-      ? { bassPitchClass: sourceChord.bassPitchClass }
-      : {}),
-    isSeventh,
-    isMajor7,
-  });
+  const guitarChord = input.step
+    ? withGuitarStepBass(input.chord, input.step, "concert")
+    : input.chord;
+  const guitarVoicing = resolveGuitarChordVoicing(guitarChord);
 
   const sourceManualPitches =
     input.step?.performance?.voicingMode === "manual" &&
@@ -472,8 +471,9 @@ export function realizeGuitarStepAudioEvents(
     input.step.performance.manualVoicing.length > 0
       ? input.step.performance.manualVoicing
       : undefined;
-  const sourcePitches = sourceManualPitches ?? guitarVoicing.pitches;
-  const pitches = sourcePitches.map((pitch) => transposeExactPitch(pitch, transposition));
+  const pitches = sourceManualPitches
+    ? sourceManualPitches.map((pitch) => transposeExactPitch(pitch, transposition))
+    : guitarVoicing.pitches;
 
   const durationBeats = input.durationBeats ?? input.step?.duration?.beats ?? rational(4, 1);
   const secondsPerBeat = 60 / input.tempoBpm;

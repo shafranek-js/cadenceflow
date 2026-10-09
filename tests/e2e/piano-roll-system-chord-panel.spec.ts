@@ -333,7 +333,11 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
         ? Object.freeze({ ...step, duration: musicalDuration(rational(1, 4)) })
         : step,
   );
-  await importVisualFixture(page, { ...fixture, progression: { ...fixture.progression, steps } });
+  await importVisualFixture(page, {
+    ...fixture,
+    independentBassEnabled: true,
+    progression: { ...fixture.progression, steps },
+  });
   await page.evaluate(() => {
     const target = window as Window & {
       __cardAuditions?: unknown[];
@@ -348,7 +352,7 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
       return null;
     };
   });
-  const pianoButtons = page.getByRole("button", { name: "Show piano", exact: true });
+  const pianoButtons = page.getByRole("button", { name: "Show piano chord", exact: true });
   const guitarButtons = page.getByRole("button", { name: "Show guitar chord", exact: true });
   await expect(pianoButtons.first()).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".piano-roll-instrument-card")).toHaveCount(0);
@@ -366,8 +370,10 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
   await cardsA.first().click();
   await expect
     .poll(() =>
-      page.evaluate(
-        () => (window as Window & { __cardAuditions: unknown[] }).__cardAuditions.length,
+      page.evaluate(() =>
+        "__cardAuditions" in window && Array.isArray(window.__cardAuditions)
+          ? window.__cardAuditions.length
+          : 0,
       ),
     )
     .toBe(1);
@@ -375,8 +381,10 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
   const cardB = page.locator('.piano-roll-instrument-card[data-source-step-id="chord-b"]').first();
   await cardB.click({ modifiers: ["Shift"] });
   expect(
-    await page.evaluate(
-      () => (window as Window & { __cardAuditions: unknown[] }).__cardAuditions.length,
+    await page.evaluate(() =>
+      "__cardAuditions" in window && Array.isArray(window.__cardAuditions)
+        ? window.__cardAuditions.length
+        : 0,
     ),
   ).toBe(1);
   await expect(cardsA.first()).toHaveAttribute("aria-pressed", "true");
@@ -479,9 +487,10 @@ test("embedded chord cards retain inversion and transposition while Matrix instr
   };
   await importVisualFixture(page, {
     ...fixture,
+    independentBassEnabled: true,
     progression: { ...fixture.progression, steps: [step, ...fixture.progression.steps.slice(1)] },
   });
-  await page.getByRole("button", { name: "Show piano", exact: true }).first().click();
+  await page.getByRole("button", { name: "Show piano chord", exact: true }).first().click();
   await page.getByRole("button", { name: "Show guitar chord", exact: true }).first().click();
   const piano = page.locator(".piano-roll-card-row .mini-piano-card-visual").first();
   const pianoSnapshot = await piano
@@ -515,7 +524,7 @@ test("Piano Roll chord controls stay on the System row and edit through undoable
 }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await openStudio(page);
-  await page.getByTestId("progression-view-btn-tablature").click();
+  await page.getByTestId("progression-view-btn-staff").click();
   for (const functionId of ["I", "V", "vi", "IV"]) await addChord(page, functionId);
   // Put two contiguous chords in one Measure so ArrowRight has a valid shared-boundary preview.
   const progressionSteps = page.locator("[data-progression-step-select]");
@@ -886,14 +895,14 @@ test("music-visible NOTE, CHORD and hidden-selection captures fit normal viewpor
     return Object.freeze({
       ...step,
       melody: snapshotChordMelody({
-        mode: "authored",
+        mode: "authored" as const,
         phrase: snapshotAuthoredMelodyPhrase({
           notes: step.id === firstStep.id ? [firstNote] : [],
         }),
       }),
     });
   });
-  const visualProject: Project = Object.freeze({
+  const visualProject: Project = Object.freeze<Project>({
     ...fixture,
     harmonyTrack: Object.freeze({ ...fixture.harmonyTrack, muted: true }),
     melodyTrack: Object.freeze({ ...fixture.melodyTrack, muted: true }),
@@ -1070,7 +1079,7 @@ test("selecting a chord continuation displays its source Step panel in that Syst
   const fixture = createPianoRollSystemChordFixture();
   const first = fixture.progression.steps[0];
   if (!first) throw new Error("Fixture is missing its first Step");
-  const spanningProject: Project = Object.freeze({
+  const spanningProject: Project = Object.freeze<Project>({
     ...fixture,
     harmonyTrack: Object.freeze({ ...fixture.harmonyTrack, muted: true }),
     melodyTrack: Object.freeze({ ...fixture.melodyTrack, muted: true }),

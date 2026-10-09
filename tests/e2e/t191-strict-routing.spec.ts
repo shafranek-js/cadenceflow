@@ -1,14 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function boot(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.matrix-panel[data-module="progressions"]')).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function progressionCount(page: Page): Promise<number> {
-  return page.locator('[data-testid="progression-step"]').count();
+  return page.locator(".measure-staff-event-select").count();
 }
 
 async function addWithControl(page: Page, functionId: string): Promise<void> {

@@ -1,10 +1,14 @@
 import {
+  Fragment,
+  memo,
   useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent,
   type ReactNode,
 } from "react";
 import type { ExactPitch } from "../../domain/harmony/pitch";
@@ -21,6 +25,7 @@ import {
   type GuitarMelodyInputNote,
   type GuitarTabPosition,
 } from "../../domain/instruments/guitar/tablature";
+import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import type { Project } from "../../domain/project/project";
 import type { PlaybackClockSnapshot } from "../transport/transportStore";
@@ -74,6 +79,24 @@ const SONG_SECTION_MARKER_ROW_PX = 24;
 const MELODY_NOTE_ANNOTATION_ROW_GAP_PX = 31;
 const MELODY_NOTE_ANNOTATION_MIN_GAP_PX = 36;
 
+interface SystemDragSession {
+  readonly pointerId: number;
+  readonly sourceSystem: ScoreSystem;
+  readonly sourceHeader: HTMLElement;
+  readonly project: Project;
+  readonly projection: ReturnType<typeof projectScoreSystems>;
+  readonly startX: number;
+  readonly startY: number;
+  phase: "pending" | "active";
+  dropInsertMeasureIndex?: number;
+}
+
+interface SystemDragVisual {
+  readonly sourceSystemIndex: number;
+  readonly dropInsertMeasureIndex?: number;
+  readonly markerTopPx?: number;
+}
+
 function formatPitch(pitch: ExactPitch): string {
   return `${formatPitchSpelling(pitch.spelling)}${pitch.octave}`;
 }
@@ -103,7 +126,12 @@ function sourceChordLabel(project: Project, stepId: string): string {
   if (!step || step.kind !== "chord") return stepId;
   const chord = realizeProgressionStepChord(step, project.tonic);
   return formatChordSymbol(
-    withEffectiveBass(chord, realizeProgressionStepRealization(step, project.tonic).bassPitch),
+    withEffectiveBass(
+      chord,
+      project.independentBassEnabled
+        ? realizeProgressionStepRealization(step, project.tonic).bassPitch
+        : realizeProgressionStepRealization(step, project.tonic).pitches[0],
+    ),
   );
 }
 
@@ -137,8 +165,12 @@ function harmonySequenceEntry(
       (candidate) => candidate.id === item.stepId && candidate.kind === "chord",
     );
     if (step && step.kind === "chord") {
-      const chord = realizeProgressionStepChord(step, project.tonic);
-      const tabEntry = resolveGuitarTabEntry(withEffectiveBass(chord, item.bassPitch), item.label);
+      const chord = withGuitarStepBass(
+        realizeProgressionStepChord(step, project.tonic),
+        step,
+        "concert",
+      );
+      const tabEntry = resolveGuitarTabEntry(chord, item.label);
       tabPositions = tabEntry.strings
         .filter((s) => s.fret >= 0)
         .map((s) => ({
@@ -152,7 +184,9 @@ function harmonySequenceEntry(
     key: item.key,
     kind: "chord",
     projection: projectPitchesToStaff(item.pitches),
-    ...(item.bassPitch ? { bassProjection: projectPitchesToStaff([item.bassPitch]) } : {}),
+    ...(project?.independentBassEnabled && !isTablature && item.bassPitch
+      ? { bassProjection: projectPitchesToStaff([item.bassPitch]) }
+      : {}),
     ...(tabPositions ? { tabPositions } : {}),
     sourceEventKeys: [item.stepId],
     duration: item.duration,
@@ -475,6 +509,10 @@ interface ScoreSystemCanvasProps {
   readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onAuditionSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetPianoRollSystemScope?: ((systemIndex: number) => void) | undefined;
+  readonly onSetCurrentMeasureScope?:
+    ((measureIndex: number, systemIndex: number) => void) | undefined;
+  readonly currentMeasureIndex?: number | undefined;
+  readonly currentSystemIndex?: number | undefined;
   readonly onSelectPianoRollSystemNotes?: ((system: ScoreSystem) => void) | undefined;
   readonly pianoRollSelectionScopeLabel?: string | undefined;
   readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
@@ -482,6 +520,9 @@ interface ScoreSystemCanvasProps {
   readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
   readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly isSystemDragSource?: boolean | undefined;
+  readonly onStartSystemDrag?:
+    ((system: ScoreSystem, event: PointerEvent<HTMLElement>) => void) | undefined;
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
@@ -548,6 +589,9 @@ function ScoreSystemCanvas({
   onPlayFromSystem,
   onAuditionSystem,
   onSetPianoRollSystemScope,
+  onSetCurrentMeasureScope,
+  currentMeasureIndex,
+  currentSystemIndex,
   onSelectPianoRollSystemNotes,
   pianoRollSelectionScopeLabel = "Progression",
   onToggleLoopSystem,
@@ -555,6 +599,8 @@ function ScoreSystemCanvas({
   onToggleSoloSystem,
   onMoveSystemUp,
   onMoveSystemDown,
+  isSystemDragSource = false,
+  onStartSystemDrag,
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
@@ -583,6 +629,9 @@ function ScoreSystemCanvas({
     pianoRollMeasureCapacity !== undefined &&
     pianoRollMeasureMinimumWidthPx !== undefined &&
     pianoRollMusicViewportWidthPx !== undefined;
+  // The row always reserves the full grouping, even when this System holds fewer Measures. A short
+  // final System then shows its Measures at the same width as every other System and leaves the
+  // remaining cells as free space, instead of stretching one Measure across the whole row.
   const pianoRollSystemWidthPx = hasPianoRollMeasureSlots
     ? Math.max(
         pianoRollMusicViewportWidthPx,
@@ -643,6 +692,7 @@ function ScoreSystemCanvas({
             subtractRational(start.startBeats, measure.startBeats),
             barLength,
             project.presentation.progressionView !== "tablature" &&
+              project.independentBassEnabled &&
               project.presentation.showBassInStaff,
           ),
           names: [],
@@ -691,6 +741,7 @@ function ScoreSystemCanvas({
     displayWidthPx,
     layout.barLengthBeats,
     project.presentation.progressionView,
+    project.independentBassEnabled,
     project.presentation.showBassInStaff,
     project.progression.sections,
     system,
@@ -746,6 +797,7 @@ function ScoreSystemCanvas({
 
   const isLooping = isSystemLooping ? isSystemLooping(system) : false;
   const isMuted = isSystemMuted ? isSystemMuted(system) : false;
+  const isCurrentSystem = currentSystemIndex === system.index;
   const isSolo = isSystemSolo ? isSystemSolo(system) : false;
 
   const systemMelodyLanes = useMemo(
@@ -759,7 +811,8 @@ function ScoreSystemCanvas({
   );
   const isTablature = project.presentation.progressionView === "tablature";
   const isNotationView = project.presentation.progressionView === "staff" || isTablature;
-  const showBass = isTablature ? false : project.presentation.showBassInStaff;
+  const showBass =
+    isTablature || !project.independentBassEnabled ? false : project.presentation.showBassInStaff;
   const suzukiColors = project.presentation.noteColorMode === "suzuki";
 
   const optimizedMelodyTabPositions = useMemo(() => {
@@ -774,11 +827,12 @@ function ScoreSystemCanvas({
             (c) => c.id === item.stepId && c.kind === "chord",
           );
           if (step && step.kind === "chord") {
-            const chord = {
-              ...realizeProgressionStepChord(step, project.tonic),
-            };
-            const bassPc = item.bassPitch?.pitchClassIdentity;
-            const tabEntry = resolveGuitarTabEntry(chord, item.label, bassPc);
+            const chord = withGuitarStepBass(
+              realizeProgressionStepChord(step, project.tonic),
+              step,
+              "concert",
+            );
+            const tabEntry = resolveGuitarTabEntry(chord, item.label);
             chordBaseFretByMeasure.set(projectedMeasure.measureIndex, tabEntry.baseFret);
             break;
           }
@@ -1111,46 +1165,43 @@ function ScoreSystemCanvas({
       data-testid="progression-measure-score"
     >
       <section
-        className={`score-system ${isMuted ? "is-muted" : ""}`.trim()}
+        className={`score-system ${isMuted ? "is-muted" : ""} ${isCurrentSystem ? "is-current-context" : ""} ${isSystemDragSource ? "is-system-drag-source" : ""}`.trim()}
         data-testid="progression-score-system"
         data-system-index={system.index}
+        data-current-context={isCurrentSystem ? "true" : undefined}
+        aria-current={isCurrentSystem ? "location" : undefined}
         data-measure-count={system.measures.length}
         data-horizontally-scrollable={systemHorizontallyScrollable ? "true" : undefined}
         data-is-muted={isMuted ? "true" : undefined}
         data-is-solo={isSolo ? "true" : undefined}
         data-is-looping={isLooping ? "true" : undefined}
-        aria-label={`Score system ${system.index + 1}, measures ${system.measures[0]?.measure.number} through ${system.measures.at(-1)?.measure.number}`}
+        aria-label={`Score system ${system.index + 1}, measures ${system.measures[0]?.measure.number} through ${system.measures.at(-1)?.measure.number}${isCurrentSystem ? ", current context" : ""}`}
       >
         <header
           className="score-system-header"
           data-testid="score-system-header"
           data-system-index={system.index}
-          tabIndex={project.presentation.progressionView === "piano-roll" ? 0 : undefined}
+          tabIndex={0}
+          onPointerDown={(event) => onStartSystemDrag?.(system, event)}
           aria-label={
             project.presentation.progressionView === "piano-roll"
-              ? `Set Ctrl+A selection scope to System ${system.index + 1}`
-              : undefined
+              ? `Set Ctrl+A selection scope and current context to System ${system.index + 1}`
+              : `Set current context to System ${system.index + 1}`
           }
-          aria-keyshortcuts={
-            project.presentation.progressionView === "piano-roll" ? "Enter Space" : undefined
-          }
+          aria-keyshortcuts="Enter Space"
           onFocus={(event) => {
-            if (
-              project.presentation.progressionView === "piano-roll" &&
-              event.target === event.currentTarget
-            )
-              onSetPianoRollSystemScope?.(system.index);
+            if (event.target === event.currentTarget) onSetPianoRollSystemScope?.(system.index);
           }}
           onClick={(event) => {
+            const target = event.target;
             if (
-              project.presentation.progressionView === "piano-roll" &&
-              event.target === event.currentTarget
+              target === event.currentTarget ||
+              (target instanceof Element && !target.closest("button, a, input, select, textarea"))
             )
               onSetPianoRollSystemScope?.(system.index);
           }}
           onKeyDown={(event) => {
             if (
-              project.presentation.progressionView !== "piano-roll" ||
               event.target !== event.currentTarget ||
               (event.key !== "Enter" && event.key !== " ")
             )
@@ -1223,11 +1274,19 @@ function ScoreSystemCanvas({
                     className="score-system-measure-menu-trigger"
                     data-measure-context-trigger
                     data-measure-index={measure.measureIndex}
+                    data-current-context={
+                      currentMeasureIndex === measure.measureIndex ? "true" : undefined
+                    }
+                    aria-current={
+                      currentMeasureIndex === measure.measureIndex ? "location" : undefined
+                    }
                     aria-label={`Measure ${measure.number} commands`}
                     aria-haspopup="menu"
                     title={`Measure ${measure.number} commands`}
+                    onFocus={() => onSetCurrentMeasureScope?.(measure.measureIndex, system.index)}
                     onClick={(event) => {
                       event.stopPropagation();
+                      onSetCurrentMeasureScope?.(measure.measureIndex, system.index);
                       const rect = event.currentTarget.getBoundingClientRect();
                       onOpenMeasureMenu?.(measure.measureIndex, event.currentTarget, {
                         x: rect.left,
@@ -1390,6 +1449,41 @@ function ScoreSystemCanvas({
             {isNotationView ? (
               <div
                 className="score-system-paper"
+                onClick={(event) => {
+                  if (!onSetCurrentMeasureScope || !isNotationView) return;
+                  const target = event.target;
+                  if (
+                    target instanceof Element &&
+                    target.closest(
+                      "button, a, input, select, textarea, [contenteditable], [role=menu], [role=dialog], .score-system-header",
+                    )
+                  )
+                    return;
+                  if (target instanceof Element) {
+                    const annotation = target.closest<HTMLElement>(
+                      ".measure-staff-event, .measure-staff-gap",
+                    );
+                    const measureIndex = Number(annotation?.dataset.measureIndex);
+                    if (Number.isInteger(measureIndex)) {
+                      onSetCurrentMeasureScope(measureIndex, system.index);
+                      return;
+                    }
+                  }
+                  const paper = event.currentTarget;
+                  const localX = event.clientX - paper.getBoundingClientRect().left;
+                  const measure = system.measures.find(({ measure }) => {
+                    const geometry = systemMeasureResizeGeometry(
+                      system,
+                      displayWidthPx,
+                      measure.measureIndex,
+                      showBass,
+                    );
+                    return (
+                      localX >= geometry.leftPx && localX <= geometry.leftPx + geometry.widthPx
+                    );
+                  });
+                  if (measure) onSetCurrentMeasureScope(measure.measure.measureIndex, system.index);
+                }}
                 style={{
                   position: "relative",
                   width: `${displayWidthPx}px`,
@@ -1412,6 +1506,36 @@ function ScoreSystemCanvas({
                     pointerEvents: "none",
                   }}
                 />
+                {currentMeasureIndex !== undefined &&
+                system.measures.some(({ measure }) => measure.measureIndex === currentMeasureIndex)
+                  ? (() => {
+                      const currentMeasure = system.measures.find(
+                        ({ measure }) => measure.measureIndex === currentMeasureIndex,
+                      )!.measure;
+                      const geometry = systemMeasureResizeGeometry(
+                        system,
+                        displayWidthPx,
+                        currentMeasureIndex,
+                        showBass,
+                      );
+                      return (
+                        <div
+                          className="score-system-current-measure-frame"
+                          data-testid={`score-system-current-measure-${currentMeasureIndex}`}
+                          data-current-context="true"
+                          aria-current="location"
+                          aria-label={`Current Measure ${currentMeasure.number}`}
+                          role="img"
+                          style={{
+                            left: `${geometry.leftPx}px`,
+                            width: `${geometry.widthPx}px`,
+                            top: `${scoreLabelBandPx}px`,
+                            height: `${systemHeight}px`,
+                          }}
+                        />
+                      );
+                    })()
+                  : null}
                 <div
                   ref={playheadRef}
                   className="score-system-playhead"
@@ -1513,7 +1637,7 @@ function ScoreSystemCanvas({
                     const playing = playingStepId === item.stepId;
                     const chord = item.kind === "chord" ? item : null;
                     const displayPitches = chord
-                      ? chord.bassPitch
+                      ? project.independentBassEnabled && !isTablature && chord.bassPitch
                         ? [chord.bassPitch, ...chord.pitches]
                         : chord.pitches
                       : [];
@@ -1547,9 +1671,13 @@ function ScoreSystemCanvas({
                         className={`measure-staff-event ${selected ? "is-selected" : ""} ${playing ? "is-playing" : ""} ${item.kind === "rest" ? "is-rest" : ""} ${chord && !chord.startsHere ? "is-continuation" : ""} ${renderDurationResizeHandle && chord && !chord.continuesToNext ? "has-duration-resize-handle" : ""}`}
                         style={style}
                         data-staff-item-key={item.key}
+                        data-measure-index={projectedMeasure.measureIndex}
                         data-resize-measure-left-px={resizeGeometry.leftPx}
                         data-resize-measure-width-px={resizeGeometry.widthPx}
                         data-resize-paper-width-px={displayWidthPx}
+                        data-current-context={
+                          currentMeasureIndex === projectedMeasure.measureIndex ? "true" : undefined
+                        }
                       >
                         <button
                           type="button"
@@ -1562,8 +1690,12 @@ function ScoreSystemCanvas({
                           aria-haspopup={onOpenMelodyMenu ? "menu" : undefined}
                           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
                           title={`${label}. ${keyboardDescription}`}
+                          onFocus={() =>
+                            onSetCurrentMeasureScope?.(projectedMeasure.measureIndex, system.index)
+                          }
                           onClick={(event) => {
                             event.stopPropagation();
+                            onSetCurrentMeasureScope?.(projectedMeasure.measureIndex, system.index);
                             onSelectStep(item.stepId);
                           }}
                           onContextMenu={(event) => {
@@ -1680,6 +1812,9 @@ function ScoreSystemCanvas({
                         style={gapStyle}
                         data-testid="progression-score-gap"
                         data-measure-index={projectedMeasure.measureIndex}
+                        data-current-context={
+                          currentMeasureIndex === projectedMeasure.measureIndex ? "true" : undefined
+                        }
                         aria-label={`Empty space in measure ${measureNumber}: ${formatMusicalDuration(item.duration)} beats`}
                       >
                         <strong>Empty</strong>
@@ -1777,7 +1912,19 @@ function ScoreSystemCanvas({
                             aria-pressed={selected}
                             aria-current={active ? "step" : undefined}
                             title={label}
-                            onClick={() => onSelectStep(entry.sourceStepId)}
+                            onFocus={() =>
+                              onSetCurrentMeasureScope?.(
+                                projectedMeasure.measureIndex,
+                                system.index,
+                              )
+                            }
+                            onClick={() => {
+                              onSetCurrentMeasureScope?.(
+                                projectedMeasure.measureIndex,
+                                system.index,
+                              );
+                              onSelectStep(entry.sourceStepId);
+                            }}
                           />
                         );
                       });
@@ -1805,6 +1952,9 @@ function ScoreSystemCanvas({
                       : "100%",
                   ...(hasPianoRollMeasureSlots
                     ? {
+                        // One column per slot of the grouping, so every Measure is the same width in
+                        // every System. A short final System leaves the unused cells empty rather
+                        // than stretching its Measure across the row.
                         gridTemplateColumns: `repeat(${pianoRollMeasureCapacity}, minmax(${pianoRollMeasureMinimumWidthPx}px, 1fr))`,
                       }
                     : {}),
@@ -1920,13 +2070,22 @@ export interface ScoreSystemViewProps {
   readonly onPlayFromSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onAuditionSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onSetPianoRollSystemScope?: ((systemIndex: number) => void) | undefined;
+  readonly onSetCurrentMeasureScope?:
+    ((measureIndex: number, systemIndex: number) => void) | undefined;
+  readonly currentMeasureIndex?: number | undefined;
+  readonly currentSystemIndex?: number | undefined;
   readonly onSelectPianoRollSystemNotes?: ((system: ScoreSystem) => void) | undefined;
   readonly pianoRollSelectionScopeLabel?: string | undefined;
   readonly onToggleLoopSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleMuteSystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onToggleSoloSystem?: ((system: ScoreSystem) => void) | undefined;
-  readonly onMoveSystemUp?: ((system: ScoreSystem) => void) | undefined;
-  readonly onMoveSystemDown?: ((system: ScoreSystem) => void) | undefined;
+  readonly onMoveSystemBlock?:
+    | ((
+        system: ScoreSystem,
+        toInsertMeasureIndex: number,
+        sourceProject: Project,
+      ) => string | undefined)
+    | undefined;
   readonly onCopySystem?: ((system: ScoreSystem) => void) | undefined;
   readonly onPasteSystemAfter?: ((system: ScoreSystem) => void) | undefined;
   readonly onInsertEmptySystemAfter?: ((system: ScoreSystem) => void) | undefined;
@@ -1955,7 +2114,7 @@ export interface ScoreSystemViewProps {
 }
 
 /** Responsive multi-measure Staff and Tablature projection used by My Progression. */
-export function ScoreSystemView({
+export const ScoreSystemView = memo(function ScoreSystemView({
   project,
   layout,
   melodyTimeline,
@@ -1986,13 +2145,15 @@ export function ScoreSystemView({
   onPlayFromSystem,
   onAuditionSystem,
   onSetPianoRollSystemScope,
+  onSetCurrentMeasureScope,
+  currentMeasureIndex,
+  currentSystemIndex,
   onSelectPianoRollSystemNotes,
   pianoRollSelectionScopeLabel,
   onToggleLoopSystem,
   onToggleMuteSystem,
   onToggleSoloSystem,
-  onMoveSystemUp,
-  onMoveSystemDown,
+  onMoveSystemBlock,
   onCopySystem,
   onPasteSystemAfter,
   onInsertEmptySystemAfter,
@@ -2028,6 +2189,189 @@ export function ScoreSystemView({
     return "badge";
   });
   const [showHandLegend, setShowHandLegend] = useState(false);
+  const [systemDragVisual, setSystemDragVisual] = useState<SystemDragVisual | null>(null);
+  const [systemMoveMessage, setSystemMoveMessage] = useState<string | null>(null);
+  const systemDragRef = useRef<SystemDragSession | null>(null);
+  const suppressSystemHeaderClickRef = useRef(false);
+
+  const cancelSystemDrag = () => {
+    const drag = systemDragRef.current;
+    systemDragRef.current = null;
+    setSystemDragVisual(null);
+    if (drag && drag.sourceHeader.hasPointerCapture(drag.pointerId)) {
+      try {
+        drag.sourceHeader.releasePointerCapture(drag.pointerId);
+      } catch {
+        // The browser may already have released capture during pointer cancellation.
+      }
+    }
+  };
+
+  const handleStartSystemDrag = (system: ScoreSystem, event: PointerEvent<HTMLElement>) => {
+    if (
+      !onMoveSystemBlock ||
+      event.button !== 0 ||
+      !(event.target instanceof Element) ||
+      event.target.closest(
+        "button, a, input, select, textarea, [contenteditable='true'], [role='menu'], [role='menuitem'], [role='dialog']",
+      )
+    )
+      return;
+    try {
+      // Capturing before the threshold lets pointerup outside the score clear a pending press.
+      // It does not prevent the ordinary click/focus behavior when the user releases in place.
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      return;
+    }
+    suppressSystemHeaderClickRef.current = false;
+    systemDragRef.current = {
+      pointerId: event.pointerId,
+      sourceSystem: system,
+      sourceHeader: event.currentTarget,
+      project,
+      projection: projection!,
+      startX: event.clientX,
+      startY: event.clientY,
+      phase: "pending",
+    };
+  };
+
+  const getSystemDropPosition = (clientY: number) => {
+    if (!projection) return undefined;
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const rootTop = root.getBoundingClientRect().top;
+    for (const system of projection.systems) {
+      const element = root.querySelector<HTMLElement>(
+        `[data-testid="progression-score-system"][data-system-index="${system.index}"]`,
+      );
+      const card = element?.closest<HTMLElement>(".score-system-card");
+      if (!card) continue;
+      const rect = card.getBoundingClientRect();
+      if (clientY < (rect.top + rect.bottom) / 2) {
+        return {
+          dropInsertMeasureIndex: system.measures[0]?.measure.measureIndex ?? 0,
+          markerTopPx: rect.top - rootTop,
+        };
+      }
+    }
+    const lastSystem = projection.systems.at(-1);
+    const lastElement = lastSystem
+      ? root.querySelector<HTMLElement>(
+          `[data-testid="progression-score-system"][data-system-index="${lastSystem.index}"]`,
+        )
+      : null;
+    const lastCard = lastElement?.closest<HTMLElement>(".score-system-card");
+    return {
+      dropInsertMeasureIndex: layout.measures.length,
+      markerTopPx: lastCard
+        ? lastCard.getBoundingClientRect().bottom - rootTop
+        : root.getBoundingClientRect().height,
+    };
+  };
+
+  const handleSystemDragPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = systemDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if ((event.buttons & 1) !== 1) {
+      cancelSystemDrag();
+      return;
+    }
+    if (drag.project !== project || drag.projection !== projection) {
+      cancelSystemDrag();
+      return;
+    }
+    if (
+      drag.phase === "pending" &&
+      Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) >= 4
+    ) {
+      drag.phase = "active";
+      event.preventDefault();
+      try {
+        drag.sourceHeader.focus({ preventScroll: true });
+      } catch {
+        // Pointer capture can fail when a browser cancels the initiating gesture.
+        cancelSystemDrag();
+        return;
+      }
+    }
+    if (drag.phase !== "active") return;
+    event.preventDefault();
+    const root = rootRef.current;
+    const rootRect = root?.getBoundingClientRect();
+    const withinDropArea = Boolean(
+      rootRect &&
+      event.clientX >= rootRect.left &&
+      event.clientX <= rootRect.right &&
+      event.clientY >= rootRect.top &&
+      event.clientY <= rootRect.bottom,
+    );
+    const position = withinDropArea ? getSystemDropPosition(event.clientY) : undefined;
+    if (!position) {
+      delete drag.dropInsertMeasureIndex;
+      setSystemDragVisual({ sourceSystemIndex: drag.sourceSystem.index });
+      return;
+    }
+    drag.dropInsertMeasureIndex = position.dropInsertMeasureIndex;
+    setSystemDragVisual({
+      sourceSystemIndex: drag.sourceSystem.index,
+      ...position,
+    });
+  };
+
+  const handleSystemDragPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = systemDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.project !== project || drag.projection !== projection) {
+      cancelSystemDrag();
+      return;
+    }
+    const shouldCommit = drag.phase === "active" && drag.dropInsertMeasureIndex !== undefined;
+    const source = drag.sourceSystem;
+    const target = drag.dropInsertMeasureIndex;
+    if (shouldCommit) {
+      event.preventDefault();
+      suppressSystemHeaderClickRef.current = true;
+      window.setTimeout(() => {
+        suppressSystemHeaderClickRef.current = false;
+      }, 0);
+    }
+    cancelSystemDrag();
+    if (shouldCommit && target !== undefined) {
+      setSystemMoveMessage(onMoveSystemBlock?.(source, target, drag.project) ?? null);
+    }
+  };
+
+  const handleSystemHeaderClickCapture = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!suppressSystemHeaderClickRef.current) return;
+    if (!(event.target instanceof Element) || !event.target.closest(".score-system-header")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressSystemHeaderClickRef.current = false;
+  };
+
+  const handleSystemDragKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Escape" || !systemDragRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    cancelSystemDrag();
+  };
+
+  useEffect(
+    () => () => {
+      const drag = systemDragRef.current;
+      if (drag && drag.sourceHeader.hasPointerCapture(drag.pointerId)) {
+        try {
+          drag.sourceHeader.releasePointerCapture(drag.pointerId);
+        } catch {
+          // Ignore a pointer capture already released by the browser.
+        }
+      }
+      systemDragRef.current = null;
+    },
+    [],
+  );
 
   const handleSetFingeringStyle = (style: TabFingeringStyle) => {
     setFingeringStyle(style);
@@ -2079,19 +2423,40 @@ export function ScoreSystemView({
         : Object.freeze([]),
     [melodyTimeline],
   );
-  const isStaffView = project.presentation.progressionView === "staff";
+  const progressionView = project.presentation.progressionView;
+  const isStaffView = progressionView === "staff";
   const usesScoreSystems =
-    isStaffView ||
-    project.presentation.progressionView === "tablature" ||
-    project.presentation.progressionView === "piano-roll";
-  const projection = useMemo(() => {
-    if (!usesScoreSystems) return null;
-    return projectScoreSystems(layout, {
-      availableWidthPx: availableWidthPx || DEFAULT_SCORE_WIDTH_PX,
-      measuresPerSystem,
-      additionalAttacks,
-    });
-  }, [additionalAttacks, availableWidthPx, usesScoreSystems, layout, measuresPerSystem]);
+    isStaffView || progressionView === "tablature" || progressionView === "piano-roll";
+  const computedProjection = useMemo(
+    () =>
+      projectScoreSystems(layout, {
+        availableWidthPx: availableWidthPx || DEFAULT_SCORE_WIDTH_PX,
+        measuresPerSystem,
+        // An "auto" System holds as many Measures as the meter's denominator says: 4/4 and 5/4 hold
+        // four, 3/2 holds two. Counting quarter beats or pixels instead both produced the wrong
+        // grouping — three Measures for 5/4, or eight of them crammed onto one row.
+        meterDenominator: layout.meter.denominator,
+        additionalAttacks,
+        // The piano-roll lays Measures out as shrinkable grid cells, so a System keeps its Measures
+        // and lets the row shrink (or scroll) instead of pushing the last one onto the next row.
+        packMeasuresByWidth: renderSystemPitchScale === undefined,
+      }),
+    [additionalAttacks, availableWidthPx, layout, measuresPerSystem, renderSystemPitchScale],
+  );
+  const projection = usesScoreSystems ? computedProjection : null;
+  useEffect(() => {
+    const drag = systemDragRef.current;
+    if (!drag || (drag.project === project && drag.projection === projection)) return;
+    systemDragRef.current = null;
+    setSystemDragVisual(null);
+    if (drag.phase === "active" && drag.sourceHeader.hasPointerCapture(drag.pointerId)) {
+      try {
+        drag.sourceHeader.releasePointerCapture(drag.pointerId);
+      } catch {
+        // Ignore a pointer capture already released by the browser.
+      }
+    }
+  }, [project, projection]);
   const progressionViewLabel = isStaffView
     ? "Staff score"
     : usesScoreSystems
@@ -2116,93 +2481,147 @@ export function ScoreSystemView({
           : undefined
       }
       aria-label={scoreLabel}
-      style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%", maxWidth: "100%" }}
+      onPointerMove={handleSystemDragPointerMove}
+      onPointerUp={handleSystemDragPointerUp}
+      onPointerCancel={cancelSystemDrag}
+      onClickCapture={handleSystemHeaderClickCapture}
+      onKeyDownCapture={handleSystemDragKeyDownCapture}
+      style={{
+        gridColumn: "1 / -1",
+        minWidth: 0,
+        width: "100%",
+        maxWidth: "100%",
+        position: "relative",
+      }}
     >
+      {systemDragVisual?.dropInsertMeasureIndex !== undefined &&
+      systemDragVisual.markerTopPx !== undefined ? (
+        <div
+          className="score-system-drop-marker"
+          data-testid="score-system-drop-marker"
+          data-source-system-index={systemDragVisual.sourceSystemIndex}
+          data-drop-measure-index={systemDragVisual.dropInsertMeasureIndex}
+          aria-hidden="true"
+          style={{ top: `${systemDragVisual.markerTopPx}px` }}
+        />
+      ) : null}
       {projection
         ? projection.systems.map((system) => {
             const displayWidthPx = system.horizontallyScrollable
               ? system.requiredWidthPx
               : Math.max(system.requiredWidthPx, projection.availableWidthPx - 2);
             return (
-              <ScoreSystemCanvas
-                key={system.index}
-                project={project}
-                layout={layout}
-                system={system}
-                displayWidthPx={displayWidthPx}
-                {...(renderSystemPitchScale
-                  ? {
-                      pianoRollMeasureCapacity: projection.maximumMeasuresPerSystem,
-                      pianoRollMeasureMinimumWidthPx: pianoRollMeasureMinimumWidthPx ?? 250,
-                      pianoRollMusicViewportWidthPx: Math.max(
-                        0,
-                        projection.availableWidthPx -
-                          PIANO_ROLL_PITCH_GUTTER_WIDTH_PX -
-                          SCORE_SYSTEM_VIEW_BORDER_WIDTH_PX,
-                      ),
-                    }
-                  : {})}
-                melodyTimeline={melodyTimeline}
-                measureItems={measureItems}
-                selectedStepId={selectedStepId}
-                rangeSelectedStepIds={rangeSelectedStepIds}
-                playingStepId={playingStepId}
-                activeMelodyEventKey={activeMelodyEventKey}
-                playbackClockSnapshot={playbackClockSnapshot}
-                onSelectStep={onSelectStep}
-                onEditPerformance={onEditPerformance}
-                onReorder={onReorder}
-                {...(onOpenMelodyMenu ? { onOpenMelodyMenu } : {})}
-                {...(onOpenMeasureMenu ? { onOpenMeasureMenu } : {})}
-                {...(onDeleteMeasureFromButton ? { onDeleteMeasureFromButton } : {})}
-                {...(onFocusMatrix ? { onFocusMatrix } : {})}
-                {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
-                {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
-                {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
-                {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
-                {...(onDeleteSystem ? { onDeleteSystem } : {})}
-                totalSystems={projection.systems.length}
-                isSystemLooping={isSystemLooping}
-                isSystemMuted={isSystemMuted}
-                isSystemSolo={isSystemSolo}
-                canPasteSystem={canPasteSystem}
-                onPlayFromSystem={onPlayFromSystem}
-                onAuditionSystem={onAuditionSystem}
-                onSetPianoRollSystemScope={onSetPianoRollSystemScope}
-                onSelectPianoRollSystemNotes={onSelectPianoRollSystemNotes}
-                pianoRollSelectionScopeLabel={pianoRollSelectionScopeLabel}
-                onToggleLoopSystem={onToggleLoopSystem}
-                onToggleMuteSystem={onToggleMuteSystem}
-                onToggleSoloSystem={onToggleSoloSystem}
-                onMoveSystemUp={onMoveSystemUp}
-                onMoveSystemDown={onMoveSystemDown}
-                onCopySystem={onCopySystem}
-                onPasteSystemAfter={onPasteSystemAfter}
-                onInsertEmptySystemAfter={onInsertEmptySystemAfter}
-                onInsertRestAfterSystem={onInsertRestAfterSystem}
-                onExploreAlternativeFromSystem={onExploreAlternativeFromSystem}
-                onOctaveUpSystem={onOctaveUpSystem}
-                onOctaveDownSystem={onOctaveDownSystem}
-                onResetPerformanceSystem={onResetPerformanceSystem}
-                onSetArticulationSystem={onSetArticulationSystem}
-                onApplyMelodyContourSystem={onApplyMelodyContourSystem}
-                onSetMelodyGridSystem={onSetMelodyGridSystem}
-                onClearMelodySystem={onClearMelodySystem}
-                {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
-                showFingering={showFingering}
-                onToggleFingering={() => setShowFingering((prev) => !prev)}
-                fingeringStyle={fingeringStyle}
-                onOpenHandLegend={() => setShowHandLegend(true)}
-                renderMeasureContent={renderMeasureContent}
-                {...(renderSystemPitchScale ? { renderSystemPitchScale } : {})}
-                {...(renderSystemNotePanel ? { renderSystemNotePanel } : {})}
-                {...(renderSystemChordPanel ? { renderSystemChordPanel } : {})}
-                {...(renderSystemControls ? { renderSystemControls } : {})}
-                {...(renderDurationResizeHandle ? { renderDurationResizeHandle } : {})}
-              />
+              <Fragment key={system.index}>
+                <ScoreSystemCanvas
+                  project={project}
+                  layout={layout}
+                  system={system}
+                  displayWidthPx={displayWidthPx}
+                  {...(renderSystemPitchScale
+                    ? {
+                        pianoRollMeasureCapacity: projection.maximumMeasuresPerSystem,
+                        pianoRollMeasureMinimumWidthPx: pianoRollMeasureMinimumWidthPx ?? 250,
+                        pianoRollMusicViewportWidthPx: Math.max(
+                          0,
+                          projection.availableWidthPx -
+                            PIANO_ROLL_PITCH_GUTTER_WIDTH_PX -
+                            SCORE_SYSTEM_VIEW_BORDER_WIDTH_PX,
+                        ),
+                      }
+                    : {})}
+                  melodyTimeline={melodyTimeline}
+                  measureItems={measureItems}
+                  selectedStepId={selectedStepId}
+                  rangeSelectedStepIds={rangeSelectedStepIds}
+                  playingStepId={playingStepId}
+                  activeMelodyEventKey={activeMelodyEventKey}
+                  playbackClockSnapshot={playbackClockSnapshot}
+                  onSelectStep={onSelectStep}
+                  onEditPerformance={onEditPerformance}
+                  onReorder={onReorder}
+                  {...(onOpenMelodyMenu ? { onOpenMelodyMenu } : {})}
+                  {...(onOpenMeasureMenu ? { onOpenMeasureMenu } : {})}
+                  {...(onDeleteMeasureFromButton ? { onDeleteMeasureFromButton } : {})}
+                  {...(onFocusMatrix ? { onFocusMatrix } : {})}
+                  {...(onFillGapWithRest ? { onFillGapWithRest } : {})}
+                  {...(onExtendFinalChord ? { onExtendFinalChord } : {})}
+                  {...(onRepeatFinalChord ? { onRepeatFinalChord } : {})}
+                  {...(onDuplicateSystem ? { onDuplicateSystem } : {})}
+                  {...(onDeleteSystem ? { onDeleteSystem } : {})}
+                  totalSystems={projection.systems.length}
+                  isSystemLooping={isSystemLooping}
+                  isSystemMuted={isSystemMuted}
+                  isSystemSolo={isSystemSolo}
+                  canPasteSystem={canPasteSystem}
+                  onPlayFromSystem={onPlayFromSystem}
+                  onAuditionSystem={onAuditionSystem}
+                  onSetPianoRollSystemScope={onSetPianoRollSystemScope}
+                  onSetCurrentMeasureScope={onSetCurrentMeasureScope}
+                  currentMeasureIndex={currentMeasureIndex}
+                  currentSystemIndex={currentSystemIndex}
+                  onSelectPianoRollSystemNotes={onSelectPianoRollSystemNotes}
+                  pianoRollSelectionScopeLabel={pianoRollSelectionScopeLabel}
+                  onToggleLoopSystem={onToggleLoopSystem}
+                  onToggleMuteSystem={onToggleMuteSystem}
+                  onToggleSoloSystem={onToggleSoloSystem}
+                  onMoveSystemUp={
+                    onMoveSystemBlock
+                      ? (movingSystem) => {
+                          const previous = projection.systems[movingSystem.index - 1];
+                          const target = previous?.measures[0]?.measure.measureIndex;
+                          if (target !== undefined)
+                            onMoveSystemBlock(movingSystem, target, project);
+                        }
+                      : undefined
+                  }
+                  onMoveSystemDown={
+                    onMoveSystemBlock
+                      ? (movingSystem) => {
+                          const next = projection.systems[movingSystem.index + 1];
+                          const nextLastMeasure = next?.measures.at(-1)?.measure.measureIndex;
+                          const target =
+                            nextLastMeasure === undefined
+                              ? layout.measures.length
+                              : nextLastMeasure + 1;
+                          onMoveSystemBlock(movingSystem, target, project);
+                        }
+                      : undefined
+                  }
+                  isSystemDragSource={systemDragVisual?.sourceSystemIndex === system.index}
+                  onStartSystemDrag={handleStartSystemDrag}
+                  onCopySystem={onCopySystem}
+                  onPasteSystemAfter={onPasteSystemAfter}
+                  onInsertEmptySystemAfter={onInsertEmptySystemAfter}
+                  onInsertRestAfterSystem={onInsertRestAfterSystem}
+                  onExploreAlternativeFromSystem={onExploreAlternativeFromSystem}
+                  onOctaveUpSystem={onOctaveUpSystem}
+                  onOctaveDownSystem={onOctaveDownSystem}
+                  onResetPerformanceSystem={onResetPerformanceSystem}
+                  onSetArticulationSystem={onSetArticulationSystem}
+                  onApplyMelodyContourSystem={onApplyMelodyContourSystem}
+                  onSetMelodyGridSystem={onSetMelodyGridSystem}
+                  onClearMelodySystem={onClearMelodySystem}
+                  {...(onToggleSuzukiColors ? { onToggleSuzukiColors } : {})}
+                  showFingering={showFingering}
+                  onToggleFingering={() => setShowFingering((prev) => !prev)}
+                  fingeringStyle={fingeringStyle}
+                  onOpenHandLegend={() => setShowHandLegend(true)}
+                  renderMeasureContent={renderMeasureContent}
+                  {...(renderSystemPitchScale ? { renderSystemPitchScale } : {})}
+                  {...(renderSystemNotePanel ? { renderSystemNotePanel } : {})}
+                  {...(renderSystemChordPanel ? { renderSystemChordPanel } : {})}
+                  {...(renderSystemControls ? { renderSystemControls } : {})}
+                  {...(renderDurationResizeHandle ? { renderDurationResizeHandle } : {})}
+                />
+              </Fragment>
             );
           })
         : layout.measures.map((measure) => renderMeasureContent?.(measure) ?? null)}
+      {systemMoveMessage !== null ? (
+        <p className="progression-gap-hint" role="status" data-testid="score-system-move-message">
+          {systemMoveMessage}
+        </p>
+      ) : null}
       {showHandLegend ? (
         <GuitarHandLegendModal
           onClose={() => setShowHandLegend(false)}
@@ -2212,4 +2631,4 @@ export function ScoreSystemView({
       ) : null}
     </div>
   );
-}
+});

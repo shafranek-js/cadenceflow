@@ -4,6 +4,7 @@ import { normalizeProjectName } from "../../domain/project/name";
 import type { PortableProjectExport } from "../../app/projectController";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
+import { downloadBlob } from "./exportActionSupport";
 
 export interface PortableProjectActionsProps {
   readonly project: Project;
@@ -13,17 +14,9 @@ export interface PortableProjectActionsProps {
 }
 
 function downloadPortableProject(exported: PortableProjectExport): void {
-  const createObjectUrl = URL.createObjectURL;
-  if (typeof createObjectUrl !== "function") {
-    throw new Error("This browser cannot download portable project files.");
-  }
-
-  const url = createObjectUrl.call(URL, new Blob([exported.text], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = exported.filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  // Routed through the shared download helper so the object URL is not revoked until the browser
+  // has actually read it. Doing that synchronously after `click()` could produce an empty file.
+  downloadBlob(exported.text, exported.filename, "application/json");
 }
 
 export function PortableProjectActions({

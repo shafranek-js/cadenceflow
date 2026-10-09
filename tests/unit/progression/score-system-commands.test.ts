@@ -20,7 +20,12 @@ import { meter } from "../../../src/domain/timing/meter";
 import { groove } from "../../../src/domain/timing/swing";
 import { PlaybackController } from "../../../src/audio/playbackController";
 import { TransportStore } from "../../../src/ui/transport/transportStore";
-import type { AudioClock, AudioNoteEvent, AudioProvider, ScheduledPlayback } from "../../../src/audio/contracts";
+import type {
+  AudioClock,
+  AudioNoteEvent,
+  InstrumentAudioProvider,
+  ScheduledPlayback,
+} from "../../../src/audio/contracts";
 import type { Project } from "../../../src/domain/project/project";
 import type { ChordStep, RestStep } from "../../../src/domain/progression/step";
 import { DEFAULT_PIANO_PERFORMANCE } from "../../../src/domain/project/factory";
@@ -29,7 +34,7 @@ const T0 = "2026-09-13T12:00:00.000Z";
 const T1 = "2026-09-13T12:00:01.000Z";
 
 function withSteps(project: Project, steps: readonly (ChordStep | RestStep)[]): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze([...steps]) }),
   });
@@ -48,7 +53,8 @@ class FakeAudioClock implements AudioClock {
   }
 }
 
-class MockAudioProvider implements AudioProvider {
+class MockAudioProvider implements InstrumentAudioProvider {
+  readonly id = "mock-audio";
   state = "ready" as const;
   scheduledBatches: Array<{
     id: string;
@@ -86,11 +92,18 @@ describe("Score System Commands & Playback", () => {
       };
 
       const result = reorderSteps(initial, command);
-      expect(result.project.progression.steps.map((s) => s.id)).toEqual(["step-2", "step-3", "step-1"]);
+      expect(result.project.progression.steps.map((s) => s.id)).toEqual([
+        "step-2",
+        "step-3",
+        "step-1",
+      ]);
       expect(result.inverse.type).toBe("progression/restore");
 
       // Undo
-      const restored = restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project;
+      const restored = restoreProgression(
+        result.project,
+        result.inverse as RestoreProgressionCommand,
+      ).project;
       expect(restored.progression.steps.map((s) => s.id)).toEqual(["step-1", "step-2", "step-3"]);
     });
 
@@ -115,7 +128,7 @@ describe("Score System Commands & Playback", () => {
       const s2 = createMatrixChordStep(base, "V", "step-2");
       const initial = withSteps(base, [s1, s2]);
 
-      const restStep: RestStep = Object.freeze({
+      const restStep: RestStep = Object.freeze<RestStep>({
         id: "rest-1",
         kind: "rest",
         duration: musicalDuration(rational(4, 1)),
@@ -127,11 +140,18 @@ describe("Score System Commands & Playback", () => {
       };
 
       const result = insertStepsAfter(initial, command);
-      expect(result.project.progression.steps.map((s) => s.id)).toEqual(["step-1", "rest-1", "step-2"]);
+      expect(result.project.progression.steps.map((s) => s.id)).toEqual([
+        "step-1",
+        "rest-1",
+        "step-2",
+      ]);
       expect(result.inverse.type).toBe("progression/restore");
 
       // Undo
-      const restored = restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project;
+      const restored = restoreProgression(
+        result.project,
+        result.inverse as RestoreProgressionCommand,
+      ).project;
       expect(restored.progression.steps.map((s) => s.id)).toEqual(["step-1", "step-2"]);
     });
 
@@ -155,7 +175,7 @@ describe("Score System Commands & Playback", () => {
       const s2 = createMatrixChordStep(base, "V", "step-2");
       const initial = withSteps(base, [s1, s2]);
 
-      const restStep: RestStep = Object.freeze({
+      const restStep: RestStep = Object.freeze<RestStep>({
         id: "rest-0",
         kind: "rest",
         duration: musicalDuration(rational(4, 1)),
@@ -167,11 +187,18 @@ describe("Score System Commands & Playback", () => {
       };
 
       const result = insertStepsBefore(initial, command);
-      expect(result.project.progression.steps.map((s) => s.id)).toEqual(["step-1", "rest-0", "step-2"]);
+      expect(result.project.progression.steps.map((s) => s.id)).toEqual([
+        "step-1",
+        "rest-0",
+        "step-2",
+      ]);
       expect(result.inverse.type).toBe("progression/restore");
 
       // Undo
-      const restored = restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project;
+      const restored = restoreProgression(
+        result.project,
+        result.inverse as RestoreProgressionCommand,
+      ).project;
       expect(restored.progression.steps.map((s) => s.id)).toEqual(["step-1", "step-2"]);
     });
 
@@ -215,7 +242,10 @@ describe("Score System Commands & Playback", () => {
       expect(patched[2]!.performance.articulation).toBe("humanized"); // unchanged
 
       // Undo
-      const restored = restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project;
+      const restored = restoreProgression(
+        result.project,
+        result.inverse as RestoreProgressionCommand,
+      ).project;
       const reverted = restored.progression.steps as readonly ChordStep[];
       expect(reverted[0]!.performance.articulation).toBe(s1.performance.articulation);
       expect(reverted[0]!.performance.register).toBe(s1.performance.register);
@@ -226,7 +256,12 @@ describe("Score System Commands & Playback", () => {
       const s1 = createMatrixChordStep(base, "I", "step-1");
       const modifiedS1: ChordStep = {
         ...s1,
-        performance: { ...s1.performance, articulation: "broken-chord", register: 2, masterVelocity: 110 },
+        performance: {
+          ...s1.performance,
+          articulation: "broken-chord",
+          register: 2,
+          masterVelocity: 110,
+        },
       };
       const initial = withSteps(base, [modifiedS1]);
 
@@ -272,6 +307,7 @@ describe("Score System Commands & Playback", () => {
             {
               stepId: "step-1",
               patch: {
+                // `ChordStep.melody` is a `ChordMelody`: `{ mode: "generated" as const, recipe }`.
                 melody: {
                   pitchMotion: "up",
                   rhythm: "even",
@@ -284,6 +320,7 @@ describe("Score System Commands & Playback", () => {
             {
               stepId: "step-2",
               patch: {
+                // `ChordStep.melody` is a `ChordMelody`: `{ mode: "generated" as const, recipe }`.
                 melody: {
                   pitchMotion: "up",
                   rhythm: "even",
@@ -299,12 +336,17 @@ describe("Score System Commands & Playback", () => {
       };
       const withMelody = batchPatchSteps(initial, applyCmd);
       const step1 = withMelody.project.progression.steps[0] as ChordStep;
+      // The command normalizes the patch into the canonical `ChordMelody` wrapper; the bare recipe
+      // is the input shape, not the stored one.
       expect(step1.melody).toEqual({
-        pitchMotion: "up",
-        rhythm: "even",
-        connection: "retrigger",
-        grid: "eighth",
-        octaveOffset: 0,
+        mode: "generated" as const,
+        recipe: {
+          pitchMotion: "up",
+          rhythm: "even",
+          connection: "retrigger",
+          grid: "eighth",
+          octaveOffset: 0,
+        },
       });
 
       // Clear melody contour
@@ -347,7 +389,12 @@ describe("Score System Commands & Playback", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         mutedStepIds: new Set(["step-mute-1"]),
       });
 

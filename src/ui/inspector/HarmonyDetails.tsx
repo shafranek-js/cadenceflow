@@ -1,18 +1,8 @@
-import { useState } from "react";
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import { getFunctionSemantics } from "../../domain/harmony/functionSemantics";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 
 const HARMONY_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.preview-harmony-open";
-
-function readDisclosureState(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const stored = window.localStorage.getItem(HARMONY_DISCLOSURE_STORAGE_KEY);
-    return stored === null ? false : stored === "true";
-  } catch {
-    return false;
-  }
-}
 
 export function HarmonyDetails({ chord }: { readonly chord: ChordDefinition | null }) {
   if (!chord) return null;
@@ -20,7 +10,7 @@ export function HarmonyDetails({ chord }: { readonly chord: ChordDefinition | nu
 }
 
 function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
-  const [open, setOpen] = useState(readDisclosureState);
+  const disclosure = useInspectorDisclosure(HARMONY_DISCLOSURE_STORAGE_KEY, false);
   const fn = chord.harmonicFunction;
   const target = fn.targetFunctionId;
   const naturalVariant =
@@ -38,15 +28,6 @@ function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
           ? "Chromatic color / voice-leading resource in the Dark Harmony vocabulary."
           : null;
 
-  const persistDisclosureState = (nextOpen: boolean) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(HARMONY_DISCLOSURE_STORAGE_KEY, String(nextOpen));
-    } catch {
-      // Disclosure preferences are best-effort when storage is unavailable.
-    }
-  };
-
   const semantics = getFunctionSemantics(fn.functionId);
 
   return (
@@ -54,12 +35,8 @@ function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
       className="harmony-details inspector-disclosure"
       aria-label="Harmony details"
       data-context="preview-harmony"
-      open={open}
-      onToggle={(event) => {
-        const nextOpen = event.currentTarget.open;
-        setOpen(nextOpen);
-        persistDisclosureState(nextOpen);
-      }}
+      open={disclosure.isOpen}
+      onToggle={(event) => disclosure.setOpen(event.currentTarget.open)}
     >
       <summary>
         <span>Preview harmony</span>
@@ -99,10 +76,7 @@ function HarmonyDetailsContent({ chord }: { readonly chord: ChordDefinition }) {
             <span className="harmony-field-val">{semantics.emotionalColor}</span>
           </div>
 
-          <div
-            className="harmony-semantic-rule"
-            data-tendency-type={semantics.tendencyType}
-          >
+          <div className="harmony-semantic-rule" data-tendency-type={semantics.tendencyType}>
             <span className="harmony-rule-icon" aria-hidden="true">
               {semantics.tendencyType === "dominant-resolution" ||
               semantics.tendencyType === "diminished-tension"

@@ -14,6 +14,7 @@ function halfChordProject() {
   const step = createMatrixChordStep(base, "I", "half-chord");
   return Object.freeze({
     ...base,
+    independentBassEnabled: true,
     globalTiming: Object.freeze({ ...base.globalTiming, meter: meter(4, 4, [4]) }),
     progression: Object.freeze({
       ...base.progression,

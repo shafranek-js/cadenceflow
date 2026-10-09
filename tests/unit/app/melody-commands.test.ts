@@ -1,3 +1,4 @@
+import { requireChord } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { AppStore } from "../../../src/app/appStore";
 import { applyInverseCommand } from "../../../src/app/commands/dispatcher";
@@ -68,7 +69,7 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     const applied = setMelodyRecipe(initial, command);
 
     expect(applied.project.progression.steps[0]).toHaveProperty("melody", {
-      mode: "generated",
+      mode: "generated" as const,
       recipe,
     });
     expect(applied.project.melodyTrack.instrument).toBe("violin");
@@ -86,7 +87,7 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     expect(store.project).toEqual(initial);
     expect(store.redo()).toBe(true);
     expect(store.project.progression.steps[0]).toHaveProperty("melody", {
-      mode: "generated",
+      mode: "generated" as const,
       recipe,
     });
     expect(store.project.melodyTrack.instrument).toBe("violin");
@@ -200,7 +201,7 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
         setMelodyTrackSettings(initial, {
           type: "melody/set-track-settings",
           payload: {
-            patch: patch as SetMelodyTrackSettingsCommand["payload"]["patch"],
+            patch: patch as NonNullable<SetMelodyTrackSettingsCommand["payload"]["patch"]>,
             nowIso: T1,
           },
         }),
@@ -305,28 +306,37 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     }).project;
     const repeatedRecipe =
       repeated.progression.steps[1]?.kind === "chord"
-        ? repeated.progression.steps[1].melody
+        ? repeated.progression.steps[1]!.melody
         : undefined;
-    expect(repeatedRecipe).toEqual({ mode: "generated", recipe });
-    expect(repeatedRecipe).not.toBe(withRecipe.progression.steps[0]?.melody);
+    expect(repeatedRecipe).toEqual({ mode: "generated" as const, recipe });
+    expect(repeatedRecipe).not.toBe(requireChord(withRecipe.progression.steps[0])?.melody);
 
     const extended = setStepDuration(withRecipe, {
       type: "timing/set-step-duration",
       payload: { stepId: "step-1", duration: musicalDuration(rational(6)), nowIso: T1 },
     }).project;
-    expect(extended.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
+    expect(extended.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated" as const,
+      recipe,
+    });
 
     const replaced = replaceStep(withRecipe, {
       type: "progression/replace-step",
       payload: { stepId: "step-1", functionId: "V", nowIso: T1 },
     }).project;
-    expect(replaced.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
+    expect(replaced.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated" as const,
+      recipe,
+    });
 
     const reordered = reorderStep(repeated, {
       type: "progression/reorder-step",
       payload: { stepId: "step-2", targetIndex: 0, nowIso: T1 },
     }).project;
-    expect(reordered.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
+    expect(reordered.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated" as const,
+      recipe,
+    });
 
     const removed = removeStep(withRecipe, {
       type: "progression/remove-step",
@@ -340,13 +350,16 @@ describe("T169 — undoable melody recipe and Melody Track commands", () => {
     });
     expect(
       applyInverseCommand(removed.project, removed.inverse).progression.steps[0],
-    ).toHaveProperty("melody", { mode: "generated", recipe });
+    ).toHaveProperty("melody", { mode: "generated" as const, recipe });
 
     const reset = resetStepPerformance(withRecipe, {
       type: "progression/reset-performance",
       payload: { stepId: "step-1", nowIso: T1 },
     }).project;
-    expect(reset.progression.steps[0]).toHaveProperty("melody", { mode: "generated", recipe });
+    expect(reset.progression.steps[0]).toHaveProperty("melody", {
+      mode: "generated" as const,
+      recipe,
+    });
   });
 
   it("keeps generated events out of Custom Presets", () => {

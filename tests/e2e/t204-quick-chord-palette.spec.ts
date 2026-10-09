@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test.describe("T204 Quick Chord / Command Palette", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
@@ -8,6 +9,7 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     page,
   }) => {
     await page.goto("/");
+    await setProgressionView(page, "staff");
     const trigger = page.getByTestId("matrix-quick-chord-trigger");
 
     await trigger.click();
@@ -22,7 +24,7 @@ test.describe("T204 Quick Chord / Command Palette", () => {
 
     await result.click();
     await expect(page.getByTestId("chord-card-V7/V")).toHaveClass(/is-selected/);
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
     await page.getByTestId("quick-chord-palette-cancel").click();
     await expect(page.getByTestId("quick-chord-palette")).toHaveCount(0);
     await expect(trigger).toBeFocused();
@@ -32,7 +34,7 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     await page.getByTestId("quick-chord-candidate-V7-V").click();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("quick-chord-palette")).toHaveCount(0);
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
     await expect(trigger).toBeFocused();
   });
 
@@ -40,6 +42,7 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     page,
   }) => {
     await page.goto("/");
+    await setProgressionView(page, "staff");
     await ensureHistoryControlsVisible(page);
 
     await page.keyboard.press("Control+k");
@@ -50,24 +53,26 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     await search.press("Enter");
 
     await expect(page.getByTestId("quick-chord-palette")).toHaveCount(0);
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
-    const applied = await page.getByTestId("progression-step").innerText();
+    const steps = page.locator(".measure-staff-event-select");
+    await expect(steps).toHaveCount(1);
+    const applied = await steps.first().getAttribute("aria-label");
     const undo = page.getByRole("button", { name: "Undo", exact: true });
     const redo = page.getByRole("button", { name: "Redo", exact: true });
     await expect(undo).toBeEnabled();
     await undo.click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(steps).toHaveCount(0);
     await expect(redo).toBeEnabled();
     await redo.click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
-    await expect(page.getByTestId("progression-step")).toContainText("V7/V");
-    expect(await page.getByTestId("progression-step").innerText()).toBe(applied);
+    await expect(steps).toHaveCount(1);
+    await expect(steps.first()).toHaveAttribute("aria-label", /V7\/V/);
+    expect(await steps.first().getAttribute("aria-label")).toBe(applied);
   });
 
   test("uses the committed endpoint after a preview and preserves strict warning/Add anyway semantics", async ({
     page,
   }) => {
     await page.goto("/");
+    await setProgressionView(page, "staff");
     await ensureHistoryControlsVisible(page);
     await page
       .getByTestId("chord-card-V7/vi")
@@ -75,7 +80,8 @@ test.describe("T204 Quick Chord / Command Palette", () => {
       .click({
         modifiers: ["Control"],
       });
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
+    const steps = page.locator(".measure-staff-event-select");
+    await expect(steps).toHaveCount(1);
 
     await page.getByTestId("matrix-quick-chord-trigger").click();
     const search = page.getByTestId("quick-chord-palette-search");
@@ -87,7 +93,7 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     await apply.click();
     await expect(page.getByRole("dialog", { name: "Confirm harmonic route" })).toBeVisible();
     await expect(page.getByTestId("route-warning-message")).toContainText("vi");
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
+    await expect(steps).toHaveCount(1);
 
     // Ctrl/Cmd+K is inert while a dialog owns focus.
     await page.keyboard.press("Control+k");
@@ -102,12 +108,12 @@ test.describe("T204 Quick Chord / Command Palette", () => {
     await apply.click();
     await page.getByTestId("route-add-anyway").click();
     await expect(page.getByTestId("quick-chord-palette")).toHaveCount(0);
-    await expect(page.getByTestId("progression-step")).toHaveCount(2);
+    await expect(steps).toHaveCount(2);
 
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(1);
+    await expect(steps).toHaveCount(1);
     await page.getByRole("button", { name: "Redo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(2);
+    await expect(steps).toHaveCount(2);
   });
 
   test("keeps results scrollable and Cancel visible under 200% layout pressure", async ({

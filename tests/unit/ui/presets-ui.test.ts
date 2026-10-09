@@ -1,3 +1,4 @@
+import { omitFields } from "../../fixtures/assertions";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -54,7 +55,7 @@ function makeChordStep(id: string, functionId: string): ChordStep {
   return {
     id,
     kind: "chord",
-    harmonicFunction: { moduleId: "progressions", functionId },
+    harmonicFunction: { moduleId: "progressions", functionId, category: "core" },
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(1, 1)),
     performance: DEFAULT_PIANO_PERFORMANCE,
@@ -153,11 +154,11 @@ describe("T117 — Presets UI Components", () => {
         source: "custom",
         steps: [
           {
-            harmonicFunction: { moduleId: "progressions", functionId: "I" },
+            harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
             duration: musicalDuration(rational(2, 1)),
           },
           {
-            harmonicFunction: { moduleId: "progressions", functionId: "V" },
+            harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
             duration: musicalDuration(rational(2, 1)),
           },
         ],
@@ -437,9 +438,8 @@ describe("T117 — Presets UI Components", () => {
       const project = {
         ...baseProject,
         progression: {
-          ...baseProject.progression,
+          ...omitFields(baseProject.progression, "selectedStepId"),
           steps: [step1],
-          selectedStepId: null, // No selection
         },
       };
 
@@ -515,7 +515,7 @@ describe("T117 — Presets UI Components", () => {
         source: "custom",
         steps: [
           {
-            harmonicFunction: { moduleId: "dark-harmony", functionId: "D7" },
+            harmonicFunction: { moduleId: "dark-harmony", functionId: "D7", category: "core" },
             duration: musicalDuration(rational(1, 1)),
           },
         ],
@@ -550,7 +550,11 @@ describe("T117 — Presets UI Components", () => {
         source: "custom",
         steps: [
           {
-            harmonicFunction: { moduleId: "progressions", functionId: "UNKNOWN_FUNCTION_XYZ" },
+            harmonicFunction: {
+              moduleId: "progressions",
+              functionId: "UNKNOWN_FUNCTION_XYZ",
+              category: "core",
+            },
             duration: musicalDuration(rational(1, 1)),
           },
         ],
@@ -860,7 +864,7 @@ describe("T117 — Presets UI Components", () => {
         source: "custom",
         steps: [
           {
-            harmonicFunction: { moduleId: "dark-harmony", functionId: "D7" },
+            harmonicFunction: { moduleId: "dark-harmony", functionId: "D7", category: "core" },
             duration: musicalDuration(rational(1, 1)),
           },
         ],

@@ -1,3 +1,4 @@
+import { exactPitch } from "../../../src/domain/harmony/pitch";
 import { describe, expect, it } from "vitest";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
@@ -26,8 +27,12 @@ describe("duplicateSteps command", () => {
       ...baseChord1,
       performance: {
         ...baseChord1.performance,
-        bass: { pitch: { spelling: { letter: "C", accidental: "natural" }, octave: 2 }, enabled: true },
-        perNoteVelocityOverrides: { "C4": 110 },
+        bass: {
+          choice: "custom",
+          octaveOffset: "auto",
+          customPitch: exactPitch(36, { step: "C", alter: 0 }),
+        },
+        perNoteVelocityOverrides: { C4: 110 },
       },
     };
     const chord2 = createMatrixChordStep(project, "IV", "step-2");
@@ -64,8 +69,12 @@ describe("duplicateSteps command", () => {
     expect(duplicated1.performance).not.toBe(chord1.performance);
     expect(duplicated1.performance.bass).toEqual(chord1.performance.bass);
     expect(duplicated1.performance.bass).not.toBe(chord1.performance.bass);
-    expect(duplicated1.performance.perNoteVelocityOverrides).toEqual(chord1.performance.perNoteVelocityOverrides);
-    expect(duplicated1.performance.perNoteVelocityOverrides).not.toBe(chord1.performance.perNoteVelocityOverrides);
+    expect(duplicated1.performance.perNoteVelocityOverrides).toEqual(
+      chord1.performance.perNoteVelocityOverrides,
+    );
+    expect(duplicated1.performance.perNoteVelocityOverrides).not.toBe(
+      chord1.performance.perNoteVelocityOverrides,
+    );
 
     // Inverse restores previous steps
     const inverse = applied.inverse as RestoreProgressionCommand;
@@ -79,12 +88,17 @@ describe("duplicateSteps command", () => {
     let project = createDefaultProject("p", "RestMelodyTest", T0);
     const chord: ChordStep = {
       ...createMatrixChordStep(project, "V", "chord-1"),
+      // `ChordStep.melody` is a `ChordMelody`, i.e. `{ mode: "generated" as const, recipe }`; a bare recipe
+      // is not a valid value. Passing one made `cloneStepMelody` read `.phrase` off it and throw.
       melody: {
-        pitchMotion: "up",
-        rhythm: "even",
-        connection: "retrigger",
-        grid: "eighth",
-        octaveOffset: 1,
+        mode: "generated" as const,
+        recipe: {
+          pitchMotion: "up",
+          rhythm: "even",
+          connection: "retrigger",
+          grid: "eighth",
+          octaveOffset: 1,
+        },
       },
     };
     const rest: RestStep = {
@@ -146,7 +160,10 @@ describe("duplicateSteps command", () => {
     });
 
     // Layout with 2 measures per system
-    const layout = createProgressionMeasureLayout(project.progression.steps, project.globalTiming.meter);
+    const layout = createProgressionMeasureLayout(
+      project.progression.steps,
+      project.globalTiming.meter,
+    );
     const projection = projectScoreSystems(layout, {
       availableWidthPx: 960,
       measuresPerSystem: 2,
@@ -180,7 +197,10 @@ describe("duplicateSteps command", () => {
     expect(updated.progression.steps).toHaveLength(6);
 
     // Verify new layout has 3 systems
-    const updatedLayout = createProgressionMeasureLayout(updated.progression.steps, updated.globalTiming.meter);
+    const updatedLayout = createProgressionMeasureLayout(
+      updated.progression.steps,
+      updated.globalTiming.meter,
+    );
     const updatedProjection = projectScoreSystems(updatedLayout, {
       availableWidthPx: 960,
       measuresPerSystem: 2,
@@ -241,7 +261,10 @@ describe("duplicateSteps command", () => {
     });
 
     // 2 measures per system = 2 systems
-    const layout = createProgressionMeasureLayout(project.progression.steps, project.globalTiming.meter);
+    const layout = createProgressionMeasureLayout(
+      project.progression.steps,
+      project.globalTiming.meter,
+    );
     const projection = projectScoreSystems(layout, {
       availableWidthPx: 960,
       measuresPerSystem: 2,
@@ -256,7 +279,9 @@ describe("duplicateSteps command", () => {
         stepIndices.add(frag.stepIndex);
       }
     }
-    const stepIdsToRemove = Array.from(stepIndices).map((idx) => project.progression.steps[idx]!.id);
+    const stepIdsToRemove = Array.from(stepIndices).map(
+      (idx) => project.progression.steps[idx]!.id,
+    );
     expect(stepIdsToRemove).toEqual(["c1", "c2"]);
 
     const command: RemoveStepsCommand = {
@@ -269,7 +294,10 @@ describe("duplicateSteps command", () => {
     expect(updated.progression.steps).toHaveLength(2);
     expect(updated.progression.steps.map((s) => s.id)).toEqual(["c3", "c4"]);
 
-    const updatedLayout = createProgressionMeasureLayout(updated.progression.steps, updated.globalTiming.meter);
+    const updatedLayout = createProgressionMeasureLayout(
+      updated.progression.steps,
+      updated.globalTiming.meter,
+    );
     const updatedProjection = projectScoreSystems(updatedLayout, {
       availableWidthPx: 960,
       measuresPerSystem: 2,

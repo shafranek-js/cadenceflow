@@ -12,10 +12,14 @@ import type { ProgressionStep } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 
 function makeStep(id: string, num = 2, den = 1): ProgressionStep {
-  return Object.freeze({
+  return Object.freeze<ProgressionStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId: "I" }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions",
+      functionId: "I",
+      category: "core",
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(num, den)),
     cardView: "harmonic",

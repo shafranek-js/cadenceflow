@@ -1,3 +1,4 @@
+import { requireValue } from "../fixtures/assertions";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { exactPitch } from "../../src/domain/harmony/pitch";
@@ -9,6 +10,7 @@ import type {
 import type { Project } from "../../src/domain/project/project";
 import type { ProgressionStep, RestStep } from "../../src/domain/progression/step";
 import { musicalDuration } from "../../src/domain/timing/duration";
+import { setProgressionView } from "./test-helpers/progression-settings";
 import { globalTiming, meter } from "../../src/domain/timing/meter";
 import { rational } from "../../src/domain/timing/rational";
 import {
@@ -263,10 +265,13 @@ function durationUiState(duration: string): { duration: string; triplet: boolean
   if (!numerator || !denominator) return { duration: "custom", triplet: false };
   for (const preset of ["4/1", "2/1", "1/1", "1/2", "1/4"] as const) {
     const [baseNumerator, baseDenominator] = preset.split("/").map(Number);
-    if (numerator * baseDenominator === baseNumerator * denominator) {
+    if (numerator * requireValue(baseDenominator) === requireValue(baseNumerator) * denominator) {
       return { duration: preset, triplet: false };
     }
-    if (numerator * baseDenominator * 3 === baseNumerator * denominator * 2) {
+    if (
+      numerator * requireValue(baseDenominator) * 3 ===
+      requireValue(baseNumerator) * denominator * 2
+    ) {
       return { duration: preset, triplet: true };
     }
   }
@@ -380,6 +385,7 @@ test("System note panel edits selected notes and keeps empty-cell clicks transie
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
+  await setProgressionView(page, "staff");
   const step = page.locator("[data-progression-step-select]").first();
   const stepId = await step.getAttribute("data-step-id");
   if (!stepId) throw new Error("First Step has no stable ID");
@@ -1236,8 +1242,20 @@ test("System note panel edits selected notes and keeps empty-cell clicks transie
   const beforeGroupEndRejection = await exportPortableProject(page);
   const firstStepBeforeGroupEndRejection = portableMelody(beforeGroupEndRejection, stepId);
   await firstNote.click();
+  await expect(firstNote).toHaveAttribute("aria-pressed", "true");
   await relocatedFinalNote.click({ modifiers: ["Shift"] });
-  await expect(page.locator("button.piano-roll-note[aria-pressed='true']")).toHaveCount(2);
+  await expect(firstNote).toHaveAttribute("aria-pressed", "true");
+  await expect(relocatedFinalNote).toHaveAttribute("aria-pressed", "true");
+  const selectedNotes = await page
+    .locator("button.piano-roll-note[aria-pressed='true']")
+    .evaluateAll((notes) =>
+      notes.map((note) => ({
+        sourceStepId: note.getAttribute("data-source-step-id"),
+        eventKey: note.getAttribute("data-piano-roll-event-key"),
+        label: note.getAttribute("aria-label"),
+      })),
+    );
+  expect(selectedNotes).toHaveLength(2);
   const finalPanel = page.locator("[data-testid^='piano-roll-system-note-panel-']");
   await expect(finalPanel).toHaveCount(1);
   const finalDuration = finalPanel.getByLabel("Note duration", { exact: true });
@@ -1308,6 +1326,7 @@ test("System note palette follows the active tonic, minor scale, alteration and 
   await page.getByRole("button", { name: /^Dark Harmony/i }).click();
   const confirmSwitch = page.locator(".module-switch-dialog .primary-btn");
   if (await confirmSwitch.isVisible()) await confirmSwitch.click();
+  await setProgressionView(page, "staff");
   const step = page.locator("[data-progression-step-select]").first();
   const stepId = await step.getAttribute("data-step-id");
   if (!stepId) throw new Error("D minor Step has no stable ID");

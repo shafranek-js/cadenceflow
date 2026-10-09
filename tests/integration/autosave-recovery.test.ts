@@ -1,5 +1,7 @@
+import type { Project } from "../../src/domain/project/project";
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrations";
 import { createRichProjectFixture } from "../fixtures/rich-project.fixture";
 import { createDefaultProject } from "../../src/domain/project/factory";
 import {
@@ -68,7 +70,7 @@ describe("T120 — Dexie Autosave and Project Repository Recovery Contract", () 
       // Identity & harmonic context
       expect(recovered.id).toBe(richProject.id);
       expect(recovered.name).toBe(richProject.name);
-      expect(recovered.schemaVersion).toBe(6);
+      expect(recovered.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(recovered.tonic).toBe(richProject.tonic);
       expect(recovered.activeModule).toBe(richProject.activeModule);
 
@@ -95,7 +97,7 @@ describe("T120 — Dexie Autosave and Project Repository Recovery Contract", () 
 
       // Custom presets
       expect(recovered.customPresets).toHaveLength(1);
-      expect(recovered.customPresets[0].name).toBe("Custom I-vi-IV");
+      expect(recovered.customPresets[0]!.name).toBe("Custom I-vi-IV");
 
       // Template overrides
       expect(recovered.moduleTemplateStates.progressions.cards["I"]).toBeDefined();
@@ -253,7 +255,7 @@ describe("T120 — Dexie Autosave and Project Repository Recovery Contract", () 
       // Original valid project remains intact and uncorrupted
       const loaded = await repo.loadProject(validProject.id);
       expect(loaded).not.toBeNull();
-      expect(loaded?.schemaVersion).toBe(6);
+      expect(loaded?.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(loaded?.name).toBe(validProject.name);
     });
   });

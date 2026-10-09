@@ -1,3 +1,4 @@
+import { requireValue } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import {
   createProgressionTimeline,
@@ -16,7 +17,7 @@ import type {
 } from "../../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 
-const DEFAULT_TEST_PERFORMANCE: StepPerformance = Object.freeze({
+const DEFAULT_TEST_PERFORMANCE: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -27,10 +28,14 @@ const DEFAULT_TEST_PERFORMANCE: StepPerformance = Object.freeze({
 });
 
 function makeCanonicalChordStep(id: string, num: number, den = 1, functionId = "I"): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions" as const,
+      functionId,
+      category: "core" as const,
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(num, den)),
     cardView: "harmonic",
@@ -39,7 +44,7 @@ function makeCanonicalChordStep(id: string, num: number, den = 1, functionId = "
 }
 
 function makeCanonicalRestStep(id: string, num: number, den = 1): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(num, den)),
@@ -63,24 +68,24 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       expect(timeline.steps).toHaveLength(4);
 
       // Step 0: [0, 4]
-      expect(timeline.steps[0].startBeats).toEqual(rational(0, 1));
-      expect(timeline.steps[0].endBeats).toEqual(rational(4, 1));
-      expect(timeline.steps[0].durationBeats).toEqual(rational(4, 1));
-      expect(timeline.steps[0].stepIndex).toBe(0);
+      expect(timeline.steps[0]!.startBeats).toEqual(rational(0, 1));
+      expect(timeline.steps[0]!.endBeats).toEqual(rational(4, 1));
+      expect(timeline.steps[0]!.durationBeats).toEqual(rational(4, 1));
+      expect(timeline.steps[0]!.stepIndex).toBe(0);
 
       // Step 1: [4, 6]
-      expect(timeline.steps[1].startBeats).toEqual(rational(4, 1));
-      expect(timeline.steps[1].endBeats).toEqual(rational(6, 1));
-      expect(timeline.steps[1].durationBeats).toEqual(rational(2, 1));
-      expect(timeline.steps[1].stepIndex).toBe(1);
+      expect(timeline.steps[1]!.startBeats).toEqual(rational(4, 1));
+      expect(timeline.steps[1]!.endBeats).toEqual(rational(6, 1));
+      expect(timeline.steps[1]!.durationBeats).toEqual(rational(2, 1));
+      expect(timeline.steps[1]!.stepIndex).toBe(1);
 
       // Step 2: [6, 8]
-      expect(timeline.steps[2].startBeats).toEqual(rational(6, 1));
-      expect(timeline.steps[2].endBeats).toEqual(rational(8, 1));
+      expect(timeline.steps[2]!.startBeats).toEqual(rational(6, 1));
+      expect(timeline.steps[2]!.endBeats).toEqual(rational(8, 1));
 
       // Step 3: [8, 12]
-      expect(timeline.steps[3].startBeats).toEqual(rational(8, 1));
-      expect(timeline.steps[3].endBeats).toEqual(rational(12, 1));
+      expect(timeline.steps[3]!.startBeats).toEqual(rational(8, 1));
+      expect(timeline.steps[3]!.endBeats).toEqual(rational(12, 1));
 
       // Total beats and bars (12 beats in 4/4 = 3 bars)
       expect(timeline.totalDurationBeats).toEqual(rational(12, 1));
@@ -98,16 +103,16 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       const timeline = createProgressionTimeline(steps, m44);
 
       // 0 -> 3/2
-      expect(timeline.steps[0].startBeats).toEqual(rational(0, 1));
-      expect(timeline.steps[0].endBeats).toEqual(rational(3, 2));
+      expect(timeline.steps[0]!.startBeats).toEqual(rational(0, 1));
+      expect(timeline.steps[0]!.endBeats).toEqual(rational(3, 2));
 
       // 3/2 -> 3/2 + 5/4 = 11/4
-      expect(timeline.steps[1].startBeats).toEqual(rational(3, 2));
-      expect(timeline.steps[1].endBeats).toEqual(rational(11, 4));
+      expect(timeline.steps[1]!.startBeats).toEqual(rational(3, 2));
+      expect(timeline.steps[1]!.endBeats).toEqual(rational(11, 4));
 
       // 11/4 -> 11/4 + 1/4 = 12/4 = 3/1
-      expect(timeline.steps[2].startBeats).toEqual(rational(11, 4));
-      expect(timeline.steps[2].endBeats).toEqual(rational(3, 1));
+      expect(timeline.steps[2]!.startBeats).toEqual(rational(11, 4));
+      expect(timeline.steps[2]!.endBeats).toEqual(rational(3, 1));
 
       expect(timeline.totalDurationBeats).toEqual(rational(3, 1));
     });
@@ -123,8 +128,8 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       const tl1 = createProgressionTimeline(oneBarSteps, m78);
       expect(tl1.totalDurationBeats).toEqual(rational(7, 2));
       expect(tl1.totalBars).toEqual(rational(1, 1));
-      expect(tl1.steps[0].startBar).toBe(0);
-      expect(tl1.steps[0].endBar).toBe(1);
+      expect(tl1.steps[0]!.startBar).toBe(0);
+      expect(tl1.steps[0]!.endBar).toBe(1);
 
       // Test 2: progression total = 7 canonical beats -> totalBars = 2
       const twoBarSteps: ProgressionStep[] = [
@@ -134,10 +139,10 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       const tl2 = createProgressionTimeline(twoBarSteps, m78);
       expect(tl2.totalDurationBeats).toEqual(rational(7, 1));
       expect(tl2.totalBars).toEqual(rational(2, 1));
-      expect(tl2.steps[0].startBar).toBe(0);
-      expect(tl2.steps[0].endBar).toBe(1);
-      expect(tl2.steps[1].startBar).toBe(1);
-      expect(tl2.steps[1].endBar).toBe(2);
+      expect(tl2.steps[0]!.startBar).toBe(0);
+      expect(tl2.steps[0]!.endBar).toBe(1);
+      expect(tl2.steps[1]!.startBar).toBe(1);
+      expect(tl2.steps[1]!.endBar).toBe(2);
     });
 
     it("handles an empty progression by returning a zero-duration empty timeline", () => {
@@ -162,14 +167,14 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       expect(timeline.steps).toHaveLength(3);
 
       // Rest step occupies beats 4 to 6
-      expect(timeline.steps[1].step.kind).toBe("rest");
-      expect(timeline.steps[1].startBeats).toEqual(rational(4, 1));
-      expect(timeline.steps[1].endBeats).toEqual(rational(6, 1));
+      expect(timeline.steps[1]!.step.kind).toBe("rest");
+      expect(timeline.steps[1]!.startBeats).toEqual(rational(4, 1));
+      expect(timeline.steps[1]!.endBeats).toEqual(rational(6, 1));
 
       // Next chord starts exactly at beat 6
-      expect(timeline.steps[2].step.kind).toBe("chord");
-      expect(timeline.steps[2].startBeats).toEqual(rational(6, 1));
-      expect(timeline.steps[2].endBeats).toEqual(rational(8, 1));
+      expect(timeline.steps[2]!.step.kind).toBe("chord");
+      expect(timeline.steps[2]!.startBeats).toEqual(rational(6, 1));
+      expect(timeline.steps[2]!.endBeats).toEqual(rational(8, 1));
     });
 
     it("resolves harmonic predecessor across single or multiple rest steps to the prior sounding chord", () => {
@@ -234,8 +239,8 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
       const timeline = createProgressionTimeline(steps, m44);
       const sharedBoundary = lookupStepBoundary(timeline, 1);
 
-      expect(equalRational(sharedBoundary, timeline.steps[0].endBeats)).toBe(true);
-      expect(equalRational(sharedBoundary, timeline.steps[1].startBeats)).toBe(true);
+      expect(equalRational(sharedBoundary, timeline.steps[0]!.endBeats)).toBe(true);
+      expect(equalRational(sharedBoundary, timeline.steps[1]!.startBeats)).toBe(true);
     });
 
     it("throws RangeError for out-of-range or non-integer boundary indices", () => {
@@ -332,13 +337,13 @@ describe("T100 — Progression Timeline and Boundary Contract", () => {
 
       // Each step i must start at exactly rational(i, 3) and end at rational(i + 1, 3)
       for (let i = 0; i < 10; i++) {
-        expect(timeline.steps[i].startBeats).toEqual(rational(i, 3));
-        expect(timeline.steps[i].endBeats).toEqual(rational(i + 1, 3));
+        expect(timeline.steps[i]!.startBeats).toEqual(rational(i, 3));
+        expect(timeline.steps[i]!.endBeats).toEqual(rational(i + 1, 3));
       }
 
       const last = timeline.steps[count - 1];
-      expect(last.startBeats).toEqual(rational(count - 1, 3));
-      expect(last.endBeats).toEqual(rational(count, 3));
+      expect(requireValue(last).startBeats).toEqual(rational(count - 1, 3));
+      expect(requireValue(last).endBeats).toEqual(rational(count, 3));
     });
   });
 });

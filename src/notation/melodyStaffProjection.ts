@@ -7,7 +7,6 @@ import {
   createHarmonicNoteRoleContext,
   type HarmonicNoteRole,
 } from "../domain/harmony/noteRoles";
-import { realizeChord } from "../domain/harmony/realization";
 import {
   addRational,
   compareRational,

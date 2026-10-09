@@ -126,7 +126,7 @@ function parseSmf(bytes: Uint8Array): ParsedMidi {
 }
 
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     ...DEFAULT_PIANO_PERFORMANCE,
     articulation: "block",
     ...overrides,
@@ -150,7 +150,7 @@ function chordStep(
   performanceOverrides: Partial<StepPerformance> = {},
   harmonicVariant: HarmonicVariant = EMPTY_HARMONIC_VARIANT,
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
     harmonicFunction: Object.freeze({
@@ -170,7 +170,7 @@ function restStep(
   beats: Rational,
   displayHint: RestStep["duration"]["displayHint"],
 ): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(beats, displayHint),
@@ -186,13 +186,13 @@ function canonicalProject(): Project {
     globalTiming: globalTiming(140, meter(7, 8, [2, 2, 3])),
     groove: groove("swing", 0.55),
   });
-  const variant: HarmonicVariant = Object.freeze({
+  const variant: HarmonicVariant = Object.freeze<HarmonicVariant>({
     seventh: "minor7",
     extensions: Object.freeze([9]),
     suspensions: Object.freeze([]),
     alterations: Object.freeze([{ degree: 5, semitones: 1 }]),
   });
-  const steps: readonly ProgressionStep[] = Object.freeze([
+  const steps: readonly ProgressionStep[] = Object.freeze<readonly ProgressionStep[]>([
     chordStep(contextProject, "i", "manual-i", rational(1, 2), {
       articulation: "arp-up",
       voicingMode: "manual",
@@ -227,8 +227,9 @@ function canonicalProject(): Project {
       baseBeats: rational(1),
     }),
   ]);
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...contextProject,
+    independentBassEnabled: true,
     progression: Object.freeze({ steps }),
     temporaryBranch: Object.freeze({
       id: "active-temporary-branch",
@@ -321,6 +322,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
       },
       tempoBpm: project.globalTiming.tempoBpm,
       groove: project.groove,
+      independentBassEnabled: project.independentBassEnabled,
     });
     const audioEvents = realizeProgressionAudioEvents({
       steps: project.progression.steps,
@@ -333,6 +335,7 @@ describe("T139 — canonical playback/MIDI/MusicXML projection consistency", () 
       },
       tempoBpm: project.globalTiming.tempoBpm,
       groove: project.groove,
+      independentBassEnabled: project.independentBassEnabled,
     });
     const midiProjection: MidiProjection = projectProjectToMidi(project);
     const midiBytes = writeStandardMidiFile(midiProjection);

@@ -1,9 +1,12 @@
+import { requireValue } from "../fixtures/assertions";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrations";
 import { addRestToProgression } from "./test-helpers/progression-settings";
 
 const screenshotRoot =
+  process.env.CADENCEFLOW_BATCH1_SCREENSHOT_ROOT ??
   "C:/Users/pavel/.codex/visualizations/2026/09/30/01a0f3c2-898f-7322-a361-ad7b563d465e/piano-roll-batch1";
 const views = ["staff", "tablature"] as const;
 const sizes = [
@@ -53,9 +56,9 @@ test("v9 authored Rest continuation remains usable in every existing view and th
   );
   if (restIndex < 0) throw new Error("Test fixture did not create a Rest Step");
   const rest = raw.progression.steps.splice(restIndex, 1)[0];
-  rest.id = "rest-melody-owner";
-  rest.duration = { beats: { numerator: 2, denominator: 1 } };
-  rest.authoredMelody = {
+  requireValue(rest).id = "rest-melody-owner";
+  requireValue(rest).duration = { beats: { numerator: 2, denominator: 1 } };
+  requireValue(rest).authoredMelody = {
     notes: [
       {
         id: "rest-long-continuation",
@@ -81,8 +84,8 @@ test("v9 authored Rest continuation remains usable in every existing view and th
       },
     ],
   };
-  rest.melodyInstrumentOverride = "cello";
-  raw.progression.steps.unshift(rest);
+  requireValue(rest).melodyInstrumentOverride = "cello";
+  raw.progression.steps.unshift(requireValue(rest));
   if (!raw.progression.steps.some((step: Record<string, unknown>) => step.kind === "chord")) {
     throw new Error("Test fixture must retain the UI-created chord after the Rest owner");
   }
@@ -152,9 +155,9 @@ test("v9 authored Rest continuation remains usable in every existing view and th
   const downloadPath = await download.path();
   if (!downloadPath) throw new Error("Could not read exported Project");
   const roundTrip = JSON.parse(await readFile(downloadPath, "utf8"));
-  expect(roundTrip.schemaVersion).toBe(10);
+  expect(roundTrip.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
   expect(roundTrip.presentation.progressionView).toBe("piano-roll");
-  expect(roundTrip.progression.steps[0].authoredMelody.notes[0].duration).toEqual({
+  expect(roundTrip.progression.steps[0]!.authoredMelody.notes[0]!.duration).toEqual({
     numerator: 6,
     denominator: 1,
   });

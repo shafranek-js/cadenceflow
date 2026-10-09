@@ -61,7 +61,10 @@ afterEach(() => document.body.replaceChildren());
 
 describe("Matrix selected-card plus shortcut", () => {
   it("adds the selected visible card once for main-keyboard plus and Numpad Add", () => {
-    const { container, root, onAdd, onPreview } = renderMatrix(createDefaultProject(), "V");
+    const { container, root, onAdd, onPreview } = renderMatrix(
+      createDefaultProject("test-project"),
+      "V",
+    );
     const selectedCard = container.querySelector('[data-testid="chord-card-V"] .chord-main')!;
 
     press(selectedCard, { key: "+", code: "Equal", shiftKey: true });
@@ -145,7 +148,7 @@ describe("Matrix selected-card plus shortcut", () => {
 
   it("does nothing without a visible selected card", () => {
     const { container, root, onAdd, onPreview } = renderMatrix(
-      createDefaultProject(),
+      createDefaultProject("test-project"),
       "not-visible",
     );
     const panel = container.querySelector<HTMLElement>(".matrix-panel")!;
@@ -157,7 +160,10 @@ describe("Matrix selected-card plus shortcut", () => {
   });
 
   it("guards editable, dialog, repeated, and modified events with a visible selection", () => {
-    const { container, root, onAdd, onPreview } = renderMatrix(createDefaultProject(), "V");
+    const { container, root, onAdd, onPreview } = renderMatrix(
+      createDefaultProject("test-project"),
+      "V",
+    );
     const panel = container.querySelector<HTMLElement>(".matrix-panel")!;
 
     const input = document.createElement("input");

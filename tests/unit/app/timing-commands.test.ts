@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultProject } from "../../../src/domain/project/factory";
+import {
+  DEFAULT_PIANO_PERFORMANCE,
+  createDefaultProject,
+} from "../../../src/domain/project/factory";
 import { meter } from "../../../src/domain/timing/meter";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
@@ -30,54 +33,36 @@ describe("T102/T109 — Timing Commands Integration & Reflow Invariants", () => 
     const step1: ChordStep = {
       id: "step-1",
       kind: "chord",
-      harmonicFunction: { functionId: "I", role: "tonic", category: "primary", layer: "core" },
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
       duration: musicalDuration(rational(4, 1)),
       cardView: "harmonic",
-      performance: { articulation: "block", masterVelocity: 80 },
-      harmonicContext: {
-        tonic: 0,
-        mode: "ionian",
-        category: "primary",
-        degree: "I",
-        variant: EMPTY_HARMONIC_VARIANT,
-      },
+      performance: { ...DEFAULT_PIANO_PERFORMANCE, articulation: "block", masterVelocity: 80 },
+      harmonicVariant: EMPTY_HARMONIC_VARIANT,
     };
 
     const step2: ChordStep = {
       id: "step-2",
       kind: "chord",
       harmonicFunction: {
+        moduleId: "progressions",
         functionId: "IV",
-        role: "subdominant",
-        category: "primary",
-        layer: "core",
+
+        category: "core",
       },
       duration: musicalDuration(rational(2, 1)),
       cardView: "harmonic",
-      performance: { articulation: "block", masterVelocity: 80 },
-      harmonicContext: {
-        tonic: 0,
-        mode: "ionian",
-        category: "primary",
-        degree: "IV",
-        variant: EMPTY_HARMONIC_VARIANT,
-      },
+      performance: { ...DEFAULT_PIANO_PERFORMANCE, articulation: "block", masterVelocity: 80 },
+      harmonicVariant: EMPTY_HARMONIC_VARIANT,
     };
 
     const step3: ChordStep = {
       id: "step-3",
       kind: "chord",
-      harmonicFunction: { functionId: "V", role: "dominant", category: "primary", layer: "core" },
+      harmonicFunction: { moduleId: "progressions", functionId: "V", category: "core" },
       duration: musicalDuration(rational(2, 1)),
       cardView: "harmonic",
-      performance: { articulation: "block", masterVelocity: 80 },
-      harmonicContext: {
-        tonic: 0,
-        mode: "ionian",
-        category: "primary",
-        degree: "V",
-        variant: EMPTY_HARMONIC_VARIANT,
-      },
+      performance: { ...DEFAULT_PIANO_PERFORMANCE, articulation: "block", masterVelocity: 80 },
+      harmonicVariant: EMPTY_HARMONIC_VARIANT,
     };
 
     return Object.freeze({

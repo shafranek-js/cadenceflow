@@ -24,13 +24,8 @@ async function waitForStudio(page: Page): Promise<void> {
 
 async function readProgressionIdentity(page: Page): Promise<string[]> {
   return page
-    .locator('[data-testid="progression-step"]')
-    .evaluateAll((steps) =>
-      steps.map(
-        (step) =>
-          step.querySelector('[data-testid="step-function"]')?.textContent?.trim() ?? "Rest",
-      ),
-    );
+    .locator(".measure-staff-event-select")
+    .evaluateAll((steps) => steps.map((step) => step.getAttribute("data-step-id") ?? ""));
 }
 
 async function expectNoPageHorizontalScroll(page: Page): Promise<void> {
@@ -127,6 +122,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
   }) => {
     test.slow();
     await waitForStudio(page);
+    await setProgressionView(page, "staff");
 
     const matrixCard = page.getByTestId("chord-card-I");
     const previewButton = matrixCard.getByRole("button", { name: /Preview I/ });
@@ -137,7 +133,7 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await page.keyboard.press("Space");
     await expect(matrixCard).toHaveClass(/is-selected/);
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     const beforeAdd = await steps.count();
     const chordMain = matrixCard.locator(".chord-main");
     await chordMain.focus();
@@ -167,52 +163,51 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
     await expect(steps).toHaveCount(beforeAdd + 3);
     const identityBeforeReorder = await readProgressionIdentity(page);
     const middleStep = steps.nth(1);
-    const middleStepSelect = middleStep.getByRole("button", {
-      name: /Select progression step 2: IV/,
-    });
+    const middleStepId = await middleStep.getAttribute("data-step-id");
+    expect(middleStepId).toBeTruthy();
+    const middleStepSelect = middleStep;
     await middleStepSelect.focus();
     await page.keyboard.press("Enter");
-    await expect(middleStep).toHaveAttribute("data-selected", "true");
+    await expect(middleStep).toHaveAttribute("aria-pressed", "true");
     await expect(middleStepSelect).toHaveAttribute("aria-pressed", "true");
 
     const moveLeft = page.getByRole("button", { name: "Move step left" });
     await moveLeft.focus();
     await page.keyboard.press("Enter");
-    await expect(page.locator('[data-testid="progression-step"]').nth(0)).toHaveAttribute(
-      "data-selected",
-      "true",
-    );
+    await expect(steps.nth(0)).toHaveAttribute("data-step-id", middleStepId!);
+    await expect(steps.nth(0)).toHaveAttribute("aria-pressed", "true");
     await expect
       .poll(() =>
         page.evaluate(
-          () => document.activeElement?.closest('[data-testid="progression-step"]')?.textContent,
+          () =>
+            document.activeElement?.closest<HTMLElement>("[data-progression-step-select]")?.dataset
+              .stepId,
         ),
       )
-      .toContain("IV");
+      .toBe(middleStepId);
 
     const moveRight = page.getByRole("button", { name: "Move step right" });
     await moveRight.focus();
     await page.keyboard.press("Enter");
-    await expect(page.locator('[data-testid="progression-step"]').nth(1)).toHaveAttribute(
-      "data-selected",
-      "true",
-    );
-    await expect(page.locator('[data-testid="progression-step"]').nth(1)).toContainText("IV");
+    await expect(steps.nth(1)).toHaveAttribute("data-step-id", middleStepId!);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
     expect(await readProgressionIdentity(page)).toEqual(identityBeforeReorder);
 
-    expect(await middleStep.getAttribute("role")).toBeNull();
-    expect(await middleStep.getAttribute("tabindex")).toBeNull();
     await addRestToProgression(page);
-    const restStep = page.locator('[data-testid="progression-step"]').last();
-    const restStepSelect = restStep.getByRole("button", {
-      name: `Select progression step ${beforeAdd + 4}: Rest`,
-      exact: true,
-    });
+    const restStepSelect = page
+      .locator(".measure-staff-event.is-rest .measure-staff-event-select")
+      .last();
+    await expect(restStepSelect).toHaveAttribute("aria-label", /Select Rest/);
+    const restStepId = await restStepSelect.getAttribute("data-step-id");
+    expect(restStepId).toBeTruthy();
+    const selectedBeforeRest = await restStepSelect.getAttribute("aria-pressed");
+    expect(selectedBeforeRest).toBe("false");
     await restStepSelect.focus();
     await page.keyboard.press("Space");
     await expect(restStepSelect).toHaveAttribute("aria-pressed", "true");
-    expect(await restStep.getAttribute("role")).toBeNull();
-    expect(await restStep.getAttribute("tabindex")).toBeNull();
+    const restStepEvent = restStepSelect.locator("..");
+    expect(await restStepEvent.getAttribute("role")).toBeNull();
+    expect(await restStepEvent.getAttribute("tabindex")).toBeNull();
   });
 
   test("keeps global Matrix and Progression views keyboard-accessible without per-card controls", async ({
@@ -329,17 +324,14 @@ test.describe("US10 Batch B — accessible studio interaction", () => {
   }) => {
     test.slow();
     await waitForStudio(page);
+    await setProgressionView(page, "staff");
     await page
       .getByTestId("chord-card-bIII")
       .locator(".chord-main")
       .click({
         modifiers: ["Control"],
       });
-    await page
-      .locator('[data-testid="progression-step"]')
-      .last()
-      .getByRole("button", { name: /Select progression step 1: bIII/ })
-      .click();
+    await page.locator(".measure-staff-event-select").last().click();
     await page
       .getByTestId("chord-card-I")
       .getByRole("button", { name: /Preview I/ })

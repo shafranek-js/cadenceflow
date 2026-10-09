@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function createProgression(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
@@ -9,11 +10,12 @@ async function createProgression(page: import("@playwright/test").Page): Promise
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
-  await expect(page.getByTestId("progression-step")).toHaveCount(3);
+  await setProgressionView(page, "staff");
+  await expect(page.locator(".measure-staff-event-select")).toHaveCount(3);
 }
 
 function stepButton(page: import("@playwright/test").Page, index: number) {
-  return page.getByTestId("progression-step").nth(index).locator("[data-progression-step-select]");
+  return page.locator(".measure-staff-event-select").nth(index);
 }
 
 test.describe("T203 deterministic alternatives tray", () => {
@@ -35,11 +37,11 @@ test.describe("T203 deterministic alternatives tray", () => {
       page.getByTestId("alternatives-candidate").first().locator("button").first(),
     ).toBeFocused();
 
-    const before = await page.getByTestId("progression-step").allInnerTexts();
+    const before = await page.locator(".measure-staff-event-select").allInnerTexts();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByTestId("alternatives-candidate").nth(1)).toHaveClass(/is-active/);
     await page.keyboard.press("Space");
-    const afterAudition = await page.getByTestId("progression-step").allInnerTexts();
+    const afterAudition = await page.locator(".measure-staff-event-select").allInnerTexts();
     expect(afterAudition).toEqual(before);
 
     await page.getByTestId("alternatives-tray-cancel").focus();
@@ -61,8 +63,9 @@ test.describe("T203 deterministic alternatives tray", () => {
     await ensureHistoryControlsVisible(page);
     await stepButton(page, 0).click();
 
-    const originalCount = await page.getByTestId("progression-step").count();
-    const original = await page.getByTestId("progression-step").nth(0).innerText();
+    const steps = page.locator(".measure-staff-event-select");
+    const originalCount = await steps.count();
+    const original = await steps.nth(0).innerText();
     await page.getByTestId("matrix-explore-alternative").click();
     const candidateFunction = await page
       .getByTestId("alternatives-candidate")
@@ -77,17 +80,17 @@ test.describe("T203 deterministic alternatives tray", () => {
     await firstCandidate.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("alternatives-tray")).toHaveCount(0);
-    await expect(page.getByTestId("progression-step")).toHaveCount(originalCount + 1);
-    await expect.poll(() => page.getByTestId("progression-step").nth(0).innerText()).toBe(original);
-    await expect(page.getByTestId("progression-step").nth(1)).toContainText(candidateFunction);
-    const applied = await page.getByTestId("progression-step").nth(1).innerText();
+    await expect(steps).toHaveCount(originalCount + 1);
+    await expect.poll(() => steps.nth(0).innerText()).toBe(original);
+    await expect(steps.nth(1)).toContainText(candidateFunction);
+    const applied = await steps.nth(1).innerText();
 
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(originalCount);
-    await expect.poll(() => page.getByTestId("progression-step").nth(0).innerText()).toBe(original);
+    await expect(steps).toHaveCount(originalCount);
+    await expect.poll(() => steps.nth(0).innerText()).toBe(original);
     await page.getByRole("button", { name: "Redo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(originalCount + 1);
-    await expect.poll(() => page.getByTestId("progression-step").nth(1).innerText()).toBe(applied);
+    await expect(steps).toHaveCount(originalCount + 1);
+    await expect.poll(() => steps.nth(1).innerText()).toBe(applied);
 
     await stepButton(page, 0).click();
     await page.getByTestId("matrix-explore-alternative").click();
@@ -107,7 +110,8 @@ test.describe("T203 deterministic alternatives tray", () => {
       .getByRole("heading", { name: "My Progression" })
       .click({ button: "right" });
     await page.getByTestId("progression-menu-add-rest").click();
-    const restButton = page.locator(".progression-rest-card [data-progression-step-select]");
+    await setProgressionView(page, "staff");
+    const restButton = page.locator(".measure-staff-event.is-rest .measure-staff-event-select");
     await restButton.click();
     await page.getByTestId("range-toolbar-explore").click();
     await expect(page.getByTestId("alternatives-tray")).toHaveCount(0);

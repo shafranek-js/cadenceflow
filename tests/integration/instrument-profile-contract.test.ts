@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrations";
 import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
 import { realizeChord } from "../../src/domain/harmony/realization";
 import { modeForModule } from "../../src/domain/harmony/functions";
@@ -14,7 +15,7 @@ import type {
   ValidationResult,
 } from "../../src/instruments/contracts";
 
-const proofOfConceptProfile: InstrumentProfile = Object.freeze({
+const proofOfConceptProfile: InstrumentProfile = Object.freeze<InstrumentProfile>({
   id: "proof-of-concept-strings",
   displayName: "Proof-of-concept Strings",
   realizeChord({ chord }: InstrumentRealizationInput) {
@@ -23,7 +24,7 @@ const proofOfConceptProfile: InstrumentProfile = Object.freeze({
     });
   },
   validateManualVoicing(_pitches): ValidationResult {
-    return Object.freeze({ valid: true, messages: Object.freeze([]) });
+    return Object.freeze<ValidationResult>({ valid: true, messages: Object.freeze([]) });
   },
   supportedCardViews() {
     return Object.freeze([{ id: "harmonic", label: "Harmonic" }]);
@@ -66,7 +67,7 @@ describe("SC-016 InstrumentProfile boundary", () => {
 
     const encoded = encodePortableProject(project);
     const payload = JSON.parse(encoded) as Record<string, unknown>;
-    expect(payload.schemaVersion).toBe(6);
+    expect(payload.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     expect(payload).not.toHaveProperty("instrumentProfile");
     expect(decodePortableProject(encoded)).toEqual(project);
   });

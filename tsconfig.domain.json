@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    // Deliberately no "DOM": the domain layer must not depend on browser globals. Use
+    // `src/domain/runtime/ids.ts` for the host capabilities it genuinely needs.
     "lib": ["ES2022"],
     "strict": true,
     "noEmit": true,
@@ -8,7 +10,11 @@
     "moduleResolution": "Bundler",
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // Enables .tsx files to be *resolved* so that importing a UI/React module from the domain
+    // fails with a layering-relevant error rather than a confusing "jsx is not set" message.
+    // The `include` list above still excludes every .tsx file from this project.
+    "jsx": "preserve"
   },
   "include": ["src/domain/**/*.ts", "src/instruments/contracts.ts", "src/audio/contracts.ts"]
 }

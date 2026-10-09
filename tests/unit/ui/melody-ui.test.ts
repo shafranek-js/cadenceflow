@@ -1,3 +1,4 @@
+import { requireChord } from "../../fixtures/assertions";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -10,7 +11,12 @@ import {
 } from "../../../src/domain/project/factory";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
-import { MELODY_PITCH_MOTIONS } from "../../../src/domain/melody/types";
+import {
+  MELODY_PITCH_MOTIONS,
+  snapshotChordMelody,
+  type ChordMelody,
+  type MelodyRecipeInput,
+} from "../../../src/domain/melody/types";
 import type { ChordStep } from "../../../src/domain/progression/step";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
@@ -41,16 +47,18 @@ function mountToDom(element: React.ReactElement) {
   };
 }
 
-function makeStep(id = "source-step", melody?: ChordStep["melody"]): ChordStep {
+// Callers pass a bare recipe literal; the helper adds the `{ mode: "generated" as const, recipe }` wrapper
+// that `ChordStep.melody` requires.
+function makeStep(id = "source-step", melody?: ChordMelody | MelodyRecipeInput): ChordStep {
   return {
     id,
     kind: "chord",
-    harmonicFunction: { moduleId: "progressions", functionId: "I" },
+    harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(2)),
     performance: DEFAULT_PIANO_PERFORMANCE,
     cardView: "staff",
-    ...(melody ? { melody } : {}),
+    ...(melody ? { melody: snapshotChordMelody(melody) } : {}),
   };
 }
 
@@ -146,7 +154,7 @@ describe("T170 — Melody UI", () => {
       el(MelodyEditorDialog, {
         isOpen: true,
         mode: "edit",
-        step: project.progression.steps[0],
+        step: requireChord(project.progression.steps[0]),
         project,
         restoreFocusRef: { current: null },
         onClose,
@@ -258,7 +266,7 @@ describe("T170 — Melody UI", () => {
       el(MelodyEditorDialog, {
         isOpen: true,
         mode: "edit",
-        step: project.progression.steps[0],
+        step: requireChord(project.progression.steps[0]),
         project,
         restoreFocusRef: { current: null },
         onClose,
@@ -359,5 +367,42 @@ describe("T170 — Melody UI", () => {
     act(() => solo.click());
     expect(onChange).toHaveBeenLastCalledWith({ solo: true });
     mounted.unmount();
+  });
+
+  it("folds the Melody Track section through the shared disclosure toggle", () => {
+    window.localStorage.clear();
+    const mounted = mountToDom(
+      el(MelodyTrackControls, {
+        settings: { instrument: "flute", muted: false, solo: false, volume: 100 },
+        onChange: vi.fn(),
+      }),
+    );
+
+    const toggle = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="melody-track-disclosure-btn"]',
+    );
+    expect(toggle?.tagName).toBe("BUTTON");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(mounted.container.querySelector('[aria-label="Melody Track Volume"]')).not.toBeNull();
+
+    act(() => toggle?.click());
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(mounted.container.querySelector('[aria-label="Melody Track Volume"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Mute Melody Track"]')).toBeNull();
+    expect(
+      window.localStorage.getItem("cadenceflow.ui.track-controls-melody-disclosure-open"),
+    ).toBe("false");
+    // The collapsed section keeps its accessible region and title.
+    expect(mounted.container.querySelector('[aria-label="Melody Track controls"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain("Melody Track");
+
+    act(() => toggle?.click());
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(mounted.container.querySelector('[aria-label="Melody Track Volume"]')).not.toBeNull();
+
+    mounted.unmount();
+    window.localStorage.clear();
   });
 });

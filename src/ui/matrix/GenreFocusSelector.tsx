@@ -1,7 +1,4 @@
-import {
-  GENRE_FOCUS_OPTIONS,
-  type GenreFocusId,
-} from "../../domain/harmony/functionSemantics";
+import { GENRE_FOCUS_OPTIONS, type GenreFocusId } from "../../domain/harmony/functionSemantics";
 
 export function GenreFocusSelector({
   value,

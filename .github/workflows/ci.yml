@@ -1,0 +1,125 @@
+name: CI
+
+# Regression gates. Before this workflow existed the only automation was a manual
+# `workflow_dispatch` deploy that ran `pnpm run build` and nothing else, so the unit suite,
+# the Playwright suite and the linter were never enforced anywhere. Several defects reached
+# a release-candidate revision through exactly that gap: no unit test imported
+# `encodePortableProject` with a `cardView` the UI can produce, and no automation ran the
+# e2e suite that is the only coverage for ~15% of `src`.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Typecheck, lint, format, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build
+        run: pnpm run build
+        env:
+          GITHUB_ACTIONS: "true"
+
+      # `build` already runs this, but an explicit step makes a layering violation obvious in the
+      # job log instead of hiding inside the build output.
+      - name: Layering guards (domain / foundation)
+        run: pnpm run typecheck:layers
+
+      # Blocking: keep test fixtures and helpers compatible with the current model types.
+      - name: Typecheck tests
+        run: pnpm run typecheck:tests
+
+      # Blocking: the source trees are format-clean as of this workflow's addition. Formatting is
+      # mechanical and reviewable separately; keeping it green stops it drifting again.
+      - name: Prettier (source trees)
+        run: pnpm run format:check
+
+      # `--maxWorkers=1` matches how the suite is verified locally. Tests are timing-sensitive
+      # (the transport soak test asserts loop-boundary drift) and go flaky under parallelism.
+      - name: Unit and integration tests
+        run: pnpm exec vitest run --maxWorkers=1
+
+      # Blocking: the suite is green as of this workflow's addition (0 errors, 13 warnings).
+      # The warnings are pre-existing `exhaustive-deps` / fast-refresh notices, so they are not
+      # fatal; a new error fails the build.
+      - name: ESLint
+        run: pnpm run lint
+
+      # Report-only while GHSA-ch52-4w7c-c8xp remains in http-cache-semantics@4.2.0
+      # through optional libxmljs2 > node-gyp > make-fetch-happen (no patched release listed).
+      # This chain supports offline MusicXML XSD validation and validation tests, not app runtime.
+      # Keep it until the validator dependency chain can be updated without dropping that coverage.
+      - name: Dependency audit (report only, non-blocking)
+        run: pnpm audit --audit-level high
+        continue-on-error: true
+
+  e2e:
+    name: Playwright (chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+        env:
+          GITHUB_ACTIONS: "true"
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      # One worker and no retries: the suite mutates shared localStorage state and the Firefox
+      # project is intentionally excluded because PDF generation is Chromium-only.
+      - name: Run end-to-end tests
+        run: pnpm exec playwright test --project=chromium --workers=1 --retries=0
+        env:
+          GITHUB_ACTIONS: "true"
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

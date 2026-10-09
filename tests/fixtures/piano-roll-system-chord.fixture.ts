@@ -1,3 +1,4 @@
+import type { AuthoredMelodyPhrase } from "../../src/domain/melody/types";
 import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
 import {
   snapshotAuthoredMelodyPhrase,
@@ -18,15 +19,12 @@ const E4 = exactPitch(64, { step: "E", alter: 0 });
 const G4 = exactPitch(67, { step: "G", alter: 0 });
 const A4 = exactPitch(69, { step: "A", alter: 0 });
 
-function authored(
-  step: ChordStep,
-  notes: Parameters<typeof snapshotAuthoredMelodyPhrase>[0]["notes"],
-): ChordStep {
-  return Object.freeze({
+function authored(step: ChordStep, notes: AuthoredMelodyPhrase["notes"]): ChordStep {
+  return Object.freeze<ChordStep>({
     ...step,
     melodyInstrumentOverride: "flute",
     melody: snapshotChordMelody({
-      mode: "authored",
+      mode: "authored" as const,
       phrase: snapshotAuthoredMelodyPhrase({ notes }),
     }),
   });
@@ -36,7 +34,7 @@ function chord(
   project: Project,
   id: string,
   functionId: string,
-  notes?: Parameters<typeof snapshotAuthoredMelodyPhrase>[0]["notes"],
+  notes?: AuthoredMelodyPhrase["notes"],
 ): ChordStep {
   const base = createMatrixChordStep(project, functionId, id);
   const step = Object.freeze({ ...base, duration: musicalDuration(rational(4)) });
@@ -58,7 +56,7 @@ export function createPianoRollSystemChordFixture(
   const stepC = chord(base, "chord-c", "I", [
     { id: "section-note", pitch: E4, onset: rational(1), duration: rational(1, 2) },
   ]);
-  const rest: RestStep = Object.freeze({
+  const rest: RestStep = Object.freeze<RestStep>({
     id: "rest-d",
     kind: "rest",
     duration: musicalDuration(rational(4)),
@@ -71,16 +69,18 @@ export function createPianoRollSystemChordFixture(
     }),
   });
   const generatedBase = createMatrixChordStep(base, "vi", "generated-e");
-  const generated: ChordStep = Object.freeze({
+  const generated: ChordStep = Object.freeze<ChordStep>({
     ...generatedBase,
     duration: musicalDuration(rational(4)),
     melodyInstrumentOverride: "flute",
     melody: Object.freeze({
-      mode: "generated",
+      mode: "generated" as const,
       recipe: snapshotChordMelodyRecipe({
-        pattern: "outside-in",
+        pitchMotion: "outside-in",
         grid: "eighth-triplet",
         octaveOffset: 1,
+        rhythm: "even",
+        connection: "retrigger",
       }),
     }),
   });
@@ -113,7 +113,7 @@ export function createPianoRollSystemChordFixture(
     steps: Object.freeze([branchStep]),
   });
 
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     updatedAt: FIXTURE_TIME,
     presentation: Object.freeze({

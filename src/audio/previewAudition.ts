@@ -8,6 +8,12 @@ import type {
 export interface PreviewAuditionControllerOptions {
   readonly provider: InstrumentAudioProvider;
   readonly clock?: AudioClock;
+  readonly onActivityChange?: (activity: PreviewAuditionActivity | null) => void;
+}
+export interface PreviewAuditionActivity {
+  readonly events: readonly AudioNoteEvent[];
+  readonly playback: ScheduledPlayback;
+  readonly clock: AudioClock;
 }
 export type PreviewAuditionScheduledCallback = (
   playback: ScheduledPlayback,
@@ -31,6 +37,7 @@ interface PreviewCapableProvider extends InstrumentAudioProvider {
 export class PreviewAuditionController {
   private readonly provider: InstrumentAudioProvider;
   private readonly clock: AudioClock;
+  private readonly onActivityChange?: PreviewAuditionControllerOptions["onActivityChange"];
   private activePlayback: ScheduledPlayback | null = null;
   private pendingAudition: {
     readonly events: readonly AudioNoteEvent[];
@@ -45,6 +52,7 @@ export class PreviewAuditionController {
     this.clock = options.clock ?? {
       now: () => (typeof performance !== "undefined" ? performance.now() / 1000 : 0),
     };
+    this.onActivityChange = options.onActivityChange;
   }
 
   getProvider(): InstrumentAudioProvider {
@@ -120,13 +128,18 @@ export class PreviewAuditionController {
         ? previewProvider.schedulePreview(events, this.clock)
         : this.provider.schedule(events, this.clock);
       const scheduled = this.activePlayback;
-      if (onScheduled) {
+      if (onScheduled || this.onActivityChange) {
         const notify = () => {
-          if (this.activePlayback === scheduled) onScheduled(scheduled, this.clock);
+          if (this.activePlayback !== scheduled) return;
+          this.onActivityChange?.({ events, playback: scheduled, clock: this.clock });
+          onScheduled?.(scheduled, this.clock);
         };
         if (scheduled.ready) {
           void scheduled.ready.then(notify).catch(() => {
-            if (this.activePlayback === scheduled) this.activePlayback = null;
+            if (this.activePlayback === scheduled) {
+              this.activePlayback = null;
+              this.onActivityChange?.(null);
+            }
             scheduled.cancel();
           });
         } else {
@@ -151,6 +164,7 @@ export class PreviewAuditionController {
       }
       this.activePlayback = null;
     }
+    this.onActivityChange?.(null);
   }
 
   dispose(): void {

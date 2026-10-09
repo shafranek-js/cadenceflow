@@ -37,6 +37,29 @@ export async function ensureSelectedProgressionSettingsVisible(page: Page): Prom
   return settings;
 }
 
+/** Enables the project-wide extra bass voice for tests that explicitly assert it. */
+export async function enableIndependentBassVoice(page: Page): Promise<void> {
+  const toggle = page.getByTestId("independent-bass-toggle");
+  if (!(await toggle.isVisible().catch(() => false))) {
+    const selectedInspector = page.getByTestId("step-performance-inspector");
+    if (await selectedInspector.isVisible().catch(() => false)) {
+      const settings = selectedInspector.getByTestId("selected-progression-settings");
+      if (!(await settings.evaluate((element) => (element as HTMLDetailsElement).open))) {
+        await settings.locator(":scope > summary").click();
+      }
+    } else {
+      const globalInspector = page.getByTestId("progression-global-inspector");
+      const tracks = globalInspector.locator(".global-tracks-disclosure");
+      if (!(await tracks.evaluate((element) => (element as HTMLDetailsElement).open))) {
+        await tracks.locator(":scope > summary").click();
+      }
+    }
+  }
+  await expect(toggle).toBeVisible();
+  if (!(await toggle.isChecked())) await toggle.check();
+  await expect(toggle).toBeChecked();
+}
+
 /** Sets measures per system via the My Progression header context menu. */
 export async function setLayoutMeasuresPerSystem(
   page: Page,
@@ -51,7 +74,7 @@ export async function setLayoutMeasuresPerSystem(
 /** Selects a Progression view through the visible Studio view buttons. */
 export async function setProgressionView(
   page: Page,
-  view: "harmonic" | "piano" | "staff" | "guitar" | "tablature",
+  view: "staff" | "tablature" | "piano-roll",
   activation: "pointer" | "keyboard" = "pointer",
 ): Promise<void> {
   const button = page.getByTestId(`progression-view-btn-${view}`);
@@ -63,6 +86,24 @@ export async function setProgressionView(
     await button.click();
   }
   await expect(button).toHaveAttribute("aria-pressed", "true");
+}
+
+/** Returns one Staff/Tab selection button per persisted Step, skipping continuation fragments. */
+export async function getLogicalProgressionStepButtons(page: Page): Promise<Locator[]> {
+  const ids = await page.locator("[data-progression-step-select]").evaluateAll((elements) => {
+    const seen = new Set<string>();
+    return elements.flatMap((element) => {
+      const id = element.getAttribute("data-step-id");
+      if (!id || seen.has(id)) return [];
+      seen.add(id);
+      return [id];
+    });
+  });
+
+  return ids.map((id) => {
+    const escapedId = id.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return page.locator(`[data-progression-step-select][data-step-id="${escapedId}"]`).first();
+  });
 }
 
 /** Adds a rest to the end of the progression via the My Progression context menu. */

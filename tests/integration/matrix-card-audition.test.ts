@@ -1,3 +1,4 @@
+import { requireChord } from "../fixtures/assertions";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -267,7 +268,7 @@ describe("Matrix Card Audition Integration Suite (FR-016 / US1 Corrective Accept
     );
 
     expect(store.project.progression.steps.length).toBe(1);
-    expect(store.project.progression.steps[0]?.harmonicFunction.functionId).toBe("I");
+    expect(requireChord(store.project.progression.steps[0])?.harmonicFunction.functionId).toBe("I");
   });
 
   it("Item 10: Provider failure fails gracefully without mutating Project or throwing unhandled errors", () => {

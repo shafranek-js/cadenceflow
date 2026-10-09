@@ -20,10 +20,14 @@ import type {
   RestStep,
   StepPerformance,
 } from "../domain/progression/step";
-import { snapshotStepPerformance } from "../domain/progression/step";
+import {
+  snapshotChordPropertiesOrigin,
+  snapshotStepPerformance,
+  type ChordPropertiesOrigin,
+} from "../domain/progression/step";
 import { assertStepTranspositionSemitones } from "../domain/progression/transposition";
 import { orderSongSections, validateSongSections } from "../domain/progression/sections";
-import type { ExactPitch, PitchClassIdentity } from "../domain/harmony/pitch";
+import type { ExactPitch, PitchClassIdentity, PitchSpelling } from "../domain/harmony/pitch";
 import type { HarmonicVariant } from "../domain/harmony/chord";
 import type { HarmonicFunctionIdentity, HarmonicModuleId } from "../domain/harmony/functions";
 import type { GenreFocusId } from "../domain/harmony/functionSemantics";
@@ -47,6 +51,7 @@ import {
 import {
   CURRENT_PROJECT_SCHEMA_VERSION,
   InvalidProjectDataError,
+  type MigrationDiagnostic,
   migrateProjectData,
   UnsupportedProjectVersionError,
 } from "../domain/project/migrations";
@@ -358,6 +363,69 @@ function decodeHarmonyTrackSettings(raw: unknown): HarmonyTrackSettings {
 }
 
 // Wire step representations
+
+const DIATONIC_STEPS: ReadonlySet<string> = new Set(["C", "D", "E", "F", "G", "A", "B"]);
+
+/**
+ * Validates a saved-spelling override map read from a project file.
+ *
+ * Keys are either the bare MIDI number (`"60"`) or the role-qualified form (`"upper:60"`,
+ * `"bass:60"`) — the consumers accept both shapes, so both are preserved. Malformed entries
+ * are dropped rather than rejecting the whole file: a corrupt spelling must not make an
+ * otherwise good project unopenable.
+ */
+function decodeExplicitSpellingOverrides(
+  raw: unknown,
+): Readonly<Record<string, PitchSpelling>> | undefined {
+  if (raw === undefined || raw === null || typeof raw !== "object") return undefined;
+  const overrides: Record<string, PitchSpelling> = {};
+
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const midiPart = key.includes(":") ? key.slice(key.indexOf(":") + 1) : key;
+    const midiNumber = Number(midiPart);
+    if (!Number.isInteger(midiNumber) || midiNumber < 0 || midiNumber > 127) continue;
+    if (typeof value !== "object" || value === null) continue;
+
+    const candidate = value as { step?: unknown; alter?: unknown };
+    if (typeof candidate.step !== "string" || !DIATONIC_STEPS.has(candidate.step)) continue;
+    if (typeof candidate.alter !== "number" || !Number.isInteger(candidate.alter)) continue;
+    if (candidate.alter < -2 || candidate.alter > 2) continue;
+
+    overrides[key] = Object.freeze({
+      step: candidate.step as PitchSpelling["step"],
+      alter: candidate.alter,
+    });
+  }
+
+  return Object.keys(overrides).length > 0 ? Object.freeze(overrides) : undefined;
+}
+
+/**
+ * Serializes saved-spelling overrides.
+ *
+ * Regression context: `explicitSpellingOverrides` was declared in the domain model, accepted
+ * by the JSON schema and consumed by MusicXML projection and the melody timeline, but was
+ * written by neither the encoder nor the decoder. A user's manual enharmonic choice (Cb for B)
+ * therefore survived only until the next save, and the same field was silently discarded when
+ * importing a file that did contain it.
+ */
+function encodeExplicitSpellingOverrides(
+  overrides: Readonly<Record<string, PitchSpelling>> | undefined,
+): Record<string, PitchSpelling> | undefined {
+  if (overrides === undefined) return undefined;
+  const entries = Object.entries(overrides).filter(([, value]) => {
+    if (!value || typeof value !== "object") return false;
+    if (typeof value.step !== "string" || !DIATONIC_STEPS.has(value.step)) return false;
+    return typeof value.alter === "number" && Number.isInteger(value.alter);
+  });
+  if (entries.length === 0) return undefined;
+  const encoded: Record<string, PitchSpelling> = {};
+  for (const [key, value] of entries) {
+    encoded[key] = Object.freeze({ step: value.step, alter: value.alter });
+  }
+  return encoded;
+}
+
 function encodeStep(step: ProgressionStep): Record<string, unknown> {
   if (step.kind === "rest") {
     return {
@@ -373,6 +441,7 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
         : {}),
     };
   }
+  const spellingOverrides = encodeExplicitSpellingOverrides(step.explicitSpellingOverrides);
   return {
     id: step.id,
     kind: "chord",
@@ -382,6 +451,10 @@ function encodeStep(step: ProgressionStep): Record<string, unknown> {
     duration: encodeDuration(step.duration),
     performance: step.performance,
     cardView: step.cardView,
+    ...(step.chordPropertiesOrigin !== undefined
+      ? { chordPropertiesOrigin: step.chordPropertiesOrigin }
+      : {}),
+    ...(spellingOverrides !== undefined ? { explicitSpellingOverrides: spellingOverrides } : {}),
     ...(step.melody !== undefined ? { melody: encodeChordMelody(step.melody) } : {}),
     ...(step.melodyInstrumentOverride !== undefined
       ? { melodyInstrumentOverride: validateMelodyInstrumentId(step.melodyInstrumentOverride) }
@@ -415,9 +488,20 @@ function decodeStep(raw: Record<string, unknown>): ProgressionStep {
     ...(transpositionSemitones !== 0 ? { transpositionSemitones } : {}),
     harmonicFunction: raw["harmonicFunction"] as HarmonicFunctionIdentity,
     harmonicVariant: raw["harmonicVariant"] as HarmonicVariant,
+    ...(raw["chordPropertiesOrigin"] !== undefined
+      ? {
+          chordPropertiesOrigin: snapshotChordPropertiesOrigin(
+            raw["chordPropertiesOrigin"] as ChordPropertiesOrigin,
+          ),
+        }
+      : {}),
     duration,
     performance: raw["performance"] as StepPerformance,
     cardView: (raw["cardView"] as CardViewId | undefined) ?? "harmonic",
+    ...(() => {
+      const overrides = decodeExplicitSpellingOverrides(raw["explicitSpellingOverrides"]);
+      return overrides !== undefined ? { explicitSpellingOverrides: overrides } : {};
+    })(),
     ...(raw["melody"] !== undefined ? { melody: decodeChordMelody(raw["melody"]) } : {}),
     ...(raw["authoredMelody"] !== undefined
       ? { authoredMelody: snapshotAuthoredMelodyPhrase(raw["authoredMelody"]) }
@@ -563,6 +647,7 @@ export function encodePortableProject(project: Project): string {
     },
     harmonyTrack: encodeHarmonyTrackSettings(project.harmonyTrack),
     melodyTrack: encodeMelodyTrackSettings(project.melodyTrack),
+    independentBassEnabled: project.independentBassEnabled,
     defaults,
     moduleTemplateStates,
     progression,
@@ -595,7 +680,18 @@ export function encodePortableProject(project: Project): string {
  * 6. JSON Schema validation
  * 7. Domain invariant validation & decoding
  */
+export interface PortableProjectDecodeResult {
+  readonly project: Project;
+  readonly diagnostics: readonly MigrationDiagnostic[];
+}
+
 export function decodePortableProject(jsonString: string): Project {
+  return decodePortableProjectWithDiagnostics(jsonString).project;
+}
+
+export function decodePortableProjectWithDiagnostics(
+  jsonString: string,
+): PortableProjectDecodeResult {
   // 1. JSON.parse
   let raw: unknown;
   try {
@@ -624,8 +720,13 @@ export function decodePortableProject(jsonString: string): Project {
 
   // 5. Migration chain
   let migrated: Record<string, unknown>;
+  let diagnostics: readonly MigrationDiagnostic[];
   try {
-    migrated = migrateProjectData(rawDoc);
+    // Diagnostics are collected rather than thrown: a migration that cannot read one field drops
+    // it and reports here, instead of making an otherwise valid legacy project unopenable.
+    const migration = migrateProjectData(rawDoc, true);
+    migrated = migration.project;
+    diagnostics = migration.diagnostics;
   } catch (err) {
     if (err instanceof UnsupportedProjectVersionError) {
       throw err;
@@ -841,6 +942,7 @@ export function decodePortableProject(jsonString: string): Project {
     })(),
     harmonyTrack,
     melodyTrack,
+    independentBassEnabled: migrated["independentBassEnabled"] === true,
     defaults,
     moduleTemplateStates,
     progression: Object.freeze({
@@ -851,6 +953,9 @@ export function decodePortableProject(jsonString: string): Project {
       ...(progressionRaw.loopRegion !== null && progressionRaw.loopRegion !== undefined
         ? { loopRegion: progressionRaw.loopRegion }
         : {}),
+      // `sections` is always present as an array. The JSON schema requires the key, so the decoder
+      // normalises to `[]` rather than leaving it absent — keeping the in-memory and on-disk shapes
+      // aligned, which is what the codec round-trip tests rely on.
       sections: orderSongSections({ steps, sections: decodedSections }),
     }),
     ...(temporaryBranch !== undefined ? { temporaryBranch } : {}),
@@ -864,5 +969,5 @@ export function decodePortableProject(jsonString: string): Project {
       `Invalid Song Sections: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return project;
+  return Object.freeze({ project, diagnostics });
 }

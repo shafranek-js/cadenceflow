@@ -40,6 +40,9 @@ async function expectProgressionsTopology(page: Page): Promise<void> {
       ["V7/V", "V"],
       ["V7/iii", "iii"],
     ].map(([sourceId, targetId]) => {
+      if (typeof sourceId !== "string" || typeof targetId !== "string") {
+        throw new Error("Every aligned topology pair must name both matrix cards.");
+      }
       const sourceRect = rect(sourceId);
       const targetRect = rect(targetId);
       return Math.abs((sourceRect?.left ?? 0) - (targetRect?.left ?? 0)) <= 1;
@@ -180,7 +183,7 @@ test.describe("T190 Matrix spatial topology", () => {
     await page
       .locator('[data-testid="chord-card-V7"] .chord-main')
       .click({ modifiers: ["Control"] });
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(1);
+    await expect(page.getByTestId("piano-roll-chord")).toHaveCount(1);
 
     await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(page.getByTestId("transport-status")).toContainText("Playing", {

@@ -132,6 +132,72 @@ export const DARK_HARMONY_NATURAL_VARIANTS: readonly DarkFunctionSpec[] = [
     quality: "major",
     position: { column: 6, row: 1 },
   },
+  // Minor-mode degrees whose quality differs from natural minor. These are not placed in
+  // the Matrix topology: they exist so the Modes Explorer can materialize and audibly
+  // match the chords it previews. `computeModalChords` derives minor-variant chords from
+  // the scale intervals, while Apply goes through a functional identity, so without these
+  // entries the two disagreed: harmonic-minor degree 5 previewed as E7 (raised leading
+  // tone) but applied as Em7, losing the dominant seventh that defines the mode.
+  {
+    id: "III+",
+    layerId: "tonal-minor-core",
+    category: "core",
+    // Degree 3 of natural minor IS the mode's major third above the tonic, and the
+    // `tonal-minor` spelling reference already flattens degree 3 to it. An absolute offset
+    // is used instead of `chromaticAlter: 1` because that would raise the already-flattened
+    // degree and spell the root a semitone too high (C# rather than C in A minor).
+    absoluteOffset: 3,
+    quality: "augmented",
+    auxiliary: true,
+    position: { column: 2, row: 1 },
+  },
+  {
+    id: "IV",
+    layerId: "tonal-minor-core",
+    category: "core",
+    degree: 4,
+    quality: "major",
+    auxiliary: true,
+    position: { column: 3, row: 1 },
+  },
+  {
+    id: "vi°",
+    layerId: "tonal-minor-core",
+    category: "core",
+    degree: 6,
+    chromaticAlter: 1,
+    quality: "diminished",
+    targetId: "V",
+    mixPolicy: "must-resolve",
+    auxiliary: true,
+    position: { column: 5, row: 1 },
+  },
+  // Melodic minor raises the 6th as well, so its ii becomes a plain minor triad and its IV
+  // a major triad with a major seventh. Both live on the free row-2 column slots.
+  {
+    id: "ii",
+    layerId: "tonal-minor-core",
+    category: "core",
+    degree: 2,
+    quality: "minor",
+    auxiliary: true,
+    position: { column: 1, row: 2 },
+  },
+  {
+    id: "IV7",
+    layerId: "tonal-minor-core",
+    category: "core",
+    degree: 4,
+    quality: "major",
+    variant: Object.freeze({
+      seventh: "major7" as const,
+      extensions: Object.freeze([]),
+      suspensions: Object.freeze([]),
+      alterations: Object.freeze([]),
+    }),
+    auxiliary: true,
+    position: { column: 3, row: 2 },
+  },
 ];
 
 export const DARK_HARMONY_COLOR_FUNCTIONS: readonly DarkFunctionSpec[] = [

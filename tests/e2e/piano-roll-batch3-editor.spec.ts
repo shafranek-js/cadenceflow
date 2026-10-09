@@ -1,9 +1,7 @@
+import { decodePortableProject } from "../../src/persistence/portableProject";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import {
-  createEffectiveMelodyTimeline,
-  type EffectiveMelodyTimelineInput,
-} from "../../src/domain/melody/effectiveTimeline";
+import { createEffectiveMelodyTimeline } from "../../src/domain/melody/effectiveTimeline";
 import { addRational, rational, subtractRational } from "../../src/domain/timing/rational";
 import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
 
@@ -46,10 +44,6 @@ type PortableStep = {
   };
 };
 type PortableProject = { progression: { steps: PortableStep[] } };
-
-type PortableProjectForTimeline = PortableProject & {
-  tonic: { semitone: number };
-};
 
 async function exportPortableProject(
   page: import("@playwright/test").Page,
@@ -138,6 +132,7 @@ test("Piano Roll directly edits generated notes and preserves transactional edit
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
+  await page.getByTestId("progression-view-btn-staff").click();
   const stepId = await page
     .locator("[data-progression-step-select]")
     .first()
@@ -541,8 +536,17 @@ test("Piano Roll directly edits generated notes and preserves transactional edit
     sourceGridBox.height;
   const destinationGrid = await page.evaluate(
     ({ destinationStart, sourceStepId }) => {
+      const requireFiniteNumber = (value: number | undefined, label: string) => {
+        if (value === undefined || !Number.isFinite(value)) {
+          throw new Error(`Expected a finite ${label}.`);
+        }
+        return value;
+      };
       const [startN, startD] = destinationStart.split("/").map(Number);
-      const start = startN / startD;
+      const startNumerator = requireFiniteNumber(startN, "beat numerator");
+      const startDenominator = requireFiniteNumber(startD, "beat denominator");
+      if (startDenominator === 0) throw new Error("Expected a non-zero beat denominator.");
+      const start = startNumerator / startDenominator;
       const chord = document.querySelector<HTMLElement>(
         `.piano-roll-chord[data-source-step-id='${sourceStepId}']`,
       );
@@ -550,7 +554,10 @@ test("Piano Roll directly edits generated notes and preserves transactional edit
         ?.closest(".piano-roll-measure")
         ?.querySelector("header span")?.textContent;
       const [numerator, denominator] = (meterText ?? "4/4").split("/").map(Number);
-      const beatsPerBar = (numerator * 4) / denominator;
+      const beatsPerBarNumerator = requireFiniteNumber(numerator, "meter numerator");
+      const beatsPerBarDenominator = requireFiniteNumber(denominator, "meter denominator");
+      if (beatsPerBarDenominator === 0) throw new Error("Expected a non-zero meter denominator.");
+      const beatsPerBar = (beatsPerBarNumerator * 4) / beatsPerBarDenominator;
       const targetBeat = start + 1.75;
       const measureIndex = Math.floor(targetBeat / beatsPerBar);
       const fraction = (targetBeat - measureIndex * beatsPerBar) / beatsPerBar;
@@ -635,6 +642,7 @@ test("Piano Roll note audition playhead crosses system boundaries and clears at 
         .click({ modifiers: ["Control"] });
     }
   }
+  await page.getByTestId("progression-view-btn-staff").click();
   const firstStep = page.locator("[data-progression-step-select]").first();
   const firstStepId = await firstStep.getAttribute("data-step-id");
   if (!firstStepId) throw new Error("First Step has no stable ID");
@@ -710,6 +718,7 @@ test("vertical Piano Roll drags preserve exact off-grid onset at every body grab
         .click({ modifiers: ["Control"] });
     }
   }
+  await page.getByTestId("progression-view-btn-staff").click();
   const first = page.locator("[data-progression-step-select]").first();
   const stepId = await first.getAttribute("data-step-id");
   if (!stepId) throw new Error("First Step has no stable ID");
@@ -793,7 +802,7 @@ test("Piano Roll keyboard creates at the active cell and edits pitch without aud
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
-  await page.locator("[data-progression-step-select]").first().click();
+  await page.getByTestId("piano-roll-chord").first().click();
   await page.getByTestId("progression-view-btn-piano-roll").click();
   const grid = page.locator(".piano-roll-grid").first();
   await grid.focus();
@@ -875,6 +884,7 @@ for (const gridMode of ["Degrees", "Chromatic"] as const) {
         .locator(".chord-main")
         .click({ modifiers: ["Control"] });
     }
+    await page.getByTestId("progression-view-btn-staff").click();
     const first = page.locator("[data-progression-step-select]").first();
     await first.click({ button: "right" });
     await page
@@ -904,13 +914,7 @@ for (const gridMode of ["Degrees", "Chromatic"] as const) {
       noteIdentities.reduce((best, note) => (note.pitch < best.pitch ? note : best)),
     ];
     const portableAtStart = await exportPortableProject(page);
-    const portableWireProject = JSON.parse(
-      JSON.stringify(portableAtStart),
-    ) as PortableProjectForTimeline & Record<string, unknown>;
-    const decodedProjectAtStart = {
-      ...portableWireProject,
-      tonic: portableWireProject.tonic.semitone,
-    } as EffectiveMelodyTimelineInput;
+    const decodedProjectAtStart = decodePortableProject(JSON.stringify(portableAtStart));
     const effectiveAtStart = createEffectiveMelodyTimeline(decodedProjectAtStart);
     const portableSteps = new Map(
       portableAtStart.progression.steps.map((step) => [step.id, step] as const),

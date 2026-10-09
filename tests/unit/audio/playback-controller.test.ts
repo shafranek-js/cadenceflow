@@ -77,7 +77,7 @@ class MockAudioProvider implements InstrumentAudioProvider {
   }
 }
 
-const DEFAULT_PERF: StepPerformance = Object.freeze({
+const DEFAULT_PERF: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -88,10 +88,14 @@ const DEFAULT_PERF: StepPerformance = Object.freeze({
 });
 
 function makeChord(id: string, num: number, den = 1, functionId = "I"): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions" as const,
+      functionId,
+      category: "core" as const,
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(num, den)),
     cardView: "harmonic",
@@ -100,7 +104,7 @@ function makeChord(id: string, num: number, den = 1, functionId = "I"): ChordSte
 }
 
 function makeRest(id: string, num: number, den = 1): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(num, den)),
@@ -128,7 +132,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
       });
       expect(transportStore.getState().status).toBe("playing");
       expect(transportStore.getState().currentStepIndex).toBe(0);
@@ -173,7 +182,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
       });
 
@@ -183,11 +197,18 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       expect(startingSnapshot?.startBeats).toEqual(rational(0));
       expect(startingSnapshot?.endBeats).toEqual(rational(4));
       expect(startingSnapshot?.schedulerStartOffsetSeconds).toBeCloseTo(2, 6);
+      expect(transportStore.getKeyboardNotes().length).toBeGreaterThan(0);
+      expect(
+        transportStore
+          .getKeyboardNotes()
+          .every((note) => note.part !== "metronome" && note.start >= 12),
+      ).toBe(true);
 
       clock.advance(2.25);
       controller.pause();
       const pausedSnapshot = transportStore.getState().playbackClockSnapshot;
       expect(transportStore.getState().status).toBe("paused");
+      expect(transportStore.getKeyboardNotes()).toEqual([]);
       expect(pausedSnapshot?.state).toBe("paused");
       expect(pausedSnapshot?.musicalPositionAnchorBeats).toBeCloseTo(0.5, 6);
 
@@ -198,6 +219,11 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       expect(resumedSnapshot?.state).toBe("playing");
       expect(resumedSnapshot?.musicalPositionAnchorBeats).toBeCloseTo(0.5, 6);
       expect(resumedSnapshot?.audioClockAnchorSeconds).toBeCloseTo(clock.now(), 6);
+      expect(
+        transportStore
+          .getKeyboardNotes()
+          .some((note) => note.start === clock.now() && note.end > clock.now()),
+      ).toBe(true);
 
       clock.advance(0.25);
       controller.pause();
@@ -235,7 +261,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
       loopState: setLoopRange("snapshot-loop-b", "snapshot-loop-c", steps),
     });
 
@@ -271,7 +302,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     expect(transportStore.getState().status).toBe("playing");
@@ -313,7 +349,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("swing", 0.55),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     const events = provider.scheduledBatches.flatMap((batch) => batch.events);
@@ -346,7 +387,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     const allEvents = provider.scheduledBatches.flatMap((b) => b.events);
@@ -393,7 +439,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     // Advance clock to 0.5s and pause
@@ -447,7 +498,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 60,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     const firstBatch = provider.scheduledBatches[0]!.events;
@@ -461,7 +517,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("straight"),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     const secondBatch = provider.scheduledBatches[provider.scheduledBatches.length - 1]!.events;
@@ -491,7 +552,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
       tempoBpm: 120,
       groove: groove("swing", 0.7),
       tonic: 0,
-      context: "major",
+      context: {
+        tonic: 0,
+        moduleId: "progressions",
+        mode: "major",
+        spellingContext: { tonic: 0, mode: "major" },
+      },
     });
 
     expect(step1.duration.beats).toBe(origBeats);
@@ -525,7 +591,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
       });
 
       // Advance clock into Step 1 (0.5s into playback)
@@ -588,7 +659,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
       });
 
       expect(startResult).toBe(false);
@@ -601,7 +677,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
       });
 
       expect(playFromHereResult).toBe(false);
@@ -633,7 +714,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
       });
 
       expect(transportStore.getState().status).toBe("playing");
@@ -671,7 +757,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
       });
 
@@ -717,7 +808,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
       });
 
@@ -752,7 +848,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
       });
 
@@ -795,7 +896,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
         loopState: { mode: "all", enabled: true, region: { startStepId: "c1", endStepId: "c1" } },
       });
@@ -837,7 +943,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         countInEnabled: true,
       });
 
@@ -885,7 +996,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         loopState: { mode: "disabled", enabled: false, region: null },
       });
       expect(transportStore.getState().startingStepIndex).toBe(0);
@@ -899,7 +1015,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         loopState: {
           mode: "all",
           enabled: true,
@@ -937,7 +1058,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         loopState: setLoopRange("c2", "c3", steps),
       });
 
@@ -973,7 +1099,12 @@ describe("T106 — Transport & Audio Scheduler Integration", () => {
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: {
+          tonic: 0,
+          moduleId: "progressions",
+          mode: "major",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
         loopState: setLoopRange("c3", "c3", steps),
       });
 

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { AudioProviderState } from "../../audio/contracts";
+import { InspectorDisclosureToggle } from "../inspector/InspectorDisclosure";
+import { useInspectorDisclosure } from "../inspector/useInspectorDisclosure";
 
 export interface TrackControlSettings {
   readonly instrument: string;
@@ -38,6 +40,11 @@ export function TrackControls({
 }) {
   const legacyClassPrefix = trackName.toLowerCase();
   const providerIssueIsFatal = providerState === "error";
+  const bodyId = useId();
+  const disclosure = useInspectorDisclosure(
+    `cadenceflow.ui.track-controls-${legacyClassPrefix}-disclosure-open`,
+    true,
+  );
   const [volumeDraft, setVolumeDraft] = useState(settings.volume);
   const volumeDraftRef = useRef(settings.volume);
   const pointerEditingRef = useRef(false);
@@ -72,102 +79,113 @@ export function TrackControls({
       aria-label={`${trackName} Track controls`}
     >
       <div className={`track-controls-title ${legacyClassPrefix}-track-title`}>
+        <InspectorDisclosureToggle
+          isOpen={disclosure.isOpen}
+          onToggle={disclosure.toggle}
+          ariaLabel={`Toggle ${trackName} Track section`}
+          controlsId={bodyId}
+          testId={`${legacyClassPrefix}-track-disclosure-btn`}
+        />
         <strong>{trackName} Track</strong>
         <span>{trackName === "Melody" ? "Derived notation" : "Chord realization"}</span>
       </div>
-      <div
-        className={`track-controls-audio-status ${legacyClassPrefix}-track-audio-status`}
-        role={providerError && providerIssueIsFatal ? "alert" : "status"}
-      >
-        {providerError
-          ? `${trackName} audio ${providerIssueIsFatal ? "error" : "warning"}: ${providerError}`
-          : providerState === "loading"
-            ? `${trackName} audio loading…`
-            : providerState === "ready"
-              ? `${trackName} audio ready`
-              : providerState === "fallback"
-                ? `${trackName} audio fallback`
-                : `${trackName} audio unavailable`}
-        {providerError && onRetry ? (
+      {disclosure.isOpen ? (
+        <div id={bodyId} className={`track-controls-body ${legacyClassPrefix}-track-body`}>
+          <div
+            className={`track-controls-audio-status ${legacyClassPrefix}-track-audio-status`}
+            role={providerError && providerIssueIsFatal ? "alert" : "status"}
+          >
+            {providerError
+              ? `${trackName} audio ${providerIssueIsFatal ? "error" : "warning"}: ${providerError}`
+              : providerState === "loading"
+                ? `${trackName} audio loading…`
+                : providerState === "ready"
+                  ? `${trackName} audio ready`
+                  : providerState === "fallback"
+                    ? `${trackName} audio fallback`
+                    : `${trackName} audio unavailable`}
+            {providerError && onRetry ? (
+              <button
+                type="button"
+                className={`track-controls-retry ${legacyClassPrefix}-track-retry`}
+                onClick={onRetry}
+              >
+                Retry
+              </button>
+            ) : null}
+          </div>
+          {instrumentControl ? (
+            <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
+              <span>Instrument</span>
+              {instrumentControl}
+            </label>
+          ) : (
+            <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
+              <span>Instrument</span>
+              <select
+                aria-label={`${trackName} Track Instrument`}
+                value={settings.instrument}
+                disabled={instrumentDisabled}
+                onChange={(event) => onChange({ instrument: event.target.value })}
+              >
+                {(instrumentOptions ?? []).map((instrument) => (
+                  <option key={instrument.value} value={instrument.value}>
+                    {instrument.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
-            className={`track-controls-retry ${legacyClassPrefix}-track-retry`}
-            onClick={onRetry}
+            className={`track-controls-toggle ${legacyClassPrefix}-track-toggle`}
+            aria-label={`Mute ${trackName} Track`}
+            aria-pressed={settings.muted}
+            onClick={() => onChange({ muted: !settings.muted })}
           >
-            Retry
+            {settings.muted ? "Muted" : "Mute"}
           </button>
-        ) : null}
-      </div>
-      {instrumentControl ? (
-        <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
-          <span>Instrument</span>
-          {instrumentControl}
-        </label>
-      ) : (
-        <label className={`track-controls-instrument ${legacyClassPrefix}-track-instrument`}>
-          <span>Instrument</span>
-          <select
-            aria-label={`${trackName} Track Instrument`}
-            value={settings.instrument}
-            disabled={instrumentDisabled}
-            onChange={(event) => onChange({ instrument: event.target.value })}
+          <button
+            type="button"
+            className={`track-controls-toggle ${legacyClassPrefix}-track-toggle`}
+            aria-label={`Solo ${trackName} Track`}
+            aria-pressed={settings.solo}
+            onClick={() => onChange({ solo: !settings.solo })}
           >
-            {(instrumentOptions ?? []).map((instrument) => (
-              <option key={instrument.value} value={instrument.value}>
-                {instrument.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <button
-        type="button"
-        className={`track-controls-toggle ${legacyClassPrefix}-track-toggle`}
-        aria-label={`Mute ${trackName} Track`}
-        aria-pressed={settings.muted}
-        onClick={() => onChange({ muted: !settings.muted })}
-      >
-        {settings.muted ? "Muted" : "Mute"}
-      </button>
-      <button
-        type="button"
-        className={`track-controls-toggle ${legacyClassPrefix}-track-toggle`}
-        aria-label={`Solo ${trackName} Track`}
-        aria-pressed={settings.solo}
-        onClick={() => onChange({ solo: !settings.solo })}
-      >
-        {settings.solo ? "Solo on" : "Solo"}
-      </button>
-      <label className={`track-controls-volume ${legacyClassPrefix}-track-volume`}>
-        <span>Volume</span>
-        <input
-          type="range"
-          min="0"
-          max="127"
-          step="1"
-          value={volumeDraft}
-          aria-label={`${trackName} Track Volume`}
-          aria-valuetext={`${volumeDraft} of 127`}
-          onPointerDown={() => {
-            pointerEditingRef.current = true;
-          }}
-          onChange={handleVolumeChange}
-          onPointerUp={() => {
-            pointerEditingRef.current = false;
-            commitVolume(volumeDraftRef.current);
-          }}
-          onPointerCancel={() => {
-            pointerEditingRef.current = false;
-            commitVolume(volumeDraftRef.current);
-          }}
-          onBlur={() => {
-            pointerEditingRef.current = false;
-            commitVolume(volumeDraftRef.current);
-          }}
-        />
-        <output>{volumeDraft}</output>
-      </label>
-      {children}
+            {settings.solo ? "Solo on" : "Solo"}
+          </button>
+          <label className={`track-controls-volume ${legacyClassPrefix}-track-volume`}>
+            <span>Volume</span>
+            <input
+              type="range"
+              min="0"
+              max="127"
+              step="1"
+              value={volumeDraft}
+              aria-label={`${trackName} Track Volume`}
+              aria-valuetext={`${volumeDraft} of 127`}
+              onPointerDown={() => {
+                pointerEditingRef.current = true;
+              }}
+              onChange={handleVolumeChange}
+              onPointerUp={() => {
+                pointerEditingRef.current = false;
+                commitVolume(volumeDraftRef.current);
+              }}
+              onPointerCancel={() => {
+                pointerEditingRef.current = false;
+                commitVolume(volumeDraftRef.current);
+              }}
+              onBlur={() => {
+                pointerEditingRef.current = false;
+                commitVolume(volumeDraftRef.current);
+              }}
+            />
+            <output>{volumeDraft}</output>
+          </label>
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }

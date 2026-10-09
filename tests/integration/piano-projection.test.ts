@@ -9,15 +9,16 @@ import { buildPianoKeyboardLayout } from "../../src/ui/piano/pianoKeyboard";
 import type { ChordStep } from "../../src/domain/progression/step";
 
 const context = Object.freeze({
-  tonic: 0,
-  mode: "major" as const,
-  activeModuleId: "progressions" as const,
+  tonic: 0 as const,
+  mode: "major",
+  moduleId: "progressions",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
 });
 
-const step: ChordStep = Object.freeze({
+const step: ChordStep = Object.freeze<ChordStep>({
   id: "piano-contract-step",
   kind: "chord",
-  harmonicFunction: Object.freeze({ moduleId: "progressions", functionId: "I" }),
+  harmonicFunction: Object.freeze({ moduleId: "progressions", functionId: "I", category: "core" }),
   harmonicVariant: EMPTY_HARMONIC_VARIANT,
   duration: musicalDuration(rational(1, 1)),
   cardView: "piano",

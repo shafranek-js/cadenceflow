@@ -139,17 +139,8 @@ export function ModesExplorerModal({
     (chordDef: ModalChordDefinition) => {
       if (!onAuditionChord) return;
       if (cardVisualView === "guitar") {
-        const isSeventh =
-          chordDef.chord.baseQuality === "dominant" ||
-          chordDef.chord.variant?.seventh !== undefined;
-        const isMajor7 = chordDef.chord.variant?.seventh === "major7";
-        const voicing = resolveGuitarChordVoicing({
-          rootPitchClass: chordDef.chord.rootPitchClass,
-          baseQuality: chordDef.chord.baseQuality,
-          spelling: chordDef.chord.spelling,
-          isSeventh,
-          isMajor7,
-        });
+        const voicing = resolveGuitarChordVoicing(chordDef.chord);
+        if (voicing.unsupportedReason) return;
         const pitches = voicing.pitches.map((p) => ({ midiNumber: p.midiNumber }));
         onAuditionChord(pitches, "guitar");
       } else {

@@ -62,6 +62,8 @@
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <dot/>
         <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
@@ -75,6 +77,8 @@
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <dot/>
         <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
@@ -88,6 +92,8 @@
         </pitch>
         <duration>9</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <dot/>
         <staff>1</staff>
         <notations>
           <arpeggiate direction="up"/>
@@ -125,6 +131,12 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <note>
@@ -136,6 +148,12 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <note>
@@ -146,6 +164,12 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <note>
@@ -156,6 +180,12 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <note>
@@ -166,12 +196,24 @@
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <note>
         <rest/>
         <duration>2</duration>
         <voice>1</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>eighth</normal-type>
+        </time-modification>
         <staff>1</staff>
       </note>
       <harmony>
@@ -188,6 +230,7 @@
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <type>quarter</type>
         <staff>1</staff>
       </note>
       <note>
@@ -198,6 +241,7 @@
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <type>quarter</type>
         <staff>1</staff>
       </note>
       <note>
@@ -209,6 +253,7 @@
         </pitch>
         <duration>6</duration>
         <voice>1</voice>
+        <type>quarter</type>
         <staff>1</staff>
       </note>
       <backup>
@@ -221,6 +266,8 @@
         </pitch>
         <duration>9</duration>
         <voice>2</voice>
+        <type>quarter</type>
+        <dot/>
         <staff>2</staff>
       </note>
       <note>
@@ -231,12 +278,24 @@
         </pitch>
         <duration>4</duration>
         <voice>2</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+        </time-modification>
         <staff>2</staff>
       </note>
       <note>
         <rest/>
         <duration>2</duration>
         <voice>2</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>eighth</normal-type>
+        </time-modification>
         <staff>2</staff>
       </note>
       <note>
@@ -247,6 +306,7 @@
         </pitch>
         <duration>6</duration>
         <voice>2</voice>
+        <type>quarter</type>
         <staff>2</staff>
       </note>
     </measure>

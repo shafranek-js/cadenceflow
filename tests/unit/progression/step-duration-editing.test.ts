@@ -1,3 +1,5 @@
+import type { Project } from "../../../src/domain/project/project";
+import { requireValue, requireChord } from "../../fixtures/assertions";
 // @vitest-environment jsdom
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -26,7 +28,6 @@ import { StepDurationControl } from "../../../src/ui/progression/StepDurationCon
 import { ProgressionStepCard } from "../../../src/ui/progression/ProgressionStepCard";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
 import { TransportBar } from "../../../src/ui/transport/TransportBar";
-import { TransportStore } from "../../../src/ui/transport/transportStore";
 import type { LoopState } from "../../../src/ui/transport/loopState";
 
 // Setup JSDOM globals
@@ -257,7 +258,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
     it("Item 11: fractional custom duration (3/2, 2/3, 5/4) retains exact Rational precision", () => {
       const p0 = createDefaultProject("test-dur-frac", "Fractional Precision");
       const step = createMatrixChordStep(p0, "ii", "step-ii");
-      let project = {
+      let project: Project = {
         ...p0,
         progression: {
           ...p0.progression,
@@ -277,12 +278,14 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
           type: "timing/set-step-duration",
           payload: {
             stepId: "step-ii",
-            duration: musicalDuration(rational(num, den)),
+            duration: musicalDuration(rational(requireValue(num), den)),
             nowIso: new Date().toISOString(),
           },
         };
         project = setStepDuration(project, command).project;
-        expect(project.progression.steps[0]!.duration.beats).toEqual(rational(num, den));
+        expect(project.progression.steps[0]!.duration.beats).toEqual(
+          rational(requireValue(num), den),
+        );
       }
     });
 
@@ -290,7 +293,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       const p0 = createDefaultProject("test-dur-rest", "Rest Step Duration");
       const addRestCmd: AddRestStepCommand = {
         type: "progression/add-rest",
-        payload: { nowIso: new Date().toISOString() },
+        payload: { stepId: "rest-step", nowIso: new Date().toISOString() },
       };
       const p1 = addRestStep(p0, addRestCmd).project;
       const restStep = p1.progression.steps[0] as RestStep;
@@ -436,7 +439,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       });
 
       expect(onChange).toHaveBeenCalledTimes(1);
-      const passedDur = onChange.mock.calls[0][0] as MusicalDuration;
+      const passedDur = requireValue(onChange.mock.calls[0])[0] as MusicalDuration;
       expect(passedDur.beats).toEqual(rational(2, 1));
 
       act(() => {
@@ -479,7 +482,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       });
 
       expect(onChange).toHaveBeenCalledTimes(1);
-      const passedDur = onChange.mock.calls[0][0] as MusicalDuration;
+      const passedDur = requireValue(onChange.mock.calls[0])[0] as MusicalDuration;
       expect(passedDur.beats).toEqual(rational(3, 4));
 
       act(() => {
@@ -589,6 +592,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
       };
       const project = {
         ...p0,
+        // Card view: `.progression-rest-card` only exists in the card layouts. The project default
+        // is the piano-roll view, whose rest is rendered as `.piano-roll-chord.is-rest`.
+        presentation: { ...p0.presentation, progressionView: "harmonic" as const },
         progression: {
           ...p0.progression,
           steps: [chordStep, restStep],
@@ -604,6 +610,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             project,
             onSelectStep: vi.fn(),
             onEditPerformance: vi.fn(),
+            onSetStepDuration: vi.fn(),
             onSetProgressionView: vi.fn(),
             onRemove: vi.fn(),
             onReorder: vi.fn(),
@@ -631,10 +638,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
   });
 
   describe("4. Bidirectional Synchronization & Shared TransportBar Integration", () => {
-    const dummyLoopState: LoopState = {
-      mode: "disabled",
-      region: null,
-    };
+    const dummyLoopState: LoopState = { enabled: false, mode: "disabled", region: null };
 
     it("My Progression 4 -> 2 updates Project and TransportBar immediately reflects 2", () => {
       const p0 = createDefaultProject("test-dual-1", "Dual 1");
@@ -648,7 +652,6 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         },
       });
 
-      const transportStore = new TransportStore();
       const root = createRoot(container);
 
       function DualSurfaceView() {
@@ -662,16 +665,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
           null,
           createElement(TransportBar, {
             project: proj,
-            transportState: transportStore.getState(),
+
             loopState: dummyLoopState,
-            metronomeEnabled: false,
-            countInEnabled: false,
-            onPlay: vi.fn(),
-            onPlayFromHere: vi.fn(),
-            onPause: vi.fn(),
-            onResume: vi.fn(),
-            onStop: vi.fn(),
-            onSetTempo: vi.fn(),
+
             onSetMeter: vi.fn(),
             onSetGroove: vi.fn(),
             onSetStepDuration: (stepId, dur) => {
@@ -685,12 +681,10 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             },
             onSetLoopMode: vi.fn(),
             onSetLoopRange: vi.fn(),
-            onToggleMetronome: vi.fn(),
-            onToggleCountIn: vi.fn(),
           }),
           selected &&
             createElement(ProgressionStepCard, {
-              step: selected,
+              step: requireChord(selected),
               tonic: proj.tonic,
               selected: true,
               onSelect: vi.fn(),
@@ -762,7 +756,6 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         },
       });
 
-      const transportStore = new TransportStore();
       const root = createRoot(container);
 
       function DualSurfaceView() {
@@ -776,16 +769,9 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
           null,
           createElement(TransportBar, {
             project: proj,
-            transportState: transportStore.getState(),
+
             loopState: dummyLoopState,
-            metronomeEnabled: false,
-            countInEnabled: false,
-            onPlay: vi.fn(),
-            onPlayFromHere: vi.fn(),
-            onPause: vi.fn(),
-            onResume: vi.fn(),
-            onStop: vi.fn(),
-            onSetTempo: vi.fn(),
+
             onSetMeter: vi.fn(),
             onSetGroove: vi.fn(),
             onSetStepDuration: (stepId, dur) => {
@@ -799,12 +785,10 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
             },
             onSetLoopMode: vi.fn(),
             onSetLoopRange: vi.fn(),
-            onToggleMetronome: vi.fn(),
-            onToggleCountIn: vi.fn(),
           }),
           selected &&
             createElement(ProgressionStepCard, {
-              step: selected,
+              step: requireChord(selected),
               tonic: proj.tonic,
               selected: true,
               onSelect: vi.fn(),
@@ -927,8 +911,8 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         expect(onButtonsChange).toHaveBeenCalledTimes(1);
         expect(onSelectChange).toHaveBeenCalledTimes(1);
 
-        const durButtons = onButtonsChange.mock.calls[0][0] as MusicalDuration;
-        const durSelect = onSelectChange.mock.calls[0][0] as MusicalDuration;
+        const durButtons = requireValue(onButtonsChange.mock.calls[0])[0] as MusicalDuration;
+        const durSelect = requireValue(onSelectChange.mock.calls[0])[0] as MusicalDuration;
 
         expect(durButtons.beats).toEqual(durSelect.beats);
       }

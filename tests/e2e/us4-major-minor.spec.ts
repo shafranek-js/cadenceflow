@@ -1,9 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test("US4 switches unambiguous progression from Major to Tonal Minor without losing steps", async ({
   page,
 }) => {
   await page.goto("/");
+  await setProgressionView(page, "staff");
   await page
     .getByTestId("chord-card-I")
     .locator(".chord-main")
@@ -15,17 +17,15 @@ test("US4 switches unambiguous progression from Major to Tonal Minor without los
   await page.getByRole("button", { name: "Set key D", exact: true }).click();
   await expect(page.getByTestId("chord-card-V")).toContainText("A");
   await page.getByRole("button", { name: /Dark Harmony/i }).click();
-  await expect(page.getByTestId("progression-step")).toHaveCount(2);
-  await expect(page.getByTestId("progression-step").nth(0).getByTestId("step-function")).toHaveText(
-    "i",
-  );
-  await expect(page.getByTestId("progression-step").nth(1).getByTestId("step-function")).toHaveText(
-    "V",
-  );
+  const steps = page.locator(".measure-staff-event-select");
+  await expect(steps).toHaveCount(2);
+  await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select i ·/);
+  await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select V ·/);
 });
 
 test("US4 never guesses an ambiguous module conversion silently", async ({ page }) => {
   await page.goto("/");
+  await setProgressionView(page, "staff");
   await page
     .getByTestId("chord-card-bVII")
     .locator(".chord-main")

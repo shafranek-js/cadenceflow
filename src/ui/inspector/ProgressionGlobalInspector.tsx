@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type {
   MeasuresPerSystem,
   NoteColorMode,
@@ -34,7 +34,10 @@ import { InspectorGrooveSection } from "./InspectorGrooveSection";
 import { InspectorLoopSection } from "./InspectorLoopSection";
 import type { LoopMode, LoopState } from "../transport/loopState";
 import { Icon } from "../common/Icon";
+import { InspectorDisclosureToggle } from "./InspectorDisclosure";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 import { useReorderableSections } from "./useReorderableSections";
+import { IndependentBassVoiceControl } from "./IndependentBassVoiceControl";
 
 export const GLOBAL_INSPECTOR_SECTION_ORDER_STORAGE_KEY =
   "cadenceflow.ui.progression-global-inspector-section-order";
@@ -56,6 +59,8 @@ export const DEFAULT_GLOBAL_INSPECTOR_SECTIONS = [
 
 export type GlobalInspectorSectionId = (typeof DEFAULT_GLOBAL_INSPECTOR_SECTIONS)[number];
 
+const GLOBAL_INSPECTOR_DISCLOSURE_STORAGE_KEY =
+  "cadenceflow.ui.progression-global-inspector-disclosure-open";
 const GLOBAL_METER_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-meter-disclosure-open";
 const GLOBAL_GROOVE_DISCLOSURE_STORAGE_KEY =
@@ -77,25 +82,6 @@ const GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY =
   "cadenceflow.ui.progression-global-view-disclosure-open";
 const GLOBAL_MEASURES_LAYOUT_STORAGE_KEY =
   "cadenceflow.ui.progression-global-measures-layout-disclosure-open";
-
-function readDisclosureState(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
-function persistDisclosureState(key: string, open: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, String(open));
-  } catch {
-    // Best effort
-  }
-}
 
 const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
   Object.freeze([
@@ -120,6 +106,7 @@ export interface ProgressionGlobalInspectorProps {
   readonly onBatchDurationChange: (duration: MusicalDuration) => void;
   readonly onResetAll: () => void;
   readonly onSetProgressionView?: (view: ProgressionView) => void;
+  readonly onSetIndependentBassEnabled?: (enabled: boolean) => void;
   readonly onSetMeasuresPerSystem?: (value: MeasuresPerSystem) => void;
   readonly onSetMeter?: (newMeter: Meter, policy: MeterChangePolicy) => void;
   readonly onSetGroove?: (groove: GrooveSettings) => void;
@@ -147,6 +134,7 @@ export function ProgressionGlobalInspector({
   onBatchDurationChange,
   onResetAll,
   onSetProgressionView,
+  onSetIndependentBassEnabled,
   onSetMeasuresPerSystem,
   onSetMeter,
   onSetGroove,
@@ -167,33 +155,23 @@ export function ProgressionGlobalInspector({
   selectedPianoNote = null,
   onEditSelectedPianoNote,
 }: ProgressionGlobalInspectorProps) {
-  const [tracksOpen, setTracksOpen] = useState(() =>
-    readDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false),
+  const panelBodyId = useId();
+  const panelDisclosure = useInspectorDisclosure(GLOBAL_INSPECTOR_DISCLOSURE_STORAGE_KEY, true);
+  const tracksDisclosure = useInspectorDisclosure(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, false);
+  const presetsDisclosure = useInspectorDisclosure(GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY, true);
+  const registerDisclosure = useInspectorDisclosure(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, true);
+  const articulationDisclosure = useInspectorDisclosure(
+    GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY,
+    true,
   );
-  const [presetsOpen, setPresetsOpen] = useState(() =>
-    readDisclosureState(GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY, true),
+  const durationDisclosure = useInspectorDisclosure(GLOBAL_DURATION_DISCLOSURE_STORAGE_KEY, true);
+  const dynamicsDisclosure = useInspectorDisclosure(GLOBAL_DYNAMICS_DISCLOSURE_STORAGE_KEY, true);
+  const bassDisclosure = useInspectorDisclosure(GLOBAL_BASS_DISCLOSURE_STORAGE_KEY, true);
+  const progressionViewDisclosure = useInspectorDisclosure(
+    GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY,
+    true,
   );
-  const [registerOpen, setRegisterOpen] = useState(() =>
-    readDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [articulationOpen, setArticulationOpen] = useState(() =>
-    readDisclosureState(GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [durationOpen, setDurationOpen] = useState(() =>
-    readDisclosureState(GLOBAL_DURATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [dynamicsOpen, setDynamicsOpen] = useState(() =>
-    readDisclosureState(GLOBAL_DYNAMICS_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [bassOpen, setBassOpen] = useState(() =>
-    readDisclosureState(GLOBAL_BASS_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [progressionViewOpen, setProgressionViewOpen] = useState(() =>
-    readDisclosureState(GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [measuresLayoutOpen, setMeasuresLayoutOpen] = useState(() =>
-    readDisclosureState(GLOBAL_MEASURES_LAYOUT_STORAGE_KEY, true),
-  );
+  const measuresLayoutDisclosure = useInspectorDisclosure(GLOBAL_MEASURES_LAYOUT_STORAGE_KEY, true);
   const [viewPreference, setViewPreference] = useState<DynamicsViewPreference>("musical");
 
   const currentMeter = project.globalTiming.meter;
@@ -348,12 +326,8 @@ export function ProgressionGlobalInspector({
         return onHarmonyTrackSettingsChange ? (
           <details
             className="inspector-disclosure global-tracks-disclosure"
-            open={tracksOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setTracksOpen(open);
-              persistDisclosureState(GLOBAL_TRACKS_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={tracksDisclosure.isOpen}
+            onToggle={(event) => tracksDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -387,6 +361,12 @@ export function ProgressionGlobalInspector({
                     {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
                   />
                 ) : null}
+                {onSetIndependentBassEnabled ? (
+                  <IndependentBassVoiceControl
+                    enabled={project.independentBassEnabled}
+                    onChange={onSetIndependentBassEnabled}
+                  />
+                ) : null}
               </div>
             </div>
           </details>
@@ -397,12 +377,8 @@ export function ProgressionGlobalInspector({
           <details
             className="inspector-disclosure global-presets-disclosure presets-disclosure"
             data-testid="global-presets-disclosure"
-            open={presetsOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setPresetsOpen(open);
-              persistDisclosureState(GLOBAL_PRESETS_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={presetsDisclosure.isOpen}
+            onToggle={(event) => presetsDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -455,12 +431,8 @@ export function ProgressionGlobalInspector({
         return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-register-disclosure"
-            open={registerOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setRegisterOpen(open);
-              persistDisclosureState(GLOBAL_REGISTER_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={registerDisclosure.isOpen}
+            onToggle={(event) => registerDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -494,12 +466,8 @@ export function ProgressionGlobalInspector({
         return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-articulation-disclosure"
-            open={articulationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setArticulationOpen(open);
-              persistDisclosureState(GLOBAL_ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={articulationDisclosure.isOpen}
+            onToggle={(event) => articulationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -532,12 +500,8 @@ export function ProgressionGlobalInspector({
         return stepCount > 0 ? (
           <details
             className="inspector-disclosure template-duration-disclosure"
-            open={durationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setDurationOpen(open);
-              persistDisclosureState(GLOBAL_DURATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={durationDisclosure.isOpen}
+            onToggle={(event) => durationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -575,12 +539,8 @@ export function ProgressionGlobalInspector({
         return stepCount > 0 ? (
           <details
             className="inspector-disclosure dynamics-disclosure"
-            open={dynamicsOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setDynamicsOpen(open);
-              persistDisclosureState(GLOBAL_DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={dynamicsDisclosure.isOpen}
+            onToggle={(event) => dynamicsDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -677,12 +637,8 @@ export function ProgressionGlobalInspector({
         return stepCount > 0 ? (
           <details
             className="inspector-disclosure bass-disclosure"
-            open={bassOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setBassOpen(open);
-              persistDisclosureState(GLOBAL_BASS_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={bassDisclosure.isOpen}
+            onToggle={(event) => bassDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -695,7 +651,11 @@ export function ProgressionGlobalInspector({
                 Bass voice
               </span>
               <span className="disclosure-status">
-                {commonBassChoice === "auto" ? "Auto" : `Note: ${commonBassChoice}`}
+                {!project.independentBassEnabled
+                  ? "Off"
+                  : commonBassChoice === "auto"
+                    ? "Auto"
+                    : `Note: ${commonBassChoice}`}
               </span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -704,7 +664,7 @@ export function ProgressionGlobalInspector({
                   <label htmlFor="global-bass-choice-select">Bass Note</label>
                   <select
                     id="global-bass-choice-select"
-                    disabled={chordStepCount === 0}
+                    disabled={chordStepCount === 0 || !project.independentBassEnabled}
                     value={commonBassChoice}
                     onChange={(e) =>
                       onBatchPerformanceChange({
@@ -728,7 +688,7 @@ export function ProgressionGlobalInspector({
                   <label htmlFor="global-bass-octave-select">Bass Octave</label>
                   <select
                     id="global-bass-octave-select"
-                    disabled={chordStepCount === 0}
+                    disabled={chordStepCount === 0 || !project.independentBassEnabled}
                     value={String(commonBassOctave)}
                     onChange={(e) =>
                       onBatchPerformanceChange({
@@ -751,6 +711,12 @@ export function ProgressionGlobalInspector({
                   </select>
                 </div>
               </div>
+              {!project.independentBassEnabled ? (
+                <p className="chord-properties-independent-bass-note" role="note">
+                  Independent bass is off. Saved bass choices remain available when you turn the
+                  separate voice back on; chord inversions still sound.
+                </p>
+              ) : null}
             </div>
           </details>
         ) : null;
@@ -759,12 +725,8 @@ export function ProgressionGlobalInspector({
         return onSetProgressionView || onSetNoteColorMode ? (
           <details
             className="inspector-disclosure progression-view-disclosure"
-            open={progressionViewOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setProgressionViewOpen(open);
-              persistDisclosureState(GLOBAL_PROGRESSION_VIEW_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={progressionViewDisclosure.isOpen}
+            onToggle={(event) => progressionViewDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -846,12 +808,8 @@ export function ProgressionGlobalInspector({
         return onSetMeasuresPerSystem ? (
           <details
             className="inspector-disclosure measures-per-system-disclosure"
-            open={measuresLayoutOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setMeasuresLayoutOpen(open);
-              persistDisclosureState(GLOBAL_MEASURES_LAYOUT_STORAGE_KEY, open);
-            }}
+            open={measuresLayoutDisclosure.isOpen}
+            onToggle={(event) => measuresLayoutDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -965,13 +923,22 @@ export function ProgressionGlobalInspector({
       data-testid="progression-global-inspector"
     >
       <header className="progression-global-header">
-        <div>
-          <h3>All Steps &amp; Measures</h3>
-          <span className="template-status is-inherited">
-            {stepCount === 0
-              ? "0 steps · Empty progression"
-              : `${measureCount} measure${measureCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
-          </span>
+        <div className="inspector-panel-heading">
+          <InspectorDisclosureToggle
+            isOpen={panelDisclosure.isOpen}
+            onToggle={panelDisclosure.toggle}
+            ariaLabel="Toggle All Steps & Measures section"
+            controlsId={panelBodyId}
+            testId="progression-global-disclosure-btn"
+          />
+          <div>
+            <h3>All Steps &amp; Measures</h3>
+            <span className="template-status is-inherited">
+              {stepCount === 0
+                ? "0 steps · Empty progression"
+                : `${measureCount} measure${measureCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
+            </span>
+          </div>
         </div>
         <div className="progression-global-header-actions">
           {project.presentation.progressionView === "piano-roll" ? (
@@ -1015,26 +982,30 @@ export function ProgressionGlobalInspector({
         </div>
       </header>
 
-      {stepCount === 0 ? (
-        <p className="hint-text" style={{ padding: "12px 16px" }}>
-          No steps in progression. Add chords from the Harmonic Matrix to apply global progression
-          settings.
-        </p>
+      {panelDisclosure.isOpen ? (
+        <div id={panelBodyId} className="inspector-panel-body">
+          {stepCount === 0 ? (
+            <p className="hint-text" style={{ padding: "12px 16px" }}>
+              No steps in progression. Add chords from the Harmonic Matrix to apply global
+              progression settings.
+            </p>
+          ) : null}
+
+          {sectionOrder.map((sectionId) => {
+            const content = renderSectionContent(sectionId);
+            if (!content) return null;
+            return (
+              <div key={sectionId} {...getSectionItemProps(sectionId)}>
+                {content}
+              </div>
+            );
+          })}
+
+          <p className="hint-text" style={{ padding: "12px 16px 4px" }}>
+            These settings apply globally to all cards in all measures of My Progression.
+          </p>
+        </div>
       ) : null}
-
-      {sectionOrder.map((sectionId) => {
-        const content = renderSectionContent(sectionId);
-        if (!content) return null;
-        return (
-          <div key={sectionId} {...getSectionItemProps(sectionId)}>
-            {content}
-          </div>
-        );
-      })}
-
-      <p className="hint-text" style={{ padding: "12px 16px 4px" }}>
-        These settings apply globally to all cards in all measures of My Progression.
-      </p>
     </section>
   );
 }

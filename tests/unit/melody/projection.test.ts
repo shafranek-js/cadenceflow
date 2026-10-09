@@ -1,10 +1,10 @@
+import type { MelodyRecipeInput } from "../../../src/domain/melody/types";
 import { describe, expect, it } from "vitest";
 import { exactPitch, type ExactPitch } from "../../../src/domain/harmony/pitch";
 import { equalRational, rational } from "../../../src/domain/timing/rational";
 import {
   MelodyValidationError,
   realizeChordMelody,
-  type ChordMelodyRecipe,
   type MelodyGrid,
   type MelodyPattern,
 } from "../../../src/domain/melody/projection";
@@ -30,7 +30,7 @@ function recipe(
   pattern: MelodyPattern,
   grid: MelodyGrid = "quarter",
   octaveOffset: -2 | -1 | 0 | 1 | 2 = 0,
-): ChordMelodyRecipe {
+): MelodyRecipeInput {
   return { pattern, grid, octaveOffset };
 }
 
@@ -358,9 +358,12 @@ describe("T167 — deterministic Chord Step melody projection", () => {
     const upperPitches = [SOURCE_PITCHES[2]!, SOURCE_PITCHES[0]!, SOURCE_PITCHES[1]!];
     const originalPitches = upperPitches.slice();
     const melodyRecipe = {
-      pattern: "outside-in" as const,
+      pitchMotion: "outside-in" as const,
       grid: "eighth-triplet" as const,
       octaveOffset: 1 as const,
+
+      rhythm: "even" as const,
+      connection: "retrigger" as const,
     };
     const originalRecipe = { ...melodyRecipe };
 

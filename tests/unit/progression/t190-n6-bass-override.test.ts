@@ -27,7 +27,7 @@ const baseProject = Object.freeze({
 
 function stepWithBass(choice: BassChoice, customPitch?: ReturnType<typeof exactPitch>): ChordStep {
   const step = createMatrixChordStep(baseProject, "N6", `n6-${choice}`);
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     ...step,
     performance: snapshotStepPerformance({
       ...step.performance,

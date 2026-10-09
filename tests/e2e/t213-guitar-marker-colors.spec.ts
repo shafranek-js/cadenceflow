@@ -174,7 +174,8 @@ async function verifyMatrixCardScrollAccess(page: Page, symbol: string) {
     const chordCard = element.closest<HTMLElement>(".chord-card");
     const svg = element.querySelector("svg");
     const legend = element.querySelector<HTMLElement>(".guitar-fingering-legend");
-    if (!board || !shell || !chordCard || !svg || !legend) return null;
+    if (!(element instanceof HTMLElement) || !board || !shell || !chordCard || !svg || !legend)
+      return null;
 
     const visible = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
     const clippingAncestors: string[] = [];

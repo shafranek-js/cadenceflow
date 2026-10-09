@@ -1,6 +1,41 @@
-# Developer Assignment — T196 Guitar Asset Provenance
+# Developer Assignment — Close the Local Release Gate
 
-**Status:** Accepted by the orchestrator on 2026-09-26 after independent verification. Historical handoff only; T195 has not been assigned.
+**Updated:** 2026-10-09. Continue in the canonical, heavily dirty checkout `C:\Projects\cadenceflow`. The portable Project is schema v11. The five accepted scope outcomes, including T217, are recorded in [PROJECT_STATUS.md](PROJECT_STATUS.md); the Scale Degrees palette review is complete. This assignment concerns the remaining local release gate only. Do not start T216 or another feature milestone. Preserve all current work: no reset, cleanup, stage, commit, push, deploy, Actions changes, or publication.
+
+## Current release blockers
+
+- The final full Chromium run against fresh external preview `http://127.0.0.1:4187` was 350/351, with one failure in `playback-keyboard.spec.ts`: hidden auto-range expected `[60, 83]` but observed `[60, 95]` after playback began. Preserve the full-run result. A focused exact reproduction passed 3/3 and an external observer run passed 8/8, so inspect the trace/state transition before proposing any product fix. Preserve the intent to recompute after actual Stop or project-session change.
+- The final full Firefox run was 338 passed / 12 failed / 1 expected Chromium-only PDF skip, with zero retries and zero flaky tests. Ten cases remain after separating the two T211 fixture-readiness failures: current Piano Roll Measure context; two light/dark native-selection scope checks; two generated-note audition/playhead checks; Degrees and Chromatic edge-drag pitch off by one; Palette toolbar height; altered-note viewport; and group-note movement pitch. Exact test names/assertions and the full-run logs are in the 2026-10-08 release evidence directory recorded in PROJECT_STATUS.md. Diagnose each observed mismatch narrowly; preserve musical-state, viewport, and accessibility assertions.
+- Header-context follow-up (2026-10-09) identified a 15.1 px toolbar-wrap layout shift under Firefox pointer coordinates. The scope caption now has a narrow no-shrink/no-wrap CSS correction; six focused Chromium checks passed, including context, light/dark drag, auto-range edge drag, and palette layout. Firefox 153 could not complete a fixture-free static `page.setContent()` or close within 5 seconds, so the three affected Firefox cases remain unverified. See [the dated geometry and validation report](specs/001-cadenceflow-core-studio/release-gate-header-context-2026-10-09.md); do not claim the old full-suite failures resolved.
+- T211 fixture readiness was corrected by waiting for the visible project-menu toggle and `My Progression` region before calling `setProgressionView`. Focused Chromium passed 4/4. Focused Firefox was 3/4 on the first run: the 1280×720 light scenario reached its 60-second limit during history-action click after slow startup; that exact case then passed 1/1 in an isolated run at the unchanged timeout. Keep these reports separate and retain the initial timeout in the record.
+- The local release gate is not closed until the ten Firefox mismatches and Chromium auto-range issue have evidence-based disposition and a coherent fresh cross-browser suite result. Do not rerun the full 351-case suite merely to turn a failure green; first fix a demonstrated cause and run the affected regression.
+
+## Authorized next work
+
+1. Restore and verify the bundled Firefox diagnostic baseline with a fixture-free static page (`setContent`, evaluate, screenshot, and normal close). Then run the controlled header event check and the three affected context/native-selection cases on a fresh preview. For the remaining browser cases, read the exact failure context and trace, then compare focused Chromium/Firefox reproductions. Fix only causes supported by that evidence. Do not broaden scope to T216 or weaken assertions to accommodate timing, coordinates, or viewport state.
+2. For the current-object-context and native-selection cases, preserve the distinction between current Measure/System context, selected chord/notes, and progression-wide selection. For note/audition cases, preserve canonical pitch/timing and audition end semantics. For layout/viewport cases, use the actual rendered geometry and inspect screenshots; do not rely on a full-page capture as a viewport assertion.
+3. After a production fix, run its focused unit/E2E regression, make a fresh external build, and run a new full Chromium and full Firefox pass serially with one worker and zero retries. Use unique external output, report, screenshot and CWD roots; audit environment-variable destinations before launch. Do not overwrite existing release-gate reports or repository screenshots.
+4. Complete the physical MIDI/audio checklist in PROJECT_STATUS.md on real hardware before claiming device acceptance. Record OS, browser, device, permissions, press/release, focus recovery, unplug/reconnect, audible playback/Stop, and whether project/history remained correct.
+5. Keep the HQ Piano sample-source/licensing disposition open. Local hashes/notices prove bytes and bundled attribution only; they do not establish exact sample lineage or redistribution rights. Do not replace or remove user assets without a separately authorized, evidence-backed plan.
+
+## Release-gate evidence and limits
+
+- Full Vitest passed 205 files / 1,562 tests (`--maxWorkers=1`) before the later print-only CSS/E2E assertion and T211 readiness-only E2E edit. No application/domain logic changed after that run.
+- Fresh external build passed; local preview `127.0.0.1:4187` returned HTTP 200. `verify:fixtures` passed with an inventory of 33 fixture entries (not 33 round-trips), GM Melody verification passed for 128 programs, Guitar provenance passed, copied piano-bank decode passed 480/480, MusicXML 4.0 fixture validation passed, and the Vitest export test validates generated writer output through the offline XSD.
+- T195 PDF-generation focused Chromium case passed 1/1 and received independent two-page A4 visual review; its separate keyboard/theme regression passed. The final full browser reports, including the exact 12/1 failures above, remain immutable in the external evidence directory.
+- Full `pnpm run format:check` passed. ESLint passed for the three directly affected E2E specs (0 errors/warnings). A broad serial ESLint attempt completed one 35-file batch with 0 errors / 4 existing `App.tsx` warnings; its PowerShell JSON aggregator failed before starting the next batch. Generated `public/audio/*-mp3.js` banks were excluded; do not claim full repository lint passed.
+- Latest external inventory and delta are `final-release-manifest-reviewed-20261009-v3.tsv` and `final-release-delta-reviewed-20261009-v3.json`; v2 remains preserved as historical evidence.
+- No physical MIDI/audio audition was performed; device availability was not confirmed. No staging, commit, push, deploy or publication occurred.
+
+## Out of scope
+
+T216, feature work, unrelated lint cleanup, asset regeneration, staging/commit/push/deploy, GitHub Actions, and publication.
+
+---
+
+## Historical assignment — T196 Guitar Asset Provenance
+
+**Status:** Accepted by the orchestrator on 2026-09-26 after independent verification. Historical handoff only; current HQ Piano source/redistribution rights remain open as described above.
 
 ## Baseline and ownership
 

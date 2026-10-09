@@ -13,12 +13,22 @@ export interface AppStoreChange {
 
 export class AppStore {
   #project: Project;
+  #editingSuspended = false;
   #matrixSession: MatrixSessionState = Object.freeze({});
   #listeners = new Set<(change: AppStoreChange) => void>();
   readonly history = new SessionHistory();
 
   constructor(project: Project) {
     this.#project = project;
+  }
+
+  /** Identity transitions reject all commands, including MIDI and delayed callbacks. */
+  setEditingSuspended(suspended: boolean): void {
+    this.#editingSuspended = suspended;
+  }
+
+  get editingSuspended(): boolean {
+    return this.#editingSuspended;
   }
 
   get project(): Project {
@@ -51,6 +61,7 @@ export class AppStore {
     command: TCommand,
     handler: ProjectCommandHandler<TCommand>,
   ): void {
+    if (this.#editingSuspended) return;
     const before = this.#project;
     const applied = handler(before, command);
     if (applied.project === before) return;
@@ -63,6 +74,7 @@ export class AppStore {
   }
 
   undo(): boolean {
+    if (this.#editingSuspended) return false;
     const entry = this.history.takeUndo();
     if (!entry) return false;
     this.#project = applyInverseCommand(this.#project, entry.inverse);
@@ -71,6 +83,7 @@ export class AppStore {
   }
 
   redo(): boolean {
+    if (this.#editingSuspended) return false;
     const entry = this.history.takeRedo();
     if (!entry) return false;
     this.#project = applyInverseCommand(this.#project, entry.forward);
@@ -87,6 +100,7 @@ export class AppStore {
   }
 
   setProjectDefaults(defaults: Project["defaults"]): void {
+    if (this.#editingSuspended) return;
     this.#project = Object.freeze({
       ...this.#project,
       defaults,

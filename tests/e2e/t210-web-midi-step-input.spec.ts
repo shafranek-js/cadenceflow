@@ -1,3 +1,4 @@
+import { requireValue } from "../fixtures/assertions";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { createEffectiveMelodyTimeline } from "../../src/domain/melody/effectiveTimeline";
@@ -828,7 +829,7 @@ test("MIDI altered pitch preserves exact full-height Degrees notes and chord gui
     [1280, 720],
     [1920, 1080],
   ]) {
-    await page.setViewportSize({ width, height });
+    await page.setViewportSize({ width: requireValue(width), height: requireValue(height) });
     for (const theme of ["Dark theme", "Light theme"]) {
       await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: theme }).click();
       if ((await guides.getAttribute("aria-pressed")) !== "true") await guides.click();
@@ -900,7 +901,7 @@ test("MIDI step controls and cursor render at normal scale in both themes and pi
           );
         });
         await expect(midi).toBeHidden();
-        const stem = `${themeName.split(" ")[0].toLowerCase()}-${gridName.toLowerCase()}-${size}`;
+        const stem = `${requireValue(themeName.split(" ")[0]).toLowerCase()}-${gridName.toLowerCase()}-${size}`;
         await page.screenshot({
           path: `artifacts/validation/t210-midi/${stem}-closed.png`,
           animations: "disabled",

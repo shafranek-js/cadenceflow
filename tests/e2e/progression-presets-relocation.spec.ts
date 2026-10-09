@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 test.describe("Progression Presets Relocation", () => {
   test.beforeEach(async ({ page }) => {
@@ -85,7 +86,8 @@ test.describe("Progression Presets Relocation", () => {
     // 4. When a step is selected (Selected step inspector active), Presets accessible via header right-click
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
-    const step = page.locator('[data-testid="progression-step"]').first();
+    await setProgressionView(page, "staff");
+    const step = page.locator(".measure-staff-event-select").first();
     await step.click();
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
 

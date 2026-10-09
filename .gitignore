@@ -2,10 +2,18 @@ node_modules/
 dist/
 playwright-report/
 test-results/
+# Playwright runs with a suffixed --output directory produce test-results-<name>/.
+test-results*/
 coverage/
 *.tsbuildinfo
 .DS_Store
 .env*
 !.env.example
 .codegraph/
+
+# Generated validation evidence (screenshots, metrics JSON, throwaway scripts).
+artifacts/
+
+# Generated tool caches (graphify).
+graphify-out/cache/
 

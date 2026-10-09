@@ -3,6 +3,7 @@ import type { ProgressionStep } from "../../domain/progression/step";
 import type { ProgressionMeasure } from "../../domain/timing/measureLayout";
 import { computeScalePitches } from "../../domain/harmony/modes";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
+import type { Meter } from "../../domain/timing/meter";
 import {
   addRational,
   compareRational,
@@ -13,29 +14,88 @@ import {
   type Rational,
 } from "../../domain/timing/rational";
 
-const SNAP_BEATS: Record<string, Rational> = {
+/** Snap steps given as a note value: a fraction of a whole note, independent of the meter. */
+const NOTE_VALUE_SNAP_BEATS: Record<string, Rational> = {
   "1/1": rational(4),
   "1/2": rational(2),
   "1/4": rational(1),
   "1/8": rational(1, 2),
   "1/16": rational(1, 4),
+  "1/32": rational(1, 8),
   "1/1 triplet": rational(8, 3),
   "1/2 triplet": rational(4, 3),
   "1/4 triplet": rational(2, 3),
   "1/8 triplet": rational(1, 3),
   "1/16 triplet": rational(1, 6),
+  // A 32nd triplet is 1/12 of a quarter, which is the step needed to show six cells on an eighth-note
+  // pulse: 6/8 has eighth pulses, and the finest triplet snap stopped at 1/6 of a quarter, giving
+  // only three cells per pulse.
+  "1/32 triplet": rational(1, 12),
 };
 
-export function pianoRollSnapBeats(snap: string): Rational {
-  return SNAP_BEATS[snap] ?? SNAP_BEATS["1/4"]!;
+/**
+ * Snap steps given as cells per pulse: the step is `pulse / N`, where the pulse is one unit of the
+ * meter's denominator.
+ *
+ * This family is derived rather than enumerated, so "6 per beat" shows six cells on one pulse of *any*
+ * meter — an eighth in 6/8, a quarter in 4/4, a 16th in 6/16. The note-value family cannot: it stops
+ * at a fixed finest value, so a /16 meter still showed only three cells.
+ */
+const PULSE_SNAP_DIVISORS: Record<string, number> = {
+  "pulse/1": 1,
+  "pulse/2": 2,
+  "pulse/3": 3,
+  "pulse/4": 4,
+  "pulse/6": 6,
+  "pulse/8": 8,
+};
+
+/** The note-value family, in display order. */
+export const NOTE_VALUE_SNAPS: readonly string[] = Object.freeze(
+  Object.keys(NOTE_VALUE_SNAP_BEATS),
+);
+
+/** The cells-per-pulse family, in display order. */
+export const PULSE_SNAPS: readonly string[] = Object.freeze(Object.keys(PULSE_SNAP_DIVISORS));
+
+/**
+ * Every Snap choice, in display order.
+ *
+ * One list drives the model, the control and preference validation. They used to be three separate
+ * copies, so `1/32` could sit in the model while the Snap control never offered it and the saved
+ * preference would have been rejected — the value existed but was unreachable.
+ */
+export const PIANO_ROLL_SNAPS: readonly string[] = Object.freeze([
+  ...NOTE_VALUE_SNAPS,
+  ...PULSE_SNAPS,
+]);
+
+/** How a Snap reads in the control: note values as themselves, pulse steps as "N per beat". */
+export function pianoRollSnapLabel(snap: string): string {
+  const divisor = PULSE_SNAP_DIVISORS[snap];
+  return divisor === undefined ? snap : `${divisor} per beat`;
+}
+
+/** The meter's pulse in quarter beats: one unit of its denominator. */
+function meterPulseBeats(meter: Meter): Rational {
+  return rational(4, meter.denominator);
+}
+
+export function pianoRollSnapBeats(snap: string, meter: Meter): Rational {
+  const divisor = PULSE_SNAP_DIVISORS[snap];
+  if (divisor !== undefined) {
+    return multiplyRational(meterPulseBeats(meter), rational(1, divisor));
+  }
+  return NOTE_VALUE_SNAP_BEATS[snap] ?? NOTE_VALUE_SNAP_BEATS["1/4"]!;
 }
 
 export function pianoRollSnapOffsets(
   barLength: Rational,
   snap: string,
+  meter: Meter,
   measureStart: Rational = rational(0),
 ): readonly Rational[] {
-  const increment = pianoRollSnapBeats(snap);
+  const increment = pianoRollSnapBeats(snap, meter);
   const offsets: Rational[] = [];
   const end = addRational(measureStart, barLength);
   const scaledNumerator = measureStart.numerator * increment.denominator;
@@ -128,7 +188,7 @@ export function pianoRollPaletteDegrees(
 
 export function pianoRollPaletteColor(degree: number): string {
   return (
-    ["#aa1c24", "#a74d00", "#786500", "#287331", "#007386", "#6d36a5", "#a00083"][degree - 1] ??
+    ["#f60100", "#fbaf01", "#efe700", "#3ed700", "#3f00ff", "#b100e7", "#f700cd"][degree - 1] ??
     "#667085"
   );
 }

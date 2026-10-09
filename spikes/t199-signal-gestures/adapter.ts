@@ -191,7 +191,7 @@ export function selectByMarquee(
       );
     })
     .map((note) => note.id);
-  return { selectedIds, anchorId: selectedIds[0] };
+  return { selectedIds, ...(selectedIds[0] ? { anchorId: selectedIds[0] } : {}) };
 }
 
 function lcm(a: number, b: number): number {
@@ -453,9 +453,11 @@ export function keyboardExtendSelection(
   state: SelectionState,
   direction: "left" | "right",
 ): SelectionState {
-  const anchorIndex = state.anchorId ? orderedIds.indexOf(state.anchorId) : -1;
+  const anchorId = state.anchorId;
+  if (!anchorId) return state;
+  const anchorIndex = orderedIds.indexOf(anchorId);
   if (anchorIndex < 0) return state;
-  const currentId = state.selectedIds[state.selectedIds.length - 1] ?? state.anchorId;
+  const currentId = state.selectedIds[state.selectedIds.length - 1] ?? anchorId;
   const currentIndex = orderedIds.indexOf(currentId);
   const nextIndex = Math.max(
     0,
@@ -463,5 +465,5 @@ export function keyboardExtendSelection(
   );
   const from = Math.min(anchorIndex, nextIndex);
   const to = Math.max(anchorIndex, nextIndex);
-  return { selectedIds: orderedIds.slice(from, to + 1), anchorId: state.anchorId };
+  return { selectedIds: orderedIds.slice(from, to + 1), anchorId };
 }

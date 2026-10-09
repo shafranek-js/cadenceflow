@@ -27,7 +27,7 @@ const now = "2026-10-03T10:00:00.000Z";
 
 function projectWithChords(): Project {
   const project = createDefaultProject("range-transpose", "Range Transpose", now);
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({
       steps: Object.freeze([
@@ -50,7 +50,7 @@ describe("selected-range transposition command", () => {
           Object.freeze({
             ...original,
             melody: snapshotChordMelody({
-              mode: "authored",
+              mode: "authored" as const,
               phrase: snapshotAuthoredMelodyPhrase({
                 notes: [
                   {
@@ -105,7 +105,7 @@ describe("selected-range transposition command", () => {
             ...original,
             transpositionSemitones: 2,
             melody: snapshotChordMelody({
-              mode: "authored",
+              mode: "authored" as const,
               phrase: snapshotAuthoredMelodyPhrase({
                 notes: [
                   {
@@ -176,7 +176,7 @@ describe("selected-range transposition command", () => {
             ...original,
             transpositionSemitones: 2,
             melody: snapshotChordMelody({
-              mode: "authored",
+              mode: "authored" as const,
               phrase: snapshotAuthoredMelodyPhrase({
                 notes: [
                   {
@@ -265,7 +265,7 @@ describe("selected-range transposition command", () => {
           Object.freeze({
             ...first,
             melody: snapshotChordMelody({
-              mode: "authored",
+              mode: "authored" as const,
               phrase: snapshotAuthoredMelodyPhrase({
                 notes: [
                   {
@@ -340,7 +340,7 @@ describe("selected-range transposition command", () => {
     const generated = Object.freeze({
       ...initial.progression.steps[0]!,
       melody: snapshotChordMelody({
-        mode: "generated",
+        mode: "generated" as const,
         recipe: {
           pitchMotion: "up" as const,
           rhythm: "even" as const,
@@ -454,7 +454,7 @@ describe("selected-range transposition command", () => {
     const targetOwner = Object.freeze({
       ...initial.progression.steps[0]!,
       melody: snapshotChordMelody({
-        mode: "generated",
+        mode: "generated" as const,
         recipe: {
           pitchMotion: "up",
           rhythm: "even",

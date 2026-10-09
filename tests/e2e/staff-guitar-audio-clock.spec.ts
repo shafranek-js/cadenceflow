@@ -155,7 +155,10 @@ test("Staff and rhythmic TAB follow the audio clock through melody silence", asy
           if (!canvas) throw new Error("The active score system has no notation canvas.");
           const canvasTop = canvas.getBoundingClientRect().top;
           const targetCanvasTop = appHeaderBottom + 8;
-          window.scrollBy({ top: canvasTop - targetCanvasTop, behavior: "instant" });
+          const studioScroller = canvas.closest<HTMLElement>(".studio-grid");
+          if (studioScroller)
+            studioScroller.scrollBy({ top: canvasTop - targetCanvasTop, behavior: "instant" });
+          else window.scrollBy({ top: canvasTop - targetCanvasTop, behavior: "instant" });
 
           const scrollRect = scroll.getBoundingClientRect();
           const playheadRect = playheadLine.getBoundingClientRect();
@@ -257,7 +260,10 @@ test("Staff and rhythmic TAB follow the audio clock through melody silence", asy
           };
         }, viewCase.view);
         expect(captureEvidence.glyphs).toBeGreaterThan(0);
-        expect(captureEvidence.playheadHeight).toBeGreaterThan(30);
+        expect(
+          captureEvidence.playheadHeight,
+          JSON.stringify({ view: viewCase.label, viewport, themeName, captureEvidence }),
+        ).toBeGreaterThan(30);
         expect(captureEvidence.scoreHeight).toBeGreaterThan(30);
         await page.screenshot({
           path: testInfo.outputPath(
@@ -395,6 +401,8 @@ test("Staff playhead wraps at a one-measure System loop on the controlled audio 
   page,
 }) => {
   test.setTimeout(120_000);
+  await page.clock.install({ time: new Date("2026-10-08T12:00:00.000Z") });
+  await page.clock.pauseAt(new Date("2026-10-08T12:00:01.000Z"));
   await page.addInitScript(() => {
     const NativeAudioContext = window.AudioContext;
     if (!NativeAudioContext) throw new Error("This browser has no AudioContext implementation");
@@ -453,40 +461,111 @@ test("Staff playhead wraps at a one-measure System loop on the controlled audio 
   await countIn.click();
   await expect(countIn).toHaveAttribute("aria-pressed", "true");
 
+  await page.evaluate(() => {
+    type SchedulerStart = (
+      events: readonly unknown[],
+      startAudioTime?: number,
+      startOffsetSeconds?: number,
+      playbackDurationSeconds?: number,
+    ) => void;
+    const testWindow = window as Window & {
+      __cadenceflow_audio__?: { LookAheadScheduler?: { prototype: { start: SchedulerStart } } };
+      __staffGuitarSchedulerStarts?: Array<{
+        startAudioTime: number;
+        duration: number;
+      }>;
+    };
+    const schedulerPrototype = testWindow.__cadenceflow_audio__?.LookAheadScheduler?.prototype;
+    if (!schedulerPrototype) throw new Error("Audio scheduler test hook is unavailable");
+    testWindow.__staffGuitarSchedulerStarts = [];
+    const originalStart = schedulerPrototype.start;
+    schedulerPrototype.start = function (events, startAudioTime, startOffsetSeconds, duration) {
+      testWindow.__staffGuitarSchedulerStarts?.push({
+        startAudioTime: startAudioTime ?? 0,
+        duration: duration ?? 0,
+      });
+      return originalStart.call(this, events, startAudioTime, startOffsetSeconds, duration);
+    };
+  });
+  let performanceAnchor = 0;
+  const advanceControlledClock = async (milliseconds: number) => {
+    await page.clock.runFor(milliseconds);
+    const audioTime = await page.evaluate(
+      (anchor) => (performance.now() - anchor) / 1000,
+      performanceAnchor,
+    );
+    await page.evaluate((time) => {
+      (window as Window & { __staffGuitarTestAudioTime?: number }).__staffGuitarTestAudioTime =
+        time;
+    }, audioTime);
+    // Let the scheduler observe the updated audio clock while advancing both
+    // the performance clock and animation frames by the same monotonic amount.
+    await page.clock.runFor(25);
+    const tickAudioTime = await page.evaluate(
+      (anchor) => (performance.now() - anchor) / 1000,
+      performanceAnchor,
+    );
+    await page.evaluate((time) => {
+      (window as Window & { __staffGuitarTestAudioTime?: number }).__staffGuitarTestAudioTime =
+        time;
+    }, tickAudioTime);
+  };
+
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.clock.runFor(25);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __staffGuitarSchedulerStarts?: readonly unknown[] })
+            .__staffGuitarSchedulerStarts?.length ?? 0,
+      ),
+    )
+    .toBe(1);
+  performanceAnchor = await page.evaluate(() => performance.now());
   const playhead = page.locator(".score-system-playhead:visible").first();
-  const performanceStart = await page.evaluate(() => performance.now());
   await expect(page.locator(".score-system-playhead:visible")).toHaveCount(0);
-  await page.waitForTimeout(1_750);
-  await page.evaluate((start) => {
-    const testWindow = window as Window & { __staffGuitarTestAudioTime?: number };
-    testWindow.__staffGuitarTestAudioTime = (performance.now() - start) / 1000;
-  }, performanceStart);
+  await advanceControlledClock(1_750);
   await expect(page.locator(".score-system-playhead:visible")).toHaveCount(0);
-  await page.waitForTimeout(400);
-  await page.evaluate((start) => {
-    const testWindow = window as Window & { __staffGuitarTestAudioTime?: number };
-    testWindow.__staffGuitarTestAudioTime = (performance.now() - start) / 1000;
-  }, performanceStart);
+  await advanceControlledClock(225);
   await expect(playhead).toBeVisible({ timeout: 10_000 });
   const initialX = await playhead.evaluate((element) => element.getBoundingClientRect().left);
-  await page.waitForTimeout(1_750);
-  await page.evaluate((start) => {
-    const testWindow = window as Window & { __staffGuitarTestAudioTime?: number };
-    testWindow.__staffGuitarTestAudioTime = (performance.now() - start) / 1000;
-  }, performanceStart);
+  await advanceControlledClock(1_000);
   await expect
     .poll(() => playhead.evaluate((element) => element.getBoundingClientRect().left))
     .toBeGreaterThan(initialX + 50);
   const beforeWrapX = await playhead.evaluate((element) => element.getBoundingClientRect().left);
-
-  await page.evaluate(() => {
-    (window as Window & { __staffGuitarTestAudioTime?: number }).__staffGuitarTestAudioTime = 4.2;
+  const beforeWrapClock = await page.evaluate(() => {
+    const testWindow = window as Window & { __staffGuitarTestAudioTime?: number };
+    return testWindow.__staffGuitarTestAudioTime ?? 0;
   });
-  await page.waitForTimeout(150);
+  expect(beforeWrapClock).toBeGreaterThan(3);
+  expect(beforeWrapClock).toBeLessThan(4);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __staffGuitarSchedulerStarts?: readonly unknown[];
+          }
+        ).__staffGuitarSchedulerStarts?.length ?? 0,
+    ),
+  ).toBe(1);
+  await advanceControlledClock(950);
+  const schedulerStarts = await page.evaluate(() => {
+    const testWindow = window as Window & {
+      __staffGuitarSchedulerStarts?: Array<{ startAudioTime: number; duration: number }>;
+    };
+    return testWindow.__staffGuitarSchedulerStarts ?? [];
+  });
+  expect(schedulerStarts).toEqual([
+    { startAudioTime: 0, duration: 4 },
+    { startAudioTime: 4, duration: 2 },
+  ]);
   await expect
     .poll(() => playhead.evaluate((element) => element.getBoundingClientRect().left))
     .toBeLessThan(beforeWrapX - 50);
+  await page.clock.resume();
 
   await firstHeader.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Loop System" }).click();

@@ -82,9 +82,9 @@ test.describe("Inspector Drag & Reorder", () => {
       .click({ modifiers: ["Control"] });
 
     // Select the chord in the progression track
-    const steps = page.locator("[data-progression-step-select]");
+    const steps = page.getByRole("button", { name: /^Harmony / });
     await expect(steps).toHaveCount(1);
-    const stepId = await steps.first().getAttribute("data-step-id");
+    const stepId = await steps.first().getAttribute("data-source-step-id");
     expect(stepId).toBeTruthy();
     await steps.first().click();
 
@@ -154,7 +154,9 @@ test.describe("Inspector Drag & Reorder", () => {
     await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
 
     // Select the chord step again after reload
-    const reloadedStep = page.locator(`[data-progression-step-select][data-step-id="${stepId}"]`);
+    const reloadedStep = page.locator(
+      `[data-testid="piano-roll-chord"][data-source-step-id="${stepId}"]`,
+    );
     await expect(reloadedStep).toHaveCount(1);
     await reloadedStep.click();
     const reloadedInspector = page.getByTestId("step-performance-inspector");

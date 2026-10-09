@@ -38,6 +38,7 @@ export function realizePianoRollChordAudition(
     },
     tempoBpm: tempo,
     groove: project.groove,
+    independentBassEnabled: project.independentBassEnabled,
   })
     .filter((event) => event.stepIndex === stepIndex)
     .map((event) => {

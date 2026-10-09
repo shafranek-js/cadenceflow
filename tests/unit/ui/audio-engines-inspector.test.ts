@@ -1,3 +1,4 @@
+import { DEFAULT_HARMONY_TRACK_SETTINGS } from "../../../src/domain/harmony/track";
 // @vitest-environment jsdom
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import React, { act } from "react";
@@ -29,6 +30,7 @@ function mount(element: React.ReactElement) {
 }
 
 const defaultSettings: HarmonyTrackSettings = {
+  ...DEFAULT_HARMONY_TRACK_SETTINGS,
   instrument: "piano",
   volume: 0.8,
   muted: false,
@@ -57,10 +59,14 @@ describe("AudioEnginesInspector", () => {
     const badge = mounted.container.querySelector('[data-testid="audio-engine-active-badge"]');
     expect(badge?.textContent).toBe("Piano: HQ Grand");
 
-    const pianoHqBtn = mounted.container.querySelector('[data-testid="inspector-piano-engine-hq-btn"]');
+    const pianoHqBtn = mounted.container.querySelector(
+      '[data-testid="inspector-piano-engine-hq-btn"]',
+    );
     expect(pianoHqBtn?.getAttribute("aria-checked")).toBe("true");
 
-    const pianoSfBtn = mounted.container.querySelector('[data-testid="inspector-piano-engine-soundfont-btn"]');
+    const pianoSfBtn = mounted.container.querySelector(
+      '[data-testid="inspector-piano-engine-soundfont-btn"]',
+    );
     expect(pianoSfBtn?.getAttribute("aria-checked")).toBe("false");
 
     mounted.unmount();
@@ -91,7 +97,9 @@ describe("AudioEnginesInspector", () => {
       }),
     );
 
-    const updatedBadge = mounted.container.querySelector('[data-testid="audio-engine-active-badge"]');
+    const updatedBadge = mounted.container.querySelector(
+      '[data-testid="audio-engine-active-badge"]',
+    );
     expect(updatedBadge?.textContent).toBe("Guitar: SoundFont");
 
     mounted.unmount();

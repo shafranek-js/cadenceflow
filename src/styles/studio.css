@@ -4104,6 +4104,73 @@ summary:focus-visible,
   background: var(--surface-2);
 }
 
+/* Shared inspector section disclosure header (real button + rotating chevron + aria-expanded). */
+.inspector-disclosure-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.inspector-disclosure-toggle .ui-icon-disclosure {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.inspector-disclosure-toggle .ui-icon-disclosure.is-rotated {
+  transform: rotate(90deg);
+}
+
+.inspector-disclosure-toggle:hover .inspector-panel-title,
+.inspector-disclosure-toggle:focus-visible .inspector-panel-title {
+  color: var(--accent);
+}
+
+.inspector-disclosure-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.inspector-panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Title row of a panel that carries a disclosure toggle next to its existing heading. */
+.inspector-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inspector-panel-heading > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inspector-panel-heading > .inspector-disclosure-toggle {
+  margin-top: 2px;
+}
+
+/* Collapsible body of a panel; inherits the panel's own gap so spacing stays unchanged. */
+.inspector-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  min-width: 0;
+}
+
 .recommendation-inspector {
   padding: 0;
   overflow: hidden;
@@ -4297,6 +4364,36 @@ summary:focus-visible,
   padding: 0 9px 10px;
 }
 
+.independent-bass-setting {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.independent-bass-setting input {
+  margin: 2px 0 0;
+}
+
+.independent-bass-setting span {
+  display: grid;
+  gap: 3px;
+}
+
+.independent-bass-setting small,
+.chord-properties-independent-bass-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
 /* Reorderable Inspector Sections */
 .inspector-reorderable-section {
   position: relative;
@@ -4375,6 +4472,51 @@ summary:focus-visible,
   color: var(--text-muted);
   font-size: 0.72rem;
   line-height: 1.35;
+}
+
+/* Non-fatal notices that replace a former render-time throw. */
+.inspector-helper.is-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/*
+ * Error-boundary fallback. Replaces a subtree that threw during render, so the studio stays
+ * usable instead of blanking the page.
+ */
+.error-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.error-boundary-fallback h2 {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.95rem;
+}
+
+.error-boundary-fallback p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.error-boundary-detail {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .dynamics-disclosure > .inspector-disclosure-body > .inspector-group {
@@ -4564,6 +4706,212 @@ summary:focus-visible,
   justify-content: space-between;
   flex-wrap: nowrap;
   gap: 8px;
+}
+
+.chord-properties-inspector {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel, 8px);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.chord-properties-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chord-properties-header h3 {
+  margin: 0 0 3px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.chord-properties-symbol {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.chord-properties-function,
+.chord-properties-sounding {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.chord-properties-sounding > span:first-child {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.chord-properties-bass {
+  display: block;
+  margin-top: 2px;
+}
+
+.chord-properties-reset {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--border-control, var(--border));
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.chord-properties-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chord-properties-grid,
+.chord-properties-alterations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+
+.chord-properties-field,
+.chord-properties-options > label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  align-content: start;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.chord-properties-field select,
+.chord-properties-field input,
+.chord-properties-options select {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-control, var(--border));
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.chord-properties-type-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.chord-properties-type-segmented button {
+  flex: 1 1 30px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 3px 4px;
+  border: 1px solid var(--border-control, var(--border));
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chord-properties-type-segmented button:first-child {
+  flex-basis: 46px;
+  min-width: 46px;
+}
+
+.chord-properties-type-segmented button[aria-pressed="true"] {
+  border-color: var(--accent, var(--border-control, var(--border)));
+  background: var(--accent-soft, var(--surface));
+  color: var(--text);
+}
+
+.chord-properties-type-segmented button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chord-properties-manual-note {
+  margin: 0;
+  padding: 7px 8px;
+  border-inline-start: 2px solid var(--accent, var(--border-control, var(--border)));
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.chord-properties-field small,
+.chord-properties-options small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.chord-properties-options {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control, 4px);
+}
+
+.chord-properties-options legend {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.chord-properties-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.chord-properties-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  color: var(--text);
+  font-size: 0.76rem;
+}
+
+.chord-properties-checks input {
+  margin: 0;
+}
+
+.chord-properties-functions small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 480px) {
+  .chord-properties-inspector {
+    padding: 9px;
+  }
+
+  .chord-properties-grid,
+  .chord-properties-alterations {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .card-template-inspector header > div,
@@ -4891,6 +5239,175 @@ body {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overflow-anchor: none;
+}
+.app-shell.has-bottom-panel {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+.playback-keyboard {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text);
+  padding: 4px 6px;
+}
+.playback-keyboard-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.72rem;
+  min-height: 26px;
+}
+.playback-keyboard-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.playback-keyboard-controls button,
+.playback-keyboard-controls select {
+  font: inherit;
+  min-height: 24px;
+}
+.playback-keyboard-close {
+  margin-left: auto;
+}
+.playback-keyboard-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.playback-keyboard-keys {
+  position: relative;
+  width: 100%;
+  height: clamp(40px, 9vh, 76px);
+}
+.playback-keyboard .playback-key {
+  position: absolute;
+  top: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #75808c;
+  border-radius: 0 0 3px 3px;
+  height: 100%;
+  background: #fff;
+  color: #17202a;
+}
+.playback-keyboard .playback-key.mini-black-key {
+  height: 64%;
+  background: #252a30;
+  color: white;
+  z-index: 1;
+}
+.playback-keyboard .playback-key.is-active {
+  background: #38bdf8;
+  color: #102a43;
+}
+/*
+ * Two colours so the player can tell at a glance which hand plays what:
+ *   amber  = left hand  (chord upper voices and the bass line)
+ *   cyan   = right hand (melody)
+ * The previous single blue told the user a key was sounding but not which hand owned it. Amber and
+ * cyan stay distinguishable for the common red/green confusions, and both are paired with a
+ * data-hand attribute so the distinction is not colour-only.
+ */
+.playback-keyboard .playback-key.is-active.is-left-hand {
+  background: #f0b24a;
+  color: #2c1a02;
+  box-shadow: inset 0 -3px 0 #b97f14;
+}
+.playback-keyboard .playback-key.mini-black-key.is-active.is-left-hand {
+  background: #c8862a;
+  color: #fff8ea;
+  box-shadow: inset 0 -3px 0 #8a5b12;
+}
+.playback-keyboard .playback-key.is-active.is-right-hand {
+  background: #38bdf8;
+  color: #102a43;
+  box-shadow: inset 0 -3px 0 #0d84b8;
+}
+.playback-keyboard .playback-key.mini-black-key.is-active.is-right-hand {
+  background: #1f9ed4;
+  color: #eaf8ff;
+  box-shadow: inset 0 -3px 0 #0a6c94;
+}
+/*
+ * A repeated note: the same pitch sounded again rather than held.
+ *
+ * The key keeps its sound colour and flashes a ring, so "which hand" and "played again" are two
+ * independent cues and neither hides the other. `animation` is restarted by removing and re-adding
+ * the class, which is why the component clears the list before setting it.
+ */
+.playback-keyboard .playback-key.is-rearticulated {
+  animation: playback-key-rearticulated 320ms ease-out;
+}
+@keyframes playback-key-rearticulated {
+  0% {
+    outline: 3px solid #ffffff;
+    outline-offset: -3px;
+    filter: brightness(1.75);
+  }
+  60% {
+    outline: 3px solid #ffffff;
+    outline-offset: -3px;
+    filter: brightness(1.2);
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+    filter: brightness(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the cue, drop the animation: a static ring still distinguishes the repeated note. */
+  .playback-keyboard .playback-key.is-rearticulated {
+    animation: none;
+    outline: 3px solid #ffffff;
+    outline-offset: -3px;
+  }
+}
+.playback-keyboard-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.playback-keyboard-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.playback-keyboard-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgb(0 0 0 / 25%);
+  display: inline-block;
+}
+.playback-keyboard-swatch.is-left-hand {
+  background: #f0b24a;
+}
+.playback-keyboard-swatch.is-right-hand {
+  background: #38bdf8;
+}
+.playback-keyboard-swatch.is-rearticulated {
+  background: #64748b;
+  outline: 2px solid #ffffff;
+  outline-offset: -1px;
+}
+.playback-keyboard .playback-key:focus-visible {
+  outline: 2px solid #075bb5;
+  outline-offset: -3px;
+  z-index: 2;
+}
+.playback-keyboard .playback-key span {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  width: 100%;
+  font-size: 0.6rem;
+  text-align: center;
 }
 
 .app-header {
@@ -5192,6 +5709,18 @@ body {
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * Autosave failures must not be truncated: the message is the only signal that the
+ * user's latest edits are not on disk.
+ */
+.app-status-message.is-error {
+  overflow: visible;
+  color: var(--error);
+  font-weight: 600;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .global-settings-control {
@@ -7585,35 +8114,6 @@ summary:focus-visible,
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-}
-
-.audio-engines-header .inspector-disclosure-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  color: var(--text);
-  text-align: left;
-  min-width: 0;
-}
-
-.audio-engines-header .inspector-disclosure-toggle .ui-icon-disclosure {
-  transition: transform 0.15s ease;
-  flex-shrink: 0;
-}
-
-.audio-engines-header .inspector-disclosure-toggle .ui-icon-disclosure.is-rotated {
-  transform: rotate(90deg);
-}
-
-.audio-engines-header .inspector-panel-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
 }
 
 .audio-engines-header .audio-engine-active-badge {

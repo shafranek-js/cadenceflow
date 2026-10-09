@@ -1,3 +1,4 @@
+import { requireValue } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { optimizeProgressionVoiceLeading } from "../../../src/domain/progression/voiceLeadingOptimizer";
 import type { ChordStep, StepPerformance } from "../../../src/domain/progression/step";
@@ -28,7 +29,7 @@ function makeChord(
     id,
     kind: "chord",
     ...(transpositionSemitones === 0 ? {} : { transpositionSemitones }),
-    harmonicFunction: { moduleId: "progressions", functionId },
+    harmonicFunction: { moduleId: "progressions", functionId, category: "core" },
     harmonicVariant: seventh ? { ...EMPTY_HARMONIC_VARIANT, seventh } : EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(4, 4)),
     performance: createPerformance(),
@@ -44,11 +45,7 @@ describe("Voice Leading & Bassline Optimizer", () => {
   });
 
   it("resets all chords to root position under reset-root strategy", () => {
-    const steps = [
-      makeChord("step-1", "I"),
-      makeChord("step-2", "V"),
-      makeChord("step-3", "vi"),
-    ];
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "V"), makeChord("step-3", "vi")];
 
     const res = optimizeProgressionVoiceLeading(steps, 0, "major", "reset-root");
     expect(res.updates).toHaveLength(3);
@@ -59,11 +56,7 @@ describe("Voice Leading & Bassline Optimizer", () => {
   });
 
   it("applies smooth upper voice leading with root bass under smooth-upper strategy", () => {
-    const steps = [
-      makeChord("step-1", "I"),
-      makeChord("step-2", "IV"),
-      makeChord("step-3", "V"),
-    ];
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "IV"), makeChord("step-3", "V")];
 
     const res = optimizeProgressionVoiceLeading(steps, 0, "major", "smooth-upper");
     expect(res.updates).toHaveLength(3);
@@ -74,17 +67,13 @@ describe("Voice Leading & Bassline Optimizer", () => {
   });
 
   it("applies tonic pedal point under pedal-tonic strategy", () => {
-    const steps = [
-      makeChord("step-1", "I"),
-      makeChord("step-2", "IV"),
-      makeChord("step-3", "V"),
-    ];
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "IV"), makeChord("step-3", "V")];
 
     const res = optimizeProgressionVoiceLeading(steps, 0, "major", "pedal-tonic"); // Tonic: C (0)
     expect(res.updates).toHaveLength(3);
     for (const update of res.updates) {
       expect(update.patch.performance?.bass?.choice).toBe("custom");
-      expect(update.patch.performance?.bass?.customPitch?.midiNumber % 12).toBe(0); // C
+      expect(requireValue(update.patch.performance?.bass?.customPitch?.midiNumber) % 12).toBe(0); // C
     }
   });
 
@@ -108,17 +97,13 @@ describe("Voice Leading & Bassline Optimizer", () => {
   });
 
   it("applies dominant pedal point under pedal-dominant strategy", () => {
-    const steps = [
-      makeChord("step-1", "I"),
-      makeChord("step-2", "IV"),
-      makeChord("step-3", "V"),
-    ];
+    const steps = [makeChord("step-1", "I"), makeChord("step-2", "IV"), makeChord("step-3", "V")];
 
     const res = optimizeProgressionVoiceLeading(steps, 0, "major", "pedal-dominant"); // Dominant: G (7)
     expect(res.updates).toHaveLength(3);
     for (const update of res.updates) {
       expect(update.patch.performance?.bass?.choice).toBe("custom");
-      expect(update.patch.performance?.bass?.customPitch?.midiNumber % 12).toBe(7); // G
+      expect(requireValue(update.patch.performance?.bass?.customPitch?.midiNumber) % 12).toBe(7); // G
     }
   });
 

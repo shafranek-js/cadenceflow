@@ -39,7 +39,9 @@ describe("US13 global presentation state", () => {
     expect(store.undo()).toBe(true);
     expect(store.project.presentation.measuresPerSystem).toBe("auto");
     expect(store.undo()).toBe(true);
-    expect(store.project.presentation.progressionView).toBe("harmonic");
+    // The undo restores the project's own initial view, which is the shipped piano-roll default;
+    // this assertion used to expect "harmonic" from a previous default.
+    expect(store.project.presentation.progressionView).toBe("piano-roll");
     expect(store.redo()).toBe(true);
     expect(store.redo()).toBe(true);
     expect(store.project.presentation).toMatchObject({

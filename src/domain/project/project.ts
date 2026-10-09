@@ -78,6 +78,8 @@ export interface Project {
   readonly presentation: PresentationState;
   readonly harmonyTrack: HarmonyTrackSettings;
   readonly melodyTrack: MelodyTrackSettings;
+  /** Whether each chord also sounds as an independent lower bass voice. */
+  readonly independentBassEnabled: boolean;
   readonly defaults: ProjectDefaults;
   readonly moduleTemplateStates: Readonly<Record<HarmonicModuleId, ModuleTemplateState>>;
   readonly progression: Progression;

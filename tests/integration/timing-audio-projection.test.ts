@@ -1,3 +1,14 @@
+/**
+ * `realizeProgressionAudioEvents` takes a full `HarmonicContext`, not a mode name. The call sites
+ * here passed the string "major", which the type system rejected and which would have made the
+ * realizer read `context.tonic` off a string.
+ */
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
+  tonic: 0,
+  moduleId: "progressions",
+  mode: "major",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
+});
 import { describe, expect, it } from "vitest";
 import { rational, type Rational } from "../../src/domain/timing/rational";
 import { barsToBeats, musicalDuration } from "../../src/domain/timing/duration";
@@ -9,6 +20,7 @@ import {
 } from "../../src/domain/timing/timeline";
 import type { ChordStep, RestStep, StepPerformance } from "../../src/domain/progression/step";
 import { EMPTY_HARMONIC_VARIANT } from "../../src/domain/harmony/chord";
+import type { HarmonicContext } from "../../src/domain/harmony/modules/types";
 import { realizeProgressionAudioEvents } from "../../src/audio/eventRealizer";
 import { PlaybackController } from "../../src/audio/playbackController";
 import { TransportStore } from "../../src/ui/transport/transportStore";
@@ -82,7 +94,7 @@ class MockAudioProvider implements InstrumentAudioProvider {
   }
 }
 
-const DEFAULT_PERF: StepPerformance = Object.freeze({
+const DEFAULT_PERF: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -93,10 +105,10 @@ const DEFAULT_PERF: StepPerformance = Object.freeze({
 });
 
 function makeChord(id: string, num: number, den = 1, functionId = "I"): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId, category: "core" }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(rational(num, den)),
     performance: DEFAULT_PERF,
@@ -105,7 +117,7 @@ function makeChord(id: string, num: number, den = 1, functionId = "I"): ChordSte
 }
 
 function makeRest(id: string, num: number, den = 1): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(num, den)),
@@ -140,7 +152,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
       const events120 = realizeProgressionAudioEvents({
         steps,
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
         tempoBpm: 120,
       });
 
@@ -148,7 +160,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
       const events60 = realizeProgressionAudioEvents({
         steps,
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
         tempoBpm: 60,
       });
 
@@ -199,7 +211,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
         readonly pitch: number;
       }
 
-      const inputNotes: readonly MockNote[] = Object.freeze([
+      const inputNotes: readonly MockNote[] = Object.freeze<readonly MockNote[]>([
         { id: "onbeat", pitch: 60, startBeats: rational(0, 1), durationBeats: U },
         { id: "offbeat", pitch: 64, startBeats: rational(1, 2), durationBeats: U },
       ]);
@@ -292,7 +304,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
       const events = realizeProgressionAudioEvents({
         steps,
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
         tempoBpm: 120,
       });
 
@@ -333,7 +345,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
         countInEnabled: true,
       });
 
@@ -392,7 +404,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
       });
 
       expect(transportStore.getState().status).toBe("playing");
@@ -437,7 +449,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
       });
 
       // Advance 0.6s into Step 1
@@ -501,7 +513,7 @@ describe("T110 — Timing Domain to Audio Projection Integration Acceptance", ()
         tempoBpm: 120,
         groove: groove("straight"),
         tonic: 0,
-        context: "major",
+        context: C_MAJOR_CONTEXT,
       });
 
       expect(transportStore.getState().status).toBe("playing");

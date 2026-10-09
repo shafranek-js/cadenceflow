@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { formatChordSymbol } from "../../domain/harmony/chord";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
 import { getResolutionTarget } from "../../domain/harmony/tendencyArrows";
-import { realizeChord } from "../../domain/harmony/realization";
 import type { ChordStep, ProgressionStep } from "../../domain/progression/step";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
+import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import type { Project } from "../../domain/project/project";
 import {
   createProgressionMeasureLayout,
@@ -18,10 +19,14 @@ import {
 import { GuitarCardView } from "../guitar/GuitarCardView";
 import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
-function chordLabel(step: ChordStep, tonic: Project["tonic"]): string {
-  const chord = realizeProgressionStepChord(step, tonic);
+function chordLabel(step: ChordStep, project: Project): string {
+  const chord = realizeProgressionStepChord(step, project.tonic);
+  const realization = realizeProgressionStepRealization(step, project.tonic);
   return formatChordSymbol(
-    withEffectiveBass(chord, realizeProgressionStepRealization(step, tonic).bassPitch),
+    withEffectiveBass(
+      chord,
+      project.independentBassEnabled ? realization.bassPitch : realization.pitches[0],
+    ),
   );
 }
 
@@ -46,23 +51,27 @@ function renderChordBody(
   nextStep: ChordStep | undefined,
 ): ReactNode {
   if (fragment.step.kind !== "chord") return null;
-  const label = chordLabel(fragment.step, project.tonic);
+  const label = chordLabel(fragment.step, project);
   const direction =
     nextStep &&
     directionTarget(fragment.step, project.activeModule) === nextStep.harmonicFunction.functionId
       ? nextStep.harmonicFunction.functionId
       : undefined;
-  const chord = withEffectiveBass(
+  const chord = withGuitarStepBass(
     realizeProgressionStepChord(fragment.step, project.tonic),
-    realizeProgressionStepRealization(fragment.step, project.tonic).bassPitch,
+    fragment.step,
+    "concert",
   );
+  const guitarLabel = formatChordSymbol(chord);
 
   return (
     <>
       <span className="printable-chord-symbol" data-testid="printable-chord-symbol">
         {label}
       </span>
-      <span className="printable-chord-function">{fragment.step.harmonicFunction.functionId}</span>
+      <span className="printable-chord-function">
+        {harmonicFunctionLabel(fragment.step.harmonicFunction)}
+      </span>
       <StepTranspositionBadge
         semitones={stepTranspositionSemitones(fragment.step)}
         className="printable-transposition-indicator"
@@ -78,7 +87,7 @@ function renderChordBody(
         </span>
       ) : null}
       <div className="printable-guitar-diagram" data-testid="printable-guitar-diagram">
-        <GuitarCardView chord={chord} chordLabel={label} orientation="horizontal" />
+        <GuitarCardView chord={chord} chordLabel={guitarLabel} orientation="horizontal" />
       </div>
     </>
   );
@@ -127,7 +136,7 @@ function PrintableFragment({
       className="printable-step printable-chord"
       data-testid="printable-chord-step"
       data-step-id={fragment.step.id}
-      aria-label={`Progression step ${stepNumber}: ${chordLabel(fragment.step, project.tonic)}`}
+      aria-label={`Progression step ${stepNumber}: ${chordLabel(fragment.step, project)}`}
     >
       <span className="printable-step-number">{stepNumber}</span>
       {renderChordBody(fragment, project, nextStep)}

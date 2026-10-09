@@ -10,6 +10,7 @@ import {
   createMidiExportFile,
   createMusicXmlExportFile,
   downloadBrowserExport,
+  downloadBlob,
   formatExportError,
   sanitizeExportBaseName,
   summarizeMusicXmlDiagnostics,
@@ -118,5 +119,59 @@ describe("T138 — export actions", () => {
     ).toBe(
       "Notation omissions: Swing is written as straight durations; per-note velocity differences are omitted.",
     );
+  });
+});
+
+/**
+ * The portable-project download is a separate call site from MIDI/MusicXML export, and it used to
+ * carry its own copy of the Blob-URL lifecycle that revoked the URL synchronously after
+ * `link.click()`. Revoking before the browser reads the URL can yield an empty backup file. The
+ * existing tests above only covered `downloadBrowserExport`, which is why that copy went
+ * unnoticed; these cover the shared helper both paths now use.
+ */
+describe("downloadBlob keeps the Blob URL alive for string payloads", () => {
+  const portablePayload = JSON.stringify({ schemaVersion: 11, id: "p" });
+
+  it("revokes only after the download has been dispatched", () => {
+    vi.useFakeTimers();
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:portable");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    try {
+      downloadBlob(portablePayload, "Take.cadenceflow.json", "application/json");
+
+      expect(createObjectURL).toHaveBeenCalledOnce();
+      expect(click).toHaveBeenCalledOnce();
+      // The regression: this must NOT have happened synchronously.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:portable");
+    } finally {
+      vi.useRealTimers();
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+      click.mockRestore();
+    }
+  });
+
+  it("revokes immediately when dispatch fails, so the URL is not leaked", () => {
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:portable-fail");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+      throw new Error("dispatch failed");
+    });
+    try {
+      expect(() =>
+        downloadBlob(portablePayload, "Take.cadenceflow.json", "application/json"),
+      ).toThrow("dispatch failed");
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:portable-fail");
+    } finally {
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+      click.mockRestore();
+    }
   });
 });

@@ -278,7 +278,9 @@ export function patchGlobalMatrixTemplate(
   const previousPiano = previousDefaults.piano;
   const hasDurationChange =
     command.payload.durationOverride !== undefined && command.payload.durationOverride !== null;
-  const nextDuration = hasDurationChange ? command.payload.durationOverride! : previousPiano.duration;
+  const nextDuration = hasDurationChange
+    ? command.payload.durationOverride!
+    : previousPiano.duration;
   const performanceKeys = command.payload.performanceOverrides
     ? Object.keys(command.payload.performanceOverrides)
     : [];
@@ -307,7 +309,9 @@ export function patchGlobalMatrixTemplate(
     ...project,
     updatedAt: command.payload.nowIso,
     defaults: nextDefaults,
-    moduleTemplateStates: Object.freeze(nextModuleTemplateStates as Project["moduleTemplateStates"]),
+    moduleTemplateStates: Object.freeze(
+      nextModuleTemplateStates as Project["moduleTemplateStates"],
+    ),
   });
 
   return {
@@ -328,9 +332,10 @@ export interface RestoreGlobalMatrixTemplatePayload {
   readonly moduleTemplateStates: Project["moduleTemplateStates"];
   readonly nowIso: string;
 }
-export type RestoreGlobalMatrixTemplateCommand = ProjectCommand<RestoreGlobalMatrixTemplatePayload> & {
-  readonly type: "matrix-template/restore-global";
-};
+export type RestoreGlobalMatrixTemplateCommand =
+  ProjectCommand<RestoreGlobalMatrixTemplatePayload> & {
+    readonly type: "matrix-template/restore-global";
+  };
 
 export function restoreGlobalMatrixTemplate(
   project: Project,
@@ -397,4 +402,3 @@ export function resetGlobalMatrixTemplate(
     },
   };
 }
-

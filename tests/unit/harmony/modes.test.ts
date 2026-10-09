@@ -242,4 +242,3 @@ describe("Modes Domain Modeling", () => {
     }
   });
 });
-

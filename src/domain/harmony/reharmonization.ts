@@ -431,19 +431,17 @@ const MAJOR_SUBSTITUTION_CATALOG: Readonly<Record<string, readonly RawSubstituti
       },
     ),
 
-    subV7: list(
-      {
-        id: "subV7-to-V7",
-        kind: "tritone",
-        title: "Swap back to Primary Dominant (V7)",
-        targetFunctionId: "V7",
-        operation: "replace",
-        description: "Returns from tritone substitute to fifth-degree dominant.",
-        theoreticalRationale:
-          "Returns from the chromatic tritone substitute to the traditional fifth-degree dominant.",
-        tags: ["Dominant", "Traditional"],
-      },
-    ),
+    subV7: list({
+      id: "subV7-to-V7",
+      kind: "tritone",
+      title: "Swap back to Primary Dominant (V7)",
+      targetFunctionId: "V7",
+      operation: "replace",
+      description: "Returns from tritone substitute to fifth-degree dominant.",
+      theoreticalRationale:
+        "Returns from the chromatic tritone substitute to the traditional fifth-degree dominant.",
+      tags: ["Dominant", "Traditional"],
+    }),
   });
 
 const MINOR_SUBSTITUTION_CATALOG: Readonly<Record<string, readonly RawSubstitutionTemplate[]>> =
@@ -564,8 +562,7 @@ const MINOR_SUBSTITUTION_CATALOG: Readonly<Record<string, readonly RawSubstituti
         targetFunctionId: "i",
         operation: "replace",
         description: "Returns to root minor tonic.",
-        theoreticalRationale:
-          "Restores the root minor tonic from the submediant.",
+        theoreticalRationale: "Restores the root minor tonic from the submediant.",
         tags: ["Tonic Group", "Dark"],
       },
       {
@@ -614,8 +611,7 @@ const MINOR_SUBSTITUTION_CATALOG: Readonly<Record<string, readonly RawSubstituti
         targetFunctionId: "i",
         operation: "replace",
         description: "Returns to minor tonic center.",
-        theoreticalRationale:
-          "Returns to the minor tonic center.",
+        theoreticalRationale: "Returns to the minor tonic center.",
         tags: ["Tonic", "Minor"],
       },
       {

@@ -1,14 +1,13 @@
 import type { ChordDefinition } from "../../domain/harmony/chord";
 import {
   exactPitch,
-  normalizePitchClass,
   type ExactPitch,
   type PitchClassIdentity,
   type PitchSpelling,
 } from "../../domain/harmony/pitch";
 import type { BassSettings } from "../../domain/progression/step";
 import { PIANO_RANGE_MAX_MIDI, PIANO_RANGE_MIN_MIDI } from "../contracts";
-import { spellChordTone } from "./voicing";
+import { resolveChordTones } from "../../domain/harmony/chordTones";
 
 /**
  * Resolves the independent bass pitch for a chord step.
@@ -27,6 +26,7 @@ export function resolveBassPitch(
   bassSettings: BassSettings,
   upperPitches?: readonly ExactPitch[],
   previousBassPitch?: ExactPitch,
+  concertTranspositionSemitones = 0,
 ): ExactPitch {
   const rootPc = chord.rootPitchClass;
   const rootSpelling = chord.spelling.root;
@@ -36,68 +36,52 @@ export function resolveBassPitch(
     if (!bassSettings.customPitch) {
       throw new Error("Custom bass pitch is required when bass choice is 'custom'");
     }
-    const midi = bassSettings.customPitch.midiNumber;
-    if (midi < PIANO_RANGE_MIN_MIDI || midi > PIANO_RANGE_MAX_MIDI) {
+    const sourceMidi =
+      bassSettings.customPitch.midiNumber +
+      (bassSettings.customPitch.transpositionCompensationSemitones ?? 0);
+    const concertMidi = sourceMidi + concertTranspositionSemitones;
+    if (concertMidi < PIANO_RANGE_MIN_MIDI || concertMidi > PIANO_RANGE_MAX_MIDI) {
       throw new RangeError(
-        `Custom bass pitch MIDI ${midi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
+        `Custom bass concert pitch MIDI ${concertMidi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
       );
     }
     return bassSettings.customPitch;
   }
 
-  // 2. Determine target pitch class and spelling based on choice
+  // 2. Resolve explicit chord-member choices through the same interval list as the upper voicing.
   let targetPc: PitchClassIdentity;
   let targetSpelling: PitchSpelling;
+  const bassDegree: Readonly<Partial<Record<BassSettings["choice"], number>>> = {
+    root: 1,
+    second: 2,
+    third: 3,
+    fourth: 4,
+    fifth: 5,
+    seventh: 7,
+    ninth: 9,
+    eleventh: 11,
+    thirteenth: 13,
+  };
+  const explicitTone = bassDegree[bassSettings.choice]
+    ? resolveChordTones(chord).find(
+        (tone) => tone.diatonicDegree === bassDegree[bassSettings.choice],
+      )
+    : undefined;
 
-  if (bassSettings.choice === "third") {
-    let thirdInterval = 4;
-    if (chord.baseQuality === "minor" || chord.baseQuality === "diminished") {
-      thirdInterval = 3;
-    }
-    targetPc = normalizePitchClass(rootPc + thirdInterval);
-    targetSpelling = spellChordTone(rootSpelling, thirdInterval, 3);
-  } else if (bassSettings.choice === "fifth") {
-    let fifthInterval = 7;
-    if (chord.baseQuality === "diminished") fifthInterval = 6;
-    if (chord.baseQuality === "augmented") fifthInterval = 8;
-    const fifthAlteration = chord.variant.alterations?.find((a) => a.degree === 5);
-    if (fifthAlteration) fifthInterval += fifthAlteration.semitones;
-
-    targetPc = normalizePitchClass(rootPc + fifthInterval);
-    targetSpelling = spellChordTone(rootSpelling, fifthInterval, 5);
-  } else if (bassSettings.choice === "seventh") {
-    let seventhInterval = 10;
-    if (chord.variant.seventh) {
-      switch (chord.variant.seventh) {
-        case "minor7":
-        case "half-diminished7":
-          seventhInterval = 10;
-          break;
-        case "major7":
-          seventhInterval = 11;
-          break;
-        case "diminished7":
-          seventhInterval = 9;
-          break;
-      }
-    } else if (chord.baseQuality === "major") {
-      seventhInterval = 11;
-    } else if (chord.baseQuality === "dominant" || chord.baseQuality === "minor") {
-      seventhInterval = 10;
-    } else if (chord.baseQuality === "diminished") {
-      seventhInterval = 9;
-    }
-    targetPc = normalizePitchClass(rootPc + seventhInterval);
-    targetSpelling = spellChordTone(rootSpelling, seventhInterval, 7);
-  } else if (bassSettings.choice === "root") {
-    targetPc = rootPc;
-    targetSpelling = rootSpelling;
+  if (explicitTone) {
+    targetPc = explicitTone.pitchClass;
+    targetSpelling = explicitTone.spelling;
   } else {
-    // choice === "auto"
+    // A stale explicit choice from a legacy project is safe: resolve it as Root until the user
+    // chooses a chord tone that exists in the current variant.
     // A harmonic definition may provide an explicit semantic inversion (for
     // example N6's IV-degree bass). It is the default only; an authored bass
     // choice still remains authoritative.
-    if (chord.bassPitchClass !== undefined && chord.bassSpelling) {
+    if (
+      bassSettings.choice === "auto" &&
+      chord.bassPitchClass !== undefined &&
+      chord.bassSpelling
+    ) {
       targetPc = chord.bassPitchClass;
       targetSpelling = chord.bassSpelling;
     } else {
@@ -106,12 +90,9 @@ export function resolveBassPitch(
       targetPc = rootPc;
       targetSpelling = rootSpelling;
 
-      if (previousBassPitch) {
-        let thirdInterval = 4;
-        if (chord.baseQuality === "minor" || chord.baseQuality === "diminished") {
-          thirdInterval = 3;
-        }
-        const thirdPc = normalizePitchClass(rootPc + thirdInterval);
+      const thirdTone = resolveChordTones(chord).find((tone) => tone.diatonicDegree === 3);
+      if (previousBassPitch && thirdTone) {
+        const thirdPc = thirdTone.pitchClass;
 
         // Distance from previous bass
         const rootDist = Math.min(
@@ -126,7 +107,7 @@ export function resolveBassPitch(
         // If third is clearly stepwise (1 or 2 semitones away) while root is a large leap (> 4 semitones)
         if (thirdDist <= 2 && rootDist > 4) {
           targetPc = thirdPc;
-          targetSpelling = spellChordTone(rootSpelling, thirdInterval, 3);
+          targetSpelling = thirdTone.spelling;
         }
       }
     }
@@ -149,6 +130,13 @@ export function resolveBassPitch(
   // 5. Constrain within acoustic piano bounds (21..108)
   while (finalMidi < PIANO_RANGE_MIN_MIDI) finalMidi += 12;
   while (finalMidi > PIANO_RANGE_MAX_MIDI) finalMidi -= 12;
+
+  const concertMidi = finalMidi + concertTranspositionSemitones;
+  if (concertMidi < PIANO_RANGE_MIN_MIDI || concertMidi > PIANO_RANGE_MAX_MIDI) {
+    throw new RangeError(
+      `Bass concert pitch MIDI ${concertMidi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
+    );
+  }
 
   return exactPitch(finalMidi, targetSpelling);
 }

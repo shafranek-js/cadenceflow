@@ -147,7 +147,7 @@ describe("Modulation Domain Engine", () => {
     it("supports minor key target (C Major -> A Minor)", () => {
       const paths = getAvailableModulations(0, "progressions", 9, "dark-harmony");
       expect(paths.length).toBeGreaterThanOrEqual(2);
-      const arrival = paths[0]?.bridgeSteps[paths[0].bridgeSteps.length - 1];
+      const arrival = paths[0]?.bridgeSteps[paths[0]!.bridgeSteps.length - 1];
       expect(arrival?.chordSymbol).toBe("Am");
       expect(arrival?.baseQuality).toBe("minor");
     });

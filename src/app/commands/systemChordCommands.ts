@@ -501,7 +501,11 @@ export function replaceSystemChord(
         : {}),
     });
   } else {
-    const { explicitSpellingOverrides: _discarded, ...withoutSpelling } = target;
+    const {
+      explicitSpellingOverrides: _discarded,
+      chordPropertiesOrigin: _discardedChordPropertiesOrigin,
+      ...withoutSpelling
+    } = target;
     next = Object.freeze({
       ...withoutSpelling,
       harmonicFunction: replacement.harmonicFunction,

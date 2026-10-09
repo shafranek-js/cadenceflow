@@ -5,10 +5,7 @@ import type { GenreFocusId } from "../harmony/functionSemantics";
 
 export type CadenceFormulaCategory = "cadence" | "turnaround" | "loop" | "modal-path";
 
-export type CadenceFormulaGenre =
-  | GenreFocusId
-  | "dark-classical"
-  | "flamenco";
+export type CadenceFormulaGenre = GenreFocusId | "dark-classical" | "flamenco";
 
 export interface CadenceFormula extends FunctionalPreset {
   readonly formulaId: string;
@@ -78,7 +75,11 @@ export const CADENCE_FORMULAS: readonly CadenceFormula[] = Object.freeze([
         duration: musicalDuration(rational(2, 1), { kind: "beats" }),
       },
       {
-        harmonicFunction: { moduleId: "progressions", functionId: "iv", category: "modal-interchange" },
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId: "iv",
+          category: "modal-interchange",
+        },
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
@@ -148,7 +149,11 @@ export const CADENCE_FORMULAS: readonly CadenceFormula[] = Object.freeze([
         duration: musicalDuration(rational(2, 1), { kind: "beats" }),
       },
       {
-        harmonicFunction: { moduleId: "progressions", functionId: "bVII", category: "modal-interchange" },
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId: "bVII",
+          category: "modal-interchange",
+        },
         duration: musicalDuration(rational(2, 1), { kind: "beats" }),
       },
       {
@@ -209,15 +214,27 @@ export const CADENCE_FORMULAS: readonly CadenceFormula[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
-        harmonicFunction: { moduleId: "progressions", functionId: "bVI", category: "modal-interchange" },
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId: "bVI",
+          category: "modal-interchange",
+        },
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
-        harmonicFunction: { moduleId: "progressions", functionId: "bIII", category: "modal-interchange" },
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId: "bIII",
+          category: "modal-interchange",
+        },
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
-        harmonicFunction: { moduleId: "progressions", functionId: "bVII", category: "modal-interchange" },
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId: "bVII",
+          category: "modal-interchange",
+        },
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
     ],
@@ -299,7 +316,11 @@ export const CADENCE_FORMULAS: readonly CadenceFormula[] = Object.freeze([
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
-        harmonicFunction: { moduleId: "dark-harmony", functionId: "Pass°7", category: "chromatic-color" },
+        harmonicFunction: {
+          moduleId: "dark-harmony",
+          functionId: "Pass°7",
+          category: "chromatic-color",
+        },
         duration: musicalDuration(rational(4, 1), { kind: "bars", bars: 1 }),
       },
       {
@@ -395,7 +416,9 @@ export function getCadenceFormulaById(id: string): CadenceFormula | undefined {
   return CADENCE_FORMULAS_BY_ID.get(id);
 }
 
-export function getFormulasForModule(moduleId: "progressions" | "dark-harmony"): readonly CadenceFormula[] {
+export function getFormulasForModule(
+  moduleId: "progressions" | "dark-harmony",
+): readonly CadenceFormula[] {
   return CADENCE_FORMULAS.filter(
     (formula) => formula.recommendedModule === moduleId || formula.recommendedModule === "both",
   );

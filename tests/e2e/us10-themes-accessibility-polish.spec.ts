@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { startBranchAlternative } from "./test-helpers/progression-settings";
+import { setProgressionView, startBranchAlternative } from "./test-helpers/progression-settings";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -15,17 +15,18 @@ async function waitForStudio(page: Page): Promise<void> {
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("main", { name: "CadenceFlow Studio" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Playback Transport" })).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function readProgression(page: Page): Promise<string[]> {
-  return page
-    .locator('[data-testid="progression-step"]')
-    .evaluateAll((steps) =>
-      steps.map(
-        (step) =>
-          step.querySelector('[data-testid="step-function"]')?.textContent?.trim() ?? "Rest",
-      ),
-    );
+  return page.locator(".measure-staff-event-select").evaluateAll((steps) =>
+    steps.map((step) => {
+      const label = step.getAttribute("aria-label") ?? "";
+      return label.startsWith("Select Rest:")
+        ? "Rest"
+        : (label.replace(/^Select /, "").split(":", 1)[0] ?? "");
+    }),
+  );
 }
 
 async function expectNoPageHorizontalScroll(page: Page): Promise<void> {
@@ -75,11 +76,7 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
       .click({
         modifiers: ["Control"],
       });
-    await page
-      .locator('[data-testid="progression-step"]')
-      .last()
-      .getByRole("button", { name: /Select progression step 1: bIII/ })
-      .click();
+    await page.locator(".measure-staff-event-select").last().click();
     await page.getByTestId("chord-card-I").locator(".chord-main").click();
     const bestCard = page.locator('.chord-card[data-recommendation="best"]').first();
     const alternativeCard = page.locator('.chord-card[data-recommendation="alternative"]').first();
@@ -121,11 +118,11 @@ test.describe("US10 Batch 5 — themes and accessibility polish", () => {
       .click({
         modifiers: ["Control"],
       });
-    const progressionStep = page.locator('[data-testid="progression-step"]').last();
-    await progressionStep.getByRole("button", { name: /Select progression step 2: I/ }).click();
+    const progressionStep = page.locator(".measure-staff-event-select").last();
+    await progressionStep.click();
     const progressionBeforePlayback = await readProgression(page);
     await page.getByRole("button", { name: "Play", exact: true }).click();
-    await expect(page.locator(".progression-step-card.is-playing.is-selected")).toBeVisible({
+    await expect(page.locator(".measure-staff-event.is-playing.is-selected")).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByTestId("transport-status")).toContainText("Playing");

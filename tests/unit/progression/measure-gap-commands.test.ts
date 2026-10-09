@@ -1,3 +1,4 @@
+import { requireChord } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import {
@@ -33,7 +34,7 @@ describe("measure gap progression commands", () => {
       duration: musicalDuration(rational(2)),
     });
     expect(repeated).not.toBe(source);
-    expect(repeated.performance).not.toBe(source.performance);
+    expect(requireChord(repeated).performance).not.toBe(source.performance);
     expect(applied.inverse).toMatchObject({ type: "progression/restore" });
   });
 

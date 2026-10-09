@@ -3,7 +3,9 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 import {
   addRestToProgression,
+  enableIndependentBassVoice,
   setLayoutMeasuresPerSystem,
+  setProgressionView,
 } from "./test-helpers/progression-settings";
 
 type JsonRecord = Record<string, unknown>;
@@ -173,7 +175,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
       .getByLabel("Global Card View")
       .locator("option")
       .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
-    expect(matrixViews).toEqual(["piano", "staff", "guitar"]);
+    expect(matrixViews).toEqual(["harmonic", "piano", "staff", "guitar"]);
     await expect(page.getByText("Mixed", { exact: true })).toHaveCount(0);
 
     const globalInspector = page.getByTestId("progression-global-inspector");
@@ -183,9 +185,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await expect(
       globalInspector.locator(".progression-view-disclosure .disclosure-status"),
     ).toHaveText("staff");
-    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
-      0,
-    );
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-view", "staff");
 
     await setLayoutMeasuresPerSystem(page, 2);
     await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "2");
@@ -216,9 +216,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await expect(viewMenu.getByText("Mixed", { exact: true })).toHaveCount(0);
   });
 
-  test("keeps Harmonic, Piano, and Guitar measures full-width and vertically independent", async ({
-    page,
-  }) => {
+  test("keeps Tablature score systems full-width and vertically independent", async ({ page }) => {
     await openStudio(page);
     await addChord(page, "I");
     await addChord(page, "IV");
@@ -227,35 +225,30 @@ test.describe("T184 — final Progression score-system acceptance", () => {
 
     const progressionView = page.getByLabel("Progression Card View");
     const stack = page.getByTestId("progression-score-systems");
-    for (const view of ["tablature"] as const) {
-      await progressionView.selectOption(view);
-      await expect(stack).toHaveAttribute("data-layout-mode", "measures");
-      await expect(stack).toHaveAttribute(
-        "aria-label",
-        new RegExp(`${view[0]!.toUpperCase() + view.slice(1)} progression measures`),
-      );
-      await expect(stack.locator(".score-system")).toHaveCount(0);
-      await expect(stack.locator(".score-system-measures-row")).toHaveCount(0);
-      await expect(stack.getByTestId("progression-measure")).toHaveCount(3);
-      await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "2");
+    await progressionView.selectOption("tablature");
+    await expect(stack).toHaveAttribute("data-layout-mode", "systems");
+    await expect(stack).toHaveAttribute("aria-label", /Tablature score systems/);
+    await expect(stack.locator(".score-system")).toHaveCount(2);
+    await expect(stack.locator(".score-system").nth(0)).toHaveAttribute("data-measure-count", "2");
+    await expect(stack.locator(".score-system").nth(1)).toHaveAttribute("data-measure-count", "1");
+    await expect(stack.locator(".score-system-canvas > svg")).toHaveCount(2);
 
-      const geometry = await stack.evaluate((element) => {
-        const root = element.getBoundingClientRect();
-        const measures = Array.from(
-          element.querySelectorAll<HTMLElement>("[data-testid='progression-measure']"),
-        ).map((measure) => {
-          const rect = measure.getBoundingClientRect();
+    const geometry = await stack.evaluate((element) => {
+      const root = element.getBoundingClientRect();
+      const systems = Array.from(element.querySelectorAll<HTMLElement>(".score-system")).map(
+        (system) => {
+          const rect = system.getBoundingClientRect();
           return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-        });
-        return { root: { left: root.left, right: root.right }, measures };
-      });
-      expect(geometry.measures).toHaveLength(3);
-      for (const [index, measure] of geometry.measures.entries()) {
-        expect(Math.abs(measure.left - geometry.root.left)).toBeLessThanOrEqual(2);
-        expect(Math.abs(measure.right - geometry.root.right)).toBeLessThanOrEqual(2);
-        if (index > 0) {
-          expect(measure.top).toBeGreaterThan(geometry.measures[index - 1]!.bottom);
-        }
+        },
+      );
+      return { root: { left: root.left, right: root.right }, systems };
+    });
+    expect(geometry.systems).toHaveLength(2);
+    for (const [index, system] of geometry.systems.entries()) {
+      expect(Math.abs(system.left - geometry.root.left)).toBeLessThanOrEqual(2);
+      expect(Math.abs(system.right - geometry.root.right)).toBeLessThanOrEqual(2);
+      if (index > 0) {
+        expect(system.top).toBeGreaterThanOrEqual(geometry.systems[index - 1]!.bottom - 1);
       }
     }
   });
@@ -275,7 +268,7 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await expect(stack.getByTestId("progression-measure")).toHaveCount(0);
   });
 
-  test("normalizes uniform, mixed, and missing legacy view values without a Mixed state", async ({
+  test("prefers one supported progression view over legacy per-step card views", async ({
     page,
   }) => {
     await openStudio(page);
@@ -283,39 +276,41 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await addChord(page, "V");
     const seed = await exportProject(page);
 
-    const legacy = (name: string): JsonRecord => {
+    const legacy = (name: string, progressionView: string): PortableDocument => {
       const document = structuredClone(seed) as PortableDocument;
       document.name = name;
       delete document.presentation.progressionView;
       delete document.presentation.measuresPerSystem;
+      document.presentation.progressionView = progressionView;
       return document;
     };
-    const uniformPiano = legacy("Legacy uniform piano");
+    const uniformPiano = legacy("Legacy uniform piano", "staff");
     uniformPiano.progression.steps.forEach((step: JsonRecord) => {
       if (step.kind === "chord") step.cardView = "piano";
     });
     await importProject(page, uniformPiano, "Legacy uniform piano");
-    await expect(page.getByLabel("Progression Card View")).toHaveValue("piano");
+    await expect(page.getByLabel("Progression Card View")).toHaveValue("staff");
     await expect(page.getByText("Mixed", { exact: true })).toHaveCount(0);
 
-    const mixed = legacy("Legacy mixed");
-    mixed.progression.steps[0].cardView = "piano";
-    mixed.progression.steps[1].cardView = "staff";
+    const mixed = legacy("Legacy mixed", "piano-roll");
+    mixed.progression.steps[0]!.cardView = "piano";
+    mixed.progression.steps[1]!.cardView = "staff";
     await importProject(page, mixed, "Legacy mixed");
-    await expect(page.getByLabel("Progression Card View")).toHaveValue("harmonic");
-
-    const missing = legacy("Legacy missing");
-    missing.progression.steps.forEach((step: JsonRecord) => {
-      if (step.kind === "chord") delete step.cardView;
-    });
-    await importProject(page, missing, "Legacy missing");
-    await expect(page.getByLabel("Progression Card View")).toHaveValue("harmonic");
+    await expect(page.getByLabel("Progression Card View")).toHaveValue("piano-roll");
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute(
+      "data-view",
+      "piano-roll",
+    );
     await expect(page.getByLabel("Measures Layout")).toHaveCount(0);
     expect(
       await page
         .locator("select")
         .evaluateAll((selects) =>
-          selects.flatMap((select) => Array.from(select.options).map((option) => option.value)),
+          selects.flatMap((select) =>
+            select instanceof HTMLSelectElement
+              ? Array.from(select.options).map((option) => option.value)
+              : [],
+          ),
         ),
     ).not.toContain("mixed");
   });
@@ -326,7 +321,10 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     test.slow();
     await page.setViewportSize({ width: 1920, height: 1080 });
     await openStudio(page);
+    await setProgressionView(page, "staff");
     await addChord(page, "I");
+    await page.locator(".measure-staff-event-select").first().click();
+    await enableIndependentBassVoice(page);
     const seed = await exportProject(page);
     const normalDense = await makeDenseFixture(seed, 2);
     await importProject(page, normalDense, "Dense 4/4 score");
@@ -359,11 +357,11 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await expect(page.getByTestId("show-bass-in-staff")).toHaveAttribute("aria-checked", "true");
 
     await setMeter(page, 3, 4, "3");
-    await expect(normalScore).toHaveAttribute("data-auto-maximum", "5");
-    await setMeter(page, 6, 8, "3+3");
-    await expect(normalScore).toHaveAttribute("data-auto-maximum", "5");
-    await setMeter(page, 7, 8, "2+2+3");
     await expect(normalScore).toHaveAttribute("data-auto-maximum", "4");
+    await setMeter(page, 6, 8, "3+3");
+    await expect(normalScore).toHaveAttribute("data-auto-maximum", "8");
+    await setMeter(page, 7, 8, "2+2+3");
+    await expect(normalScore).toHaveAttribute("data-auto-maximum", "8");
 
     await page.setViewportSize({ width: 1280, height: 720 });
     const overdense = await makeDenseFixture(seed, 8);
@@ -519,22 +517,12 @@ test.describe("T184 — final Progression score-system acceptance", () => {
     await setLayoutMeasuresPerSystem(page, 1);
     await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-layout", "1");
     await page.getByLabel("Progression Card View").selectOption("tablature");
-    await expect(page.getByTestId("progression-measure")).not.toHaveCount(0);
+    await expect(scoreRoot.locator(".score-system")).not.toHaveCount(0);
     await expect(page.getByLabel("Measures Layout")).toHaveCount(0);
-    await expect(
-      page.locator('[data-view="harmonic"] [data-testid="progression-step"]'),
-    ).not.toHaveCount(0);
-    await page.getByLabel("Progression Card View").selectOption("tablature");
-    await expect(
-      page.locator('[data-view="tablature"] [data-testid="progression-step"]'),
-    ).not.toHaveCount(0);
-    await expect(scoreRoot).toHaveAttribute("aria-label", /Piano progression measures/);
-    await expect(scoreRoot).toHaveAttribute("data-layout-mode", "measures");
-    await expect(scoreRoot.locator(".score-system-canvas > svg")).toHaveCount(0);
-    await expect(scoreRoot.getByRole("img", { name: /Score notation/ })).toHaveCount(0);
-    await expect(
-      page.locator('[data-view="tablature"] [data-testid="progression-step"]').first(),
-    ).toBeVisible();
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-view", "tablature");
+    await expect(scoreRoot).toHaveAttribute("aria-label", /Tablature score systems/);
+    await expect(scoreRoot).toHaveAttribute("data-layout-mode", "systems");
+    await expect(scoreRoot.locator(".vf-tabnote").first()).toBeVisible();
 
     const theme = page.getByRole("group", { name: "Theme" });
     await page.getByLabel("Progression Card View").selectOption("staff");

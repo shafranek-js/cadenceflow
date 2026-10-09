@@ -1,3 +1,4 @@
+import { requireChord } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { AppStore } from "../../../src/app/appStore";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
@@ -23,7 +24,7 @@ const T0 = "2026-09-29T12:00:00.000Z";
 const T1 = "2026-09-29T12:00:01.000Z";
 
 function withSteps(project: Project, steps: readonly ChordStep[]): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze([...steps]) }),
   });
@@ -119,8 +120,8 @@ describe("T202 targeted atomic commands", () => {
         nowIso: T1,
       },
     });
-    expect(result.project.progression.steps[1]!.performance.masterVelocity).toBe(55);
-    expect(result.project.progression.steps[0]!.performance.masterVelocity).toBe(80);
+    expect(requireChord(result.project.progression.steps[1]!).performance.masterVelocity).toBe(55);
+    expect(requireChord(result.project.progression.steps[0]!).performance.masterVelocity).toBe(80);
     expect(
       restoreProgression(result.project, result.inverse as RestoreProgressionCommand).project
         .progression,
@@ -138,7 +139,7 @@ describe("T202 targeted atomic commands", () => {
 
   it("clears selected Harmony to exact Rest intervals in one history entry", () => {
     const base = fixture();
-    const initial: Project = Object.freeze({
+    const initial: Project = Object.freeze<Project>({
       ...base,
       progression: Object.freeze({
         ...base.progression,

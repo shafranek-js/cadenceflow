@@ -3,6 +3,8 @@ import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 import {
   addRestToProgression,
   ensureSelectedProgressionSettingsVisible,
+  getLogicalProgressionStepButtons,
+  setProgressionView,
 } from "./test-helpers/progression-settings";
 
 test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111)", () => {
@@ -13,6 +15,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
       ).__CADENCEFLOW_ENABLE_TEST_AUDIO__ = true;
     });
     await page.goto("/");
+    await setProgressionView(page, "staff");
     await expect(page.locator(".app-shell")).toBeVisible();
     await ensureHistoryControlsVisible(page);
   });
@@ -23,11 +26,12 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(1);
+    const initialSteps = await getLogicalProgressionStepButtons(page);
+    await expect(initialSteps).toHaveLength(1);
+    const firstStep = initialSteps[0]!;
 
-    await steps.first().click();
-    await expect(steps.first()).toHaveClass(/is-selected/);
+    await firstStep.click();
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
 
     const stepDurationLabel = page.locator(".transport-step-duration .transport-label");
     const customInput = page.getByLabel("Duration in canonical quarter-note beats");
@@ -80,14 +84,16 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     // Step isolation: Add Chord IV as Step 2
     const cardIV = page.getByTestId("chord-card-IV");
     await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
-    await expect(steps).toHaveCount(2);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(2);
+    const secondStep = steps[1]!;
 
-    await steps.nth(1).click();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await secondStep.click();
+    await expect(secondStep).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("duration-preset-half").click();
     await expect(stepDurationLabel).toContainText("2 beats");
 
-    await steps.nth(0).click();
+    await firstStep.click();
     await expect(stepDurationLabel).toContainText("3/4 beats");
   });
 
@@ -97,12 +103,14 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(2);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(2);
+    const firstStep = steps[0]!;
+    const secondStep = steps[1]!;
 
-    await steps.nth(0).click();
+    await firstStep.click();
     await page.getByTestId("duration-preset-whole").click();
-    await steps.nth(1).click();
+    await secondStep.click();
     await page.getByTestId("duration-preset-half").click();
     await ensureSelectedProgressionSettingsVisible(page);
 
@@ -139,11 +147,11 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     // 6. Apply Reflow
     await applyMeterBtn.click();
 
-    await steps.nth(0).click();
+    await firstStep.click();
     const stepDurationLabel = page.locator(".transport-step-duration .transport-label");
     await expect(stepDurationLabel).toContainText("7/2 beats");
 
-    await steps.nth(1).click();
+    await secondStep.click();
     await expect(stepDurationLabel).toContainText("7/4 beats");
 
     // 7. Undo restores exact previous values
@@ -151,9 +159,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(undoBtn).toBeEnabled();
     await undoBtn.click();
 
-    await steps.nth(0).click();
+    await firstStep.click();
     await expect(stepDurationLabel).toContainText("4 beats");
-    await steps.nth(1).click();
+    await secondStep.click();
     await expect(stepDurationLabel).toContainText("2 beats");
 
     // 8. Apply meter 7/8 with Preserve policy
@@ -163,9 +171,9 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await page.locator(".policy-option:has-text('Preserve')").click();
     await applyMeterBtn.click();
 
-    await steps.nth(0).click();
+    await firstStep.click();
     await expect(stepDurationLabel).toContainText("4 beats");
-    await steps.nth(1).click();
+    await secondStep.click();
     await expect(stepDurationLabel).toContainText("2 beats");
   });
 
@@ -173,7 +181,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await steps.first().click();
     await page.getByTestId("duration-preset-quarter").click();
     await ensureSelectedProgressionSettingsVisible(page);
@@ -233,7 +241,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(stopBtn).toBeDisabled();
 
     // Set Step 1 to Eighth note (1/2 beat) and Step 2 to Whole note (4 beats)
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await steps.nth(0).click();
     await page.getByTestId("duration-preset-eighth").click();
     await steps.nth(1).click();
@@ -245,10 +253,10 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(playBtn).toBeDisabled();
     await expect(pauseBtn).toBeEnabled();
     await expect(stopBtn).toBeEnabled();
-    await expect(steps.nth(0)).toHaveClass(/is-playing/);
+    await expect(steps.nth(0).locator("..")).toHaveClass(/is-playing/);
 
     // 2. Wait for playback to advance into Step 2 (after 0.25s)
-    await expect(steps.nth(1)).toHaveClass(/is-playing/);
+    await expect(steps.nth(1).locator("..")).toHaveClass(/is-playing/);
 
     // 3. Pause while Step 2 is actively playing
     await pauseBtn.click();
@@ -262,8 +270,8 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(statusBadge).toContainText("Playing");
     await expect(pauseBtn).toBeEnabled();
     await expect(resumeBtn).toBeDisabled();
-    await expect(steps.nth(1)).toHaveClass(/is-playing/);
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/); // Playhead continuation proven!
+    await expect(steps.nth(1).locator("..")).toHaveClass(/is-playing/);
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/); // Playhead continuation proven!
 
     // 5. Stop resets playhead
     await stopBtn.click();
@@ -274,8 +282,8 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(stopBtn).toBeDisabled();
 
     // Highlights cleared
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
-    await expect(steps.nth(1)).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1).locator("..")).not.toHaveClass(/is-playing/);
   });
 
   test("Scenario 5 — Play From Here starts from target step with count-in support", async ({
@@ -288,7 +296,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(3);
 
     const playFromHereBtn = page.getByRole("button", { name: "Play From Here" });
@@ -304,8 +312,8 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     // Play from Step 2
     await playFromHereBtn.click();
     await expect(statusBadge).toContainText("Playing");
-    await expect(steps.nth(1)).toHaveClass(/is-playing/);
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(1).locator("..")).toHaveClass(/is-playing/);
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/);
 
     await stopBtn.click();
     await expect(statusBadge).toContainText("Stopped");
@@ -334,10 +342,10 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(3);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(3);
 
-    const restCard = page.locator(".progression-rest-card");
+    const restCard = page.locator(".measure-staff-event.is-rest");
     await expect(restCard).toBeVisible();
     await expect(restCard).toContainText("Rest");
 
@@ -359,7 +367,8 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
       const pianoPrototype = testWindow.__cadenceflow_audio__?.HqSamplePianoProvider?.prototype;
       if (!pianoPrototype) throw new Error("HQ Piano test hook is unavailable");
 
-      const scheduledStepIndexes = (testWindow.__cadenceflow_rest_schedule_step_indexes__ = []);
+      const scheduledStepIndexes: number[] =
+        (testWindow.__cadenceflow_rest_schedule_step_indexes__ = []);
       const originalSchedule = pianoPrototype.schedule;
       pianoPrototype.schedule = function (this: unknown, events, clock) {
         scheduledStepIndexes.push(
@@ -373,7 +382,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
     await playBtn.click();
     await expect(page.getByTestId("transport-status")).toContainText("Playing");
-    await expect(steps.nth(1)).toHaveAttribute("data-playing", "true");
+    await expect(steps[1]!.locator("..")).toHaveClass(/is-playing/);
 
     const scheduledStepIndexes = await page.evaluate(
       () =>
@@ -396,8 +405,10 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(4);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(4);
+    const secondStep = steps[1]!;
+    const thirdStep = steps[2]!;
 
     const globalInspector = page.getByTestId("progression-global-inspector");
     if (await globalInspector.isVisible().catch(() => false)) {
@@ -417,11 +428,8 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
     await loopStartSelect.selectOption({ index: 1 });
     await loopEndSelect.selectOption({ index: 2 });
-
-    await expect(steps.nth(1)).toHaveClass(/is-in-loop/);
-    await expect(steps.nth(2)).toHaveClass(/is-in-loop/);
-    await expect(steps.nth(0)).not.toHaveClass(/is-in-loop/);
-    await expect(steps.nth(3)).not.toHaveClass(/is-in-loop/);
+    await expect(loopStartSelect).toHaveValue((await secondStep.getAttribute("data-step-id"))!);
+    await expect(loopEndSelect).toHaveValue((await thirdStep.getAttribute("data-step-id"))!);
 
     const playBtn = page.getByRole("button", { name: "Play", exact: true });
     const stopBtn = page.getByRole("button", { name: "Stop", exact: true });
@@ -433,12 +441,12 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
 
     // Single-step loop: Step 2 to Step 2
     await loopEndSelect.selectOption({ index: 1 });
-    await expect(steps.nth(1)).toHaveClass(/is-in-loop/);
-    await expect(steps.nth(2)).not.toHaveClass(/is-in-loop/);
+    await expect(loopStartSelect).toHaveValue((await secondStep.getAttribute("data-step-id"))!);
+    await expect(loopEndSelect).toHaveValue((await secondStep.getAttribute("data-step-id"))!);
 
     // Disable loop
     await page.getByRole("button", { name: "Off" }).click();
-    await expect(steps.nth(1)).not.toHaveClass(/is-in-loop/);
+    await expect(page.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("Scenario 8 — Metronome & Count-in with 7/8 pulse grouping", async ({ page }) => {
@@ -478,7 +486,7 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(2);
 
     const playBtn = page.getByRole("button", { name: "Play", exact: true });
@@ -503,28 +511,28 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(4);
 
     // 1. Select Step 4
     await steps.nth(3).click();
-    await expect(steps.nth(3)).toHaveClass(/is-selected/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-pressed", "true");
 
     // 2. Play from beginning
     const playBtn = page.getByRole("button", { name: "Play", exact: true });
     await playBtn.click();
 
     // Step 4 remains selected while Step 1 is playing
-    await expect(steps.nth(3)).toHaveClass(/is-selected/);
-    await expect(steps.nth(0)).toHaveClass(/is-playing/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-pressed", "true");
+    await expect(steps.nth(0).locator("..")).toHaveClass(/is-playing/);
 
     // 3. Stop
     const stopBtn = page.getByRole("button", { name: "Stop", exact: true });
     await stopBtn.click();
 
     // Step 4 still selected after stop
-    await expect(steps.nth(3)).toHaveClass(/is-selected/);
-    await expect(steps.nth(0)).not.toHaveClass(/is-playing/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-pressed", "true");
+    await expect(steps.nth(0).locator("..")).not.toHaveClass(/is-playing/);
   });
 
   test("Scenario 11 — Direct Progression Step Duration editing in My Progression (US6/US3 Corrective UX)", async ({
@@ -536,19 +544,26 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     const cardIV = page.getByTestId("chord-card-IV");
     await cardIV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(2);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(2);
+    const firstStep = steps[0]!;
+    const secondStep = steps[1]!;
+    const selectedInspector = page.getByTestId("step-performance-inspector");
+    const selectedStepDurationLabel = selectedInspector.locator(
+      ".selected-step-duration .transport-label",
+    );
 
     // 2. Select Step 1
-    await steps.first().click();
-    await expect(steps.first()).toHaveClass(/is-selected/);
+    await firstStep.click();
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
 
-    // 3. Observe initial duration 4 in card summary
-    await expect(steps.first().locator(".step-view span")).toContainText("4");
-    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+    // 3. Observe each event's accessible duration summary
+    await expect(firstStep).toHaveAttribute("aria-label", /4 beats/);
+    await secondStep.click();
+    await expect(selectedStepDurationLabel).toContainText("4 beats");
+    await firstStep.click();
 
     // 4. Selected step inspector exposes compact note-value duration buttons
-    const selectedInspector = page.getByTestId("step-performance-inspector");
     const durationControl = selectedInspector.locator(".duration-buttons-control");
     const fullBarButton = selectedInspector.getByTestId("duration-preset-full-bar");
     const halfButton = selectedInspector.getByTestId("duration-preset-half");
@@ -559,33 +574,39 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await halfButton.click();
 
     // 6. Assert summary now shows 2
-    await expect(steps.first().locator(".step-view span")).toContainText("2");
+    await expect(firstStep).toHaveAttribute("aria-label", /2 beats/);
     // Selection remains stable
-    await expect(steps.first()).toHaveClass(/is-selected/);
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
 
     // 7. Neighboring Step remains 4
-    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+    await secondStep.click();
+    await expect(selectedStepDurationLabel).toContainText("4 beats");
+    await firstStep.click();
 
     // 8. Undo -> selected Step back to 4
     const undoBtn = page.getByRole("button", { name: "Undo" });
     await undoBtn.click();
-    await expect(steps.first().locator(".step-view span")).toContainText("4");
-    await expect(steps.first()).toHaveClass(/is-selected/);
+    await expect(firstStep).toHaveAttribute("aria-label", /4 beats/);
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
     await expect(fullBarButton).toHaveAttribute("aria-pressed", "true");
-    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+    await secondStep.click();
+    await expect(selectedStepDurationLabel).toContainText("4 beats");
+    await firstStep.click();
 
     // 9. Redo -> 2
     const redoBtn = page.getByRole("button", { name: "Redo" });
     await redoBtn.click();
-    await expect(steps.first().locator(".step-view span")).toContainText("2");
-    await expect(steps.first()).toHaveClass(/is-selected/);
+    await expect(firstStep).toHaveAttribute("aria-label", /2 beats/);
+    await expect(firstStep).toHaveAttribute("aria-pressed", "true");
     await expect(halfButton).toHaveAttribute("aria-pressed", "true");
-    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+    await secondStep.click();
+    await expect(selectedStepDurationLabel).toContainText("4 beats");
+    await firstStep.click();
 
     // 10. Reset Performance preserves edited Duration
     const resetPerfBtn = selectedInspector.getByRole("button", { name: "Reset Performance" });
     await resetPerfBtn.click();
-    await expect(steps.first().locator(".step-view span")).toContainText("2");
+    await expect(firstStep).toHaveAttribute("aria-label", /2 beats/);
 
     // 11. Custom exact duration: 3/2 beats
     const customInput = selectedInspector.getByLabel("Duration in canonical quarter-note beats");
@@ -595,12 +616,14 @@ test.describe("US6 — Exact Musical Timing & Transport Runtime Acceptance (T111
     await expect(customInput).toBeVisible();
     await customInput.fill("3/2");
     await setBtn.click();
-    await expect(steps.first().locator(".step-view span")).toContainText("3/2");
-    await expect(steps.nth(1).locator(".step-view span")).toContainText("4");
+    await expect(firstStep).toHaveAttribute("aria-label", /3\/2 beats/);
+    await secondStep.click();
+    await expect(selectedStepDurationLabel).toContainText("4 beats");
+    await firstStep.click();
 
     // Undo custom duration -> back to 2
     await undoBtn.click();
-    await expect(steps.first().locator(".step-view span")).toContainText("2");
+    await expect(firstStep).toHaveAttribute("aria-label", /2 beats/);
 
     // 12. Layout & Responsiveness: 1920x1080 and 1280x720
     for (const viewport of [

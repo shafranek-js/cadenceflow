@@ -185,13 +185,13 @@ describe("T092 — HqSamplePianoProvider", () => {
     expect(createdSources).toHaveLength(2);
     expect(createdGains).toHaveLength(2);
 
-    expect(createdSources[0].playbackRate.value).toBe(1.0);
-    expect(createdSources[0].start).toHaveBeenCalledWith(10.0);
-    expect(createdSources[0].stop).toHaveBeenCalledWith(10.55);
+    expect(createdSources[0]!.playbackRate.value).toBe(1.0);
+    expect(createdSources[0]!.start).toHaveBeenCalledWith(10.0);
+    expect(createdSources[0]!.stop).toHaveBeenCalledWith(10.55);
 
-    expect(createdSources[1].playbackRate.value).toBe(1.0);
-    expect(createdSources[1].start).toHaveBeenCalledWith(10.25);
-    expect(createdSources[1].stop).toHaveBeenCalledWith(10.8);
+    expect(createdSources[1]!.playbackRate.value).toBe(1.0);
+    expect(createdSources[1]!.start).toHaveBeenCalledWith(10.25);
+    expect(createdSources[1]!.stop).toHaveBeenCalledWith(10.8);
   });
 
   it("applies the Harmony Track volume to scheduled piano gain", async () => {
@@ -438,7 +438,7 @@ describe("T092 — HqSamplePianoProvider", () => {
     // Call stop() repeatedly
     expect(() => provider.stop()).not.toThrow();
     expect(() => provider.stop({ sessionId: "sess-1" })).not.toThrow();
-    expect(createdSources[0].stop).toHaveBeenCalled();
+    expect(createdSources[0]!.stop).toHaveBeenCalled();
 
     // Dispose
     await provider.dispose();

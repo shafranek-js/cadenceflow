@@ -37,17 +37,7 @@ export function GuitarCardView({
   orientation = "vertical",
   colorMode = "chord-roles",
 }: GuitarCardViewProps) {
-  const isSeventh = chord.baseQuality === "dominant" || chord.variant?.seventh !== undefined;
-  const isMajor7 = chord.variant?.seventh === "major7";
-
-  const voicing: GuitarChordVoicing = resolveGuitarChordVoicing({
-    rootPitchClass: chord.rootPitchClass,
-    baseQuality: chord.baseQuality,
-    spelling: chord.spelling,
-    ...(chord.bassPitchClass !== undefined ? { bassPitchClass: chord.bassPitchClass } : {}),
-    isSeventh,
-    isMajor7,
-  });
+  const voicing: GuitarChordVoicing = resolveGuitarChordVoicing(chord);
 
   const scaleTones =
     showScaleTones && scalePitchClasses && scalePitchClasses.length > 0
@@ -79,24 +69,36 @@ export function GuitarCardView({
         ) : (
           <strong className="mini-guitar-chord-name">{chordLabel}</strong>
         )}
-        <span className="mini-guitar-position" aria-label={`Position fret ${voicing.baseFret}`}>
-          {voicing.baseFret === 1 ? "Open" : `Fret ${voicing.baseFret}`}
-        </span>
+        {voicing.unsupportedReason ? (
+          <span className="mini-guitar-position">No matching fingering</span>
+        ) : (
+          <span className="mini-guitar-position" aria-label={`Position fret ${voicing.baseFret}`}>
+            {voicing.baseFret === 1 ? "Open" : `Fret ${voicing.baseFret}`}
+          </span>
+        )}
       </div>
 
-      <div className="mini-guitar-fretboard-wrap">
-        <GuitarFretboard
-          voicing={voicing}
-          scaleTones={scaleTones}
-          showScaleTones={showScaleTones}
-          showFingerings={true}
-          orientation={orientation}
-          colorMode={colorMode}
-          width={isHorizontal ? 172 : 124}
-          height={isHorizontal ? 116 : 142}
-        />
-      </div>
-      {colorMode === "fingering" ? <GuitarFingeringLegend /> : null}
+      {voicing.unsupportedReason ? (
+        <p role="status" className="guitar-no-matching-fingering">
+          {voicing.unsupportedReason}
+        </p>
+      ) : (
+        <>
+          <div className="mini-guitar-fretboard-wrap">
+            <GuitarFretboard
+              voicing={voicing}
+              scaleTones={scaleTones}
+              showScaleTones={showScaleTones}
+              showFingerings={true}
+              orientation={orientation}
+              colorMode={colorMode}
+              width={isHorizontal ? 172 : 124}
+              height={isHorizontal ? 116 : 142}
+            />
+          </div>
+          {colorMode === "fingering" ? <GuitarFingeringLegend /> : null}
+        </>
+      )}
     </div>
   );
 }

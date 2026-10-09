@@ -1,7 +1,8 @@
-import { useEffect, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import guitarHandImg from "./assets/guitar-hand-fretting.png";
 import { Icon } from "../common/Icon";
+import { useModalFocus } from "../common/useModalFocus";
 import {
   GUITAR_FINGER_COLORS,
   GUITAR_FINGER_NAMES,
@@ -23,15 +24,15 @@ export function GuitarHandLegendModal({
   fingeringStyle,
   onSetFingeringStyle,
 }: GuitarHandLegendModalProps) {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  // `useModalFocus` provides the Tab focus trap, Escape handling and focus restoration. This modal
+  // previously had only a `window` keydown listener for Escape: the dialog declares
+  // `aria-modal="true"`, which tells assistive technology that everything outside it is inert, yet
+  // Tab could walk straight out into that content, and closing left focus on `document.body`.
+  const dialogRef = useModalFocus<HTMLDivElement>({
+    isOpen: true,
+    isTopmost: true,
+    onClose,
+  });
 
   return createPortal(
     <div
@@ -42,10 +43,12 @@ export function GuitarHandLegendModal({
       }}
     >
       <section
+        ref={dialogRef}
         className="guitar-hand-legend-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="hand-legend-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="dialog-header hand-legend-header">

@@ -1,9 +1,12 @@
+import { requireValue } from "../../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { realizeChord as realizeHarmonyChord } from "../../../../src/domain/harmony/realization";
 import {
   pianoProfile,
+  realizeBasicPreview,
   realizeProgressionStepRealization,
 } from "../../../../src/instruments/piano/profile";
+import { generateVoicingCandidates } from "../../../../src/instruments/piano/voicing";
 import { PIANO_RANGE_MIN_MIDI, PIANO_RANGE_MAX_MIDI } from "../../../../src/instruments/contracts";
 import { exactPitch, type ExactPitch } from "../../../../src/domain/harmony/pitch";
 import { EMPTY_HARMONIC_VARIANT } from "../../../../src/domain/harmony/chord";
@@ -21,7 +24,8 @@ import type {
 const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze({
   tonic: 0,
   mode: "major",
-  activeModuleId: "progressions",
+  moduleId: "progressions",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
 });
 
 function createDefaultPerformance(overrides?: Partial<StepPerformance>): StepPerformance {
@@ -41,8 +45,35 @@ function createDefaultPerformance(overrides?: Partial<StepPerformance>): StepPer
 }
 
 describe("T078 — Piano manual voicing, bass, register, and range contract", () => {
+  it("projects only authored chord tones through basic preview and piano voicings", () => {
+    const base = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
+    const chord = {
+      ...base,
+      variant: {
+        ...EMPTY_HARMONIC_VARIANT,
+        no3: true,
+        no5: true,
+        add11: true,
+        add13: true,
+      },
+    };
+
+    expect(realizeBasicPreview(chord).pitches.map((pitch) => pitch.midiNumber)).toEqual([
+      60, 77, 81,
+    ]);
+    const candidate = generateVoicingCandidates(chord)[0];
+    expect(candidate?.pitches.map((pitch) => pitch.pitchClassIdentity)).toEqual([0, 5, 9]);
+    expect(candidate?.pitches.map((pitch) => pitch.spelling.step)).toEqual(["C", "F", "A"]);
+  });
+
   it("round-trips manual exact pitches and octaves unchanged", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
     const manualPitches: readonly ExactPitch[] = Object.freeze([
       exactPitch(48, { step: "C", alter: 0 }), // C3
       exactPitch(64, { step: "E", alter: 0 }), // E4
@@ -69,7 +100,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("keeps manual pitches strictly step-local without cross-step mutation", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
 
     const manualPitchesStep1: readonly ExactPitch[] = Object.freeze([
       exactPitch(52, { step: "E", alter: 0 }),
@@ -106,7 +140,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("does not shift manual exact pitches by a step register preference", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
     const manualPitches: readonly ExactPitch[] = Object.freeze([
       exactPitch(60, { step: "C", alter: 0 }),
       exactPitch(64, { step: "E", alter: 0 }),
@@ -144,7 +181,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("keeps bass realization independent from upper voicing", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
 
     const perfWithRootBass = createDefaultPerformance({
       bass: { choice: "root", octaveOffset: "auto" },
@@ -189,7 +229,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
     expect(rootPerf.bass.choice).toBe("root");
     expect(autoPerf.bass.choice).not.toBe(rootPerf.bass.choice);
 
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
 
     // Root bass MUST resolve strictly to the chord's root pitch class
     const rootRealization = pianoProfile.realizeChord({
@@ -210,7 +253,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("supports Auto / Root / 3rd / 5th / Custom bass semantics", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0); // C Major: C, E, G
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    ); // C Major: C, E, G
 
     const autoBass = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
@@ -246,16 +292,19 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
     }).bassPitch;
 
     expect(autoBass).toBeDefined();
-    expect(rootBass?.midiNumber % 12).toBe(0); // C
-    expect(thirdBass?.midiNumber % 12).toBe(4); // E
-    expect(fifthBass?.midiNumber % 12).toBe(7); // G
+    expect(requireValue(rootBass)?.midiNumber % 12).toBe(0); // C
+    expect(requireValue(thirdBass)?.midiNumber % 12).toBe(4); // E
+    expect(requireValue(fifthBass)?.midiNumber % 12).toBe(7); // G
     expect(customBass?.midiNumber).toBe(42); // F#
     expect(customBass?.spelling.step).toBe("F");
     expect(customBass?.spelling.alter).toBe(1);
   });
 
   it("keeps bass octave offset (Auto / -1 / -2) independent from upper register", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0); // G Major
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "V", category: "core" },
+      0,
+    ); // G Major
 
     const bassAuto = pianoProfile.realizeChord({
       context: C_MAJOR_CONTEXT,
@@ -312,7 +361,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("shifts realization with register offset (Auto / -2 / -1 / 0 / +1 / +2) without changing harmony", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "IV" }, 0); // F Major
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "IV", category: "core" },
+      0,
+    ); // F Major
 
     const offsets: readonly RegisterOffset[] = [-2, -1, 0, 1, 2];
     const basePitches = pianoProfile.realizeChord({
@@ -373,9 +425,9 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
 
   it("ensures produced auto-voicing and bass realizations never produce pitches outside acoustic-piano range (21..108)", () => {
     const chords = [
-      realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0),
-      realizeHarmonyChord({ moduleId: "progressions", functionId: "vii°" }, 0),
-      realizeHarmonyChord({ moduleId: "progressions", functionId: "V" }, 0),
+      realizeHarmonyChord({ moduleId: "progressions", functionId: "I", category: "core" }, 0),
+      realizeHarmonyChord({ moduleId: "progressions", functionId: "vii°", category: "core" }, 0),
+      realizeHarmonyChord({ moduleId: "progressions", functionId: "V", category: "core" }, 0),
     ];
 
     const extremeRegisters: readonly RegisterOffset[] = [-2, -1, 0, 1, 2, "auto"];
@@ -420,7 +472,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
     // Distance to Root C is 5 semitones (leap).
     // Distance to 3rd E is 1 semitone (stepwise).
     // Contextual Auto chooses 3rd (E) to avoid leap, while explicit Root strictly chooses C.
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
     const previousBassF = exactPitch(53, { step: "F", alter: 0 }); // F3
 
     const autoRealization = pianoProfile.realizeChord({
@@ -455,7 +510,10 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
   });
 
   it("validates Custom bass range explicitly (preserves valid, rejects < 21 and > 108)", () => {
-    const chord = realizeHarmonyChord({ moduleId: "progressions", functionId: "I" }, 0);
+    const chord = realizeHarmonyChord(
+      { moduleId: "progressions", functionId: "I", category: "core" },
+      0,
+    );
 
     // Valid Custom bass within 21..108 is preserved exactly
     const validCustom = exactPitch(36, { step: "C", alter: 0 }); // C2
@@ -493,14 +551,51 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
     ).toThrow(RangeError);
   });
 
+  it("validates custom bass in concert range after Step transposition", () => {
+    const createCustomStep = (
+      transpositionSemitones: number,
+      sourceMidi: number,
+      spelling: { step: "G" | "C"; alter: 1 },
+    ): ChordStep => ({
+      id: `bass-edge-${transpositionSemitones}`,
+      kind: "chord",
+      transpositionSemitones,
+      harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
+      harmonicVariant: EMPTY_HARMONIC_VARIANT,
+      duration: musicalDuration(rational(4, 1)),
+      performance: createDefaultPerformance({
+        bass: {
+          choice: "custom",
+          octaveOffset: "auto",
+          customPitch: exactPitch(sourceMidi, spelling),
+        },
+      }),
+      cardView: "harmonic",
+    });
+
+    const lowestConcertBass = realizeProgressionStepRealization(
+      createCustomStep(1, 20, { step: "G", alter: 1 }),
+      0,
+      C_MAJOR_CONTEXT,
+    );
+    const highestConcertBass = realizeProgressionStepRealization(
+      createCustomStep(-1, 109, { step: "C", alter: 1 }),
+      0,
+      C_MAJOR_CONTEXT,
+    );
+
+    expect(lowestConcertBass.bassPitch?.midiNumber).toBe(PIANO_RANGE_MIN_MIDI);
+    expect(highestConcertBass.bassPitch?.midiNumber).toBe(PIANO_RANGE_MAX_MIDI);
+  });
+
   it("realizes Dark Harmony steps consistently using actual project HarmonicContext", () => {
-    const darkContext: HarmonicContext = Object.freeze({
+    const darkContext: HarmonicContext = Object.freeze<HarmonicContext>({
       tonic: 0, // C
-      mode: "minor",
+      mode: "tonal-minor",
       moduleId: "dark-harmony",
       spellingContext: {
         tonic: 0,
-        mode: "minor",
+        mode: "tonal-minor",
       },
     });
 
@@ -511,6 +606,7 @@ describe("T078 — Piano manual voicing, bass, register, and range contract", ()
       harmonicFunction: Object.freeze({
         moduleId: "dark-harmony",
         functionId: "i",
+        category: "core",
       }),
       harmonicVariant: EMPTY_HARMONIC_VARIANT,
       duration: musicalDuration(rational(4, 1)),

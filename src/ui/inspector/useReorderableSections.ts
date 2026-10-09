@@ -45,7 +45,9 @@ function sanitizeOrder<T extends string>(saved: unknown, defaultOrder: readonly 
   if (!Array.isArray(saved)) {
     return [...defaultOrder];
   }
-  const validSaved = saved.filter((item): item is T => typeof item === "string" && defaultOrder.includes(item as T));
+  const validSaved = saved.filter(
+    (item): item is T => typeof item === "string" && defaultOrder.includes(item as T),
+  );
   const result: T[] = [...validSaved];
   for (const item of defaultOrder) {
     if (!result.includes(item)) {
@@ -122,46 +124,37 @@ export function useReorderableSections<T extends string = string>({
     }
   }, [defaultOrder, storageKey]);
 
-  const handleDragStart = useCallback(
-    (id: T, event: DragEvent<HTMLElement>) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest(".inspector-disclosure-body")) {
-        event.preventDefault();
-        return;
-      }
-
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", id);
-      setDraggingId(id);
-    },
-    [],
-  );
-
-  const handleDragOver = useCallback(
-    (id: T, event: DragEvent<HTMLElement>) => {
+  const handleDragStart = useCallback((id: T, event: DragEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".inspector-disclosure-body")) {
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
+      return;
+    }
 
-      const rect = event.currentTarget.getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      const position: "before" | "after" = event.clientY < midY ? "before" : "after";
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    setDraggingId(id);
+  }, []);
 
-      setDropIndicator({ targetId: id, position });
-    },
-    [],
-  );
+  const handleDragOver = useCallback((id: T, event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
 
-  const handleDragLeave = useCallback(
-    (id: T, event: DragEvent<HTMLElement>) => {
-      const currentTarget = event.currentTarget;
-      const related = event.relatedTarget as Node | null;
-      if (currentTarget && related && currentTarget.contains(related)) {
-        return;
-      }
-      setDropIndicator((prev) => (prev?.targetId === id ? null : prev));
-    },
-    [],
-  );
+    const rect = event.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position: "before" | "after" = event.clientY < midY ? "before" : "after";
+
+    setDropIndicator({ targetId: id, position });
+  }, []);
+
+  const handleDragLeave = useCallback((id: T, event: DragEvent<HTMLElement>) => {
+    const currentTarget = event.currentTarget;
+    const related = event.relatedTarget as Node | null;
+    if (currentTarget && related && currentTarget.contains(related)) {
+      return;
+    }
+    setDropIndicator((prev) => (prev?.targetId === id ? null : prev));
+  }, []);
 
   const handleDrop = useCallback(
     (targetId: T, event: DragEvent<HTMLElement>) => {
@@ -179,8 +172,7 @@ export function useReorderableSections<T extends string = string>({
         const targetIndex = withoutSource.indexOf(targetId);
         if (targetIndex === -1) return prev;
 
-        const insertIndex =
-          dropIndicator?.position === "after" ? targetIndex + 1 : targetIndex;
+        const insertIndex = dropIndicator?.position === "after" ? targetIndex + 1 : targetIndex;
 
         const next = [...withoutSource];
         next.splice(insertIndex, 0, sourceId);

@@ -51,8 +51,8 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       expect(projected).toHaveLength(4);
       for (let i = 0; i < notes.length; i++) {
-        expect(equalRational(projected[i].startBeats, notes[i].startBeats)).toBe(true);
-        expect(equalRational(projected[i].durationBeats, notes[i].durationBeats)).toBe(true);
+        expect(equalRational(projected[i]!.startBeats, notes[i]!.startBeats)).toBe(true);
+        expect(equalRational(projected[i]!.durationBeats, notes[i]!.durationBeats)).toBe(true);
       }
     });
 
@@ -65,10 +65,10 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       const projected = projectSwingTiming(notes, gZero);
 
-      expect(equalRational(projected[0].startBeats, rational(0, 1))).toBe(true);
-      expect(equalRational(projected[0].durationBeats, rational(1, 2))).toBe(true);
-      expect(equalRational(projected[1].startBeats, rational(1, 2))).toBe(true);
-      expect(equalRational(projected[1].durationBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[0]!.startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projected[0]!.durationBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1]!.startBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1]!.durationBeats, rational(1, 2))).toBe(true);
     });
 
     it("leaves timing unmodified when groove feel is 'straight' even with a non-zero stored swingAmount", () => {
@@ -81,10 +81,10 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       const projected = projectSwingTiming(notes, gStraightWithAmount);
 
-      expect(equalRational(projected[0].startBeats, rational(0, 1))).toBe(true);
-      expect(equalRational(projected[0].durationBeats, rational(1, 2))).toBe(true);
-      expect(equalRational(projected[1].startBeats, rational(1, 2))).toBe(true);
-      expect(equalRational(projected[1].durationBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[0]!.startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projected[0]!.durationBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1]!.startBeats, rational(1, 2))).toBe(true);
+      expect(equalRational(projected[1]!.durationBeats, rational(1, 2))).toBe(true);
     });
   });
 
@@ -102,15 +102,15 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       expect(projected).toHaveLength(2);
 
       // On-beat note starts at 0, but duration is lengthened (> 1/2 beat)
-      expect(equalRational(projected[0].startBeats, rational(0, 1))).toBe(true);
-      expect(compareRational(projected[0].durationBeats, rational(1, 2))).toBeGreaterThan(0);
+      expect(equalRational(projected[0]!.startBeats, rational(0, 1))).toBe(true);
+      expect(compareRational(projected[0]!.durationBeats, rational(1, 2))).toBeGreaterThan(0);
 
       // Off-beat note starts at the boundary after the lengthened first note
-      expect(equalRational(projected[1].startBeats, projected[0].durationBeats)).toBe(true);
-      expect(compareRational(projected[1].startBeats, rational(1, 2))).toBeGreaterThan(0);
+      expect(equalRational(projected[1]!.startBeats, projected[0]!.durationBeats)).toBe(true);
+      expect(compareRational(projected[1]!.startBeats, rational(1, 2))).toBeGreaterThan(0);
 
       // Off-beat note duration is shortened (< 1/2 beat)
-      expect(compareRational(projected[1].durationBeats, rational(1, 2))).toBeLessThan(0);
+      expect(compareRational(projected[1]!.durationBeats, rational(1, 2))).toBeLessThan(0);
     });
 
     it("strictly preserves the total sum of duration across paired subdivisions (pair invariance)", () => {
@@ -123,8 +123,8 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
         const g = groove("swing", amount);
         const projected = projectSwingTiming(notes, g);
 
-        const totalOriginal = addRational(notes[0].durationBeats, notes[1].durationBeats);
-        const totalSwung = addRational(projected[0].durationBeats, projected[1].durationBeats);
+        const totalOriginal = addRational(notes[0]!.durationBeats, notes[1]!.durationBeats);
+        const totalSwung = addRational(projected[0]!.durationBeats, projected[1]!.durationBeats);
 
         expect(equalRational(totalSwung, totalOriginal)).toBe(true);
         expect(equalRational(totalSwung, rational(1, 1))).toBe(true);
@@ -143,14 +143,16 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const stronger = projectSwingTiming(notes, groove("swing", 0.7));
 
       // Moderate amount creates measurable asymmetry
-      expect(compareRational(moderate[0].durationBeats, rational(1, 2))).toBeGreaterThan(0);
-      expect(compareRational(moderate[1].durationBeats, rational(1, 2))).toBeLessThan(0);
+      expect(compareRational(moderate[0]!.durationBeats, rational(1, 2))).toBeGreaterThan(0);
+      expect(compareRational(moderate[1]!.durationBeats, rational(1, 2))).toBeLessThan(0);
 
       // Stronger amount produces strictly greater asymmetry than moderate
-      expect(compareRational(stronger[0].durationBeats, moderate[0].durationBeats)).toBeGreaterThan(
+      expect(
+        compareRational(stronger[0]!.durationBeats, moderate[0]!.durationBeats),
+      ).toBeGreaterThan(0);
+      expect(compareRational(stronger[1]!.durationBeats, moderate[1]!.durationBeats)).toBeLessThan(
         0,
       );
-      expect(compareRational(stronger[1].durationBeats, moderate[1].durationBeats)).toBeLessThan(0);
     });
 
     it("ensures both projected subdivisions remain strictly positive even at maximum swing amount (1.0)", () => {
@@ -162,13 +164,13 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const maxSwing = projectSwingTiming(notes, groove("swing", 1.0));
 
       // First note lengthened, second note shortened but strictly positive (> 0)
-      expect(compareRational(maxSwing[0].durationBeats, rational(0, 1))).toBeGreaterThan(0);
-      expect(compareRational(maxSwing[1].durationBeats, rational(0, 1))).toBeGreaterThan(0);
-      expect(compareRational(maxSwing[0].durationBeats, rational(1, 2))).toBeGreaterThan(0);
-      expect(compareRational(maxSwing[1].durationBeats, rational(1, 2))).toBeLessThan(0);
+      expect(compareRational(maxSwing[0]!.durationBeats, rational(0, 1))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[1]!.durationBeats, rational(0, 1))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[0]!.durationBeats, rational(1, 2))).toBeGreaterThan(0);
+      expect(compareRational(maxSwing[1]!.durationBeats, rational(1, 2))).toBeLessThan(0);
 
       // Invariance still holds
-      const sum = addRational(maxSwing[0].durationBeats, maxSwing[1].durationBeats);
+      const sum = addRational(maxSwing[0]!.durationBeats, maxSwing[1]!.durationBeats);
       expect(equalRational(sum, rational(1, 1))).toBe(true);
     });
 
@@ -184,9 +186,9 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const note = createNote("unique-123", 0, 1, 1, 2, "E4");
       const projected = projectSwingTiming([note], groove("swing", 0.5));
 
-      expect(projected[0].id).toBe("unique-123");
-      expect(projected[0].pitch).toBe("E4");
-      expect(projected[0].velocity).toBe(80);
+      expect(projected[0]!.id).toBe("unique-123");
+      expect(projected[0]!.pitch).toBe("E4");
+      expect(projected[0]!.velocity).toBe(80);
     });
 
     it("does not mutate original input objects (pure projection)", () => {
@@ -198,8 +200,8 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       projectSwingTiming(notes, groove("swing", 0.5));
 
-      expect(notes[0].startBeats).toBe(origStart);
-      expect(notes[0].durationBeats).toBe(origDur);
+      expect(notes[0]!.startBeats).toBe(origStart);
+      expect(notes[0]!.durationBeats).toBe(origDur);
     });
   });
 
@@ -210,11 +212,11 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       const projected = projectSwingTiming([wholeNote, halfNote], groove("swing", 0.5));
 
-      expect(equalRational(projected[0].startBeats, rational(0, 1))).toBe(true);
-      expect(equalRational(projected[0].durationBeats, rational(4, 1))).toBe(true);
+      expect(equalRational(projected[0]!.startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projected[0]!.durationBeats, rational(4, 1))).toBe(true);
 
-      expect(equalRational(projected[1].startBeats, rational(0, 1))).toBe(true);
-      expect(equalRational(projected[1].durationBeats, rational(2, 1))).toBe(true);
+      expect(equalRational(projected[1]!.startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projected[1]!.durationBeats, rational(2, 1))).toBe(true);
     });
 
     it("does not swing quarter notes on the beat", () => {
@@ -228,8 +230,10 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const projected = projectSwingTiming(quarterNotes, groove("swing", 0.5));
 
       for (let i = 0; i < quarterNotes.length; i++) {
-        expect(equalRational(projected[i].startBeats, quarterNotes[i].startBeats)).toBe(true);
-        expect(equalRational(projected[i].durationBeats, quarterNotes[i].durationBeats)).toBe(true);
+        expect(equalRational(projected[i]!.startBeats, quarterNotes[i]!.startBeats)).toBe(true);
+        expect(equalRational(projected[i]!.durationBeats, quarterNotes[i]!.durationBeats)).toBe(
+          true,
+        );
       }
     });
 
@@ -244,8 +248,8 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const projected = projectSwingTiming(triplets, groove("swing", 0.5));
 
       for (let i = 0; i < triplets.length; i++) {
-        expect(equalRational(projected[i].startBeats, triplets[i].startBeats)).toBe(true);
-        expect(equalRational(projected[i].durationBeats, triplets[i].durationBeats)).toBe(true);
+        expect(equalRational(projected[i]!.startBeats, triplets[i]!.startBeats)).toBe(true);
+        expect(equalRational(projected[i]!.durationBeats, triplets[i]!.durationBeats)).toBe(true);
       }
     });
   });
@@ -265,10 +269,10 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       expect(run1).toEqual(run2);
       for (let i = 0; i < run1.length; i++) {
-        expect(run1[i].startBeats.numerator).toBe(run2[i].startBeats.numerator);
-        expect(run1[i].startBeats.denominator).toBe(run2[i].startBeats.denominator);
-        expect(run1[i].durationBeats.numerator).toBe(run2[i].durationBeats.numerator);
-        expect(run1[i].durationBeats.denominator).toBe(run2[i].durationBeats.denominator);
+        expect(run1[i]!.startBeats.numerator).toBe(run2[i]!.startBeats.numerator);
+        expect(run1[i]!.startBeats.denominator).toBe(run2[i]!.startBeats.denominator);
+        expect(run1[i]!.durationBeats.numerator).toBe(run2[i]!.durationBeats.numerator);
+        expect(run1[i]!.durationBeats.denominator).toBe(run2[i]!.durationBeats.denominator);
       }
     });
   });
@@ -325,14 +329,14 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
       const projectedA = projectSwingTiming(notesOrderA, gSwing);
 
       // Both first-subdivision notes remain simultaneous
-      expect(equalRational(projectedA[0].startBeats, projectedA[1].startBeats)).toBe(true);
-      expect(equalRational(projectedA[0].durationBeats, projectedA[1].durationBeats)).toBe(true);
-      expect(equalRational(projectedA[0].startBeats, rational(0, 1))).toBe(true);
+      expect(equalRational(projectedA[0]!.startBeats, projectedA[1]!.startBeats)).toBe(true);
+      expect(equalRational(projectedA[0]!.durationBeats, projectedA[1]!.durationBeats)).toBe(true);
+      expect(equalRational(projectedA[0]!.startBeats, rational(0, 1))).toBe(true);
 
       // Both second-subdivision notes remain simultaneous with delayed start
-      expect(equalRational(projectedA[2].startBeats, projectedA[3].startBeats)).toBe(true);
-      expect(equalRational(projectedA[2].durationBeats, projectedA[3].durationBeats)).toBe(true);
-      expect(equalRational(projectedA[2].startBeats, projectedA[0].durationBeats)).toBe(true);
+      expect(equalRational(projectedA[2]!.startBeats, projectedA[3]!.startBeats)).toBe(true);
+      expect(equalRational(projectedA[2]!.durationBeats, projectedA[3]!.durationBeats)).toBe(true);
+      expect(equalRational(projectedA[2]!.startBeats, projectedA[0]!.durationBeats)).toBe(true);
 
       // Shuffled orders:
       // Order B: interleaved [C4, D4, E4, F4]
@@ -374,8 +378,8 @@ describe("T099 — Swing Feel Timing Projection Contract", () => {
 
       expect(projected).toHaveLength(3);
       for (let i = 0; i < notes.length; i++) {
-        expect(equalRational(projected[i].startBeats, notes[i].startBeats)).toBe(true);
-        expect(equalRational(projected[i].durationBeats, notes[i].durationBeats)).toBe(true);
+        expect(equalRational(projected[i]!.startBeats, notes[i]!.startBeats)).toBe(true);
+        expect(equalRational(projected[i]!.durationBeats, notes[i]!.durationBeats)).toBe(true);
       }
     });
   });

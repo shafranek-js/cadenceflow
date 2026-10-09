@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -29,6 +30,7 @@ test.describe("T156 — native control keyboard boundaries", () => {
     await expect(globalView).toBeFocused();
 
     await matrixCard.locator(".chord-main").click({ modifiers: ["Control"] });
+    await setProgressionView(page, "staff");
     const progressionTarget = page.locator("[data-progression-step-select]").first();
     await progressionTarget.click();
     const progressionView = page.getByLabel("Progression Card View");

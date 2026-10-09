@@ -10,11 +10,12 @@ async function createFourStepProgression(page: import("@playwright/test").Page) 
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
-  await expect(page.getByTestId("progression-step")).toHaveCount(4);
+  await setProgressionView(page, "staff");
+  await expect(page.locator(".measure-staff-event-select")).toHaveCount(4);
 }
 
 function stepButton(page: import("@playwright/test").Page, index: number) {
-  return page.getByTestId("progression-step").nth(index).locator("[data-progression-step-select]");
+  return page.locator(".measure-staff-event-select").nth(index);
 }
 
 test.describe("T202 range selection", () => {
@@ -42,20 +43,59 @@ test.describe("T202 range selection", () => {
   });
 
   test("marquee marks one contiguous range and toolbar actions stay atomic", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
     await createFourStepProgression(page);
 
-    const header = page
-      .getByTestId("progression-measure")
-      .first()
-      .locator(".progression-measure-header");
+    const header = page.getByTestId("score-system-header").first();
+    const paper = page.locator(".score-system-paper").first();
     await header.scrollIntoViewIfNeeded();
+    const sourceSystem = page.getByTestId("progression-score-system").first();
+    const headerBox = await header.boundingBox();
+    expect(headerBox).not.toBeNull();
+    const idsBeforeHeaderGesture = await page
+      .locator(".measure-staff-event-select")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+    const headerStart = { x: headerBox!.x + 8, y: headerBox!.y + 8 };
+    const headerDrag = {
+      x: headerBox!.x + Math.min(72, headerBox!.width - 8),
+      y: headerBox!.y + 8,
+    };
+    await page.mouse.move(headerStart.x, headerStart.y);
+    await page.mouse.down();
+    await page.mouse.move(headerDrag.x, headerDrag.y);
+    await expect(sourceSystem).toHaveClass(/is-system-drag-source/);
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
+    const idsAfterHeaderGesture = await page
+      .locator(".measure-staff-event-select")
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
+    expect(idsAfterHeaderGesture).toEqual(idsBeforeHeaderGesture);
+
+    await paper.scrollIntoViewIfNeeded();
+    await stepButton(page, 3).scrollIntoViewIfNeeded();
     const first = await stepButton(page, 0).boundingBox();
     const last = await stepButton(page, 3).boundingBox();
-    const headerBox = await header.boundingBox();
+    const paperBox = await paper.boundingBox();
     expect(first).not.toBeNull();
     expect(last).not.toBeNull();
-    expect(headerBox).not.toBeNull();
-    await page.mouse.move(headerBox!.x + 4, headerBox!.y + 4);
+    expect(paperBox).not.toBeNull();
+    const paperStart = { x: paperBox!.x + 8, y: paperBox!.y + 8 };
+    expect(paperStart.x).toBeGreaterThanOrEqual(0);
+    expect(paperStart.y).toBeGreaterThanOrEqual(0);
+    expect(paperStart.x).toBeLessThan(1920);
+    expect(paperStart.y).toBeLessThan(1080);
+    const paperStartHit = await page.evaluate(({ x, y }) => {
+      const target = document.elementFromPoint(x, y);
+      return {
+        insidePaper: Boolean(target?.closest(".score-system-paper")),
+        insideEvent: Boolean(target?.closest(".measure-staff-event")),
+        insideHeader: Boolean(target?.closest(".score-system-header")),
+      };
+    }, paperStart);
+    expect(paperStartHit).toEqual({ insidePaper: true, insideEvent: false, insideHeader: false });
+
+    await page.mouse.move(paperStart.x, paperStart.y);
     await page.mouse.down();
     await page.mouse.move(last!.x + last!.width - 2, last!.y + last!.height - 2);
     await page.mouse.up();
@@ -69,7 +109,7 @@ test.describe("T202 range selection", () => {
     await page.getByTestId("range-toolbar-performance-reset").click();
     await expect(page.getByTestId("range-toolbar-transpose")).toBeEnabled();
     await page.getByTestId("range-toolbar-duplicate").click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(8);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(8);
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
   });
 
@@ -84,8 +124,10 @@ test.describe("T202 range selection", () => {
     const startsBefore = await page
       .locator("[data-progression-step-select]")
       .evaluateAll((buttons) =>
-        buttons.map(
-          (button) => button.closest<HTMLElement>("[data-start-beats]")?.dataset.startBeats,
+        buttons.map((button) =>
+          button
+            .closest<HTMLElement>(".measure-staff-event")
+            ?.style.getPropertyValue("--measure-staff-event-x"),
         ),
       );
 
@@ -94,25 +136,27 @@ test.describe("T202 range selection", () => {
     await expect(page.getByTestId("range-selection-toolbar")).toContainText("2 selected");
     await page.getByTestId("range-toolbar-delete").click();
 
-    await expect(page.getByTestId("progression-step")).toHaveCount(4);
-    await expect(page.locator(".progression-rest-card")).toHaveCount(2);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(4);
+    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(2);
     const idsAfter = await page
       .locator("[data-progression-step-select]")
       .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("data-step-id")));
     const startsAfter = await page
       .locator("[data-progression-step-select]")
       .evaluateAll((buttons) =>
-        buttons.map(
-          (button) => button.closest<HTMLElement>("[data-start-beats]")?.dataset.startBeats,
+        buttons.map((button) =>
+          button
+            .closest<HTMLElement>(".measure-staff-event")
+            ?.style.getPropertyValue("--measure-staff-event-x"),
         ),
       );
     expect(idsAfter).toEqual(idsBefore);
     expect(startsAfter).toEqual(startsBefore);
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
     await page.keyboard.press("Control+z");
-    await expect(page.locator(".progression-rest-card")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(0);
     await page.keyboard.press("Control+y");
-    await expect(page.locator(".progression-rest-card")).toHaveCount(2);
+    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(2);
   });
 
   test("clears transient range after Duplicate and keeps one selection through Undo/Redo", async ({
@@ -131,7 +175,7 @@ test.describe("T202 range selection", () => {
 
     await page.getByTestId("range-toolbar-duplicate").click();
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
-    await expect(page.getByTestId("progression-step")).toHaveCount(8);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(8);
     await expect(page.locator('[data-progression-step-select][aria-pressed="true"]')).toHaveCount(
       1,
     );
@@ -143,7 +187,7 @@ test.describe("T202 range selection", () => {
     expect(originalIds).not.toContain(duplicatedSelectionId);
 
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(4);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(4);
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
     await expect(page.locator('[data-progression-step-select][aria-pressed="true"]')).toHaveCount(
       1,
@@ -151,7 +195,7 @@ test.describe("T202 range selection", () => {
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
 
     await page.getByRole("button", { name: "Redo", exact: true }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(8);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(8);
     await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
     await expect(page.locator('[data-progression-step-select][aria-pressed="true"]')).toHaveCount(
       1,
@@ -182,19 +226,30 @@ test.describe("T202 range selection", () => {
       .getByRole("textbox", { name: "Duration in canonical quarter-note beats" })
       .fill("6");
     await durationInspector.getByRole("button", { name: "Set custom duration in beats" }).click();
-    const continuation = page.locator("[data-testid=progression-step-continuation]").first();
+    const continuation = page
+      .locator(".measure-staff-event.is-continuation .measure-staff-event-select")
+      .first();
     await expect(continuation).toHaveAttribute("data-step-id", firstStepId!);
     await continuation.click();
     await expect(stepButton(page, 0)).toHaveAttribute("aria-pressed", "true");
 
     await addRestToProgression(page);
 
-    const restTarget = page.locator(".progression-rest-card [data-progression-step-select]");
+    const restTarget = page.locator(".measure-staff-event.is-rest .measure-staff-event-select");
     const restId = await restTarget.getAttribute("data-step-id");
     expect(restId).toBeTruthy();
+    const restIndex = await page
+      .locator(".measure-staff-event-select")
+      .evaluateAll(
+        (steps, selectedRestId) =>
+          steps.findIndex((step) => step.getAttribute("data-step-id") === selectedRestId),
+        restId,
+      );
+    expect(restIndex).toBeGreaterThanOrEqual(0);
 
     await restTarget.click();
-    await stepButton(page, 3).click({ modifiers: ["Shift"] });
+    const neighborIndex = restIndex === 0 ? restIndex + 1 : restIndex - 1;
+    await stepButton(page, neighborIndex).click({ modifiers: ["Shift"] });
     await expect(page.getByTestId("range-selection-toolbar")).toContainText("2 selected");
 
     for (const view of ["staff", "tablature"] as const) {
@@ -208,10 +263,12 @@ test.describe("T202 range selection", () => {
   test("does not intercept the Rest remove button as a range-selection click", async ({ page }) => {
     await createFourStepProgression(page);
     await addRestToProgression(page);
-    await expect(page.getByTestId("progression-step")).toHaveCount(5);
-    await page.getByRole("button", { name: "Remove progression step 5: Rest" }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(5);
-    await expect(page.locator(".progression-rest-card")).toHaveCount(1);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(5);
+    const rest = page.locator(".measure-staff-event.is-rest .measure-staff-event-select");
+    await rest.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete Rest" }).click();
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(5);
+    await expect(page.locator(".measure-staff-event.is-rest")).toHaveCount(1);
   });
 
   test("Shift+Arrow extends Staff and Tablature ranges without reordering chords", async ({

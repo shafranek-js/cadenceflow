@@ -8,7 +8,7 @@ import {
   type MelodyPitchMotion,
 } from "../../../src/domain/melody/types";
 
-const PITCHES: readonly ExactPitch[] = Object.freeze([
+const PITCHES: readonly ExactPitch[] = Object.freeze<readonly ExactPitch[]>([
   exactPitch(60, { step: "C", alter: 0 }),
   exactPitch(64, { step: "E", alter: 0 }),
   exactPitch(67, { step: "G", alter: 0 }),
@@ -16,7 +16,7 @@ const PITCHES: readonly ExactPitch[] = Object.freeze([
   exactPitch(74, { step: "D", alter: 0 }),
 ]);
 
-const BASE_RECIPE: ChordMelodyRecipe = Object.freeze({
+const BASE_RECIPE: ChordMelodyRecipe = Object.freeze<ChordMelodyRecipe>({
   pitchMotion: "up",
   rhythm: "even",
   connection: "retrigger",
@@ -161,7 +161,13 @@ describe("T186 Batch A — independent Melody recipe axes", () => {
 
   it("maps legacy recipes to even retrigger semantics and round-trips new axes", () => {
     expect(
-      validateChordMelodyRecipe({ pattern: "outside-in", grid: "eighth", octaveOffset: 1 }),
+      validateChordMelodyRecipe({
+        pitchMotion: "outside-in",
+        grid: "eighth",
+        octaveOffset: 1,
+        rhythm: "even",
+        connection: "retrigger",
+      }),
     ).toEqual({
       pitchMotion: "outside-in",
       rhythm: "even",
@@ -179,13 +185,32 @@ describe("T186 Batch A — independent Melody recipe axes", () => {
     };
     expect(validateChordMelodyRecipe(recipe)).toEqual(recipe);
     expect(() => validateChordMelodyRecipe({ ...recipe, rhythm: "random" })).toThrow();
+    // An unknown motion is rejected...
+    expect(() => validateChordMelodyRecipe({ ...recipe, pitchMotion: "not-a-motion" })).toThrow();
+    // ...but a motion that is merely *unsupported by the legacy shape* is still a valid canonical
+    // one. `alternate-root-up` is canonical-only, and `up` is valid in both, so neither is an
+    // error here: the combined `pattern` + `pitchMotion` object is what the validator rejects,
+    // because it matches neither the canonical nor the legacy key set.
+    expect(validateChordMelodyRecipe({ ...recipe, pitchMotion: "up" })).toEqual({
+      ...recipe,
+      pitchMotion: "up",
+    });
     expect(() => validateChordMelodyRecipe({ ...recipe, pattern: "up" })).toThrow();
+    // The legacy shape is still accepted and resolves to the canonical axes. Only the six original
+    // motions belong to that shape — `repeat-root` and the alternates are canonical-only — so the
+    // legacy form is exercised with one of the six.
+    expect(
+      validateChordMelodyRecipe({ pattern: "up-down", grid: "eighth", octaveOffset: 0 }),
+    ).toEqual({
+      pitchMotion: "up-down",
+      rhythm: "even",
+      connection: "retrigger",
+      grid: "eighth",
+      octaveOffset: 0,
+    });
+    // A canonical-only motion cannot be expressed in the legacy shape.
     expect(() =>
-      validateChordMelodyRecipe({
-        pattern: "repeat-root",
-        grid: "eighth",
-        octaveOffset: 0,
-      }),
+      validateChordMelodyRecipe({ pattern: "repeat-root", grid: "eighth", octaveOffset: 0 }),
     ).toThrow();
   });
 });

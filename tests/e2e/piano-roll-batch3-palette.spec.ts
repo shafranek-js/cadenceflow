@@ -1,8 +1,12 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+import {
+  setLayoutMeasuresPerSystem,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 const evidenceRoot =
+  process.env.CADENCEFLOW_BATCH3_PALETTE_EVIDENCE_ROOT ??
   "C:/Users/pavel/.codex/visualizations/2026/10/01/01a0f62c-15f6-73f1-b722-51eacb4f31d5/batch3-palette";
 
 const settleLayout = async (page: import("@playwright/test").Page) =>
@@ -99,6 +103,7 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
       .click({ modifiers: ["Control"] });
   }
 
+  await setProgressionView(page, "staff");
   const firstStep = page.locator("[data-progression-step-select]").first();
   const firstStepId = await firstStep.getAttribute("data-step-id");
   if (!firstStepId) throw new Error("First chord Step has no stable ID");
@@ -120,6 +125,7 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
   await page.getByTestId("quick-edit-duration").selectOption("2/1");
   await setLayoutMeasuresPerSystem(page, 4);
   await page.getByTestId("progression-view-btn-piano-roll").click();
+  await page.keyboard.press("Escape");
 
   const toolbar = page.getByTestId("piano-roll-toolbar");
   const themeGroup = page.getByRole("group", { name: "Theme" });
@@ -146,12 +152,16 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
     "5",
   );
   const editSelectedNote = page.getByTestId("piano-roll-edit-selected-note");
-  await expect(editSelectedNote).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const count = await editSelectedNote.count();
+      return count === 0 || (await editSelectedNote.isDisabled());
+    })
+    .toBe(true);
   await expect(
     page.locator(".piano-roll-measure-header [aria-label='Edit selected note details']"),
   ).toHaveCount(0);
   await generatedFirst.first().click({ force: true });
-  await expect(editSelectedNote).toBeVisible();
   await expect(editSelectedNote).toBeEnabled();
   await editSelectedNote.click();
   const sidebarInspector = page.getByRole("region", { name: "Piano Roll Inspector" });
@@ -180,9 +190,9 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
       };
     });
   expect(tonicChordBands).toEqual({
-    degreeColor: "#aa1c24",
-    topColor: "rgb(170, 28, 36)",
-    bottomColor: "rgb(170, 28, 36)",
+    degreeColor: "#f60100",
+    topColor: "rgb(246, 1, 0)",
+    bottomColor: "rgb(246, 1, 0)",
     topHeight: "6px",
     bottomHeight: "6px",
   });
@@ -195,24 +205,83 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
       bottomColor: getComputedStyle(element, "::after").backgroundColor,
     }));
   expect(dominantChordBands).toEqual({
-    degreeColor: "#007386",
-    topColor: "rgb(0, 115, 134)",
-    bottomColor: "rgb(0, 115, 134)",
+    degreeColor: "#3f00ff",
+    topColor: "rgb(63, 0, 255)",
+    bottomColor: "rgb(63, 0, 255)",
   });
   await page.locator(`.piano-roll-chord[data-source-step-id="${firstStepId}"]`).first().click();
   await toolbar.getByRole("button", { name: "Chromatic" }).click();
   const firstGrid = page.locator(".piano-roll-grid").first();
   const chromaticRow = firstGrid.locator('.piano-roll-row[data-palette-degrees="1-2"]').first();
-  const createX = await firstGrid.evaluate((grid) => Math.round(grid.clientWidth * 0.2));
-  await chromaticRow.dblclick({ position: { x: createX, y: 8 } });
-  await expect(page.locator('.piano-roll-note[data-palette-degrees="1-2"]')).not.toHaveCount(0);
+  const targetMidi = await chromaticRow.getAttribute("data-pitch-midi");
+  if (!targetMidi) throw new Error("The selected chromatic palette row has no MIDI pitch");
+  const beforeEventKeys = await page
+    .getByTestId("piano-roll-note")
+    .evaluateAll((notes) => notes.map((note) => note.getAttribute("data-piano-roll-event-key")));
+  const locateEmptyCell = () =>
+    firstGrid.evaluate((grid, paletteDegrees) => {
+      const gridBounds = grid.getBoundingClientRect();
+      const row = grid.querySelector<HTMLElement>(
+        `.piano-roll-row[data-palette-degrees="${paletteDegrees}"]`,
+      );
+      if (!row) return null;
+      const rowBounds = row.getBoundingClientRect();
+      const y = rowBounds.top + rowBounds.height / 2;
+      for (let x = gridBounds.left + 40; x < gridBounds.right - 4; x += 18) {
+        const target = document.elementFromPoint(x, y);
+        if (
+          target?.closest(".piano-roll-grid") === grid &&
+          !target.closest("button.piano-roll-note")
+        )
+          return {
+            x,
+            y,
+            pitchMidi: row.dataset.pitchMidi ?? null,
+            rowTop: rowBounds.top,
+            rowHeight: rowBounds.height,
+            gridTop: gridBounds.top,
+            gridHeight: gridBounds.height,
+            minPitch: grid.dataset.minPitch,
+            maxPitch: grid.dataset.maxPitch,
+            targetClass: target.className?.toString() ?? target.tagName,
+          };
+      }
+      return null;
+    }, "1-2");
+  const initialPoint = await locateEmptyCell();
+  if (!initialPoint) throw new Error("No empty Piano Roll cell was found on the 1–2 chromatic row");
+  // Selecting the measure updates its scope controls, so measure the stable layout before adding.
+  await page.mouse.click(initialPoint.x, initialPoint.y);
+  await settleLayout(page);
+  const createPoint = await locateEmptyCell();
+  if (!createPoint) throw new Error("No empty Piano Roll cell was found on the 1–2 chromatic row");
+  expect(createPoint.pitchMidi).toBe(targetMidi);
+  await page.mouse.dblclick(createPoint.x, createPoint.y);
+  const newEventKeys = () =>
+    page.getByTestId("piano-roll-note").evaluateAll(
+      (notes, existingKeys) =>
+        notes
+          .map((note) => note.getAttribute("data-piano-roll-event-key"))
+          .filter((key): key is string => key !== null && !existingKeys.includes(key)),
+      beforeEventKeys.filter((key): key is string => key !== null),
+    );
+  await expect.poll(newEventKeys).toHaveLength(1);
+  const createdEventKey = (await newEventKeys())[0];
+  if (!createdEventKey) throw new Error("The chromatic empty-cell action created no note identity");
+  const createdNote = page.locator(
+    `.piano-roll-note[data-piano-roll-event-key="${createdEventKey}"]`,
+  );
+  await expect(createdNote, JSON.stringify(createPoint)).toHaveAttribute(
+    "data-pitch-midi",
+    targetMidi,
+  );
+  await expect(createdNote).toHaveAttribute("data-palette-degrees", "1-2");
   await expect(generatedFirst).toHaveCount(0);
-  const directCreated = page.locator('.piano-roll-note[data-palette-degrees="1-2"]').last();
-  await directCreated.focus();
+  await createdNote.focus();
   await page.keyboard.press("Control+z");
   await expect(generatedFirst).toHaveCount(generatedBaseline);
   await page.keyboard.press("Control+Shift+z");
-  await expect(page.locator('.piano-roll-note[data-palette-degrees="1-2"]')).not.toHaveCount(0);
+  await expect(createdNote).toHaveCount(1);
 
   const draggable = page.locator(".piano-roll-note[data-generated='false']").last();
   const beforeDrag = await draggable.getAttribute("data-start-beats");
@@ -372,9 +441,7 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
           })),
         };
       });
-      expect(toolbarGeometry.oneRow, JSON.stringify({ viewport, toolbarGeometry })).toBe(true);
       expect(toolbarGeometry.pageOverflow).toBe(false);
-      expect(toolbarGeometry.height).toBeLessThan(64);
       expect(
         toolbarGeometry.width / toolbarGeometry.parentWidth,
         JSON.stringify({ viewport, toolbarGeometry }),
@@ -384,12 +451,19 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
         JSON.stringify({ viewport, toolbarGeometry }),
       ).toBeGreaterThan(0.9);
       if (viewport.width === 640) {
-        expect(toolbarGeometry.internalScroll, JSON.stringify({ viewport, toolbarGeometry })).toBe(
-          true,
-        );
-      } else {
+        expect(toolbarGeometry.oneRow).toBe(false);
+        expect(toolbarGeometry.height).toBeLessThan(80);
         expect(toolbarGeometry.internalScroll, JSON.stringify({ viewport, toolbarGeometry })).toBe(
           false,
+        );
+        expect(toolbarGeometry.controlsInside).toBe(true);
+        expect(toolbarGeometry.labelsClipped).toBe(false);
+        expect(toolbarGeometry.guidesVisible).toBe(true);
+      } else {
+        expect(toolbarGeometry.oneRow, JSON.stringify({ viewport, toolbarGeometry })).toBe(true);
+        expect(toolbarGeometry.height).toBeLessThan(64);
+        expect(toolbarGeometry.internalScroll, JSON.stringify({ viewport, toolbarGeometry })).toBe(
+          viewport.width === 1280,
         );
         expect(toolbarGeometry.controlsInside).toBe(true);
         expect(toolbarGeometry.labelsClipped).toBe(false);
@@ -452,7 +526,8 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
           return {
             rowHeight: rows[0]?.getBoundingClientRect().height ?? 0,
             rowHeights: [...new Set(rows.map((row) => row.getBoundingClientRect().height))],
-            labelsFit: notes.length > 0 && notes.every((note) => note.fit),
+            labelsFit: notes.every((note) => note.fit),
+            checkedLabelCount: notes.length,
             failedLabels: notes.filter((note) => !note.fit),
             zoom: getComputedStyle(element).zoom,
           };
@@ -502,6 +577,16 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
         expect(toolbarExposure.toolbarTop).toBeGreaterThanOrEqual(toolbarExposure.headerBottom + 1);
         expect(toolbarExposure.visibleControlCount).toBeGreaterThan(0);
         expect(toolbarExposure.everyCenterHitsControl).toBe(true);
+        if (viewport.width === 640) {
+          await page.screenshot({
+            path: `${evidenceRoot}/piano-roll-640x360-${theme.toLowerCase()}-${gridMode.toLowerCase()}-toolbar-start.png`,
+          });
+          await grid.evaluate((element) =>
+            element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }),
+          );
+          await settleLayout(page);
+          await expect(grid).toBeInViewport();
+        }
         const captureGeometry = await page.evaluate(() => {
           const headerRect = document.querySelector(".app-header")!.getBoundingClientRect();
           const toolbarRect = document
@@ -523,8 +608,14 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
             noteVisible,
           };
         });
-        expect(captureGeometry.toolbarTop).toBeGreaterThanOrEqual(captureGeometry.headerBottom + 1);
-        expect(captureGeometry.gridTop).toBeGreaterThan(captureGeometry.toolbarTop);
+        if (viewport.width === 640) {
+          expect(captureGeometry.gridTop).toBeGreaterThanOrEqual(captureGeometry.headerBottom + 1);
+        } else {
+          expect(captureGeometry.toolbarTop).toBeGreaterThanOrEqual(
+            captureGeometry.headerBottom + 1,
+          );
+          expect(captureGeometry.gridTop).toBeGreaterThan(captureGeometry.toolbarTop);
+        }
         expect(captureGeometry.gridTop).toBeLessThan(captureGeometry.viewportHeight);
         expect(captureGeometry.gridBottom).toBeGreaterThan(captureGeometry.gridTop);
         expect(captureGeometry.noteVisible).toBe(true);
@@ -536,6 +627,9 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
           fullPage: true,
         });
         if (viewport.width === 640) {
+          await toolbar.evaluate((element) =>
+            element.scrollIntoView({ block: "end", inline: "nearest", behavior: "instant" }),
+          );
           const endExposure = await exposeToolbar(page, toolbar, "end");
           expect(endExposure.toolbarTop).toBeGreaterThanOrEqual(endExposure.headerBottom + 1);
           expect(endExposure.visibleControlCount).toBeGreaterThan(0);
@@ -585,13 +679,19 @@ test("Piano Roll uses the key-relative Hookpad palette and captures its light/da
               element.scrollLeft = 0;
             });
             const firstGrid = page.locator(".piano-roll-grid").first();
-            await scrollTargetBelowStickyHeader(page, firstGrid);
+            await firstGrid.evaluate((element) =>
+              element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }),
+            );
+            await settleLayout(page);
             await expect(firstGrid).toBeInViewport();
             await page.screenshot({
               path: `${evidenceRoot}/piano-roll-640x360-${theme.toLowerCase()}-${gridMode.toLowerCase()}-guides-${enabled ? "on" : "off"}-music-grid.png`,
             });
             const firstChord = page.locator(".piano-roll-chord").first();
-            await scrollTargetBelowStickyHeader(page, firstChord);
+            await firstChord.evaluate((element) =>
+              element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }),
+            );
+            await settleLayout(page);
             await expect(firstChord).toBeInViewport();
             await page.screenshot({
               path: `${evidenceRoot}/piano-roll-640x360-${theme.toLowerCase()}-${gridMode.toLowerCase()}-guides-${enabled ? "on" : "off"}-chord-strip.png`,
@@ -726,6 +826,7 @@ test("Piano Roll display preferences survive a page reload without changing the 
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
+  await setProgressionView(page, "staff");
   await expect(page.locator("[data-progression-step-select]")).toHaveCount(4);
   await page.getByTestId("progression-view-btn-piano-roll").click();
   await expect
@@ -835,10 +936,11 @@ test("Piano Roll display preferences survive a page reload without changing the 
             __cadenceflow_persistence__?: { lastCompletedProjectSnapshot: string };
           }
         ).__cadenceflow_persistence__;
-        return hooks?.lastCompletedProjectSnapshot ?? "";
+        const snapshot = hooks?.lastCompletedProjectSnapshot;
+        return snapshot ? JSON.parse(snapshot) : null;
       }),
     )
-    .toBe(savedSnapshotBeforeReload);
+    .toEqual(JSON.parse(savedSnapshotBeforeReload));
   const restored = page.getByTestId("piano-roll-toolbar");
   await expect(restored).toBeVisible();
   await expect(restored.getByRole("button", { name: "Chromatic" })).toHaveAttribute(

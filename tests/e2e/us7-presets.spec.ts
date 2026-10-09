@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
-import { addRestToProgression } from "./test-helpers/progression-settings";
+import {
+  addRestToProgression,
+  getLogicalProgressionStepButtons,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 async function openPresetsFromHeader(page: import("@playwright/test").Page) {
   const heading = page.getByTestId("progression-heading");
@@ -15,7 +19,7 @@ async function openSaveAsPresetFromHeader(page: import("@playwright/test").Page)
 }
 
 test.describe("US7 — Functional Presets Acceptance (T118)", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     await page.addInitScript(() => {
       (
         window as unknown as { __CADENCEFLOW_ENABLE_TEST_AUDIO__?: boolean }
@@ -23,6 +27,9 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     });
     await page.goto("/");
     await expect(page.locator(".app-shell")).toBeVisible();
+    if (testInfo.title !== "Scenario 18 — no passive history pollution") {
+      await setProgressionView(page, "staff");
+    }
     await ensureHistoryControlsVisible(page);
   });
 
@@ -36,7 +43,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(4);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(4);
   }
 
   test("Scenario 1 — Presets browser baseline", async ({ page }) => {
@@ -126,12 +133,12 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     // Original progression remains unchanged (4 steps: I, vi, IV, V)
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(4);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("vi");
-    await expect(steps.nth(2)).toContainText("IV");
-    await expect(steps.nth(3)).toContainText("V");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select vi ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select IV ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
   });
 
   test("Scenario 3 — Saved Preset exposes only functional semantics", async ({ page }) => {
@@ -237,7 +244,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
     const cardIv = page.getByTestId("chord-card-IV");
     await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(2);
 
     // Open Presets and click Apply on Major I–vi–IV–V
@@ -256,29 +263,29 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
 
     // Old steps are replaced by the 4 preset steps
     await expect(steps).toHaveCount(4);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("vi");
-    await expect(steps.nth(2)).toContainText("IV");
-    await expect(steps.nth(3)).toContainText("V");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select vi ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select IV ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
 
     // Selection is cleared
-    await expect(page.locator(".progression-step-card.is-selected")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event.is-selected")).toHaveCount(0);
 
     // Undo returns exact previous 2 steps
     const undoBtn = page.getByRole("button", { name: "Undo" });
     await undoBtn.click();
     await expect(steps).toHaveCount(2);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("IV");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select IV ·/);
 
     // Redo restores replacement
     const redoBtn = page.getByRole("button", { name: "Redo" });
     await redoBtn.click();
     await expect(steps).toHaveCount(4);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("vi");
-    await expect(steps.nth(2)).toContainText("IV");
-    await expect(steps.nth(3)).toContainText("V");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select vi ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select IV ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
   });
 
   test("Scenario 7 — Append to End", async ({ page }) => {
@@ -288,12 +295,12 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(2);
 
     // Select step 1 (I)
     await steps.nth(0).click();
-    await expect(steps.nth(0)).toHaveClass(/is-selected/);
+    await expect(steps.nth(0)).toHaveAttribute("aria-pressed", "true");
 
     // Open Presets and Apply Major ii–V–I
     await openPresetsFromHeader(page);
@@ -305,14 +312,14 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
 
     // Result order: I, V, ii, V, I (5 steps)
     await expect(steps).toHaveCount(5);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("V");
-    await expect(steps.nth(2)).toContainText("ii");
-    await expect(steps.nth(3)).toContainText("V");
-    await expect(steps.nth(4)).toContainText("I");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select V ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select ii ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
+    await expect(steps.nth(4)).toHaveAttribute("aria-label", /Select I ·/);
 
     // Prior selected step (step 1) remains selected
-    await expect(steps.nth(0)).toHaveClass(/is-selected/);
+    await expect(steps.nth(0)).toHaveAttribute("aria-pressed", "true");
 
     // Undo returns to 2 steps
     await page.getByRole("button", { name: "Undo" }).click();
@@ -321,9 +328,9 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     // Redo returns 5 steps in same order
     await page.getByRole("button", { name: "Redo" }).click();
     await expect(steps).toHaveCount(5);
-    await expect(steps.nth(2)).toContainText("ii");
-    await expect(steps.nth(3)).toContainText("V");
-    await expect(steps.nth(4)).toContainText("I");
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select ii ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
+    await expect(steps.nth(4)).toHaveAttribute("aria-label", /Select I ·/);
   });
 
   test("Scenario 8 — Insert at Selected Step", async ({ page }) => {
@@ -335,12 +342,12 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     const cardIv = page.getByTestId("chord-card-IV");
     await cardIv.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(3);
 
     // Select Step 2 (vi)
     await steps.nth(1).click();
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
 
     // Open Presets and Apply Major ii–V–I
     await openPresetsFromHeader(page);
@@ -358,25 +365,25 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
 
     // Expected: I, ii, V, I, vi, IV (6 steps total)
     await expect(steps).toHaveCount(6);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("ii");
-    await expect(steps.nth(2)).toContainText("V");
-    await expect(steps.nth(3)).toContainText("I");
-    await expect(steps.nth(4)).toContainText("vi");
-    await expect(steps.nth(5)).toContainText("IV");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select ii ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select V ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(4)).toHaveAttribute("aria-label", /Select vi ·/);
+    await expect(steps.nth(5)).toHaveAttribute("aria-label", /Select IV ·/);
 
     // Selected original Step B (vi, now index 4) remains selected
-    await expect(steps.nth(4)).toHaveClass(/is-selected/);
+    await expect(steps.nth(4)).toHaveAttribute("aria-pressed", "true");
 
     // Undo returns to 3 steps
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(steps).toHaveCount(3);
-    await expect(steps.nth(1)).toHaveClass(/is-selected/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-pressed", "true");
 
     // Redo restores inserted sequence
     await page.getByRole("button", { name: "Redo" }).click();
     await expect(steps).toHaveCount(6);
-    await expect(steps.nth(4)).toHaveClass(/is-selected/);
+    await expect(steps.nth(4)).toHaveAttribute("aria-pressed", "true");
   });
 
   test("Scenario 9 — Insert unavailable without selection", async ({ page }) => {
@@ -410,7 +417,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
 
   test("Scenario 10 — Empty progression", async ({ page }) => {
     // Start with empty progression (0 steps)
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(0);
 
     // Open Presets and Apply Major I–vi–IV–V
@@ -430,10 +437,10 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
 
     // Progression now has the 4 preset steps
     await expect(steps).toHaveCount(4);
-    await expect(steps.nth(0)).toContainText("I");
-    await expect(steps.nth(1)).toContainText("vi");
-    await expect(steps.nth(2)).toContainText("IV");
-    await expect(steps.nth(3)).toContainText("V");
+    await expect(steps.nth(0)).toHaveAttribute("aria-label", /Select I ·/);
+    await expect(steps.nth(1)).toHaveAttribute("aria-label", /Select vi ·/);
+    await expect(steps.nth(2)).toHaveAttribute("aria-label", /Select IV ·/);
+    await expect(steps.nth(3)).toHaveAttribute("aria-label", /Select V ·/);
   });
 
   test("Scenario 11 — Rest-containing Save rejection", async ({ page }) => {
@@ -444,8 +451,8 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     const cardV = page.getByTestId("chord-card-V");
     await cardV.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
-    await expect(steps).toHaveCount(3);
+    const steps = await getLogicalProgressionStepButtons(page);
+    await expect(steps).toHaveLength(3);
 
     // Open Save as Preset
     await page.getByTestId("progression-save-preset-btn").click();
@@ -467,8 +474,8 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     await expect(saveDialog).toBeHidden();
 
     // Assert progression still has 3 steps including Rest
-    await expect(steps).toHaveCount(3);
-    await expect(page.locator(".progression-rest-card")).toBeVisible();
+    await expect(await getLogicalProgressionStepButtons(page)).toHaveLength(3);
+    await expect(page.locator(".measure-staff-event.is-rest")).toBeVisible();
   });
 
   test("Scenario 12 — ambiguous mapping protection", async ({ page }) => {
@@ -511,7 +518,7 @@ test.describe("US7 — Functional Presets Acceptance (T118)", () => {
     const cardI = page.getByTestId("chord-card-I");
     await cardI.locator(".chord-main").click({ modifiers: ["Control"] });
 
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await steps.first().click();
 
     // Modify step performance to non-default settings

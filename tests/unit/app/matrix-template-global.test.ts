@@ -56,17 +56,17 @@ describe("Global Matrix Template Commands", () => {
       type: "matrix-template/patch",
       payload: {
         functionId: "V",
-        performanceOverrides: { register: 1, articulation: "staccato" },
+        performanceOverrides: { register: 1, articulation: "arp-down" },
         nowIso,
       },
     }).project;
 
-    expect(project.moduleTemplateStates.progressions.cards.I?.explicitOverrides.duration?.beats).toEqual(
-      rational(1),
-    );
-    expect(project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.register).toBe(
-      1,
-    );
+    expect(
+      project.moduleTemplateStates.progressions.cards.I?.explicitOverrides.duration?.beats,
+    ).toEqual(rational(1));
+    expect(
+      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.register,
+    ).toBe(1);
 
     project = patchGlobalMatrixTemplate(project, {
       type: "matrix-template/patch-global",
@@ -76,16 +76,19 @@ describe("Global Matrix Template Commands", () => {
       },
     }).project;
 
-    expect(project.moduleTemplateStates.progressions.cards.I?.explicitOverrides.duration).toBeUndefined();
+    expect(
+      project.moduleTemplateStates.progressions.cards.I?.explicitOverrides.duration,
+    ).toBeUndefined();
     const stepI = createMatrixChordStep(project, "I", "step-i");
     expect(stepI.duration.beats).toEqual(rational(3));
 
-    expect(project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.register).toBe(
-      1,
-    );
     expect(
-      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.articulation,
-    ).toBe("staccato");
+      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.register,
+    ).toBe(1);
+    expect(
+      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance
+        ?.articulation,
+    ).toBe("arp-down");
 
     project = patchGlobalMatrixTemplate(project, {
       type: "matrix-template/patch-global",
@@ -99,11 +102,12 @@ describe("Global Matrix Template Commands", () => {
       project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.register,
     ).toBeUndefined();
     expect(
-      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance?.articulation,
-    ).toBe("staccato");
+      project.moduleTemplateStates.progressions.cards.V?.explicitOverrides.performance
+        ?.articulation,
+    ).toBe("arp-down");
     const stepV = createMatrixChordStep(project, "V", "step-v");
     expect(stepV.performance.register).toBe(-1);
-    expect(stepV.performance.articulation).toBe("staccato");
+    expect(stepV.performance.articulation).toBe("arp-down");
   });
 
   it("supports undo and redo via restoreGlobalMatrixTemplate", () => {
@@ -112,14 +116,14 @@ describe("Global Matrix Template Commands", () => {
       type: "matrix-template/patch-global",
       payload: {
         durationOverride: musicalDuration(rational(2)),
-        performanceOverrides: { masterVelocity: 110, articulation: "legato" },
+        performanceOverrides: { masterVelocity: 110, articulation: "humanized" },
         nowIso,
       },
     });
 
     expect(patched.project.defaults.piano.duration.beats).toEqual(rational(2));
     expect(patched.project.defaults.piano.performance.masterVelocity).toBe(110);
-    expect(patched.project.defaults.piano.performance.articulation).toBe("legato");
+    expect(patched.project.defaults.piano.performance.articulation).toBe("humanized");
 
     const restored = restoreGlobalMatrixTemplate(
       patched.project,

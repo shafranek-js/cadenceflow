@@ -1,3 +1,4 @@
+import { requireValue } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { createRichProjectFixture } from "../../fixtures/rich-project.fixture";
 import {
@@ -35,8 +36,8 @@ describe("schema v8 to v9 Piano Roll cutover", () => {
     raw.schemaVersion = 8;
     raw.presentation.progressionView = "piano-roll";
     const chord = raw.progression.steps[1];
-    chord.melody = {
-      mode: "authored",
+    requireValue(chord).melody = {
+      mode: "authored" as const,
       phrase: { notes: [authoredNote] },
       sourceRecipe: {
         pitchMotion: "up",
@@ -61,7 +62,7 @@ describe("schema v8 to v9 Piano Roll cutover", () => {
     const beforeBranchStepIds = raw.temporaryBranch?.steps?.map((step) => step["id"]);
     const beforePresetIds = raw.customPresets.map((preset) => preset["id"]);
     const restored = decodePortableProject(JSON.stringify(raw));
-    expect(restored.schemaVersion).toBe(10);
+    expect(restored.schemaVersion).toBe(11);
     expect(restored.presentation.progressionView).toBe("piano-roll");
     expect(restored.progression.sections).toEqual(beforeSections);
     expect(restored.temporaryBranch?.id).toBe(beforeBranchId);
@@ -84,17 +85,17 @@ describe("schema v8 to v9 Piano Roll cutover", () => {
     expect(restored.progression.steps[2]).toMatchObject({
       kind: "chord",
       melody: {
-        mode: "authored",
+        mode: "authored" as const,
         phrase: { notes: [authoredNote] },
         sourceRecipe: { grid: "eighth-triplet" },
       },
     });
     expect(restored.progression.steps[0]).toMatchObject({
       kind: "chord",
-      melody: { mode: "generated", recipe: { grid: "eighth-triplet" } },
+      melody: { mode: "generated" as const, recipe: { grid: "eighth-triplet" } },
     });
     const exported = decodePortableProject(encodePortableProject(restored));
-    expect(exported.schemaVersion).toBe(10);
+    expect(exported.schemaVersion).toBe(11);
     expect(exported.presentation.progressionView).toBe("piano-roll");
     expect(exported.progression.steps[1]).toMatchObject({
       authoredMelody: { notes: [{ duration: authoredNote.duration }] },

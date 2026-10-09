@@ -78,7 +78,8 @@ export function MatrixResolutionArrows({
 
     updateCoords();
 
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateCoords) : null;
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateCoords) : null;
     observer?.observe(container);
     window.addEventListener("resize", updateCoords);
     container.addEventListener("scroll", updateCoords);

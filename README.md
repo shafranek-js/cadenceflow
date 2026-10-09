@@ -9,8 +9,8 @@
   <img src="https://img.shields.io/badge/Node-%3E%3D22.0.0-339933.svg" alt="Node version">
   <img src="https://img.shields.io/badge/pnpm-10.12.4-f69220.svg" alt="pnpm version">
   <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178c6.svg" alt="TypeScript version">
-  <img src="https://img.shields.io/badge/React-19.2.0-61dafb.svg" alt="React version">
-  <img src="https://img.shields.io/badge/Vite-8.1.0-646cff.svg" alt="Vite version">
+  <img src="https://img.shields.io/badge/React-19.2.8-61dafb.svg" alt="React version">
+  <img src="https://img.shields.io/badge/Vite-8.2.2-646cff.svg" alt="Vite version">
   <img src="https://img.shields.io/badge/VexFlow-5.0.0-00d1b2.svg" alt="VexFlow version">
 </p>
 

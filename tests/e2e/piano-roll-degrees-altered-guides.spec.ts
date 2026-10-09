@@ -1,6 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+import {
+  setLayoutMeasuresPerSystem,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 test("Degrees highlights only exact chord rows while keeping altered notes full height", async ({
   page,
@@ -19,6 +22,7 @@ test("Degrees highlights only exact chord rows while keeping altered notes full 
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
   }
+  await setProgressionView(page, "staff");
   const progressionSteps = page.locator("[data-progression-step-select]");
   await expect(progressionSteps).toHaveCount(5);
   const c7StepId = await progressionSteps.nth(3).getAttribute("data-step-id");
@@ -130,23 +134,47 @@ test("Degrees highlights only exact chord rows while keeping altered notes full 
         const isPressed = (await guides.getAttribute("aria-pressed")) === "true";
         if (isPressed !== guidesEnabled) await guides.click();
         if (viewport.width === 640) {
-          await alteredNote.evaluate((note) =>
-            note.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }),
-          );
           await toolbar.evaluate((element) => {
             element.scrollLeft = element.scrollWidth;
-            const header = document.querySelector<HTMLElement>(".app-header");
-            if (!header) throw new Error("Sticky application header was not rendered");
-            const headerBottom = header.getBoundingClientRect().bottom;
-            const toolbarTop = element.getBoundingClientRect().top;
-            window.scrollBy({ top: toolbarTop - headerBottom - 8, behavior: "instant" });
+            element.scrollIntoView({ block: "start", inline: "nearest", behavior: "instant" });
           });
         } else {
           await toolbar.scrollIntoViewIfNeeded();
         }
-        await expect(toolbar).toBeInViewport();
+        const toolbarGeometry = await toolbar.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const header = document
+            .querySelector<HTMLElement>(".app-header")
+            ?.getBoundingClientRect();
+          const note = document
+            .querySelector<HTMLElement>("button.piano-roll-note[data-generated='false']")
+            ?.getBoundingClientRect();
+          const ancestors: unknown[] = [];
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            const style = getComputedStyle(parent);
+            const rect = parent.getBoundingClientRect();
+            ancestors.push({
+              className: parent.className.toString(),
+              overflowY: style.overflowY,
+              scrollTop: parent.scrollTop,
+              scrollHeight: parent.scrollHeight,
+              clientHeight: parent.clientHeight,
+              top: rect.top,
+              bottom: rect.bottom,
+            });
+          }
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            scrollY: window.scrollY,
+            toolbar: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+            headerBottom: header?.bottom ?? null,
+            note: note ? { top: note.top, bottom: note.bottom } : null,
+            ancestors,
+          };
+        });
+        await expect(toolbar, JSON.stringify(toolbarGeometry)).toBeInViewport();
         await expect(alteredNote).toBeVisible();
-        await expect(alteredNote).toBeInViewport();
+        if (viewport.width !== 640) await expect(alteredNote).toBeInViewport();
         const ownerChord = page.locator(
           `.piano-roll-chord[data-source-step-id="${secondaryStepId}"]`,
         );

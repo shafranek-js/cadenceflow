@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { AudioProviderState } from "../../audio/contracts";
 import type { MelodyTrackSettings } from "../../domain/melody/types";
 import type { ProgressionStep } from "../../domain/progression/step";
@@ -9,18 +8,10 @@ import { MelodyTrackControls } from "../melody/MelodyTrackControls";
 import { InspectorGrooveSection } from "./InspectorGrooveSection";
 import { InspectorLoopSection } from "./InspectorLoopSection";
 import { InspectorMeterSection } from "./InspectorMeterSection";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
+import { IndependentBassVoiceControl } from "./IndependentBassVoiceControl";
 
 const STORAGE_KEY = "cadenceflow.ui.selected-step.progression-settings-disclosure-open";
-
-function readDisclosureState(fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
 
 export interface InspectorProgressionSettingsProps {
   readonly meter?: Meter | undefined;
@@ -38,6 +29,8 @@ export interface InspectorProgressionSettingsProps {
   readonly melodyAudioError?: string | null | undefined;
   readonly onRetryMelodyAudio?: (() => void) | undefined;
   readonly hasMelodyRecipe?: boolean | undefined;
+  readonly independentBassEnabled?: boolean | undefined;
+  readonly onSetIndependentBassEnabled?: ((enabled: boolean) => void) | undefined;
   readonly dragHandle?: React.ReactNode | undefined;
 }
 
@@ -56,26 +49,18 @@ export function InspectorProgressionSettings({
   melodyAudioError,
   onRetryMelodyAudio,
   hasMelodyRecipe = false,
+  independentBassEnabled,
+  onSetIndependentBassEnabled,
   dragHandle,
 }: InspectorProgressionSettingsProps) {
-  const [isOpen, setIsOpen] = useState(() => readDisclosureState(false));
+  const disclosure = useInspectorDisclosure(STORAGE_KEY, false);
 
   return (
     <details
       className="inspector-disclosure selected-progression-settings"
-      open={isOpen}
+      open={disclosure.isOpen}
       data-testid="selected-progression-settings"
-      onToggle={(event) => {
-        const nextOpen = event.currentTarget.open;
-        setIsOpen(nextOpen);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(STORAGE_KEY, String(nextOpen));
-          } catch {
-            // Disclosure preference persistence is best-effort.
-          }
-        }
-      }}
+      onToggle={(event) => disclosure.setOpen(event.currentTarget.open)}
     >
       <summary>
         <span>
@@ -85,21 +70,20 @@ export function InspectorProgressionSettings({
         <span className="disclosure-status">Global</span>
       </summary>
       <div className="inspector-disclosure-body">
+        {independentBassEnabled !== undefined && onSetIndependentBassEnabled ? (
+          <IndependentBassVoiceControl
+            enabled={independentBassEnabled}
+            onChange={onSetIndependentBassEnabled}
+          />
+        ) : null}
         {hasMelodyRecipe && melodyTrack && onMelodyTrackSettingsChange ? (
-          <details className="inspector-disclosure global-tracks-disclosure" open>
-            <summary>
-              <span>Melody Track</span>
-            </summary>
-            <div className="inspector-disclosure-body">
-              <MelodyTrackControls
-                settings={melodyTrack}
-                onChange={onMelodyTrackSettingsChange}
-                {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
-                {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
-                {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
-              />
-            </div>
-          </details>
+          <MelodyTrackControls
+            settings={melodyTrack}
+            onChange={onMelodyTrackSettingsChange}
+            {...(melodyAudioState ? { providerState: melodyAudioState } : {})}
+            {...(melodyAudioError !== undefined ? { providerError: melodyAudioError } : {})}
+            {...(onRetryMelodyAudio ? { onRetry: onRetryMelodyAudio } : {})}
+          />
         ) : null}
 
         {meter && onSetMeter ? (

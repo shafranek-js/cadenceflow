@@ -1,3 +1,4 @@
+import { omitFields } from "../fixtures/assertions";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { createEffectiveMelodyTimeline } from "../../src/domain/melody/effectiveTimeline";
@@ -59,8 +60,8 @@ async function scrollBelowAppHeader(page: Page, selector: string): Promise<void>
 function noteClickAuditionFixture(): Project {
   const source = createPianoRollSystemChordFixture("note-click-audition-fixture");
   const steps = source.progression.steps.map((step) => {
-    if (step.id === "chord-a")
-      return { ...step, melodyInstrumentOverride: undefined, transpositionSemitones: 2 };
+    if (step.kind === "chord" && step.id === "chord-a")
+      return { ...omitFields(step, "melodyInstrumentOverride"), transpositionSemitones: 2 };
     if (step.id === "generated-e")
       return { ...step, melodyInstrumentOverride: "oboe" as const, transpositionSemitones: -1 };
     if (step.id === "rest-d")
@@ -68,8 +69,8 @@ function noteClickAuditionFixture(): Project {
     return step;
   });
   return {
-    ...source,
-    temporaryBranch: undefined,
+    ...omitFields(source, "temporaryBranch"),
+
     melodyTrack: { ...source.melodyTrack, instrument: "violin", volume: 73 },
     progression: { ...source.progression, steps },
   };
@@ -192,8 +193,8 @@ function restOnlyFixture(projectId: string): Project {
   const rest = project.progression.steps.find((step) => step.id === "rest-d");
   if (!rest || rest.kind !== "rest") throw new Error("The fixture Rest owner is unavailable");
   return {
-    ...project,
-    temporaryBranch: undefined,
+    ...omitFields(project, "temporaryBranch"),
+
     progression: {
       steps: [rest],
       selectedStepId: rest.id,
@@ -479,6 +480,14 @@ test("Piano Roll selects across stacked Systems and scopes effective Melody note
   await expect(startNote).toHaveAttribute("aria-pressed", "true");
   await expect(endNote).not.toHaveAttribute("aria-pressed", "true");
   await expect(endNote).not.toBeInViewport();
+  await startGrid.focus();
+  await expect(scopeIndicator).toHaveText("Ctrl/Cmd+A: Measure 1");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
   const autoScrollStartGrid = await startGrid.boundingBox();
   const offscreenEndBox = await endNote.boundingBox();
   if (!autoScrollStartGrid || !offscreenEndBox)
@@ -505,6 +514,7 @@ test("Piano Roll selects across stacked Systems and scopes effective Melody note
   await page.mouse.down();
   await page.mouse.move(autoScrollStart.x - 1, autoScrollStart.y + 10, { steps: 1 });
   await expect(page.locator(".piano-roll-marquee")).toBeVisible();
+  expect(await page.evaluate(() => window.getSelection()?.isCollapsed ?? true)).toBe(true);
   const endNoteTarget = {
     x: offscreenEndBox.x + offscreenEndBox.width / 2,
     y: 639,
@@ -527,9 +537,12 @@ test("Piano Roll selects across stacked Systems and scopes effective Melody note
       break;
     }
   }
-  expect(await studioScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(
-    scrollBeforeMarquee,
-  );
+  const thresholdScrollTop = await studioScroller.evaluate((element) => element.scrollTop);
+  await page.waitForTimeout(150);
+  const idleScrollTop = await studioScroller.evaluate((element) => element.scrollTop);
+  expect(idleScrollTop).toBe(thresholdScrollTop);
+  expect(await page.evaluate(() => window.getSelection()?.isCollapsed ?? true)).toBe(true);
+  expect(idleScrollTop).toBeGreaterThan(scrollBeforeMarquee);
   expect(
     reachedVisibleEndNote,
     "Auto-scroll brings the target note into the visible scrollport",
@@ -1106,6 +1119,149 @@ test("global Delete works from the selection toolbar, scoped Ctrl+A header, and 
   );
 });
 
+test("keyboard and pointer modality plus cross-measure moves update Ctrl+A measure scope", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const project = createPianoRollSystemChordFixture("piano-roll-keyboard-measure-scope");
+  await openFixture(page, project);
+
+  const scope = page.getByTestId("piano-roll-selection-scope");
+  const sourceNote = page.locator(
+    ".piano-roll-measure[data-measure-index='0'] button.piano-roll-note[data-source-step-id='chord-a'][data-piano-roll-event-key='owner-local-collision']",
+  );
+  const destinationMeasure = page.locator(".piano-roll-measure[data-measure-index='1']");
+  const destinationNote = destinationMeasure.locator("button.piano-roll-note").first();
+
+  await sourceNote.focus();
+  let reachedDestinationByTab = false;
+  for (let tab = 0; tab < 40; tab += 1) {
+    await page.keyboard.press("Tab");
+    reachedDestinationByTab = await destinationNote.evaluate(
+      (note) => note === document.activeElement,
+    );
+    if (reachedDestinationByTab) break;
+  }
+  expect(reachedDestinationByTab, "Tab reaches a note rendered in Measure 2").toBe(true);
+  await expect(scope).toHaveText("Ctrl/Cmd+A: Measure 2");
+  await page.keyboard.press("Control+A");
+  expect((await selectedIdentities(page)).sort()).toEqual(
+    (await identitiesInside(page, ".piano-roll-measure[data-measure-index='1']")).sort(),
+  );
+
+  const sourceBoundaryNote = page.locator(
+    ".piano-roll-measure[data-measure-index='0'] button.piano-roll-note[data-source-step-id='chord-a'][data-piano-roll-event-key='cross-system-carry']",
+  );
+  const start = await page.evaluate(() => {
+    const grid = document
+      .querySelector<HTMLElement>(".piano-roll-measure[data-measure-index='0'] .piano-roll-grid")!
+      .getBoundingClientRect();
+    for (const offset of [1, 1.5, 2]) {
+      const x = grid.right - offset;
+      const note = document.querySelector<HTMLElement>(
+        ".piano-roll-measure[data-measure-index='0'] button.piano-roll-note[data-source-step-id='chord-a'][data-piano-roll-event-key='cross-system-carry']",
+      );
+      if (!note) throw new Error("The cross-measure boundary note is not rendered");
+      const y = note.getBoundingClientRect().y + 2;
+      const target = document.elementFromPoint(x, y)?.closest("button.piano-roll-note");
+      if (
+        target?.getAttribute("data-source-step-id") === "chord-a" &&
+        target?.getAttribute("data-piano-roll-event-key") === "cross-system-carry"
+      )
+        return { x, y, releaseX: grid.right + 1 };
+    }
+    return null;
+  });
+  if (!start) throw new Error("The cross-measure boundary note has no sub-threshold edge target");
+  expect(start.releaseX - start.x).toBeLessThan(4);
+  await expect(sourceBoundaryNote).toBeVisible();
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.releaseX, start.y, { steps: 1 });
+  await page.mouse.up();
+  await expect(sourceBoundaryNote).toBeFocused();
+
+  let reachedAfterOutsidePointerUp = false;
+  for (let tab = 0; tab < 40; tab += 1) {
+    await page.keyboard.press("Tab");
+    reachedAfterOutsidePointerUp = await destinationNote.evaluate(
+      (note) => note === document.activeElement,
+    );
+    if (reachedAfterOutsidePointerUp) break;
+  }
+  expect(reachedAfterOutsidePointerUp).toBe(true);
+  await expect(scope).toHaveText("Ctrl/Cmd+A: Measure 2");
+  await page.keyboard.press("Control+A");
+  expect((await selectedIdentities(page)).sort()).toEqual(
+    (await identitiesInside(page, ".piano-roll-measure[data-measure-index='1']")).sort(),
+  );
+
+  const sourceClickBox = await sourceNote.boundingBox();
+  if (!sourceClickBox) throw new Error("The native click target in Measure 1 is not visible");
+  await page.mouse.click(
+    sourceClickBox.x + sourceClickBox.width / 2,
+    sourceClickBox.y + sourceClickBox.height / 2,
+  );
+  const secondMeasureChord = destinationMeasure.locator(
+    "button.piano-roll-note[data-source-step-id='chord-b'][data-piano-roll-event-key='owner-local-collision']",
+  );
+  const secondMeasureBox = await secondMeasureChord.boundingBox();
+  if (!secondMeasureBox) throw new Error("The Shift-click target in Measure 2 is not visible");
+  await page.keyboard.down("Shift");
+  await page.mouse.click(
+    secondMeasureBox.x + secondMeasureBox.width / 2,
+    secondMeasureBox.y + secondMeasureBox.height / 2,
+  );
+  await page.keyboard.up("Shift");
+  await expect(scope).toHaveText("Ctrl/Cmd+A: Measure 2");
+  expect((await selectedIdentities(page)).sort()).toEqual(
+    [
+      JSON.stringify(["chord-a", "owner-local-collision"]),
+      JSON.stringify(["chord-b", "owner-local-collision"]),
+    ].sort(),
+  );
+
+  await page.keyboard.press("Escape");
+  await sourceNote.focus();
+  await expect(scope).toHaveText("Ctrl/Cmd+A: Measure 1");
+  const baseline = await exportProject(page, false);
+  const sourceBox = await sourceNote.boundingBox();
+  const targetGrid = destinationMeasure.locator(".piano-roll-grid");
+  const targetGridBox = await targetGrid.boundingBox();
+  const pitchRow = destinationMeasure.locator(".piano-roll-row[data-pitch-midi='60']").first();
+  const pitchRowBox = await pitchRow.boundingBox();
+  if (!sourceBox || !targetGridBox || !pitchRowBox)
+    throw new Error("The cross-measure drag targets are not visible");
+
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    targetGridBox.x + targetGridBox.width * 0.25,
+    pitchRowBox.y + pitchRowBox.height / 2,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+
+  await expect(scope).toHaveText("Ctrl/Cmd+A: Measure 2");
+  await page.keyboard.press("Control+A");
+  expect((await selectedIdentities(page)).sort()).toEqual(
+    (await identitiesInside(page, ".piano-roll-measure[data-measure-index='1']")).sort(),
+  );
+  const afterMove = await exportProject(page, false);
+  const moved = createEffectiveMelodyTimeline(afterMove).filter(
+    (note) => note.pitch.midiNumber === 60 && note.sourceStepId === "chord-b",
+  );
+  expect(moved.length).toBeGreaterThan(0);
+  expect(createEffectiveMelodyTimeline(afterMove)).toHaveLength(
+    createEffectiveMelodyTimeline(baseline).length,
+  );
+
+  await historyAction(page, "Undo");
+  await expectProjectContents(await exportProject(page, false), baseline);
+  await historyAction(page, "Redo");
+  await expectProjectContents(await exportProject(page, false), afterMove);
+});
+
 test("Ctrl+X cuts globally in one step and Ctrl+V survives both undos with automatic extension", async ({
   page,
 }) => {
@@ -1612,8 +1768,8 @@ test("Piano Roll selection stays legible at target viewports, themes and pitch g
 
   const normalHeaderSource = createPianoRollSystemChordFixture("normal-header-capture-fixture");
   const normalHeaderProject = {
-    ...normalHeaderSource,
-    temporaryBranch: undefined,
+    ...omitFields(normalHeaderSource, "temporaryBranch"),
+
     presentation: { ...normalHeaderSource.presentation, sidePanelMode: "autohide" as const },
   };
   await openFixture(page, normalHeaderProject);

@@ -6,12 +6,20 @@ import type {
   PlaybackScope,
   ScheduledPlayback,
 } from "../../src/audio/contracts";
+/** `PlaybackController.start` needs a full `HarmonicContext`; this used to pass the string "major". */
+const C_MAJOR_CONTEXT: HarmonicContext = Object.freeze<HarmonicContext>({
+  tonic: 0,
+  moduleId: "progressions",
+  mode: "major",
+  spellingContext: Object.freeze({ tonic: 0, mode: "major" }),
+});
 import { PlaybackController } from "../../src/audio/playbackController";
 import { LookAheadScheduler } from "../../src/audio/scheduler";
 import { TransportStore } from "../../src/ui/transport/transportStore";
 import { setLoopMode, INITIAL_LOOP_STATE } from "../../src/ui/transport/loopState";
 import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
 import { createDefaultProject } from "../../src/domain/project/factory";
+import type { HarmonicContext } from "../../src/domain/harmony/modules/types";
 import { musicalDuration } from "../../src/domain/timing/duration";
 import { meter } from "../../src/domain/timing/meter";
 import { rational } from "../../src/domain/timing/rational";
@@ -75,7 +83,10 @@ function makeSoakStep(
   denominator: number,
 ): ProgressionStep {
   const step = createMatrixChordStep(project, functionId, id);
-  return Object.freeze({ ...step, duration: musicalDuration(rational(numerator, denominator)) });
+  return Object.freeze<ProgressionStep>({
+    ...step,
+    duration: musicalDuration(rational(numerator, denominator)),
+  });
 }
 
 describe("T152 — virtual-clock transport and loop soak", () => {
@@ -194,7 +205,7 @@ describe("T152 — virtual-clock transport and loop soak", () => {
           tempoBpm: 120,
           groove: groove("straight"),
           tonic: 0,
-          context: "major",
+          context: C_MAJOR_CONTEXT,
           loopState,
         }),
       ).toBe(true);

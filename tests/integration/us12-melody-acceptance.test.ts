@@ -1,3 +1,5 @@
+import { generatedMelodyRecipe } from "../../src/domain/melody/types";
+import { requireValue } from "../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import { AppStore } from "../../src/app/appStore";
@@ -19,7 +21,7 @@ import {
   type MelodyGrid,
   type MelodyPattern,
 } from "../../src/domain/melody/projection";
-import { snapshotChordMelodyRecipe, type MelodyRecipeInput } from "../../src/domain/melody/types";
+import { snapshotChordMelody, type MelodyRecipeInput } from "../../src/domain/melody/types";
 import { getHarmonicModule } from "../../src/domain/harmony/moduleRegistry";
 import { realizeProgressionMelodyPerformance } from "../../src/audio/melodyPerformance";
 import { realizeOrderedPianoProgression } from "../../src/instruments/piano/progressionRealization";
@@ -97,7 +99,7 @@ const ORACLE_PATTERN_PITCHES: Readonly<Record<MelodyPattern, readonly number[]>>
   "inside-out": Object.freeze([64, 67, 60, 67]),
 });
 const ORACLE_GRID_EVENTS: Readonly<Record<MelodyGrid, readonly (readonly [Rational, Rational])[]>> =
-  Object.freeze({
+  Object.freeze<Record<MelodyGrid, readonly (readonly [Rational, Rational])[]>>({
     quarter: Object.freeze([
       [rational(0), rational(1)],
       [rational(1), rational(1, 4)],
@@ -140,8 +142,23 @@ function freezeChordWithMelody(
   return Object.freeze({
     ...step,
     duration: musicalDuration(durationBeats),
-    melody: snapshotChordMelodyRecipe(recipe),
+    // `ChordStep.melody` is a `ChordMelody`, i.e. `{ mode: "generated" as const, recipe }`. Using
+    // `snapshotChordMelodyRecipe` here stored a bare recipe, so the in-memory project differed in
+    // shape from what the portable codec returns and the round-trip comparison failed.
+    melody: snapshotChordMelody(recipe),
   });
+}
+
+/**
+ * Normalises a progression for round-trip comparison.
+ *
+ * `sections` is optional on the type, but the wire format always carries the key (the JSON schema
+ * requires it), so a project with no Song Sections comes back from storage with `sections: []`.
+ * Absent and empty mean the same thing; comparing them raw asserts a structural detail the codec is
+ * not meant to preserve.
+ */
+function progressionForComparison(progression: Project["progression"]) {
+  return { ...progression, sections: progression.sections ?? [] };
 }
 
 function canonicalProject(): Project {
@@ -464,7 +481,7 @@ function collapseTiedMusicXmlNotes(
 
 function melodyProjectionNotes(
   projection: MusicXmlProjection,
-): readonly MusicXmlMelodyMeasureEvent[] {
+): readonly Extract<MusicXmlMelodyMeasureEvent, { readonly kind: "note" }>[] {
   return Object.freeze(
     (projection.melody?.measures ?? []).flatMap((measure) =>
       measure.events.filter((event) => event.kind === "note"),
@@ -529,7 +546,13 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
       sourceStepId: "oracle-octave-doubling",
       upperPitches: ORACLE_UPPER_PITCHES,
       durationBeats: rational(2),
-      recipe: { pattern: "up" as const, grid: "eighth" as const, octaveOffset: 1 as const },
+      recipe: {
+        pitchMotion: "up" as const,
+        grid: "eighth" as const,
+        octaveOffset: 1 as const,
+        rhythm: "even" as const,
+        connection: "retrigger" as const,
+      },
     };
     const before = structuredClone(input);
     const octavePhrase = realizeChordMelody(input);
@@ -584,7 +607,7 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
         sourceStepId: step.id,
         upperPitches: realization.upperPitches,
         durationBeats: step.duration.beats,
-        recipe: step.melody,
+        recipe: requireValue(generatedMelodyRecipe(step.melody)),
       }).events;
     });
 
@@ -758,7 +781,10 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
       encodePortableProject(project),
     );
     const decoded = decodePortableProject(encoded);
-    expect(decoded).toEqual(project);
+    expect(progressionForComparison(decoded.progression)).toEqual(
+      progressionForComparison(project.progression),
+    );
+    expect({ ...decoded, progression: undefined }).toEqual({ ...project, progression: undefined });
     expect(encoded).not.toContain("startOffsetBeats");
     expect(encoded).not.toContain("durationBeats");
     expect(encoded).not.toContain("eventKey");
@@ -772,7 +798,13 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
     store.dispatch(
       createSetMelodyRecipeCommand(
         firstStep.id,
-        { pattern: "inside-out", grid: "eighth", octaveOffset: 0 },
+        {
+          pitchMotion: "inside-out",
+          grid: "eighth",
+          octaveOffset: 0,
+          rhythm: "even" as const,
+          connection: "retrigger" as const,
+        },
         "2026-09-11T10:00:00.000Z",
         "violin",
       ),
@@ -975,11 +1007,19 @@ describe("T176 — US12 SC-018 final Melody acceptance", () => {
     );
     const straightTriplets = basePerformance.events.filter((event) => {
       const step = project.progression.steps[event.stepIndex];
-      return step?.kind === "chord" && step.melody?.grid.endsWith("-triplet");
+      return (
+        step?.kind === "chord" &&
+        step.melody?.mode === "generated" &&
+        step.melody.recipe.grid.endsWith("-triplet")
+      );
     });
     const swingTriplets = swingPerformance.events.filter((event) => {
       const step = project.progression.steps[event.stepIndex];
-      return step?.kind === "chord" && step.melody?.grid.endsWith("-triplet");
+      return (
+        step?.kind === "chord" &&
+        step.melody?.mode === "generated" &&
+        step.melody.recipe.grid.endsWith("-triplet")
+      );
     });
     expect(swingTriplets.map((event) => [event.startBeats, event.durationBeats])).toEqual(
       straightTriplets.map((event) => [event.startBeats, event.durationBeats]),

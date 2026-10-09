@@ -29,8 +29,8 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const migrated = decodePortableProject(JSON.stringify(raw));
 
-    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(10);
-    expect(migrated.schemaVersion).toBe(10);
+    expect(CURRENT_PROJECT_SCHEMA_VERSION).toBe(11);
+    expect(migrated.schemaVersion).toBe(11);
     expect(migrated.harmonyTrack).toMatchObject({
       pianoEngine: "hq-samples",
       guitarEngine: "hq-samples",
@@ -80,7 +80,7 @@ describe("T197 + T192 — schema v6 cutover", () => {
 
     const restored = decodePortableProject(encodePortableProject(configured));
 
-    expect(restored.schemaVersion).toBe(10);
+    expect(restored.schemaVersion).toBe(11);
     expect(restored.harmonyTrack).toEqual(configured.harmonyTrack);
     expect(restored.presentation.noteColorMode).toBe("harmonic-role");
   });
@@ -111,8 +111,8 @@ describe("T197 + T192 — schema v6 cutover", () => {
     });
 
     const encoded = encodePortableProject(targetedProject);
-    expect(JSON.parse(encoded).progression.steps[0].melody).toMatchObject({
-      mode: "generated",
+    expect(JSON.parse(encoded).progression.steps[0]!.melody).toMatchObject({
+      mode: "generated" as const,
       recipe: { targetNextPitchClass: 2 },
     });
     expect(decodePortableProject(encoded).progression.steps[0]).toHaveProperty(

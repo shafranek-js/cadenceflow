@@ -1,3 +1,4 @@
+import { snapshotChordMelody } from "../../src/domain/melody/types";
 import { describe, expect, it } from "vitest";
 import { realizeProgressionMelodyPerformance } from "../../src/audio/melodyPerformance";
 import { modeForModule } from "../../src/domain/harmony/functions";
@@ -12,13 +13,15 @@ import { musicalDuration } from "../../src/domain/timing/duration";
 import { createRichProjectFixture } from "../fixtures/rich-project.fixture";
 
 function projectWithRecipe(
-  recipe: NonNullable<Project["progression"]["steps"][number]["melody"]>,
+  recipe: import("../../src/domain/melody/types").ChordMelodyRecipe,
 ): Project {
   const project = createRichProjectFixture();
   const steps = project.progression.steps.map((step, index) =>
-    index === 0 && step.kind === "chord" ? Object.freeze({ ...step, melody: recipe }) : step,
+    index === 0 && step.kind === "chord"
+      ? Object.freeze({ ...step, melody: snapshotChordMelody(recipe) })
+      : step,
   );
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     globalTiming: globalTiming(project.globalTiming.tempoBpm, meter(4, 4, [4])),
     progression: Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
@@ -27,7 +30,7 @@ function projectWithRecipe(
 
 function contextFor(project: Project): HarmonicContext {
   const mode = modeForModule(project.activeModule);
-  return Object.freeze({
+  return Object.freeze<HarmonicContext>({
     tonic: project.tonic,
     moduleId: project.activeModule,
     mode,
@@ -105,7 +108,9 @@ describe("T186 Batch A — one canonical Melody event projection", () => {
     const xml = projectProjectToMusicXml(project).melody;
     if (!midi || !xml) throw new Error("expected Melody projections");
     const xmlNotes = xml.measures.flatMap((measure) =>
-      measure.events.filter((event) => event.kind === "note" && event.stepId === "step-1"),
+      measure.events
+        .filter((event) => event.kind === "note")
+        .filter((event) => event.stepId === "step-1"),
     );
 
     expect(staff).toHaveLength(1);

@@ -9,24 +9,13 @@
  * 5. Direct Truck-Driver Lifts: +1 / +2 semitones anthemic chorus modulations with lead-in dominants.
  */
 
-import {
-  type BaseChordQuality,
-  type HarmonicVariant,
-} from "./chord";
+import { type BaseChordQuality, type HarmonicVariant } from "./chord";
 import type { HarmonicModuleId } from "./functions";
 import { normalizePitchClass, type PitchClassIdentity } from "./pitch";
-import {
-  defaultTonicSpelling,
-  formatPitchSpelling,
-  spellScaleDegree,
-} from "./spelling";
+import { defaultTonicSpelling, formatPitchSpelling, spellScaleDegree } from "./spelling";
 
 export type ModulationStyle =
-  | "pivot"
-  | "jazz-turnaround"
-  | "tritone-sub"
-  | "chromatic-mediant"
-  | "direct-lift";
+  "pivot" | "jazz-turnaround" | "tritone-sub" | "chromatic-mediant" | "direct-lift";
 
 export interface KeyRelationship {
   readonly intervalSemitones: number;
@@ -145,18 +134,12 @@ export function getKeyRelationship(
     description = "Fourth above source tonic (+1 flat / -1 sharp difference).";
   } else if (isDirectLift) {
     relationName =
-      interval === 1
-        ? "Half-step Lift (+1 semitone)"
-        : "Whole-step Lift (+2 semitones)";
-    description =
-      "Direct upward modulation common for high-energy final chorus transitions.";
+      interval === 1 ? "Half-step Lift (+1 semitone)" : "Whole-step Lift (+2 semitones)";
+    description = "Direct upward modulation common for high-energy final chorus transitions.";
   } else if (isMediant) {
     relationName =
-      interval === 3 || interval === 4
-        ? "Chromatic Mediant (Up)"
-        : "Chromatic Mediant (Down)";
-    description =
-      "Third-related key shift producing expansive, cinematic emotional color.";
+      interval === 3 || interval === 4 ? "Chromatic Mediant (Up)" : "Chromatic Mediant (Down)";
+    description = "Third-related key shift producing expansive, cinematic emotional color.";
   }
 
   return Object.freeze({
@@ -215,10 +198,7 @@ function getDiatonicSpecs(module: HarmonicModuleId): readonly DiatonicChordSpec[
  * Returns formatted key display string, e.g. "C Major" or "A Minor".
  */
 export function formatKeyName(tonic: PitchClassIdentity, module: HarmonicModuleId): string {
-  const spelling = defaultTonicSpelling(
-    tonic,
-    module === "progressions" ? "major" : "tonal-minor",
-  );
+  const spelling = defaultTonicSpelling(tonic, module === "progressions" ? "major" : "tonal-minor");
   return `${formatPitchSpelling(spelling)} ${module === "progressions" ? "Major" : "Minor"}`;
 }
 
@@ -423,10 +403,7 @@ export function getAvailableModulations(
     const sChord = realizeDiatonicChord(sTonic, sourceModule, sSpec);
     for (const tSpec of targetSpecs) {
       const tChord = realizeDiatonicChord(tTonic, targetModule, tSpec);
-      if (
-        sChord.rootPitchClass === tChord.rootPitchClass &&
-        sSpec.quality === tSpec.quality
-      ) {
+      if (sChord.rootPitchClass === tChord.rootPitchClass && sSpec.quality === tSpec.quality) {
         // Avoid trivial match where the pivot is the arrival tonic itself unless needed
         pivotMatches.push({
           sourceSpec: sSpec,
@@ -474,7 +451,13 @@ export function getAvailableModulations(
       }),
     });
 
-    const dominantStep = createDominantStep(tTonic, targetModule, sTonic, sourceModule, `pivot-${i}`);
+    const dominantStep = createDominantStep(
+      tTonic,
+      targetModule,
+      sTonic,
+      sourceModule,
+      `pivot-${i}`,
+    );
     const arrivalStep = createArrivalStep(tTonic, targetModule, sTonic, sourceModule, `pivot-${i}`);
 
     const isModalBorrow = match.sourceSpec.isModal;
@@ -482,7 +465,10 @@ export function getAvailableModulations(
       ? `Modal Pivot (${match.chordSymbol} = ${match.sourceSpec.roman} / ${match.targetSpec.roman}) → V7 → ${arrivalStep.chordSymbol}`
       : `Common Chord Pivot (${match.chordSymbol} = ${match.sourceSpec.roman} / ${match.targetSpec.roman}) → V7 → ${arrivalStep.chordSymbol}`;
 
-    const score = Math.max(78, 98 - relationship.circleOfFifthsDistance * 4 - (isModalBorrow ? 5 : 0));
+    const score = Math.max(
+      78,
+      98 - relationship.circleOfFifthsDistance * 4 - (isModalBorrow ? 5 : 0),
+    );
 
     paths.push(
       Object.freeze({
@@ -537,8 +523,20 @@ export function getAvailableModulations(
     }),
   });
 
-  const turnaroundDom = createDominantStep(tTonic, targetModule, sTonic, sourceModule, "turnaround");
-  const turnaroundArrival = createArrivalStep(tTonic, targetModule, sTonic, sourceModule, "turnaround");
+  const turnaroundDom = createDominantStep(
+    tTonic,
+    targetModule,
+    sTonic,
+    sourceModule,
+    "turnaround",
+  );
+  const turnaroundArrival = createArrivalStep(
+    tTonic,
+    targetModule,
+    sTonic,
+    sourceModule,
+    "turnaround",
+  );
 
   paths.push(
     Object.freeze({
@@ -627,7 +625,11 @@ export function getAvailableModulations(
     );
   }
 
-  if (relationship.isDirectLift || relationship.intervalSemitones === 1 || relationship.intervalSemitones === 2) {
+  if (
+    relationship.isDirectLift ||
+    relationship.intervalSemitones === 1 ||
+    relationship.intervalSemitones === 2
+  ) {
     // Truck-driver gear change lift
     const liftDom = createDominantStep(tTonic, targetModule, sTonic, sourceModule, "lift");
     const liftArrival = createArrivalStep(tTonic, targetModule, sTonic, sourceModule, "lift");

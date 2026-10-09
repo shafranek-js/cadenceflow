@@ -10,7 +10,7 @@ import { rational } from "../../../src/domain/timing/rational";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 
-const PERFORMANCE: StepPerformance = Object.freeze({
+const PERFORMANCE: StepPerformance = Object.freeze<StepPerformance>({
   articulation: "block",
   register: "auto",
   voicingMode: "auto",
@@ -26,10 +26,14 @@ function chord(
   functionId = "I",
 ): ChordStep {
   const beatValue = typeof beats === "number" ? rational(beats) : beats;
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
-    harmonicFunction: Object.freeze({ moduleId: "progressions", functionId }),
+    harmonicFunction: Object.freeze({
+      moduleId: "progressions" as const,
+      functionId,
+      category: "core" as const,
+    }),
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: musicalDuration(beatValue),
     performance: PERFORMANCE,

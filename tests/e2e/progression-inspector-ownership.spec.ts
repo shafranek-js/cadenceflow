@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { addRestToProgression } from "./test-helpers/progression-settings";
+import { addRestToProgression, setProgressionView } from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -24,9 +24,10 @@ async function expectActionsBeforeProgressionSettings(
   inspector: Locator,
   viewportHeight: number,
 ): Promise<void> {
-  const actions = inspector.locator(":scope > .step-actions");
+  const actions = inspector.locator(".step-actions");
   const settings = inspector.getByTestId("selected-progression-settings");
   await expect(actions).toBeVisible();
+  await actions.scrollIntoViewIfNeeded();
   await expect(settings).toBeVisible();
   const actionsBox = await actions.boundingBox();
   const settingsBox = await settings.boundingBox();
@@ -65,8 +66,9 @@ test.describe("Progression inspector ownership", () => {
       .getByTestId("chord-card-I")
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
-    const firstStep = page.locator('[data-testid="progression-step"]').first();
-    await firstStep.getByRole("button", { name: /Select progression step/ }).click();
+    await setProgressionView(page, "staff");
+    const firstStep = page.locator(".measure-staff-event-select").first();
+    await firstStep.click();
 
     const selectedInspector = page.getByTestId("step-performance-inspector");
     const progressionSettings = selectedInspector.getByTestId("selected-progression-settings");
@@ -112,7 +114,10 @@ test.describe("Progression inspector ownership", () => {
 
     await progressionSettings.locator(":scope > summary").click();
     await expect(progressionSettings).not.toHaveAttribute("open", "");
-    await firstStep.getByRole("button", { name: /Select progression step/ }).focus();
+    await firstStep.focus();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("range-selection-toolbar")).toHaveCount(0);
+    await expect(selectedInspector).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(globalInspector).toBeVisible();
     await expect(globalInspector.locator(".global-meter-disclosure .disclosure-status")).toHaveText(
@@ -125,8 +130,10 @@ test.describe("Progression inspector ownership", () => {
     await expectNoPageHorizontalScroll(page);
 
     await addRestToProgression(page);
-    const restStep = page.locator('[data-testid="progression-step"]').last();
-    await restStep.getByRole("button", { name: /Select progression step .*: Rest/ }).click();
+    const restStep = page
+      .locator(".measure-staff-event.is-rest .measure-staff-event-select")
+      .last();
+    await restStep.click();
 
     const restInspector = page.getByTestId("step-performance-inspector");
     const restSettings = restInspector.getByTestId("selected-progression-settings");

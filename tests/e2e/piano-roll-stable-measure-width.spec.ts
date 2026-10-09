@@ -20,7 +20,7 @@ function createMeasureWidthFixture(): Project {
     })),
   );
   const firstStepId = steps[0]!.id;
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     globalTiming: globalTiming(100, meter(1, 4)),
     presentation: Object.freeze({

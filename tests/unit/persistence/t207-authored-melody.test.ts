@@ -24,7 +24,7 @@ const note = {
 
 describe("T207 authored ChordMelody", () => {
   it("snapshots stable IDs and exact rational note values immutably", () => {
-    const melody = snapshotChordMelody({ mode: "authored", phrase: { notes: [note] } });
+    const melody = snapshotChordMelody({ mode: "authored" as const, phrase: { notes: [note] } });
     expect(melody.mode).toBe("authored");
     if (melody.mode !== "authored") throw new Error("expected authored melody");
     expect(melody.phrase.notes[0]).toMatchObject({
@@ -34,11 +34,11 @@ describe("T207 authored ChordMelody", () => {
     });
     expect(Object.isFrozen(melody.phrase.notes[0])).toBe(true);
     expect(() =>
-      snapshotChordMelody({ mode: "authored", phrase: { notes: [note, note] } }),
+      snapshotChordMelody({ mode: "authored" as const, phrase: { notes: [note, note] } }),
     ).toThrow();
     expect(() =>
       snapshotChordMelody({
-        mode: "authored",
+        mode: "authored" as const,
         phrase: { notes: [{ ...note, duration: rational(0) }] },
       }),
     ).toThrow();
@@ -46,14 +46,14 @@ describe("T207 authored ChordMelody", () => {
 
   it("accepts an authored note at the beginning of the phrase", () => {
     const atStart = { ...note, onset: rational(0) };
-    const melody = snapshotChordMelody({ mode: "authored", phrase: { notes: [atStart] } });
+    const melody = snapshotChordMelody({ mode: "authored" as const, phrase: { notes: [atStart] } });
     expect(melody.mode === "authored" ? melody.phrase.notes[0]?.onset : undefined).toEqual(
       rational(0),
     );
   });
 
   it("resolves authored events with stable event keys", () => {
-    const melody = snapshotChordMelody({ mode: "authored", phrase: { notes: [note] } });
+    const melody = snapshotChordMelody({ mode: "authored" as const, phrase: { notes: [note] } });
     const phrase = resolveEffectiveMelodyPhrase({
       sourceStepId: "step-a",
       melody,
@@ -88,9 +88,9 @@ describe("T207 authored ChordMelody", () => {
       schemaVersion: 6,
       progression: { steps: [{ id: "s1", kind: "chord", melody: recipe }] },
     });
-    expect(result.schemaVersion).toBe(10);
+    expect(result.schemaVersion).toBe(11);
     expect((result.progression as { steps: Array<{ melody: unknown }> }).steps[0]?.melody).toEqual({
-      mode: "generated",
+      mode: "generated" as const,
       recipe,
     });
   });
@@ -103,13 +103,16 @@ describe("T207 authored ChordMelody", () => {
       progression: Object.freeze({
         ...base.progression,
         steps: Object.freeze([
-          { ...step, melody: snapshotChordMelody({ mode: "authored", phrase: { notes: [note] } }) },
+          {
+            ...step,
+            melody: snapshotChordMelody({ mode: "authored" as const, phrase: { notes: [note] } }),
+          },
         ]),
       }),
     });
     const decoded = decodePortableProject(encodePortableProject(project));
     const chord = decoded.progression.steps[0];
-    expect(decoded.schemaVersion).toBe(10);
+    expect(decoded.schemaVersion).toBe(11);
     expect(
       chord?.kind === "chord" && chord.melody?.mode === "authored"
         ? chord.melody.phrase.notes[0]
@@ -134,11 +137,11 @@ describe("T207 authored ChordMelody", () => {
     );
     expect(
       applied.project.progression.steps[0]?.kind === "chord" &&
-        applied.project.progression.steps[0].melody?.mode,
+        applied.project.progression.steps[0]!.melody?.mode,
     ).toBe("authored");
     expect(
       inverse.project.progression.steps[0]?.kind === "chord" &&
-        inverse.project.progression.steps[0].melody,
+        inverse.project.progression.steps[0]!.melody,
     ).toBeUndefined();
   });
 });

@@ -5,7 +5,21 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "public/audio/piano-hq/samples"] },
+  {
+    // ESLint does not read `.gitignore`, so generated trees must be listed here explicitly.
+    // `artifacts/` holds validation run output (screenshots, metrics JSON, throwaway Playwright
+    // configs); linting it reported failures in files nobody maintains.
+    ignores: [
+      "dist",
+      "public/audio/piano-hq/samples",
+      // SoundFont banks are generated base64 JavaScript assets, not maintained source code.
+      "public/audio/soundfont/*-mp3.js",
+      "artifacts",
+      "graphify-out",
+      "playwright-report",
+      "coverage",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

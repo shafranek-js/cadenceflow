@@ -1,17 +1,10 @@
-import { useState, useMemo, type ChangeEvent } from "react";
+import { useId, useMemo, type ChangeEvent } from "react";
 import type { HarmonicContext } from "../../domain/harmony/modules/types";
-import {
-  exactPitch,
-  midiToPitchClass,
-  type ExactPitch,
-  type PitchSpelling,
-} from "../../domain/harmony/pitch";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
+import type { ExactPitch } from "../../domain/harmony/pitch";
 import type {
-  BassChoice,
-  BassOctaveOffset,
   ChordStep,
   DynamicsViewPreference,
-  InversionChoice,
   ProgressionStep,
   StepPerformance,
 } from "../../domain/progression/step";
@@ -22,8 +15,6 @@ import type { LoopMode, LoopState } from "../transport/loopState";
 import { InspectorProgressionSettings } from "./InspectorProgressionSettings";
 import {
   PIANO_DYNAMICS_PRESETS,
-  PIANO_RANGE_MAX_MIDI,
-  PIANO_RANGE_MIN_MIDI,
   type DynamicsPresetId,
   type MusicalDynamicLabel,
 } from "../../instruments/contracts";
@@ -36,7 +27,6 @@ import {
   realizeProgressionStepRealization,
   realizeProgressionStepSourceRealization,
 } from "../../instruments/piano/profile";
-import { pitchToConcertFrame, pitchToSourceFrame } from "../../domain/progression/transposition";
 import { RegisterControl } from "./RegisterControl";
 import { ArticulationControl } from "./ArticulationControl";
 import { StepActions } from "../progression/StepActions";
@@ -45,38 +35,14 @@ import { formatDurationBeats } from "../timing/stepDuration";
 import type { MelodyTrackSettings } from "../../domain/melody/types";
 import type { AudioProviderState } from "../../audio/contracts";
 import { Icon } from "../common/Icon";
+import { InspectorDisclosureToggle } from "./InspectorDisclosure";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 import { useReorderableSections } from "./useReorderableSections";
 import {
   getAvailableSubstitutions,
   getSubstitutionKindBadge,
   type ChordSubstitution,
 } from "../../domain/harmony/reharmonization";
-
-const BASS_CHOICES: readonly { readonly value: BassChoice; readonly label: string }[] =
-  Object.freeze([
-    Object.freeze({ value: "auto", label: "Auto" }),
-    Object.freeze({ value: "root", label: "Root" }),
-    Object.freeze({ value: "third", label: "3rd" }),
-    Object.freeze({ value: "fifth", label: "5th" }),
-    Object.freeze({ value: "seventh", label: "7th" }),
-    Object.freeze({ value: "custom", label: "Custom" }),
-  ]);
-
-const INVERSION_CHOICES: readonly { readonly value: InversionChoice; readonly label: string }[] =
-  Object.freeze([
-    Object.freeze({ value: "auto", label: "Auto (Voice Leading)" }),
-    Object.freeze({ value: 0, label: "Root Position (I)" }),
-    Object.freeze({ value: 1, label: "1st Inversion (6 / 6/5)" }),
-    Object.freeze({ value: 2, label: "2nd Inversion (6/4 / 4/3)" }),
-    Object.freeze({ value: 3, label: "3rd Inversion (4/2)" }),
-  ]);
-
-const BASS_OCTAVES: readonly { readonly value: BassOctaveOffset; readonly label: string }[] =
-  Object.freeze([
-    Object.freeze({ value: "auto", label: "Auto" }),
-    Object.freeze({ value: -1, label: "-1 Octave" }),
-    Object.freeze({ value: -2, label: "-2 Octaves" }),
-  ]);
 
 const MUSICAL_DYNAMICS: readonly MusicalDynamicLabel[] = ["pp", "p", "mp", "mf", "f", "ff"];
 
@@ -86,7 +52,6 @@ export type SelectedStepSectionId =
   | "articulation"
   | "duration"
   | "voicing"
-  | "bass"
   | "dynamics"
   | "progression";
 
@@ -96,7 +61,6 @@ export const DEFAULT_SELECTED_STEP_SECTIONS: readonly SelectedStepSectionId[] = 
   "articulation",
   "duration",
   "voicing",
-  "bass",
   "dynamics",
   "progression",
 ]);
@@ -104,44 +68,21 @@ export const DEFAULT_SELECTED_STEP_SECTIONS: readonly SelectedStepSectionId[] = 
 export const SELECTED_STEP_SECTION_ORDER_STORAGE_KEY =
   "cadenceflow:inspector:selected_step:sections_order";
 
+const PANEL_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.step-performance-inspector-disclosure-open";
 const REHARMONIZATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.reharmonization-disclosure-open";
 const DYNAMICS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.dynamics-disclosure-open";
 const PER_NOTE_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.per-note-disclosure-open";
-const BASS_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.bass-disclosure-open";
 const VOICING_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.voicing-disclosure-open";
 const REGISTER_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.register-disclosure-open";
 const ARTICULATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.articulation-disclosure-open";
 const DURATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.duration-disclosure-open";
 
-function readDisclosureState(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : stored === "true";
-  } catch {
-    return fallback;
-  }
-}
-
-const PC_TO_DEFAULT_SPELLING: Readonly<Record<number, PitchSpelling>> = {
-  0: { step: "C", alter: 0 },
-  1: { step: "C", alter: 1 },
-  2: { step: "D", alter: 0 },
-  3: { step: "E", alter: -1 },
-  4: { step: "E", alter: 0 },
-  5: { step: "F", alter: 0 },
-  6: { step: "F", alter: 1 },
-  7: { step: "G", alter: 0 },
-  8: { step: "A", alter: -1 },
-  9: { step: "A", alter: 0 },
-  10: { step: "B", alter: -1 },
-  11: { step: "B", alter: 0 },
-};
-
 export interface PianoPerformanceInspectorProps {
   readonly step: ChordStep;
   readonly tonic: number;
   readonly context: HarmonicContext;
+  readonly independentBassEnabled?: boolean;
+  readonly onSetIndependentBassEnabled?: (enabled: boolean) => void;
   readonly meter?: Meter;
   readonly onPerformanceChange: (performance: Partial<StepPerformance>) => void;
   readonly onDurationChange?: (duration: MusicalDuration) => void;
@@ -174,6 +115,8 @@ export function PianoPerformanceInspector({
   step,
   tonic,
   context,
+  independentBassEnabled = true,
+  onSetIndependentBassEnabled,
   meter,
   onPerformanceChange,
   onDurationChange,
@@ -205,45 +148,23 @@ export function PianoPerformanceInspector({
   const isManual = perf.voicingMode === "manual";
   const overrideCount = Object.keys(perf.perNoteVelocityOverrides || {}).length;
 
-  const [customBassError, setCustomBassError] = useState<string | null>(null);
-  const [reharmonizationOpen, setReharmonizationOpen] = useState(() =>
-    readDisclosureState(REHARMONIZATION_DISCLOSURE_STORAGE_KEY, true),
+  const panelBodyId = useId();
+  const panelDisclosure = useInspectorDisclosure(PANEL_DISCLOSURE_STORAGE_KEY, true);
+  const reharmonizationDisclosure = useInspectorDisclosure(
+    REHARMONIZATION_DISCLOSURE_STORAGE_KEY,
+    true,
   );
-  const [registerOpen, setRegisterOpen] = useState(() =>
-    readDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [articulationOpen, setArticulationOpen] = useState(() =>
-    readDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [durationOpen, setDurationOpen] = useState(() =>
-    readDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [dynamicsOpen, setDynamicsOpen] = useState(() =>
-    readDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [perNoteOpen, setPerNoteOpen] = useState(() =>
-    readDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [bassOpen, setBassOpen] = useState(() =>
-    readDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, true),
-  );
-  const [voicingOpen, setVoicingOpen] = useState(() =>
-    readDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, true),
-  );
+  const registerDisclosure = useInspectorDisclosure(REGISTER_DISCLOSURE_STORAGE_KEY, true);
+  const articulationDisclosure = useInspectorDisclosure(ARTICULATION_DISCLOSURE_STORAGE_KEY, true);
+  const durationDisclosure = useInspectorDisclosure(DURATION_DISCLOSURE_STORAGE_KEY, true);
+  const dynamicsDisclosure = useInspectorDisclosure(DYNAMICS_DISCLOSURE_STORAGE_KEY, true);
+  const perNoteDisclosure = useInspectorDisclosure(PER_NOTE_DISCLOSURE_STORAGE_KEY, true);
+  const voicingDisclosure = useInspectorDisclosure(VOICING_DISCLOSURE_STORAGE_KEY, true);
 
   const availableSubstitutions = useMemo(
     () => getAvailableSubstitutions(step, context.moduleId, tonic),
     [step, context.moduleId, tonic],
   );
-
-  const persistDisclosureState = (key: string, open: boolean) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(key, String(open));
-    } catch {
-      // Disclosure preferences are best-effort when storage is unavailable.
-    }
-  };
 
   // Realize current full chord step (upper voices + bass voice) within actual harmonic context
   const realization = realizeProgressionStepRealization(step, tonic, context);
@@ -252,57 +173,6 @@ export function PianoPerformanceInspector({
   const handleVoicingModeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const mode = e.target.value as "auto" | "manual";
     onPerformanceChange({ voicingMode: mode });
-  };
-
-  const handleInversionChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    onPerformanceChange({
-      inversion: val === "auto" ? "auto" : (Number(val) as 0 | 1 | 2 | 3),
-    });
-  };
-
-  const handleBassChoiceChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const choice = e.target.value as BassChoice;
-    const defaultCustom =
-      perf.bass.customPitch ??
-      pitchToSourceFrame(exactPitch(36, { step: "C", alter: 0 }), step); // concert C2
-    onPerformanceChange({
-      bass: {
-        ...perf.bass,
-        choice,
-        ...(choice === "custom" && !perf.bass.customPitch ? { customPitch: defaultCustom } : {}),
-      },
-    });
-  };
-
-  const handleBassOctaveChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    onPerformanceChange({
-      bass: {
-        ...perf.bass,
-        octaveOffset: val === "auto" ? "auto" : (Number(val) as BassOctaveOffset),
-      },
-    });
-  };
-
-  const handleCustomBassMidiChange = (rawMidi: number) => {
-    if (isNaN(rawMidi)) return;
-    if (rawMidi < PIANO_RANGE_MIN_MIDI || rawMidi > PIANO_RANGE_MAX_MIDI) {
-      setCustomBassError(
-        `Custom bass pitch MIDI ${rawMidi} is outside piano range (${PIANO_RANGE_MIN_MIDI}..${PIANO_RANGE_MAX_MIDI})`,
-      );
-      return;
-    }
-    setCustomBassError(null);
-    const pc = midiToPitchClass(rawMidi);
-    const spelling = PC_TO_DEFAULT_SPELLING[pc] ?? { step: "C", alter: 0 };
-    const nextPitch = pitchToSourceFrame(exactPitch(rawMidi, spelling), step);
-    onPerformanceChange({
-      bass: {
-        ...perf.bass,
-        customPitch: nextPitch,
-      },
-    });
   };
 
   const handleMasterVelocityChange = (val: number) => {
@@ -325,7 +195,7 @@ export function PianoPerformanceInspector({
       sourceRealization.pitches,
       perf.masterVelocity,
       undefined,
-      sourceRealization.bassPitch,
+      independentBassEnabled ? sourceRealization.bassPitch : undefined,
     );
     onPerformanceChange({ perNoteVelocityOverrides: overrides });
   };
@@ -349,30 +219,44 @@ export function PianoPerformanceInspector({
     onPerformanceChange({ perNoteVelocityOverrides: updated });
   };
 
-  // Compile full note list for per-note velocity editor
+  // Compile full note list for per-note velocity editor.
+  //
+  // Velocity overrides are keyed by the SOURCE realisation's MIDI number, so a note without a
+  // matching source pitch cannot be addressed and is skipped.
+  //
+  // Regression context: this used `throw new Error(...)` for both mismatches. Because the list
+  // is built during render, a violation unmounted the whole application (there was no error
+  // boundary), so the user lost the session instead of seeing one uneditable note.
   const notesToDisplay: {
     readonly noteKey: string;
     readonly label: string;
     readonly role: "bass" | "upper";
     readonly pitch: ExactPitch;
   }[] = [];
+  let unmappedNoteCount = 0;
 
-  if (realization.bassPitch) {
+  if (independentBassEnabled && realization.bassPitch) {
     const b = realization.bassPitch;
     const sourceBass = sourceRealization.bassPitch;
-    if (!sourceBass) throw new Error(`Missing source bass pitch for Step ${step.id}`);
-    const alterStr = b.spelling.alter === 1 ? "#" : b.spelling.alter === -1 ? "b" : "";
-    notesToDisplay.push({
-      noteKey: String(sourceBass.midiNumber),
-      label: `Bass: ${b.spelling.step}${alterStr}${b.octave}`,
-      role: "bass",
-      pitch: b,
-    });
+    if (sourceBass) {
+      const alterStr = b.spelling.alter === 1 ? "#" : b.spelling.alter === -1 ? "b" : "";
+      notesToDisplay.push({
+        noteKey: String(sourceBass.midiNumber),
+        label: `Bass: ${b.spelling.step}${alterStr}${b.octave}`,
+        role: "bass",
+        pitch: b,
+      });
+    } else {
+      unmappedNoteCount += 1;
+    }
   }
 
   realization.pitches.forEach((p, index) => {
     const sourcePitch = sourceRealization.pitches[index];
-    if (!sourcePitch) throw new Error(`Missing source upper pitch for Step ${step.id}`);
+    if (!sourcePitch) {
+      unmappedNoteCount += 1;
+      return;
+    }
     const alterStr = p.spelling.alter === 1 ? "#" : p.spelling.alter === -1 ? "b" : "";
     notesToDisplay.push({
       noteKey: String(sourcePitch.midiNumber),
@@ -399,12 +283,8 @@ export function PianoPerformanceInspector({
         return (
           <details
             className="inspector-disclosure reharmonization-disclosure"
-            open={reharmonizationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setReharmonizationOpen(open);
-              persistDisclosureState(REHARMONIZATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={reharmonizationDisclosure.isOpen}
+            onToggle={(event) => reharmonizationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -417,7 +297,8 @@ export function PianoPerformanceInspector({
                 Reharmonization
               </span>
               <span className="disclosure-status">
-                {availableSubstitutions.length} suggestion{availableSubstitutions.length === 1 ? "" : "s"}
+                {availableSubstitutions.length} suggestion
+                {availableSubstitutions.length === 1 ? "" : "s"}
               </span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -429,7 +310,8 @@ export function PianoPerformanceInspector({
                 <div className="reharmonization-header">
                   <h4>Chord Substitutions</h4>
                   <p className="reharmonization-subtitle">
-                    Contextual harmonic substitutions for {step.harmonicFunction.functionId}
+                    Contextual harmonic substitutions for{" "}
+                    {harmonicFunctionLabel(step.harmonicFunction)}
                   </p>
                 </div>
                 {availableSubstitutions.length === 0 ? (
@@ -453,9 +335,7 @@ export function PianoPerformanceInspector({
                           role="listitem"
                         >
                           <div className="reharmonization-card-header">
-                            <span className={`sub-badge ${badge.badgeClass}`}>
-                              {badge.label}
-                            </span>
+                            <span className={`sub-badge ${badge.badgeClass}`}>{badge.label}</span>
                             <span className={`sub-op-tag sub-op-${sub.operation}`}>
                               {sub.operation === "replace" ? "Swap" : "Insert Before"}
                             </span>
@@ -523,12 +403,8 @@ export function PianoPerformanceInspector({
         return (
           <details
             className="inspector-disclosure register-disclosure"
-            open={registerOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setRegisterOpen(open);
-              persistDisclosureState(REGISTER_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={registerDisclosure.isOpen}
+            onToggle={(event) => registerDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -566,12 +442,8 @@ export function PianoPerformanceInspector({
         return (
           <details
             className="inspector-disclosure articulation-disclosure"
-            open={articulationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setArticulationOpen(open);
-              persistDisclosureState(ARTICULATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={articulationDisclosure.isOpen}
+            onToggle={(event) => articulationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -599,12 +471,8 @@ export function PianoPerformanceInspector({
         return onDurationChange ? (
           <details
             className="inspector-disclosure duration-disclosure"
-            open={durationOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setDurationOpen(open);
-              persistDisclosureState(DURATION_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={durationDisclosure.isOpen}
+            onToggle={(event) => durationDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -616,7 +484,9 @@ export function PianoPerformanceInspector({
                 </span>
                 Duration
               </span>
-              <span className="disclosure-status">{formatMusicalDuration(step.duration)} beats</span>
+              <span className="disclosure-status">
+                {formatMusicalDuration(step.duration)} beats
+              </span>
             </summary>
             <div className="inspector-disclosure-body">
               <div
@@ -644,12 +514,8 @@ export function PianoPerformanceInspector({
         return (
           <details
             className="inspector-disclosure voicing-disclosure"
-            open={voicingOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setVoicingOpen(open);
-              persistDisclosureState(VOICING_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={voicingDisclosure.isOpen}
+            onToggle={(event) => voicingDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -662,17 +528,7 @@ export function PianoPerformanceInspector({
                 Voicing mode
               </span>
               <span className="disclosure-status">
-                {perf.voicingMode === "manual"
-                  ? "Manual"
-                  : perf.inversion === 0
-                    ? "Root (I)"
-                    : perf.inversion === 1
-                      ? "1st Inv (⁶)"
-                      : perf.inversion === 2
-                        ? "2nd Inv (⁶₄)"
-                        : perf.inversion === 3
-                          ? "3rd Inv (⁴₂)"
-                          : "Auto"}
+                {perf.voicingMode === "manual" ? "Manual" : "Automatic"}
               </span>
             </summary>
             <div className="inspector-disclosure-body">
@@ -687,72 +543,6 @@ export function PianoPerformanceInspector({
                   <option value="auto">Auto Voicing</option>
                   <option value="manual">Manual Exact Voicing</option>
                 </select>
-
-                {!isManual && (
-                  <div className="subgroup inversion-subgroup" role="group" aria-label="Chord Inversion">
-                    <label htmlFor="inversion-select">Chord Inversion</label>
-                    <select
-                      id="inversion-select"
-                      value={perf.inversion ?? "auto"}
-                      onChange={handleInversionChange}
-                      aria-label="Chord Inversion"
-                      data-testid="inversion-select"
-                    >
-                      {INVERSION_CHOICES.map((choice) => (
-                        <option key={choice.value} value={choice.value}>
-                          {choice.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="inversion-pills" role="radiogroup" aria-label="Quick Inversion Buttons">
-                      <button
-                        type="button"
-                        className={`inversion-pill ${(perf.inversion ?? "auto") === "auto" ? "is-active" : ""}`}
-                        onClick={() => onPerformanceChange({ inversion: "auto" })}
-                        aria-label="Auto voice leading"
-                        data-testid="inversion-pill-auto"
-                      >
-                        Auto
-                      </button>
-                      <button
-                        type="button"
-                        className={`inversion-pill ${perf.inversion === 0 ? "is-active" : ""}`}
-                        onClick={() => onPerformanceChange({ inversion: 0 })}
-                        aria-label="Root position"
-                        data-testid="inversion-pill-root"
-                      >
-                        Root
-                      </button>
-                      <button
-                        type="button"
-                        className={`inversion-pill ${perf.inversion === 1 ? "is-active" : ""}`}
-                        onClick={() => onPerformanceChange({ inversion: 1 })}
-                        aria-label="First inversion"
-                        data-testid="inversion-pill-1"
-                      >
-                        1st (⁶)
-                      </button>
-                      <button
-                        type="button"
-                        className={`inversion-pill ${perf.inversion === 2 ? "is-active" : ""}`}
-                        onClick={() => onPerformanceChange({ inversion: 2 })}
-                        aria-label="Second inversion"
-                        data-testid="inversion-pill-2"
-                      >
-                        2nd (⁶₄)
-                      </button>
-                      <button
-                        type="button"
-                        className={`inversion-pill ${perf.inversion === 3 ? "is-active" : ""}`}
-                        onClick={() => onPerformanceChange({ inversion: 3 })}
-                        aria-label="Third inversion"
-                        data-testid="inversion-pill-3"
-                      >
-                        3rd (⁴₂)
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 <button
                   type="button"
@@ -769,136 +559,12 @@ export function PianoPerformanceInspector({
           </details>
         );
 
-      case "bass":
-        return (
-          <details
-            className="inspector-disclosure bass-disclosure"
-            open={bassOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setBassOpen(open);
-              persistDisclosureState(BASS_DISCLOSURE_STORAGE_KEY, open);
-            }}
-          >
-            <summary>
-              <span>
-                <span
-                  {...getDragHandleProps("bass", "Bass")}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  ⋮⋮
-                </span>
-                Bass
-              </span>
-              <span className="disclosure-status">Independent voice</span>
-            </summary>
-            <div className="inspector-disclosure-body">
-              <div className="inspector-group" role="group" aria-label="Bass voice controls">
-                <h4>Independent Bass</h4>
-                <div className="subgroup">
-                  <label htmlFor="bass-choice-select">Bass Note</label>
-                  <select
-                    id="bass-choice-select"
-                    value={perf.bass.choice}
-                    onChange={handleBassChoiceChange}
-                    aria-label="Bass Note"
-                  >
-                    {BASS_CHOICES.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="bass-choice-pills" role="radiogroup" aria-label="Quick Bass Note Buttons">
-                    {BASS_CHOICES.filter((b) => b.value !== "custom").map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        className={`bass-choice-pill ${perf.bass.choice === opt.value ? "is-active" : ""}`}
-                        onClick={() =>
-                          onPerformanceChange({
-                            bass: {
-                              ...perf.bass,
-                              choice: opt.value,
-                            },
-                          })
-                        }
-                        aria-label={`Bass ${opt.label}`}
-                        data-testid={`bass-pill-${opt.value}`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {perf.bass.choice === "custom" ? (
-                  <div className="custom-bass-editor" role="group" aria-label="Custom Bass Note Editor">
-                    <label htmlFor="custom-bass-midi-input">
-                      Custom Bass MIDI ({PIANO_RANGE_MIN_MIDI}..{PIANO_RANGE_MAX_MIDI})
-                    </label>
-                    <input
-                      id="custom-bass-midi-input"
-                      type="number"
-                      min={PIANO_RANGE_MIN_MIDI}
-                      max={PIANO_RANGE_MAX_MIDI}
-                      value={
-                        perf.bass.customPitch
-                          ? pitchToConcertFrame(perf.bass.customPitch, step).midiNumber
-                          : 36
-                      }
-                      onChange={(e) => handleCustomBassMidiChange(Number(e.target.value))}
-                      aria-label="Custom Bass MIDI Number"
-                    />
-                    {perf.bass.customPitch && (
-                      <span className="custom-bass-readout">
-                        Pitch: {pitchToConcertFrame(perf.bass.customPitch, step).spelling.step}
-                        {pitchToConcertFrame(perf.bass.customPitch, step).spelling.alter === 1
-                          ? "#"
-                          : pitchToConcertFrame(perf.bass.customPitch, step).spelling.alter === -1
-                            ? "b"
-                            : ""}
-                        {pitchToConcertFrame(perf.bass.customPitch, step).octave}
-                      </span>
-                    )}
-                    {customBassError && (
-                      <p className="error-text" role="alert">
-                        {customBassError}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="subgroup">
-                    <label htmlFor="bass-octave-select">Bass Octave</label>
-                    <select
-                      id="bass-octave-select"
-                      value={String(perf.bass.octaveOffset)}
-                      onChange={handleBassOctaveChange}
-                      aria-label="Bass Octave"
-                    >
-                      {BASS_OCTAVES.map((opt) => (
-                        <option key={String(opt.value)} value={String(opt.value)}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
-          </details>
-        );
-
       case "dynamics":
         return (
           <details
             className="inspector-disclosure dynamics-disclosure"
-            open={dynamicsOpen}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setDynamicsOpen(open);
-              persistDisclosureState(DYNAMICS_DISCLOSURE_STORAGE_KEY, open);
-            }}
+            open={dynamicsDisclosure.isOpen}
+            onToggle={(event) => dynamicsDisclosure.setOpen(event.currentTarget.open)}
           >
             <summary>
               <span>
@@ -913,7 +579,11 @@ export function PianoPerformanceInspector({
               <span className="disclosure-status">Master + per-note</span>
             </summary>
             <div className="inspector-disclosure-body">
-              <div className="inspector-group" role="group" aria-label="Dynamics and velocity controls">
+              <div
+                className="inspector-group"
+                role="group"
+                aria-label="Dynamics and velocity controls"
+              >
                 <div
                   className="view-preference-toggle"
                   role="radiogroup"
@@ -1018,12 +688,8 @@ export function PianoPerformanceInspector({
                 {/* Per-Note Velocity Editor */}
                 <details
                   className="inspector-disclosure per-note-disclosure"
-                  open={perNoteOpen}
-                  onToggle={(event) => {
-                    const open = event.currentTarget.open;
-                    setPerNoteOpen(open);
-                    persistDisclosureState(PER_NOTE_DISCLOSURE_STORAGE_KEY, open);
-                  }}
+                  open={perNoteDisclosure.isOpen}
+                  onToggle={(event) => perNoteDisclosure.setOpen(event.currentTarget.open)}
                 >
                   <summary>
                     <span>Per-note velocity overrides</span>
@@ -1039,15 +705,36 @@ export function PianoPerformanceInspector({
                     <p className="inspector-helper">
                       Each row keeps the exact MIDI velocity or inherits Master.
                     </p>
+                    {!independentBassEnabled ? (
+                      <p className="inspector-helper" role="note">
+                        Independent bass is off; its saved note settings remain stored and are not
+                        sounding.
+                      </p>
+                    ) : null}
+                    {unmappedNoteCount > 0 ? (
+                      <p
+                        className="inspector-helper is-warning"
+                        role="status"
+                        data-testid="per-note-unmapped-warning"
+                      >
+                        {unmappedNoteCount === 1
+                          ? "1 sounding note has no matching source pitch and cannot be edited here."
+                          : `${unmappedNoteCount} sounding notes have no matching source pitch and cannot be edited here.`}
+                      </p>
+                    ) : null}
                     <div className="per-note-list">
                       {notesToDisplay.map((note) => {
-                        const isOverridden = perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
+                        const isOverridden =
+                          perf.perNoteVelocityOverrides[note.noteKey] !== undefined;
                         const currentVel = isOverridden
                           ? perf.perNoteVelocityOverrides[note.noteKey]!
                           : perf.masterVelocity;
 
                         return (
-                          <div key={`${note.role}-${note.noteKey}`} className="per-note-velocity-row">
+                          <div
+                            key={`${note.role}-${note.noteKey}`}
+                            className="per-note-velocity-row"
+                          >
                             <div className="note-info">
                               <span className="note-label">{note.label}</span>
                               <span className="note-midi">(MIDI {note.pitch.midiNumber})</span>
@@ -1058,7 +745,9 @@ export function PianoPerformanceInspector({
                             <div className="note-velocity-controls">
                               {isOverridden ? (
                                 <div className="override-active-controls">
-                                  <span className="status-badge override">Override: {currentVel}</span>
+                                  <span className="status-badge override">
+                                    Override: {currentVel}
+                                  </span>
                                   <input
                                     type="number"
                                     min={1}
@@ -1132,6 +821,8 @@ export function PianoPerformanceInspector({
             melodyAudioError={melodyAudioError}
             onRetryMelodyAudio={onRetryMelodyAudio}
             hasMelodyRecipe={hasMelodyRecipe}
+            independentBassEnabled={independentBassEnabled}
+            onSetIndependentBassEnabled={onSetIndependentBassEnabled}
           />
         );
 
@@ -1143,15 +834,24 @@ export function PianoPerformanceInspector({
   return (
     <section
       className="piano-performance-inspector"
-      aria-label={`Performance settings for step ${step.harmonicFunction.functionId}`}
+      aria-label={`Performance settings for step ${harmonicFunctionLabel(step.harmonicFunction)}`}
       data-context="selected-step"
       data-testid="step-performance-inspector"
     >
       <header className="performance-inspector-header">
-        <div>
-          <span className="inspector-context-kicker">Selected step</span>
-          <h3>Step Performance: {step.harmonicFunction.functionId}</h3>
-          <span>Step-specific controls live here. Progression settings are grouped below.</span>
+        <div className="inspector-panel-heading">
+          <InspectorDisclosureToggle
+            isOpen={panelDisclosure.isOpen}
+            onToggle={panelDisclosure.toggle}
+            ariaLabel="Toggle step performance sections"
+            controlsId={panelBodyId}
+            testId="step-performance-disclosure-btn"
+          />
+          <div>
+            <span className="inspector-context-kicker">Selected step</span>
+            <h3>Step Performance: {harmonicFunctionLabel(step.harmonicFunction)}</h3>
+            <span>Step-specific controls live here. Progression settings are grouped below.</span>
+          </div>
         </div>
         {isCustomOrder ? (
           <div style={{ display: "flex", gap: "4px" }}>
@@ -1179,15 +879,19 @@ export function PianoPerformanceInspector({
         />
       ) : null}
 
-      {sectionOrder.map((sectionId) => {
-        const content = renderSectionContent(sectionId);
-        if (!content) return null;
-        return (
-          <div key={sectionId} {...getSectionItemProps(sectionId)}>
-            {content}
-          </div>
-        );
-      })}
+      {panelDisclosure.isOpen ? (
+        <div id={panelBodyId} className="inspector-panel-body">
+          {sectionOrder.map((sectionId) => {
+            const content = renderSectionContent(sectionId);
+            if (!content) return null;
+            return (
+              <div key={sectionId} {...getSectionItemProps(sectionId)}>
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }

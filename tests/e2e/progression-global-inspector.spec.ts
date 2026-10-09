@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+import {
+  setLayoutMeasuresPerSystem,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -35,6 +38,7 @@ test.describe("Progression Global Inspector", () => {
       .getByTestId("chord-card-V")
       .locator(".chord-main")
       .click({ modifiers: ["Control"] });
+    await setProgressionView(page, "staff");
 
     // 3. Since no step is selected yet, global inspector shows count and enables reset
     await expect(globalInspector).toBeVisible();
@@ -52,8 +56,8 @@ test.describe("Progression Global Inspector", () => {
     ).toContainText("arp-up");
 
     // 5. Select step 1 -> shifts to single step inspector
-    const steps = page.locator('[data-testid="progression-step"]');
-    const firstStepSelect = steps.first().getByRole("button", { name: /Select progression step/ });
+    const steps = page.locator(".measure-staff-event-select");
+    const firstStepSelect = steps.first();
     await firstStepSelect.click();
 
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
@@ -64,7 +68,12 @@ test.describe("Progression Global Inspector", () => {
       "arp-up",
     );
 
-    // 6. Press Escape to clear selection -> global inspector returns
+    // 6. The first Escape clears the one-step range selection; the second clears the project step
+    // selection and returns to the global inspector.
+    const rangeToolbar = page.getByTestId("range-selection-toolbar");
+    await page.keyboard.press("Escape");
+    await expect(rangeToolbar).toHaveCount(0);
+    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("step-performance-inspector")).toHaveCount(0);
     await expect(globalInspector).toBeVisible();

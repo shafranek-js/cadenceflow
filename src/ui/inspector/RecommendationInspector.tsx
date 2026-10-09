@@ -1,19 +1,9 @@
-import { useState } from "react";
 import type { PresentationMode } from "../../domain/project/project";
 import type { RecommendationCandidate } from "../../domain/recommendations/engine";
 import { explainRecommendation } from "../../domain/recommendations/explanations";
+import { useInspectorDisclosure } from "./useInspectorDisclosure";
 
 const RECOMMENDATION_DISCLOSURE_STORAGE_KEY = "cadenceflow.ui.recommendation-context-open";
-
-function readDisclosureState(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const stored = window.localStorage.getItem(RECOMMENDATION_DISCLOSURE_STORAGE_KEY);
-    return stored === null ? false : stored === "true";
-  } catch {
-    return false;
-  }
-}
 
 export function RecommendationInspector({
   candidate,
@@ -24,29 +14,16 @@ export function RecommendationInspector({
   readonly blockedCandidates?: readonly RecommendationCandidate[];
   readonly mode: PresentationMode;
 }) {
-  const [open, setOpen] = useState(readDisclosureState);
+  const disclosure = useInspectorDisclosure(RECOMMENDATION_DISCLOSURE_STORAGE_KEY, false);
   const explanation = candidate ? explainRecommendation(candidate, mode) : null;
-
-  const persistDisclosureState = (nextOpen: boolean) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(RECOMMENDATION_DISCLOSURE_STORAGE_KEY, String(nextOpen));
-    } catch {
-      // Disclosure preferences are best-effort when storage is unavailable.
-    }
-  };
 
   return (
     <details
       className="inspector inspector-disclosure recommendation-inspector"
       aria-label="Recommendation inspector"
       data-context={candidate ? "recommendation" : "neutral"}
-      open={open}
-      onToggle={(event) => {
-        const nextOpen = event.currentTarget.open;
-        setOpen(nextOpen);
-        persistDisclosureState(nextOpen);
-      }}
+      open={disclosure.isOpen}
+      onToggle={(event) => disclosure.setOpen(event.currentTarget.open)}
     >
       <summary>
         <span>Recommendation context</span>

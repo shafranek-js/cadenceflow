@@ -99,10 +99,7 @@ export function generateFretCandidates(
 /**
  * Calculates internal ergonomic difficulty cost of a single fret state.
  */
-export function getInternalNodeCost(
-  candidate: FretCandidate,
-  chordBaseFret?: number,
-): number {
+export function getInternalNodeCost(candidate: FretCandidate, chordBaseFret?: number): number {
   let cost = 0;
 
   // 1. Open string bonus: effortless left-hand production
@@ -132,10 +129,7 @@ export function getInternalNodeCost(
   if (chordBaseFret !== undefined && chordBaseFret > 0 && candidate.fret > 0) {
     if (candidate.handPosition === chordBaseFret) {
       cost -= 2.0; // Exact match with chord box
-    } else if (
-      candidate.fret >= chordBaseFret &&
-      candidate.fret <= chordBaseFret + 4
-    ) {
+    } else if (candidate.fret >= chordBaseFret && candidate.fret <= chordBaseFret + 4) {
       cost -= 1.0; // Within chord span
     } else {
       cost += Math.abs(candidate.handPosition - chordBaseFret) * 0.8;
@@ -182,17 +176,9 @@ export function getTransitionCost(
 
     // Anatomical finger crossing penalty on adjacent/same strings:
     // Higher fret with lower finger (e.g. fret 3 finger 3 -> fret 4 finger 1)
-    if (
-      next.fret > prev.fret &&
-      next.finger < prev.finger &&
-      handShift <= 1
-    ) {
+    if (next.fret > prev.fret && next.finger < prev.finger && handShift <= 1) {
       cost += 14.0;
-    } else if (
-      next.fret < prev.fret &&
-      next.finger > prev.finger &&
-      handShift <= 1
-    ) {
+    } else if (next.fret < prev.fret && next.finger > prev.finger && handShift <= 1) {
       cost += 14.0;
     }
 
@@ -245,9 +231,7 @@ export function optimizeGuitarMelodyTab(
       ? chordBaseFretByMeasure?.get(notes[0].measureIndex)
       : undefined;
 
-  costs.push(
-    layers[0]!.map((candidate) => getInternalNodeCost(candidate, firstChordBase)),
-  );
+  costs.push(layers[0]!.map((candidate) => getInternalNodeCost(candidate, firstChordBase)));
   backpointers.push(new Array(layers[0]!.length).fill(0));
 
   for (let t = 1; t < layers.length; t++) {
@@ -257,13 +241,10 @@ export function optimizeGuitarMelodyTab(
 
     const currentMeasure = notes[t]?.measureIndex;
     const chordBase =
-      currentMeasure !== undefined
-        ? chordBaseFretByMeasure?.get(currentMeasure)
-        : undefined;
+      currentMeasure !== undefined ? chordBaseFretByMeasure?.get(currentMeasure) : undefined;
 
     const dt =
-      notes[t]?.startOffsetBeats !== undefined &&
-      notes[t - 1]?.startOffsetBeats !== undefined
+      notes[t]?.startOffsetBeats !== undefined && notes[t - 1]?.startOffsetBeats !== undefined
         ? Math.max(0.125, notes[t]!.startOffsetBeats! - notes[t - 1]!.startOffsetBeats!)
         : 1.0;
 

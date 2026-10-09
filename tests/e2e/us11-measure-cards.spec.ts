@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { enableIndependentBassVoice } from "./test-helpers/progression-settings";
 
 async function openStudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -19,36 +20,36 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 }
 
 async function setFirstDuration(page: Page, value: string): Promise<void> {
-  const step = page.getByTestId("progression-step").first();
-  await step.locator("[data-progression-step-select]").click();
+  await page.getByLabel("Progression Card View").selectOption("staff");
+  await page.locator(".measure-staff-event-select").first().click();
   const presetId = value === "2/1" ? "duration-preset-half" : "duration-preset-quarter";
   await page.getByTestId("step-performance-inspector").getByTestId(presetId).click();
 }
 
-test.describe("US11 measure-card progression layout", () => {
+test.describe("US11 score-system progression layout", () => {
   test("shows a proportional Half gap and fills it with an independent chord", async ({ page }) => {
     await openStudio(page);
     await addChord(page, "I");
     await setFirstDuration(page, "2/1");
 
-    await expect(page.getByTestId("progression-measure")).toHaveCount(1);
-    await expect(page.getByTestId("progression-measure-gap")).toContainText("2");
-    await expect(
-      page.getByTestId("progression-measure-gap").getByRole("button", { name: /Add chord/ }),
-    ).toBeVisible();
+    const gap = page.getByTestId("progression-score-gap");
+    await expect(gap).toContainText("2");
+    await expect(gap.getByRole("button", { name: /Add chord/ })).toBeVisible();
 
+    await gap.getByRole("button", { name: /Add chord/ }).click();
     await addChord(page, "V");
-    const steps = page.getByTestId("progression-step");
-    await expect(steps).toHaveCount(2);
-    await steps.nth(1).locator("[data-progression-step-select]").click();
+    const steps = page.locator(".measure-staff-event-select");
+    await expect(steps).toHaveCount(3);
+    await expect(
+      page.locator('.measure-staff-event-select[aria-label*="continuation"]'),
+    ).toHaveCount(1);
+    await steps.nth(1).click();
     await page
       .getByTestId("step-performance-inspector")
       .getByTestId("duration-preset-half")
       .click();
-    await expect(page.getByTestId("progression-measure")).toHaveCount(1);
-    await expect(page.getByTestId("progression-measure-gap")).toHaveCount(0);
-
-    await page.getByLabel("Progression Card View").selectOption("staff");
+    await expect(steps).toHaveCount(2);
+    await expect(page.getByTestId("progression-score-gap")).toHaveCount(0);
     await expect(page.getByTestId("progression-score-system")).toHaveCount(1);
     await expect(page.locator(".progression-measure-grid .mini-staff")).toHaveCount(0);
     const staff = page.getByTestId("progression-score-system");
@@ -68,9 +69,7 @@ test.describe("US11 measure-card progression layout", () => {
     expect(attackRatios).toHaveLength(2);
     expect(attackRatios[1]).toBeGreaterThan(attackRatios[0]!);
     await expect(page.getByTestId("progression-staff-step-grids")).toHaveCount(0);
-    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
-      0,
-    );
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-view", "staff");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -98,6 +97,8 @@ test.describe("US11 measure-card progression layout", () => {
     await openStudio(page);
     await addChord(page, "I");
     await page.getByLabel("Progression Card View").selectOption("staff");
+    await page.locator(".measure-staff-event-select").first().click();
+    await enableIndependentBassVoice(page);
 
     const svg = page.getByTestId("progression-score-system").locator(".measure-staff > svg");
     await expect(svg).toHaveAttribute("data-staff-system-clefs", "treble");
@@ -114,14 +115,15 @@ test.describe("US11 measure-card progression layout", () => {
     await openStudio(page);
     await addChord(page, "I");
     await setFirstDuration(page, "2/1");
-    const gap = page.getByTestId("progression-measure-gap");
+    const gap = page.getByTestId("progression-score-gap");
     await expect(gap.getByRole("button", { name: /Fill measure/ })).toBeVisible();
     await expect(gap.getByRole("button", { name: /Extend chord/ })).toBeVisible();
     await expect(gap.getByRole("button", { name: /Repeat chord/ })).toBeVisible();
 
     await gap.getByRole("button", { name: /Repeat chord/ }).click();
-    await expect(page.getByTestId("progression-step")).toHaveCount(2);
-    await expect(page.getByTestId("progression-measure-gap")).toHaveCount(0);
+    await page.getByLabel("Progression Card View").selectOption("staff");
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(2);
+    await expect(page.getByTestId("progression-score-gap")).toHaveCount(0);
   });
 
   test("keeps trailing-gap actions reachable from the Staff score", async ({ page }) => {
@@ -142,9 +144,7 @@ test.describe("US11 measure-card progression layout", () => {
     await expect(
       page.getByTestId("progression-score-system").locator(".measure-staff-event"),
     ).toHaveCount(2);
-    await expect(page.locator('[data-view="staff"] [data-testid="progression-step"]')).toHaveCount(
-      0,
-    );
+    await expect(page.locator(".progression-step-cards")).toHaveAttribute("data-view", "staff");
   });
 
   test("fills the final gap with an explicit Rest or extends one chord to Full bar", async ({
@@ -153,13 +153,15 @@ test.describe("US11 measure-card progression layout", () => {
     await openStudio(page);
     await addChord(page, "I");
     await setFirstDuration(page, "2/1");
-    const gap = page.getByTestId("progression-measure-gap");
+    const gap = page.getByTestId("progression-score-gap");
 
     await gap.getByRole("button", { name: /Fill measure/ }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("progression-step")).toHaveCount(2);
-    await expect(page.getByTestId("progression-step").nth(1)).toContainText("Rest");
-    await expect(page.getByTestId("progression-measure-gap")).toHaveCount(0);
+    await page.getByLabel("Progression Card View").selectOption("staff");
+    const staffEvents = page.locator(".measure-staff-event-select");
+    await expect(staffEvents).toHaveCount(2);
+    await expect(staffEvents.nth(1)).toHaveAttribute("aria-label", /^Select Rest:/);
+    await expect(page.getByTestId("progression-score-gap")).toHaveCount(0);
   });
 
   test("supports keyboard gap actions, view switching, and meter-card semantics", async ({
@@ -168,10 +170,10 @@ test.describe("US11 measure-card progression layout", () => {
     await openStudio(page);
     await addChord(page, "I");
     await setFirstDuration(page, "2/1");
-    const gap = page.getByTestId("progression-measure-gap");
+    const gap = page.getByTestId("progression-score-gap");
     await gap.getByRole("button", { name: /Extend chord/ }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("progression-measure-gap")).toHaveCount(0);
+    await expect(page.getByTestId("progression-score-gap")).toHaveCount(0);
     await expect(page.getByTestId("duration-preset-full-bar")).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -179,7 +181,7 @@ test.describe("US11 measure-card progression layout", () => {
 
     await page.getByLabel("Progression Card View").selectOption("staff");
     await expect(page.getByTestId("progression-score-system")).toHaveCount(1);
-    await expect(page.locator('[data-testid="progression-step"] .mini-staff')).toHaveCount(0);
+    await expect(page.locator(".score-system-canvas > svg")).toHaveCount(1);
     await expect(page.getByTestId("progression-score-system")).toHaveAttribute(
       "data-measure-count",
       "1",

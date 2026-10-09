@@ -24,6 +24,7 @@ import {
 } from "../../domain/progression/transposition";
 import type { LabelHierarchyMode } from "./labelHierarchy";
 import { ProgressionChordLabel } from "./ProgressionChordLabel";
+import { harmonicFunctionLabel } from "../../domain/harmony/functions";
 import { StepTranspositionBadge } from "./StepTranspositionBadge";
 
 const INVERSION_OPTIONS: readonly { readonly value: InversionChoice; readonly label: string }[] =
@@ -48,15 +49,25 @@ function durationId(duration: MusicalDuration): string {
   return `${duration.beats.numerator}/${duration.beats.denominator}`;
 }
 
-function currentChordLabel(step: ChordStep, tonic: PitchClassIdentity): string {
+function currentChordLabel(
+  step: ChordStep,
+  tonic: PitchClassIdentity,
+  independentBassEnabled: boolean,
+): string {
   const realization = realizeProgressionStepRealization(step, tonic);
   const chord: ChordDefinition = realizeProgressionStepChord(step, tonic);
-  return formatChordSymbol(withEffectiveBass(chord, realization.bassPitch));
+  return formatChordSymbol(
+    withEffectiveBass(
+      chord,
+      independentBassEnabled ? realization.bassPitch : realization.pitches[0],
+    ),
+  );
 }
 
 export function ProgressionQuickEdit({
   step,
   tonic,
+  independentBassEnabled = true,
   labelMode,
   onReplaceChord,
   onDurationChange,
@@ -65,6 +76,7 @@ export function ProgressionQuickEdit({
 }: {
   readonly step: ChordStep;
   readonly tonic: PitchClassIdentity;
+  readonly independentBassEnabled?: boolean;
   readonly labelMode: LabelHierarchyMode;
   readonly onReplaceChord?:
     ((stepId: string, functionId: string, moduleId: HarmonicModuleId) => void) | undefined;
@@ -72,7 +84,7 @@ export function ProgressionQuickEdit({
   readonly onPerformanceChange: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onOpenInspector?: (() => void) | undefined;
 }) {
-  const chordLabel = currentChordLabel(step, tonic);
+  const chordLabel = currentChordLabel(step, tonic, independentBassEnabled);
   const functionOptions = useMemo(() => {
     const identities = [
       step.harmonicFunction,
@@ -140,7 +152,7 @@ export function ProgressionQuickEdit({
         <span className="progression-quick-edit-kicker">Quick edit</span>
         <ProgressionChordLabel
           mode={labelMode}
-          functionLabel={step.harmonicFunction.functionId}
+          functionLabel={harmonicFunctionLabel(step.harmonicFunction)}
           chordLabel={chordLabel}
           className="progression-quick-edit-label"
         />

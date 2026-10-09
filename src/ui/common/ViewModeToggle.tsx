@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import type { CardViewId } from "../../domain/progression/step";
+import { DEFAULT_VIEW_IDS } from "./defaultViewIds";
 
 type ViewModeId = CardViewId | "piano-roll";
 
@@ -11,14 +12,12 @@ export interface ViewModeToggleProps {
   readonly availableViews?: readonly ViewModeId[];
 }
 
-const DEFAULT_VIEWS: readonly CardViewId[] = ["harmonic", "piano", "staff", "guitar", "tablature"];
-
 export function ViewModeToggle({
   currentView,
   onChangeView,
   selectAriaLabel,
   testIdPrefix = "view-mode",
-  availableViews = DEFAULT_VIEWS,
+  availableViews = DEFAULT_VIEW_IDS,
 }: ViewModeToggleProps) {
   const views = availableViews;
 

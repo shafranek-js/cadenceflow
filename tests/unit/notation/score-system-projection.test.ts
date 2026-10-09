@@ -7,6 +7,7 @@ import { meter } from "../../../src/domain/timing/meter";
 import { rational } from "../../../src/domain/timing/rational";
 import {
   autoMaximumMeasuresPerSystem,
+  autoMeasuresPerSystemForMeter,
   countUniqueStaffAttacks,
   projectScoreSystems,
   requiredStaffMeasureWidthPx,
@@ -16,7 +17,7 @@ function chordStep(id: string, beats: number, denominator = 1): ChordStep {
   return {
     id,
     kind: "chord",
-    harmonicFunction: { moduleId: "progressions", functionId: "I" },
+    harmonicFunction: { moduleId: "progressions", functionId: "I", category: "core" },
     harmonicVariant: EMPTY_HARMONIC_VARIANT,
     duration: { beats: rational(beats, denominator) },
     performance: DEFAULT_PIANO_PERFORMANCE,
@@ -183,6 +184,46 @@ describe("ScoreSystemProjection", () => {
     expect(projection.systems.map((system) => system.measures.length)).toEqual([4]);
   });
 
+  it("keeps a System intact in the piano-roll instead of breaking it by width", () => {
+    const layout = layoutFor(
+      Array.from({ length: 4 }, (_, index) => chordStep(`measure-${index}`, 4)),
+    );
+    // A viewport narrowed by the side panel: 4 x 336 px of notation no longer fits.
+    const narrowWidth = 900;
+
+    const byWidth = projectScoreSystems(layout, {
+      availableWidthPx: narrowWidth,
+      measuresPerSystem: "auto",
+    });
+    expect(byWidth.systems.map((system) => system.measures.length)).toEqual([2, 2]);
+
+    const pianoRoll = projectScoreSystems(layout, {
+      availableWidthPx: narrowWidth,
+      measuresPerSystem: "auto",
+      packMeasuresByWidth: false,
+    });
+    // The piano-roll keeps the meter-derived grouping and lets the row shrink down to its minimum
+    // cell width (then scroll), instead of pushing the last Measure onto the next row.
+    expect(pianoRoll.systems.map((system) => system.measures.length)).toEqual([4]);
+    expect(pianoRoll.maximumMeasuresPerSystem).toBe(4);
+    // The measured width is still reported so the caller can size and scroll the row.
+    expect(pianoRoll.availableWidthPx).toBe(narrowWidth);
+  });
+
+  it("honours an explicit measures-per-system even when the viewport is narrow", () => {
+    const layout = layoutFor(
+      Array.from({ length: 6 }, (_, index) => chordStep(`measure-${index}`, 4)),
+    );
+
+    const pianoRoll = projectScoreSystems(layout, {
+      availableWidthPx: 300,
+      measuresPerSystem: 3,
+      packMeasuresByWidth: false,
+    });
+
+    expect(pianoRoll.systems.map((system) => system.measures.length)).toEqual([3, 3]);
+  });
+
   it("supports triplet onset density without changing exact progression timing", () => {
     const layout = layoutFor([
       ...Array.from({ length: 12 }, (_, index) => chordStep(`triplet-${index + 1}`, 1, 3)),
@@ -196,6 +237,75 @@ describe("ScoreSystemProjection", () => {
     expect(projection.systems[1]?.measures.length).toBe(1);
   });
 
+  it("gives a 5/4 System four Measures, as the meter's denominator says", () => {
+    const layout = layoutFor(
+      Array.from({ length: 4 }, (_, index) => chordStep(`measure-${index}`, 5)),
+      meter(5, 4),
+    );
+
+    // Counting musical length aimed for 16 quarter beats per System, which is only three 5/4 bars, so
+    // the fourth Measure was pushed onto a row of its own while the row above still had room for it.
+    const byBeats = projectScoreSystems(layout, {
+      availableWidthPx: 1_455,
+      measuresPerSystem: "auto",
+      packMeasuresByWidth: false,
+    });
+    expect(byBeats.maximumMeasuresPerSystem).toBe(3);
+    expect(byBeats.systems.map((system) => system.measures.length)).toEqual([3, 1]);
+
+    // The meter's denominator groups them: 5/4 holds four Measures on one row.
+    const byMeter = projectScoreSystems(layout, {
+      availableWidthPx: 1_455,
+      measuresPerSystem: "auto",
+      meterDenominator: layout.meter.denominator,
+      packMeasuresByWidth: false,
+    });
+    expect(byMeter.maximumMeasuresPerSystem).toBe(4);
+    expect(byMeter.systems.map((system) => system.measures.length)).toEqual([4]);
+  });
+
+  it("keeps an inserted empty System on its own row", () => {
+    // "Insert Empty System After" appends a full row of empty Measures. Packing them at a wider
+    // capacity merged them into the row above, so the new System never appeared as a row at all.
+    const layout = layoutFor(
+      Array.from({ length: 8 }, (_, index) => chordStep(`empty-${index}`, 5)),
+      meter(5, 4),
+    );
+
+    const projection = projectScoreSystems(layout, {
+      availableWidthPx: 1_455,
+      measuresPerSystem: "auto",
+      meterDenominator: layout.meter.denominator,
+      packMeasuresByWidth: false,
+    });
+
+    expect(projection.systems.map((system) => system.measures.length)).toEqual([4, 4]);
+  });
+
+  it("groups every meter by its denominator, and never more than eight", () => {
+    for (const [numerator, denominator, expected] of [
+      [4, 4, 4],
+      [5, 4, 4],
+      [3, 4, 4],
+      [3, 2, 2],
+      [6, 8, 8],
+      [7, 8, 8],
+      [12, 8, 8],
+    ] as const) {
+      const layout = layoutFor(
+        Array.from({ length: 10 }, (_, index) => chordStep(`m-${index}`, numerator)),
+        meter(numerator, denominator),
+      );
+      const projection = projectScoreSystems(layout, {
+        availableWidthPx: 1_455,
+        measuresPerSystem: "auto",
+        meterDenominator: layout.meter.denominator,
+        packMeasuresByWidth: false,
+      });
+      expect(projection.maximumMeasuresPerSystem, `${numerator}/${denominator}`).toBe(expected);
+    }
+  });
+
   it("does not mutate the canonical layout while projecting", () => {
     const layout = layoutFor([chordStep("one", 4), chordStep("two", 4)]);
     const before = JSON.stringify(layout);
@@ -203,5 +313,25 @@ describe("ScoreSystemProjection", () => {
     projectScoreSystems(layout, { availableWidthPx: 900, measuresPerSystem: "auto" });
 
     expect(JSON.stringify(layout)).toBe(before);
+  });
+});
+
+describe("autoMeasuresPerSystemForMeter", () => {
+  it("holds as many Measures as the meter's denominator", () => {
+    expect(autoMeasuresPerSystemForMeter(4)).toBe(4);
+    expect(autoMeasuresPerSystemForMeter(2)).toBe(2);
+    expect(autoMeasuresPerSystemForMeter(3)).toBe(3);
+    expect(autoMeasuresPerSystemForMeter(8)).toBe(8);
+  });
+
+  it("falls back to common time when the denominator is unusable", () => {
+    expect(autoMeasuresPerSystemForMeter(0)).toBe(4);
+    expect(autoMeasuresPerSystemForMeter(-3)).toBe(4);
+    expect(autoMeasuresPerSystemForMeter(Number.NaN)).toBe(4);
+  });
+
+  it("keeps the grouping within the drawable range", () => {
+    expect(autoMeasuresPerSystemForMeter(64)).toBe(8);
+    expect(autoMeasuresPerSystemForMeter(1)).toBe(1);
   });
 });

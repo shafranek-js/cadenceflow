@@ -4,7 +4,10 @@ import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../src/domain/project/migrati
 import { ensureHistoryControlsVisible } from "./test-helpers/global-settings";
 import {
   addRestToProgression,
+  enableIndependentBassVoice,
   ensureSelectedProgressionSettingsVisible,
+  getLogicalProgressionStepButtons,
+  setProgressionView,
   startBranchAlternative,
 } from "./test-helpers/progression-settings";
 
@@ -80,12 +83,171 @@ async function waitForProductionAutosave(page: Page): Promise<void> {
   }, ACCEPTANCE_PROJECT_NAME);
 }
 
+async function waitForChordAutosave(page: Page): Promise<void> {
+  await page.waitForFunction((expectedName) => {
+    const state = (
+      window as unknown as {
+        __cadenceflow_persistence__?: {
+          lastScheduledProjectSnapshot: string;
+          lastCompletedProjectSnapshot: string;
+          lastAutosavedProjectName: string;
+        };
+      }
+    ).__cadenceflow_persistence__;
+    if (
+      !state ||
+      state.lastCompletedProjectSnapshot !== state.lastScheduledProjectSnapshot ||
+      state.lastAutosavedProjectName !== expectedName
+    )
+      return false;
+    try {
+      const project = JSON.parse(state.lastScheduledProjectSnapshot) as {
+        progression?: { steps?: readonly unknown[] };
+      };
+      return (project.progression?.steps?.length ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }, ACCEPTANCE_PROJECT_NAME);
+}
+
+async function seedRecoverableProject(page: Page, makeActive = false) {
+  return page.evaluate(async (makeRecoveryActive) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("CadenceFlowDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise<{ id: string; payload: string; activeId: string }>((resolve, reject) => {
+      let result: { id: string; payload: string; activeId: string } | null = null;
+      const transaction = db.transaction(["metadata", "projects"], "readwrite");
+      const activeRequest = transaction.objectStore("metadata").get("lastActiveProjectId");
+      activeRequest.onsuccess = () => {
+        const activeId = activeRequest.result?.value;
+        if (typeof activeId !== "string") {
+          reject(new Error("The active project ID is missing."));
+          return;
+        }
+        const projectRequest = transaction.objectStore("projects").get(activeId);
+        projectRequest.onsuccess = () => {
+          const activeRecord = projectRequest.result;
+          if (!activeRecord || typeof activeRecord.payload !== "string") {
+            reject(new Error("The active project payload is missing."));
+            return;
+          }
+          const document = JSON.parse(activeRecord.payload) as {
+            schemaVersion: number;
+            id: string;
+            name: string;
+            progression: { steps: Array<Record<string, unknown>> };
+          };
+          if (!document.progression.steps[0]) {
+            reject(new Error("The active project has no chord to damage."));
+            return;
+          }
+          const id = "e2e-legacy-recovery";
+          document.id = id;
+          document.name = "Legacy recovery";
+          document.schemaVersion = 6;
+          document.progression.steps[0].melody = { pitchMotion: "corrupt" };
+          const payload = JSON.stringify(document);
+          transaction.objectStore("projects").put({
+            ...activeRecord,
+            id,
+            name: document.name,
+            schemaVersion: document.schemaVersion,
+            revision: activeRecord.revision + 1,
+            payload,
+          });
+          if (makeRecoveryActive) {
+            transaction.objectStore("metadata").put({ key: "lastActiveProjectId", value: id });
+          }
+          result = { id, payload, activeId };
+        };
+      };
+      transaction.oncomplete = () => {
+        if (result) resolve(result);
+        else reject(new Error("Could not create the damaged recovery record."));
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }, makeActive);
+}
+
+async function readRecoveryDbState(page: Page, id: string) {
+  return page.evaluate(async (projectId) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("CadenceFlowDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise<{ payload: string | null; activeId: string | null }>((resolve, reject) => {
+      const transaction = db.transaction(["metadata", "projects"], "readonly");
+      let payload: string | null = null;
+      let activeId: string | null = null;
+      transaction.objectStore("projects").get(projectId).onsuccess = (event) => {
+        payload =
+          (event.target as IDBRequest<{ payload?: string } | undefined>).result?.payload ?? null;
+      };
+      transaction.objectStore("metadata").get("lastActiveProjectId").onsuccess = (event) => {
+        const value = (event.target as IDBRequest<{ value?: unknown } | undefined>).result?.value;
+        activeId = typeof value === "string" ? value : null;
+      };
+      transaction.oncomplete = () => {
+        if (payload === null) reject(new Error("The recovery payload disappeared."));
+        else resolve({ payload, activeId });
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }, id);
+}
+
+async function setOpenProjectTabs(page: Page, ids: readonly string[]): Promise<void> {
+  await page.evaluate(async (openProjectIds) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("CadenceFlowDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction("metadata", "readwrite");
+      transaction.objectStore("metadata").put({
+        key: "openProjectTabs.v8",
+        value: { ids: openProjectIds, source: "user", updatedAt: Date.now() },
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  }, ids);
+}
+
+async function readOpenProjectTabs(page: Page): Promise<{ ids: string[] } | null> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("CadenceFlowDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise<{ ids: string[] } | null>((resolve, reject) => {
+      const transaction = db.transaction("metadata", "readonly");
+      const request = transaction.objectStore("metadata").get("openProjectTabs.v8");
+      request.onsuccess = () => resolve(request.result?.value ?? null);
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  });
+}
+
 async function countProjectsThroughUi(page: Page): Promise<number> {
   await openProjectMenu(page);
   const count = await page
     .getByTestId("project-open-select")
     .locator("option")
-    .evaluateAll((options) => options.filter((option) => option.value).length);
+    .evaluateAll(
+      (options) =>
+        options.filter((option) => option instanceof HTMLOptionElement && option.value).length,
+    );
   await page.getByTestId("project-menu-toggle").click();
   return count;
 }
@@ -98,19 +260,20 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnapshot> {
   await ensureHistoryControlsVisible(page);
   await ensureSelectedProgressionSettingsVisible(page);
-  const progression = await page.locator('[data-testid="progression-step"]').evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const isRest = node.classList.contains("progression-rest-card");
+  const logicalStepButtons = await getLogicalProgressionStepButtons(page);
+  const progression = await Promise.all(
+    logicalStepButtons.map(async (node) => {
+      const label = (await node.getAttribute("aria-label")) ?? "";
+      const isRest = label.startsWith("Select Rest:");
       return {
         kind: isRest ? ("rest" as const) : ("chord" as const),
-        functionId:
-          node.querySelector('[data-testid="step-function"]')?.textContent?.trim() ?? "Rest",
-        visibleSummary:
-          node.querySelector(".step-view")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        functionId: isRest ? "Rest" : (label.replace(/^Select /, "").split(":", 1)[0] ?? ""),
+        visibleSummary: label,
       };
     }),
   );
   const performanceInspector = page.locator("section.piano-performance-inspector");
+  const chordProperties = page.getByTestId("chord-properties-inspector");
   const perNoteOverrides = await performanceInspector
     .locator(".per-note-velocity-row")
     .evaluateAll((rows) =>
@@ -138,7 +301,7 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
   await expect(voicingModal).not.toBeVisible();
   const templateCard = page.getByTestId("chord-card-i");
   const progressionCountBeforeTemplatePreview = await page
-    .locator('[data-testid="progression-step"]')
+    .locator(".measure-staff-event-select")
     .count();
   await templateCard.locator(".chord-main").click();
   const templateInspector = page.getByRole("region", { name: "Template settings for i" });
@@ -146,7 +309,7 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
   // In an active branch, the production card preview path appends to the branch.
   // Undo that transient preview so this read-only snapshot keeps the original branch intact.
   await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(
+  await expect(page.locator(".measure-staff-event-select")).toHaveCount(
     progressionCountBeforeTemplatePreview,
   );
   await expect(templateInspector).toBeVisible();
@@ -178,13 +341,12 @@ async function captureUs8AcceptanceSnapshot(page: Page): Promise<AcceptanceSnaps
         .getByLabel("Voicing Mode", { exact: true })
         .inputValue(),
       manualVoicingMidi,
-      register: await performanceInspector
-        .locator('[data-testid="register-option"][aria-pressed="true"]')
-        .getAttribute("data-register-value"),
-      bassNote: await performanceInspector.getByLabel("Bass Note", { exact: true }).inputValue(),
-      bassOctave: await performanceInspector
-        .getByLabel("Bass Octave", { exact: true })
-        .inputValue(),
+      register:
+        (await performanceInspector
+          .locator('[data-testid="register-option"][aria-pressed="true"]')
+          .getAttribute("data-register-value")) ?? "",
+      bassNote: await chordProperties.getByLabel("Bass Note", { exact: true }).inputValue(),
+      bassOctave: await chordProperties.getByLabel("Bass Octave", { exact: true }).inputValue(),
       masterVelocity: await performanceInspector
         .getByLabel("Master Velocity", { exact: true })
         .inputValue(),
@@ -237,9 +399,7 @@ async function assertTemporaryBranch(page: Page, expectedProgressionCount: numbe
   await expect(page.getByText("What-if branch active", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Commit Branch" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Original versus Alternative" })).toBeVisible();
-  await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(
-    expectedProgressionCount,
-  );
+  await expect(await getLogicalProgressionStepButtons(page)).toHaveLength(expectedProgressionCount);
 }
 
 test.describe("US8 Batch C — project actions", () => {
@@ -304,6 +464,155 @@ test.describe("US8 Batch C — project actions", () => {
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
   });
 
+  test("named migration recovery stays clickable and cancel preserves the stored payload", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const testWindow = window as unknown as {
+        __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean;
+      };
+      testWindow.__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+
+    await openProjectMenu(page);
+    await page.getByTestId("new-project-btn").click();
+    await page.getByTestId("project-name-input").fill(ACCEPTANCE_PROJECT_NAME);
+    await page.getByRole("button", { name: "Create Project" }).click();
+    await addChord(page, "I");
+    await waitForChordAutosave(page);
+    const damaged = await seedRecoverableProject(page);
+
+    await page.reload();
+    await expect(page.getByTestId("project-menu-toggle")).toContainText(ACCEPTANCE_PROJECT_NAME);
+    await openProjectMenu(page);
+    await page.getByTestId("project-open-select").selectOption(damaged.id);
+
+    const dialog = page.getByRole("dialog", { name: "Recovered project" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Open recovered project" })).toBeEnabled();
+    const beforeCancel = await readRecoveryDbState(page, damaged.id);
+    expect(beforeCancel.payload).toBe(damaged.payload);
+
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByTestId("project-menu-toggle")).toContainText(ACCEPTANCE_PROJECT_NAME);
+    const afterCancel = await readRecoveryDbState(page, damaged.id);
+    expect(afterCancel).toEqual(beforeCancel);
+
+    await openProjectMenu(page);
+    await page.getByTestId("project-open-select").selectOption(damaged.id);
+    const confirmedDialog = page.getByRole("dialog", { name: "Recovered project" });
+    await expect(confirmedDialog).toBeVisible();
+    await confirmedDialog.getByRole("button", { name: "Open recovered project" }).click();
+    await expect(page.getByTestId("project-menu-toggle")).toContainText("Legacy recovery");
+  });
+
+  test("cancelled recovery while closing the active tab preserves its tab and history", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const testWindow = window as unknown as {
+        __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean;
+      };
+      testWindow.__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+    await ensureHistoryControlsVisible(page);
+
+    await openProjectMenu(page);
+    await page.getByTestId("new-project-btn").click();
+    await page.getByTestId("project-name-input").fill(ACCEPTANCE_PROJECT_NAME);
+    await page.getByRole("button", { name: "Create Project" }).click();
+    await addChord(page, "I");
+    await waitForChordAutosave(page);
+    const damaged = await seedRecoverableProject(page);
+    await setOpenProjectTabs(page, [damaged.activeId, damaged.id]);
+
+    await page.reload();
+    const activeTab = page.getByTestId(`project-tab-${damaged.activeId}`);
+    const recoveryTab = page.getByTestId(`project-tab-${damaged.id}`);
+    await expect(activeTab).toHaveAttribute("aria-selected", "true");
+    await expect(recoveryTab).toBeVisible();
+    await page
+      .getByRole("complementary", { name: "Set The Key" })
+      .getByRole("button", { name: "Set key D", exact: true })
+      .click();
+    await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
+    const beforeTabs = await readOpenProjectTabs(page);
+    const beforeRecovery = await readRecoveryDbState(page, damaged.id);
+
+    await page.getByTestId(`project-tab-close-${damaged.activeId}`).click();
+    const dialog = page.getByRole("dialog", { name: "Recovered project" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await expect(activeTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
+    expect((await readOpenProjectTabs(page))?.ids).toEqual(beforeTabs?.ids);
+    expect(await readRecoveryDbState(page, damaged.id)).toEqual(beforeRecovery);
+    expect((await readRecoveryDbState(page, damaged.id)).activeId).toBe(damaged.activeId);
+  });
+
+  test("startup recovery cancel offers review and only confirmed recovery is autosaved", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const testWindow = window as unknown as {
+        __CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__?: boolean;
+      };
+      testWindow.__CADENCEFLOW_ENABLE_TEST_OBSERVABILITY__ = true;
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible();
+
+    await openProjectMenu(page);
+    await page.getByTestId("new-project-btn").click();
+    await page.getByTestId("project-name-input").fill(ACCEPTANCE_PROJECT_NAME);
+    await page.getByRole("button", { name: "Create Project" }).click();
+    await addChord(page, "I");
+    await waitForChordAutosave(page);
+    const damaged = await seedRecoverableProject(page, true);
+
+    await page.reload();
+    const startupDialog = page.getByRole("dialog", { name: "Recovered project" });
+    await expect(startupDialog).toBeVisible();
+    await expect(page.getByTestId("project-menu-toggle")).toHaveCount(0);
+    await startupDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Choose how to continue" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review saved project" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Start a fresh project" })).toBeEnabled();
+    expect(await readRecoveryDbState(page, damaged.id)).toEqual({
+      payload: damaged.payload,
+      activeId: damaged.id,
+    });
+
+    await page.getByRole("button", { name: "Review saved project" }).click();
+    const reviewedDialog = page.getByRole("dialog", { name: "Recovered project" });
+    await expect(reviewedDialog).toBeVisible();
+    expect(await readRecoveryDbState(page, damaged.id)).toEqual({
+      payload: damaged.payload,
+      activeId: damaged.id,
+    });
+    await reviewedDialog.getByRole("button", { name: "Open recovered project" }).click();
+    await expect(page.getByTestId("project-menu-toggle")).toContainText("Legacy recovery");
+
+    const persisted = await readRecoveryDbState(page, damaged.id);
+    expect(persisted.activeId).toBe(damaged.id);
+    expect(persisted.payload).not.toBe(damaged.payload);
+    if (persisted.payload === null) throw new Error("The confirmed recovery was not persisted.");
+    const savedProject = JSON.parse(persisted.payload) as {
+      schemaVersion: number;
+      progression: { steps: Array<Record<string, unknown>> };
+    };
+    expect(savedProject.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
+    expect(savedProject.progression.steps[0]?.melody).toBeUndefined();
+  });
+
   test("exports canonical project data and opens it through the file chooser with fresh history", async ({
     page,
   }) => {
@@ -356,6 +665,7 @@ test.describe("US8 Batch C — project actions", () => {
     await page.getByTestId("project-name-input").fill(ACCEPTANCE_PROJECT_NAME);
     await page.getByRole("button", { name: "Create Project" }).click();
     await expect(page.getByTestId("project-menu-toggle")).toContainText(ACCEPTANCE_PROJECT_NAME);
+    await setProgressionView(page, "staff");
     // Project context: non-default tonic plus explicit Dark Harmony / Tonal Minor module.
     await page
       .getByRole("complementary", { name: "Set The Key" })
@@ -373,11 +683,12 @@ test.describe("US8 Batch C — project actions", () => {
     await addChord(page, "V");
     await addChord(page, "VI");
     await addRestToProgression(page);
-    const steps = page.locator('[data-testid="progression-step"]');
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(4);
 
     // Step-local performance and timing fixture.
     await steps.nth(0).click();
+    await enableIndependentBassVoice(page);
     await page.getByRole("button", { name: "Register offset: +1 Octave" }).click();
     await page.getByRole("button", { name: "Open Piano Voicing Editor" }).click();
     const voicingModal = page.locator(".piano-voicing-editor-modal");
@@ -462,9 +773,7 @@ test.describe("US8 Batch C — project actions", () => {
     await page.reload();
     await expect(page.getByTestId("project-menu-toggle")).toContainText(ACCEPTANCE_PROJECT_NAME);
     await expect(page.getByTestId("transport-status")).toContainText("Stopped");
-    await expect(page.locator('[data-testid="progression-step"][data-playing="true"]')).toHaveCount(
-      0,
-    );
+    await expect(page.locator(".measure-staff-event.is-playing")).toHaveCount(0);
     await assertFreshHistory(page);
     expect(await countProjectsThroughUi(page)).toBe(projectCountBeforeReload);
     await openProjectMenu(page);
@@ -540,9 +849,7 @@ test.describe("US8 Batch C — project actions", () => {
       await freshPage.getByTestId("project-menu-toggle").click();
       await assertFreshHistory(freshPage);
       await expect(freshPage.getByTestId("transport-status")).toContainText("Stopped");
-      await expect(
-        freshPage.locator('[data-testid="progression-step"][data-playing="true"]'),
-      ).toHaveCount(0);
+      await expect(freshPage.locator(".measure-staff-event.is-playing")).toHaveCount(0);
       await assertTemporaryBranch(freshPage, fixtureSnapshot.progression.length);
 
       const portableSnapshot = await captureUs8AcceptanceSnapshot(freshPage);

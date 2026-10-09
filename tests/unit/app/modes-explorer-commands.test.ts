@@ -30,7 +30,7 @@ function projectWithHistory(tonic: PitchClassIdentity = 7): Project {
     steps: previousSteps,
     selectedStepId: "previous-2",
   });
-  return Object.freeze({ ...base, tonic, progression });
+  return Object.freeze<Project>({ ...base, tonic, progression });
 }
 
 function makeCommand(

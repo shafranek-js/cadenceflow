@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { useContextMenuLayout } from "../common/useContextMenuLayout";
 import type { HarmonicModuleId } from "../../domain/harmony/functions";
 import { modeForModule } from "../../domain/harmony/functions";
 import { defaultTonicSpelling, formatPitchSpelling } from "../../domain/harmony/spelling";
@@ -97,9 +98,11 @@ export function MatrixContextMenu({
   onClearSelection,
   onClose,
 }: MatrixContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Shared with the other context menus: stable item refs plus a measured menu width. The
+  // width used to be read from `menuRef.current` during render, which is `null` on first paint
+  // and fell back to a guessed 220.
+  const { registerRef, itemRefs, menuRef, menuWidth } = useContextMenuLayout();
   const submenuRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
   const [activeSubmenu, setActiveSubmenu] = useState<
     "transpose" | "module" | "view" | "articulation" | "register" | null
@@ -121,7 +124,7 @@ export function MatrixContextMenu({
       x: Math.max(margin, Math.min(position.x, window.innerWidth - width - margin)),
       y: Math.max(margin, Math.min(position.y, window.innerHeight - height - margin)),
     });
-  }, [position]);
+  }, [position, menuRef]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => itemRefs.current[0]?.focus());
@@ -151,9 +154,18 @@ export function MatrixContextMenu({
       cancelAnimationFrame(frameId);
       document.removeEventListener("pointerdown", handleOutsidePointerDown);
       document.removeEventListener("keydown", handleDocumentKeyDown);
-      invoker?.focus();
+      if (invoker?.isConnected) {
+        invoker.focus({ preventScroll: true });
+        if (document.activeElement === invoker) return;
+      }
+      const matrixPanel =
+        invoker?.closest<HTMLElement>(".matrix-panel") ??
+        document.querySelector<HTMLElement>(".matrix-panel");
+      matrixPanel
+        ?.querySelector<HTMLButtonElement>("[data-testid='matrix-focus-toggle']")
+        ?.focus({ preventScroll: true });
     };
-  }, [invoker, onClose, activeSubmenu]);
+  }, [invoker, onClose, activeSubmenu, itemRefs, menuRef]);
 
   useEffect(() => {
     if (activeSubmenu && submenuRef.current) {
@@ -246,11 +258,6 @@ export function MatrixContextMenu({
     }
   };
 
-  const registerRef = (index: number) => (node: HTMLButtonElement | null) => {
-    itemRefs.current[index] = node;
-  };
-
-  const menuWidth = menuRef.current?.getBoundingClientRect().width ?? 220;
   const submenuX =
     adjustedPosition.x + menuWidth + 215 < window.innerWidth
       ? adjustedPosition.x + menuWidth + 2
@@ -506,7 +513,7 @@ export function MatrixContextMenu({
           <>
             <div className="score-system-menu-separator" />
             <button
-              ref={registerRef(btnIndex++)}
+              ref={registerRef(btnIndex)}
               type="button"
               role="menuitem"
               className="score-system-menu-item"

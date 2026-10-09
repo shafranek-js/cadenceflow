@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CURRENT_PROJECT_SCHEMA_VERSION } from "../../../src/domain/project/migrations";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import type { Project } from "../../../src/domain/project/project";
@@ -21,7 +22,7 @@ function projectWithCardViews(cardViews: readonly ("harmonic" | "piano" | "staff
       cardView,
     }),
   );
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze(steps) }),
   });
@@ -32,6 +33,12 @@ function legacyPayload(project: Project): Record<string, unknown> {
   const presentation = payload.presentation as Record<string, unknown>;
   delete presentation.progressionView;
   delete presentation.measuresPerSystem;
+  // The wire format must declare a version that actually lacked these fields. Removing them from a
+  // current-version document produced a payload that is invalid by construction — the schema
+  // requires both — so every assertion failed on schema validation rather than on the
+  // normalisation under test. Version 8 is the last one before the presentation defaults were
+  // backfilled, so the migration chain now runs and supplies the values.
+  payload.schemaVersion = 8;
   return payload;
 }
 
@@ -91,17 +98,17 @@ describe("US13 progression presentation persistence", () => {
     ["v2 -> v3 -> v4", v2Fixture, "staff", 3, 100],
     ["v3 -> v4 legacy presentation", v3Fixture, "harmonic", 4, 91],
   ] as const)(
-    "migrates durable %s fixture and re-encodes canonical schema v6",
+    "migrates durable %s fixture and re-encodes the current schema version",
     (_label, fixture, expectedView, expectedMeasures, expectedHarmonyVolume) => {
       const raw = structuredClone(fixture) as Record<string, unknown>;
       const sourceBeforeMigration = JSON.stringify(raw);
       const migrated = migrateProjectData(raw);
 
-      expect(migrated.schemaVersion).toBe(6);
+      expect(migrated.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(JSON.stringify(raw)).toBe(sourceBeforeMigration);
 
       const restored = decodePortableProject(JSON.stringify(raw));
-      expect(restored.schemaVersion).toBe(6);
+      expect(restored.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(restored.presentation.progressionView).toBe(expectedView);
       expect(restored.presentation.measuresPerSystem).toBe(expectedMeasures);
       expect(restored.harmonyTrack.volume).toBe(expectedHarmonyVolume);
@@ -110,7 +117,7 @@ describe("US13 progression presentation persistence", () => {
       const canonicalJson = encodePortableProject(restored);
       const canonical = JSON.parse(canonicalJson) as Record<string, unknown>;
       const canonicalPresentation = canonical.presentation as Record<string, unknown>;
-      expect(canonical.schemaVersion).toBe(6);
+      expect(canonical.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
       expect(canonical.harmonyTrack).toEqual(
         expect.objectContaining({ instrument: "piano", volume: expectedHarmonyVolume }),
       );

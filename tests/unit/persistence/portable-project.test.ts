@@ -1,6 +1,8 @@
+import { requireValue } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import {
   decodePortableProject,
+  decodePortableProjectWithDiagnostics,
   encodePortableProject,
   InvalidPortableProjectError,
 } from "../../../src/persistence/portableProject";
@@ -67,8 +69,8 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       expect(compareRational(s2.duration.beats, rational(3, 2))).toBe(0);
       expect(s2.performance.voicingMode).toBe("manual");
       expect(s2.performance.manualVoicing).toHaveLength(4);
-      expect(s2.performance.manualVoicing?.[0].midiNumber).toBe(60);
-      expect(s2.performance.manualVoicing?.[3].midiNumber).toBe(72);
+      expect(requireValue(s2.performance.manualVoicing?.[0]).midiNumber).toBe(60);
+      expect(requireValue(s2.performance.manualVoicing?.[3]).midiNumber).toBe(72);
       expect(s2.performance.bass.choice).toBe("custom");
       expect(s2.performance.bass.octaveOffset).toBe(-1);
       expect(s2.performance.bass.customPitch?.midiNumber).toBe(36);
@@ -108,10 +110,10 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       // Custom Presets
       expect(restored.customPresets).toHaveLength(1);
       const cp = restored.customPresets[0];
-      expect(cp.id).toBe("custom-preset-us8-rich");
-      expect(cp.source).toBe("custom");
-      expect(cp.steps).toHaveLength(2);
-      expect(compareRational(cp.steps[0].duration.beats, rational(4, 1))).toBe(0);
+      expect(requireValue(cp).id).toBe("custom-preset-us8-rich");
+      expect(requireValue(cp).source).toBe("custom");
+      expect(requireValue(cp).steps).toHaveLength(2);
+      expect(compareRational(requireValue(cp).steps[0]!.duration.beats, rational(4, 1))).toBe(0);
     });
 
     it("defaults legacy portable projects to a hidden Staff bass", () => {
@@ -121,6 +123,10 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       >;
       const presentation = serialized["presentation"] as Record<string, unknown>;
       delete presentation["showBassInStaff"];
+      // A file from the version that did not yet contain this preference, so the migration chain
+      // runs and is what supplies the default. Removing the key from a current-version document
+      // would instead produce a payload the schema rightly rejects.
+      serialized["schemaVersion"] = 8;
 
       const restored = decodePortableProject(JSON.stringify(serialized));
       expect(restored.presentation.showBassInStaff).toBe(false);
@@ -134,16 +140,16 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       const parsed = JSON.parse(jsonText);
 
       // Verify JSON contains plain { numerator, denominator } objects for beats
-      const step2Beats = parsed.progression.steps[1].duration.beats;
+      const step2Beats = parsed.progression.steps[1]!.duration.beats;
       expect(step2Beats).toEqual({ numerator: 3, denominator: 2 });
 
-      const step3Beats = parsed.progression.steps[2].duration.beats;
+      const step3Beats = parsed.progression.steps[2]!.duration.beats;
       expect(step3Beats).toEqual({ numerator: 2, denominator: 3 });
 
-      const step4Beats = parsed.progression.steps[3].duration.beats;
+      const step4Beats = parsed.progression.steps[3]!.duration.beats;
       expect(step4Beats).toEqual({ numerator: 1, denominator: 3 });
 
-      const step5Beats = parsed.progression.steps[4].duration.beats;
+      const step5Beats = parsed.progression.steps[4]!.duration.beats;
       expect(step5Beats).toEqual({ numerator: 7, denominator: 2 });
     });
 
@@ -286,13 +292,13 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
 
       expect(restored.customPresets).toHaveLength(1);
       const preset = restored.customPresets[0];
-      expect(preset.id).toBe("custom-preset-us8-rich");
-      expect(preset.name).toBe("Custom I-vi-IV");
-      expect(preset.source).toBe("custom");
-      expect(preset.steps).toHaveLength(2);
+      expect(requireValue(preset).id).toBe("custom-preset-us8-rich");
+      expect(requireValue(preset).name).toBe("Custom I-vi-IV");
+      expect(requireValue(preset).source).toBe("custom");
+      expect(requireValue(preset).steps).toHaveLength(2);
 
       // Ensure no performance or variant data leaked into custom preset steps
-      for (const step of preset.steps) {
+      for (const step of requireValue(preset).steps) {
         expect(step).toHaveProperty("harmonicFunction");
         expect(step).toHaveProperty("duration");
         expect(step).not.toHaveProperty("performance");
@@ -309,24 +315,26 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
 
       const card = restored.moduleTemplateStates.progressions.cards["I"];
       expect(card).toBeDefined();
-      expect(card.harmonicFunctionId).toBe("I");
-      expect(card.cardViewOverride).toBe("piano");
-      expect(card.explicitOverrides.performance?.articulation).toBe("broken-chord");
-      expect(compareRational(card.explicitOverrides.duration!.beats, rational(2, 1))).toBe(0);
+      expect(requireValue(card).harmonicFunctionId).toBe("I");
+      expect(requireValue(card).cardViewOverride).toBe("piano");
+      expect(requireValue(card).explicitOverrides.performance?.articulation).toBe("broken-chord");
+      expect(
+        compareRational(requireValue(card).explicitOverrides.duration!.beats, rational(2, 1)),
+      ).toBe(0);
     });
   });
 
   describe("8. Schema Version & Migration Contract", () => {
-    it("accepts and round-trips the current schemaVersion 10", () => {
+    it("accepts and round-trips the current schemaVersion 11", () => {
       const original = createRichProjectFixture();
       expect(original.schemaVersion).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
 
       const jsonText = encodePortableProject(original);
       const restored = decodePortableProject(jsonText);
-      expect(restored.schemaVersion).toBe(10);
+      expect(restored.schemaVersion).toBe(11);
     });
 
-    it("round-trips project-scoped guitar marker colors and defaults older v10 data to chord roles", () => {
+    it("round-trips project-scoped guitar marker colors and defaults an omitted color key", () => {
       const original = createRichProjectFixture();
       const fingeringProject = {
         ...original,
@@ -359,7 +367,7 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
     it("distinguishes future version rejection from malformed JSON syntax errors", () => {
       const original = createRichProjectFixture();
       const rawObj = JSON.parse(encodePortableProject(original));
-      rawObj.schemaVersion = 11; // Future version
+      rawObj.schemaVersion = 12; // Future version
 
       expect(() => decodePortableProject(JSON.stringify(rawObj))).toThrow(
         UnsupportedProjectVersionError,
@@ -404,7 +412,7 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
     it("rejects invalid Rational denominator 0", () => {
       const original = createRichProjectFixture();
       const rawObj = JSON.parse(encodePortableProject(original));
-      rawObj.progression.steps[0].duration.beats.denominator = 0;
+      rawObj.progression.steps[0]!.duration.beats.denominator = 0;
 
       expect(() => decodePortableProject(JSON.stringify(rawObj))).toThrow(
         InvalidPortableProjectError,
@@ -414,7 +422,7 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
     it("rejects invalid step kinds", () => {
       const original = createRichProjectFixture();
       const rawObj = JSON.parse(encodePortableProject(original));
-      rawObj.progression.steps[0].kind = "unknown-kind";
+      rawObj.progression.steps[0]!.kind = "unknown-kind";
 
       expect(() => decodePortableProject(JSON.stringify(rawObj))).toThrow(
         InvalidPortableProjectError,
@@ -444,4 +452,27 @@ describe("T119 — Portable Project (.cadenceflow) Contract", () => {
       expect(original).toEqual(originalCopy);
     });
   });
+});
+
+it("returns recovery diagnostics without mutating the supplied file and preserves the wrapper", () => {
+  const clean = encodePortableProject(createRichProjectFixture());
+  expect(decodePortableProjectWithDiagnostics(clean).diagnostics).toEqual([]);
+  const raw = JSON.parse(clean);
+  raw.schemaVersion = 6;
+  raw.progression.steps[0].melody = { pitchMotion: "corrupt" };
+  const text = JSON.stringify(raw);
+  const result = decodePortableProjectWithDiagnostics(text);
+  expect(result.diagnostics).toEqual([
+    expect.objectContaining({
+      path: "progression.steps[0]",
+      field: "melody",
+      reason: expect.any(String),
+    }),
+  ]);
+  const recoveredStep = result.project.progression.steps[0];
+  expect(recoveredStep?.kind).toBe("chord");
+  if (recoveredStep?.kind === "chord") expect(recoveredStep.melody).toBeUndefined();
+  expect(decodePortableProject(text)).toEqual(result.project);
+  expect(JSON.stringify(raw)).toBe(text);
+  expect(Object.isFrozen(result)).toBe(true);
 });

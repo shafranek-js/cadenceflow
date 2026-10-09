@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 const acceptanceModes = [
   { width: 1280, height: 720, theme: "light" },
@@ -39,13 +40,16 @@ for (const acceptance of acceptanceModes) {
       sessionStorage.clear();
     });
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+    await setProgressionView(page, "staff");
     await page
       .getByRole("button", {
         name: acceptance.theme === "light" ? "Light theme" : "Dark theme",
       })
       .click();
 
-    const steps = page.getByTestId("progression-step");
+    const steps = page.locator(".measure-staff-event-select");
     const focusToggle = page.getByTestId("matrix-focus-toggle");
     await expect(steps).toHaveCount(0);
 

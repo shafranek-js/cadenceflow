@@ -27,6 +27,7 @@ import {
 import { createEffectiveMelodyTimeline } from "../../../src/domain/melody/effectiveTimeline";
 import { decodePortableProject } from "../../../src/persistence/portableProject";
 import { groove } from "../../../src/domain/timing/swing";
+import { snapshotChordMelody } from "../../../src/domain/melody/types";
 import type { ChordMelodyRecipe } from "../../../src/domain/melody/types";
 import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
 import type { Project } from "../../../src/domain/project/project";
@@ -39,6 +40,7 @@ import {
   mapTonicToMusicXmlKey,
 } from "../../../src/export/musicxml/mapping";
 import {
+  MUSICXML_MAX_DIVISIONS,
   MusicXmlExportError,
   projectProjectToMusicXml,
   type MusicXmlMelodyNoteEvent,
@@ -54,7 +56,7 @@ import {
 } from "../../../src/export/musicxml/writer";
 
 function performance(overrides: Partial<StepPerformance> = {}): StepPerformance {
-  return Object.freeze({
+  return Object.freeze<StepPerformance>({
     ...DEFAULT_PIANO_PERFORMANCE,
     articulation: "block",
     ...overrides,
@@ -78,7 +80,7 @@ function chordStep(
   variant: HarmonicVariant = EMPTY_HARMONIC_VARIANT,
   performanceOverrides: Partial<StepPerformance> = {},
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     id,
     kind: "chord",
     harmonicFunction: Object.freeze({
@@ -99,7 +101,7 @@ interface RationalParts {
 }
 
 function restStep(id: string, duration: RationalParts): RestStep {
-  return Object.freeze({
+  return Object.freeze<RestStep>({
     id,
     kind: "rest",
     duration: musicalDuration(rational(duration.numerator, duration.denominator)),
@@ -110,18 +112,19 @@ function acceptanceProject(): Project {
   const base = createDefaultProject("musicxml-acceptance", "Cadence & Flow <US9>");
   const project = Object.freeze({
     ...base,
+    independentBassEnabled: true,
     activeModule: "dark-harmony" as const,
     tonic: 2,
     globalTiming: globalTiming(140, meter(7, 8, [2, 2, 3])),
     groove: groove("swing", 0.55),
   });
-  const variant: HarmonicVariant = Object.freeze({
+  const variant: HarmonicVariant = Object.freeze<HarmonicVariant>({
     seventh: "minor7",
     extensions: Object.freeze([9]),
     suspensions: Object.freeze([]),
     alterations: Object.freeze([{ degree: 5, semitones: 1 }]),
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({
       steps: Object.freeze([
@@ -169,8 +172,9 @@ function acceptanceProject(): Project {
 function crossingProject(): Project {
   const base = createDefaultProject("musicxml-crossing", "Crossing Fixture");
   const step = chordStep(base, "I", "crossing-chord", { numerator: 5, denominator: 1 });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
+    independentBassEnabled: true,
     globalTiming: globalTiming(120, meter(4, 4, [4])),
     progression: Object.freeze({
       steps: Object.freeze([step, restStep("after-crossing", { numerator: 1, denominator: 2 })]),
@@ -202,9 +206,9 @@ function melodyChordStep(
   duration: RationalParts,
   melody: ChordMelodyRecipe,
 ): ChordStep {
-  return Object.freeze({
+  return Object.freeze<ChordStep>({
     ...chordStep(project, functionId, id, duration),
-    melody: Object.freeze({ ...melody }),
+    melody: { mode: "generated", recipe: Object.freeze({ ...melody }) },
   });
 }
 
@@ -216,9 +220,11 @@ function melodyProject(): Project {
     "melody-triplet",
     { numerator: 7, denominator: 2 },
     {
-      pattern: "up",
+      pitchMotion: "up",
       grid: "eighth-triplet",
       octaveOffset: 1,
+      rhythm: "even",
+      connection: "retrigger",
     },
   );
   const second = melodyChordStep(
@@ -227,13 +233,15 @@ function melodyProject(): Project {
     "melody-quarter",
     { numerator: 1, denominator: 1 },
     {
-      pattern: "down",
+      pitchMotion: "down",
       grid: "quarter",
       octaveOffset: 0,
+      rhythm: "even",
+      connection: "retrigger",
     },
   );
   const noRecipe = chordStep(base, "vi", "melody-no-recipe", { numerator: 1, denominator: 2 });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...base,
     melodyTrack: Object.freeze({ ...base.melodyTrack, instrument: "violin" }),
     progression: Object.freeze({
@@ -249,7 +257,7 @@ function melodyProject(): Project {
       originStepId: "melody-triplet",
       originAtEnd: false,
       rejoinStepId: "melody-no-recipe",
-      compositionIntent: "temporary melody branch",
+      compositionIntent: "neutral",
       steps: Object.freeze([
         melodyChordStep(
           base,
@@ -257,9 +265,11 @@ function melodyProject(): Project {
           "melody-branch-only",
           { numerator: 1, denominator: 1 },
           {
-            pattern: "inside-out",
+            pitchMotion: "inside-out",
             grid: "sixteenth-triplet",
             octaveOffset: 0,
+            rhythm: "even",
+            connection: "retrigger",
           },
         ),
       ]),
@@ -332,7 +342,9 @@ function xmlText(node: MusicXmlTestElement, path: string): string {
   return value;
 }
 
-const MUSIC_XML_TYPE_BEATS: Readonly<Record<string, Rational>> = Object.freeze({
+const MUSIC_XML_TYPE_BEATS: Readonly<Record<string, Rational>> = Object.freeze<
+  Readonly<Record<string, Rational>>
+>({
   whole: rational(4),
   half: rational(2),
   quarter: rational(1),
@@ -535,7 +547,7 @@ async function parseWrittenMelody(
 }
 
 const PRE_T175_NO_MELODY_GOLDEN_BASE64 =
-  "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHNjb3JlLXBhcnR3aXNlIHZlcnNpb249IjQuMCI+CiAgPHdvcms+CiAgICA8d29yay10aXRsZT5UMTc1IEdvbGRlbjwvd29yay10aXRsZT4KICA8L3dvcms+CiAgPHBhcnQtbGlzdD4KICAgIDxzY29yZS1wYXJ0IGlkPSJQMSI+CiAgICAgIDxwYXJ0LW5hbWU+UGlhbm88L3BhcnQtbmFtZT4KICAgIDwvc2NvcmUtcGFydD4KICA8L3BhcnQtbGlzdD4KICA8cGFydCBpZD0iUDEiPgogICAgPG1lYXN1cmUgbnVtYmVyPSIxIj4KICAgICAgPGF0dHJpYnV0ZXM+CiAgICAgICAgPGRpdmlzaW9ucz4xPC9kaXZpc2lvbnM+CiAgICAgICAgPGtleT4KICAgICAgICAgIDxmaWZ0aHM+MDwvZmlmdGhzPgogICAgICAgICAgPG1vZGU+bWFqb3I8L21vZGU+CiAgICAgICAgPC9rZXk+CiAgICAgICAgPHRpbWU+CiAgICAgICAgICA8YmVhdHM+NDwvYmVhdHM+CiAgICAgICAgICA8YmVhdC10eXBlPjQ8L2JlYXQtdHlwZT4KICAgICAgICA8L3RpbWU+CiAgICAgICAgPHN0YXZlcz4yPC9zdGF2ZXM+CiAgICAgICAgPHBhcnQtc3ltYm9sIHRvcC1zdGFmZj0iMSIgYm90dG9tLXN0YWZmPSIyIj5icmFjZTwvcGFydC1zeW1ib2w+CiAgICAgICAgPGNsZWYgbnVtYmVyPSIxIj4KICAgICAgICAgIDxzaWduPkc8L3NpZ24+CiAgICAgICAgICA8bGluZT4yPC9saW5lPgogICAgICAgIDwvY2xlZj4KICAgICAgICA8Y2xlZiBudW1iZXI9IjIiPgogICAgICAgICAgPHNpZ24+Rjwvc2lnbj4KICAgICAgICAgIDxsaW5lPjQ8L2xpbmU+CiAgICAgICAgPC9jbGVmPgogICAgICA8L2F0dHJpYnV0ZXM+CiAgICAgIDxkaXJlY3Rpb24gcGxhY2VtZW50PSJhYm92ZSI+CiAgICAgICAgPGRpcmVjdGlvbi10eXBlPgogICAgICAgICAgPG1ldHJvbm9tZT4KICAgICAgICAgICAgPGJlYXQtdW5pdD5xdWFydGVyPC9iZWF0LXVuaXQ+CiAgICAgICAgICAgIDxwZXItbWludXRlPjEwMDwvcGVyLW1pbnV0ZT4KICAgICAgICAgIDwvbWV0cm9ub21lPgogICAgICAgIDwvZGlyZWN0aW9uLXR5cGU+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICAgIDxzb3VuZCB0ZW1wbz0iMTAwIi8+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8ZGlyZWN0aW9uIHBsYWNlbWVudD0iYmVsb3ciPgogICAgICAgIDxkaXJlY3Rpb24tdHlwZT4KICAgICAgICAgIDxkeW5hbWljcz4KICAgICAgICAgICAgPG1mLz4KICAgICAgICAgIDwvZHluYW1pY3M+CiAgICAgICAgPC9kaXJlY3Rpb24tdHlwZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8aGFybW9ueT4KICAgICAgICA8cm9vdD4KICAgICAgICAgIDxyb290LXN0ZXA+Qzwvcm9vdC1zdGVwPgogICAgICAgIDwvcm9vdD4KICAgICAgICA8a2luZD5tYWpvcjwva2luZD4KICAgICAgPC9oYXJtb255PgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT40PC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjE8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4xPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgICA8bm90ZT4KICAgICAgICA8Y2hvcmQvPgogICAgICAgIDxwaXRjaD4KICAgICAgICAgIDxzdGVwPkU8L3N0ZXA+CiAgICAgICAgICA8b2N0YXZlPjQ8L29jdGF2ZT4KICAgICAgICA8L3BpdGNoPgogICAgICAgIDxkdXJhdGlvbj40PC9kdXJhdGlvbj4KICAgICAgICA8dm9pY2U+MTwvdm9pY2U+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICA8L25vdGU+CiAgICAgIDxub3RlPgogICAgICAgIDxjaG9yZC8+CiAgICAgICAgPHBpdGNoPgogICAgICAgICAgPHN0ZXA+Rzwvc3RlcD4KICAgICAgICAgIDxvY3RhdmU+NDwvb2N0YXZlPgogICAgICAgIDwvcGl0Y2g+CiAgICAgICAgPGR1cmF0aW9uPjQ8L2R1cmF0aW9uPgogICAgICAgIDx2b2ljZT4xPC92b2ljZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvbm90ZT4KICAgICAgPGJhY2t1cD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgIDwvYmFja3VwPgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT4zPC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjI8L3ZvaWNlPgogICAgICAgIDxzdGFmZj4yPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgPC9tZWFzdXJlPgogIDwvcGFydD4KPC9zY29yZS1wYXJ0d2lzZT4K";
+  "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHNjb3JlLXBhcnR3aXNlIHZlcnNpb249IjQuMCI+CiAgPHdvcms+CiAgICA8d29yay10aXRsZT5UMTc1IEdvbGRlbjwvd29yay10aXRsZT4KICA8L3dvcms+CiAgPHBhcnQtbGlzdD4KICAgIDxzY29yZS1wYXJ0IGlkPSJQMSI+CiAgICAgIDxwYXJ0LW5hbWU+UGlhbm88L3BhcnQtbmFtZT4KICAgIDwvc2NvcmUtcGFydD4KICA8L3BhcnQtbGlzdD4KICA8cGFydCBpZD0iUDEiPgogICAgPG1lYXN1cmUgbnVtYmVyPSIxIj4KICAgICAgPGF0dHJpYnV0ZXM+CiAgICAgICAgPGRpdmlzaW9ucz4xPC9kaXZpc2lvbnM+CiAgICAgICAgPGtleT4KICAgICAgICAgIDxmaWZ0aHM+MDwvZmlmdGhzPgogICAgICAgICAgPG1vZGU+bWFqb3I8L21vZGU+CiAgICAgICAgPC9rZXk+CiAgICAgICAgPHRpbWU+CiAgICAgICAgICA8YmVhdHM+NDwvYmVhdHM+CiAgICAgICAgICA8YmVhdC10eXBlPjQ8L2JlYXQtdHlwZT4KICAgICAgICA8L3RpbWU+CiAgICAgICAgPHN0YXZlcz4yPC9zdGF2ZXM+CiAgICAgICAgPHBhcnQtc3ltYm9sIHRvcC1zdGFmZj0iMSIgYm90dG9tLXN0YWZmPSIyIj5icmFjZTwvcGFydC1zeW1ib2w+CiAgICAgICAgPGNsZWYgbnVtYmVyPSIxIj4KICAgICAgICAgIDxzaWduPkc8L3NpZ24+CiAgICAgICAgICA8bGluZT4yPC9saW5lPgogICAgICAgIDwvY2xlZj4KICAgICAgICA8Y2xlZiBudW1iZXI9IjIiPgogICAgICAgICAgPHNpZ24+Rjwvc2lnbj4KICAgICAgICAgIDxsaW5lPjQ8L2xpbmU+CiAgICAgICAgPC9jbGVmPgogICAgICA8L2F0dHJpYnV0ZXM+CiAgICAgIDxkaXJlY3Rpb24gcGxhY2VtZW50PSJhYm92ZSI+CiAgICAgICAgPGRpcmVjdGlvbi10eXBlPgogICAgICAgICAgPG1ldHJvbm9tZT4KICAgICAgICAgICAgPGJlYXQtdW5pdD5xdWFydGVyPC9iZWF0LXVuaXQ+CiAgICAgICAgICAgIDxwZXItbWludXRlPjEwMDwvcGVyLW1pbnV0ZT4KICAgICAgICAgIDwvbWV0cm9ub21lPgogICAgICAgIDwvZGlyZWN0aW9uLXR5cGU+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICAgIDxzb3VuZCB0ZW1wbz0iMTAwIi8+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8ZGlyZWN0aW9uIHBsYWNlbWVudD0iYmVsb3ciPgogICAgICAgIDxkaXJlY3Rpb24tdHlwZT4KICAgICAgICAgIDxkeW5hbWljcz4KICAgICAgICAgICAgPG1mLz4KICAgICAgICAgIDwvZHluYW1pY3M+CiAgICAgICAgPC9kaXJlY3Rpb24tdHlwZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvZGlyZWN0aW9uPgogICAgICA8aGFybW9ueT4KICAgICAgICA8cm9vdD4KICAgICAgICAgIDxyb290LXN0ZXA+Qzwvcm9vdC1zdGVwPgogICAgICAgIDwvcm9vdD4KICAgICAgICA8a2luZD5tYWpvcjwva2luZD4KICAgICAgPC9oYXJtb255PgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT40PC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjE8L3ZvaWNlPgogICAgICAgIDx0eXBlPndob2xlPC90eXBlPgogICAgICAgIDxzdGFmZj4xPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgICA8bm90ZT4KICAgICAgICA8Y2hvcmQvPgogICAgICAgIDxwaXRjaD4KICAgICAgICAgIDxzdGVwPkU8L3N0ZXA+CiAgICAgICAgICA8b2N0YXZlPjQ8L29jdGF2ZT4KICAgICAgICA8L3BpdGNoPgogICAgICAgIDxkdXJhdGlvbj40PC9kdXJhdGlvbj4KICAgICAgICA8dm9pY2U+MTwvdm9pY2U+CiAgICAgICAgPHR5cGU+d2hvbGU8L3R5cGU+CiAgICAgICAgPHN0YWZmPjE8L3N0YWZmPgogICAgICA8L25vdGU+CiAgICAgIDxub3RlPgogICAgICAgIDxjaG9yZC8+CiAgICAgICAgPHBpdGNoPgogICAgICAgICAgPHN0ZXA+Rzwvc3RlcD4KICAgICAgICAgIDxvY3RhdmU+NDwvb2N0YXZlPgogICAgICAgIDwvcGl0Y2g+CiAgICAgICAgPGR1cmF0aW9uPjQ8L2R1cmF0aW9uPgogICAgICAgIDx2b2ljZT4xPC92b2ljZT4KICAgICAgICA8dHlwZT53aG9sZTwvdHlwZT4KICAgICAgICA8c3RhZmY+MTwvc3RhZmY+CiAgICAgIDwvbm90ZT4KICAgICAgPGJhY2t1cD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgIDwvYmFja3VwPgogICAgICA8bm90ZT4KICAgICAgICA8cGl0Y2g+CiAgICAgICAgICA8c3RlcD5DPC9zdGVwPgogICAgICAgICAgPG9jdGF2ZT4zPC9vY3RhdmU+CiAgICAgICAgPC9waXRjaD4KICAgICAgICA8ZHVyYXRpb24+NDwvZHVyYXRpb24+CiAgICAgICAgPHZvaWNlPjI8L3ZvaWNlPgogICAgICAgIDx0eXBlPndob2xlPC90eXBlPgogICAgICAgIDxzdGFmZj4yPC9zdGFmZj4KICAgICAgPC9ub3RlPgogICAgPC9tZWFzdXJlPgogIDwvcGFydD4KPC9zY29yZS1wYXJ0d2lzZT4K";
 
 describe("US9 MusicXML mapping policy", () => {
   it("preserves the canonical key spelling for every tonic in both modes", () => {
@@ -580,9 +592,81 @@ describe("US9 MusicXML mapping policy", () => {
     });
   });
 
+  it("exports add11/add13 and independent no3/no5 degree changes", () => {
+    const chord: ChordDefinition = {
+      ...realizeChord({ moduleId: "progressions", functionId: "I", category: "core" }, 0),
+      variant: {
+        baseQualityOverride: "minor",
+        seventh: "minor7",
+        extensions: [9],
+        suspensions: [],
+        alterations: [{ degree: 9, semitones: -1 }],
+        add11: true,
+        add13: true,
+        no3: true,
+        no5: true,
+      },
+    };
+
+    expect(mapChordToMusicXmlHarmony(chord).value).toEqual({
+      root: { step: "C", alter: 0 },
+      kind: "minor-seventh",
+      degrees: [
+        { value: 9, alter: -1, type: "add" },
+        { value: 11, alter: 0, type: "add" },
+        { value: 13, alter: 0, type: "add" },
+        { value: 3, alter: 0, type: "subtract" },
+        { value: 5, alter: 0, type: "subtract" },
+      ],
+    });
+  });
+
+  it("maps altered fifths relative to the base MusicXML harmony kind", () => {
+    const base = realizeChord({ moduleId: "progressions", functionId: "I", category: "core" }, 0);
+    const variant = (baseQuality: ChordDefinition["baseQuality"], semitones: -1 | 1) =>
+      mapChordToMusicXmlHarmony({
+        ...base,
+        baseQuality,
+        variant: { ...EMPTY_HARMONIC_VARIANT, alterations: [{ degree: 5, semitones }] },
+      }).value;
+
+    expect(variant("major", -1)?.degrees).toEqual([{ value: 5, alter: -1, type: "alter" }]);
+    // The quality kind already supplies these same fifths, so do not emit a duplicate change.
+    expect(variant("diminished", -1)?.degrees).toEqual([]);
+    expect(variant("augmented", 1)?.degrees).toEqual([]);
+    // A change away from the kind's fifth is measured against its actual base interval.
+    expect(variant("diminished", 1)?.degrees).toEqual([{ value: 5, alter: 2, type: "alter" }]);
+    expect(variant("augmented", -1)?.degrees).toEqual([{ value: 5, alter: -2, type: "alter" }]);
+  });
+
+  it("diagnoses suspensions combined with every authored extension or omission", () => {
+    const chord: ChordDefinition = {
+      ...realizeChord({ moduleId: "progressions", functionId: "I", category: "core" }, 0),
+      variant: {
+        ...EMPTY_HARMONIC_VARIANT,
+        suspensions: ["sus4"],
+        add11: true,
+        add13: true,
+        no3: true,
+        no5: true,
+      },
+    };
+
+    const mapped = mapChordToMusicXmlHarmony(chord);
+    expect(mapped.diagnostics.map(({ message }) => message)).toContain(
+      "Suspension combined with additional extensions, alterations, or omissions may not be represented exactly.",
+    );
+    expect(mapped.value?.degrees).toEqual([
+      { value: 11, alter: 0, type: "add" },
+      { value: 13, alter: 0, type: "add" },
+      { value: 3, alter: 0, type: "subtract" },
+      { value: 5, alter: 0, type: "subtract" },
+    ]);
+  });
+
   it("maps current seventh kinds, suspensions, and add9 as structured harmony", () => {
     const variant = (seventh: HarmonicVariant["seventh"]): HarmonicVariant => ({
-      seventh,
+      ...(seventh === undefined ? {} : { seventh }),
       extensions: [],
       suspensions: [],
       alterations: [],
@@ -925,11 +1009,17 @@ describe("US9 MusicXML writer and safety contract", () => {
     });
     expect(() => projectProjectToMusicXml(invalidTempo)).toThrowError(/positive finite tempo/);
 
+    // Raised ceiling: a denominator below `MUSICXML_MAX_DIVISIONS` is now representable, so the
+    // overflow path needs one that genuinely cannot be. (1_000_003 used to exceed the old limit of
+    // 1_000_000 and no longer does.)
     const overflowing = Object.freeze({
       ...crossingProject(),
       progression: Object.freeze({
         steps: Object.freeze([
-          chordStep(crossingProject(), "I", "huge", { numerator: 1, denominator: 1_000_003 }),
+          chordStep(crossingProject(), "I", "huge", {
+            numerator: 1,
+            denominator: MUSICXML_MAX_DIVISIONS + 3,
+          }),
         ]),
       }),
     });
@@ -940,6 +1030,62 @@ describe("US9 MusicXML writer and safety contract", () => {
       version: "3.1",
     } as unknown as MusicXmlProjection;
     expect(() => writeMusicXml(invalidProjection)).toThrowError(/version must be 4.0/);
+  });
+
+  it("exports realistic tuplet combinations that exceed the former divisions ceiling", () => {
+    // `divisions` must be a multiple of every duration denominator, so it tracks the LCM of the
+    // subdivision grid in use. Mixing tuplet families multiplies quickly: 5·7·9·25 = 1575, adding a
+    // 32nd-note grid gives 50400, and adding an 11-tuplet reaches 554400. The former ceiling of
+    // 1_000_000 admitted that last combination but refused anything beyond, so a score mixing
+    // 11- and 13-tuplets could not be exported at all despite being perfectly notatable.
+    const wideGrid = Object.freeze({
+      ...crossingProject(),
+      progression: Object.freeze({
+        steps: Object.freeze(
+          [3, 5, 7, 9, 11, 13].map((denominator) =>
+            chordStep(crossingProject(), "I", `tuplet-${denominator}`, {
+              numerator: 1,
+              denominator,
+            }),
+          ),
+        ),
+      }),
+    });
+
+    const projection = projectProjectToMusicXml(wideGrid);
+    // LCM(3, 5, 7, 9, 11, 13) = 45045: an exact, comfortably safe value. Before the ceiling was
+    // raised this combination was refused; now it exports and every tuplet is notated exactly.
+    expect(projection.attributes.divisions).toBe(45045);
+    expect(Number.isSafeInteger(projection.attributes.divisions)).toBe(true);
+    expect(projection.attributes.divisions).toBeLessThanOrEqual(MUSICXML_MAX_DIVISIONS);
+  });
+
+  it("names the offending step when divisions genuinely cannot be represented", () => {
+    // The message must be actionable: a limit error that does not identify the step leaves the
+    // user unable to find it in a long progression.
+    const beyond = Object.freeze({
+      ...crossingProject(),
+      progression: Object.freeze({
+        steps: Object.freeze([
+          chordStep(crossingProject(), "I", "offending-step", {
+            numerator: 1,
+            denominator: 200_000_003,
+          }),
+        ]),
+      }),
+    });
+
+    try {
+      projectProjectToMusicXml(beyond);
+      throw new Error("expected the projection to reject an unrepresentable denominator");
+    } catch (error) {
+      expect(error).toBeInstanceOf(MusicXmlExportError);
+      const exportError = error as MusicXmlExportError;
+      expect(exportError.code).toBe("duration-divisions-overflow");
+      expect(exportError.message).toContain("offending-step");
+      expect(exportError.message).toContain("200000003");
+      expect(exportError.message).toContain(String(MUSICXML_MAX_DIVISIONS));
+    }
   });
 
   it("is deterministic, deeply immutable in its DTO, and leaves the source Project unchanged", () => {
@@ -959,16 +1105,67 @@ describe("US9 MusicXML writer and safety contract", () => {
 });
 
 describe("T175 Melody MusicXML part", () => {
-  it("keeps the pre-T175 no-Melody bytes unchanged", () => {
+  it("keeps the no-Melody bytes stable up to the Piano written values", () => {
+    // The golden was refreshed when the Piano part started stating its written note values: a bar is
+    // not necessarily one writable value, and without `<type>` notation software cannot size it. The
+    // only change was four added `<type>whole</type>` lines (one per Piano note), nothing removed.
     const base = createDefaultProject("golden-t175", "T175 Golden", "2026-09-10T00:00:00.000Z");
     const step = chordStep(base, "I", "golden-step", { numerator: 4, denominator: 1 });
     const project = Object.freeze({
       ...base,
+      independentBassEnabled: true,
       progression: Object.freeze({ steps: Object.freeze([step]) }),
     });
     const bytes = writeMusicXmlFile(projectProjectToMusicXml(project));
     expect(Buffer.from(bytes).toString("base64")).toBe(PRE_T175_NO_MELODY_GOLDEN_BASE64);
     expect(projectProjectToMusicXml(project).melody).toBeUndefined();
+  });
+
+  it("notates a 5/4 Piano bar as tied written values so notation software can size it", () => {
+    const base = createDefaultProject("meter-5-4-piano", "Meter 5/4 Piano");
+    const project = Object.freeze({
+      ...base,
+      independentBassEnabled: true,
+      globalTiming: Object.freeze({ ...base.globalTiming, meter: meter(5, 4) }),
+      progression: Object.freeze({
+        steps: Object.freeze([chordStep(base, "I", "five-four", { numerator: 5, denominator: 1 })]),
+      }),
+    });
+
+    const projection = projectProjectToMusicXml(project);
+    const notes = (projection.measures[0]?.events ?? []).filter((event) => event.kind === "note");
+    const beatsOf = (note: (typeof notes)[number]) =>
+      note.durationBeats.numerator / note.durationBeats.denominator;
+
+    // Five quarter beats are neither a whole (4) nor a dotted whole (6), so the bar must be written
+    // as a whole tied to a quarter. Writing it as one note left the bar unmeasurable: MuseScore
+    // reported "Incomplete measure ... Found: 3/2. Expected: 5/4".
+    const upper = notes.filter((note) => note.staff === 1);
+    expect(upper.map((note) => note.type)).toEqual([
+      "whole",
+      "whole",
+      "whole",
+      "quarter",
+      "quarter",
+      "quarter",
+    ]);
+    expect(upper.map(beatsOf)).toEqual([4, 4, 4, 1, 1, 1]);
+    expect(upper[0]?.ties).toEqual(["start"]);
+    expect(upper[3]?.ties).toEqual(["stop"]);
+    // Only the first pitch of each written part is an attack; the rest sustain it.
+    expect(upper.map((note) => note.chord)).toEqual([false, true, true, false, true, true]);
+    expect(notes.filter((note) => note.staff === 2).map((note) => note.type)).toEqual([
+      "whole",
+      "quarter",
+    ]);
+
+    // Every note states its written value. That is exactly what MuseScore needs to size the bar.
+    const xml = writeMusicXml(projection);
+    const writtenNotes = xml.match(/<note>[\s\S]*?<\/note>/g) ?? [];
+    expect(writtenNotes.length).toBeGreaterThan(0);
+    expect(writtenNotes.filter((note) => !note.includes("<type>"))).toEqual([]);
+    expect(xml).toContain('<tie type="start"/>');
+    expect(xml).toContain('<tied type="start"/>');
   });
 
   it("preserves accepted Piano spelling/octave semantics without Melody", () => {
@@ -1269,7 +1466,11 @@ describe("T175 Melody MusicXML part", () => {
         "triplet-step",
         { numerator: 1, denominator: 1 },
         {
-          pattern: "up",
+          pitchMotion: "up",
+          // A recipe needs all five axes: the canonical shape requires rhythm and connection, and
+          // `validateChordMelodyRecipe` rejects a partial one.
+          rhythm: "even",
+          connection: "retrigger",
           grid,
           octaveOffset: 0,
         },
@@ -1286,6 +1487,66 @@ describe("T175 Melody MusicXML part", () => {
       expect(events.at(-1)?.tupletMarks).toEqual(["stop"]);
       expect(writeMusicXml(projection)).toContain(`<normal-type>${normalType}</normal-type>`);
     }
+  });
+
+  it("keeps tuplet brackets on the written notes that carry the tuplet ratio", () => {
+    // A Melody authored on a sixteenth-triplet grid holds notes of 5/6 and 1/6 of a quarter. The 5/6
+    // note is written as a dotted eighth tied to a 64th and a 3:1 64th, so the tuplet's first written
+    // part is a plain note. The bracket used to open on that plain note and leave the time-modified
+    // notes outside it — the bar then had no measurable length (MuseScore: "Found: 585/384.
+    // Expected: 6/4") even though every duration summed exactly.
+    const base = createDefaultProject("tuplet-brackets", "Tuplet Brackets");
+    const spellings = ["C", "D", "E", "F", "G", "A", "B"] as const;
+    const semitones = [0, 2, 4, 5, 7, 9, 11];
+    const notes = Array.from({ length: 12 }, (_, index) => {
+      const pitchIndex = index % 7;
+      return {
+        id: `n${index}`,
+        pitch: exactPitch(60 + semitones[pitchIndex]!, {
+          step: spellings[pitchIndex]!,
+          alter: 0,
+        }),
+        sourcePitchMidi: 60 + semitones[pitchIndex]!,
+        onset: rational(Math.floor(index / 2) * 6 + (index % 2 === 1 ? 5 : 0), 6),
+        duration: rational(index % 2 === 0 ? 5 : 1, 6),
+      };
+    });
+    const step = Object.freeze({
+      ...chordStep(base, "I", "authored-tuplet", { numerator: 6, denominator: 1 }),
+      melody: snapshotChordMelody({ mode: "authored" as const, phrase: { notes } }),
+    });
+    const project = Object.freeze({
+      ...base,
+      progression: Object.freeze({ steps: Object.freeze([step]) }),
+    });
+
+    const projection = projectProjectToMusicXml(project);
+    const events = melodyNotes(projection);
+    const bracketed = events.filter((event) => event.tupletMarks.length > 0);
+
+    // A bracket may only sit on a note that states its own ratio.
+    expect(bracketed.length).toBeGreaterThan(0);
+    expect(bracketed.every((event) => event.timeModification !== undefined)).toBe(true);
+    // The plain written values never open or close a bracket.
+    const plainValues = events.filter((event) => event.timeModification === undefined);
+    expect(plainValues.every((event) => event.tupletMarks.length === 0)).toBe(true);
+    // The 3:1 64th opens the tuplet and the 3:2 16th closes it.
+    const opens = bracketed.filter((event) => event.tupletMarks.includes("start"));
+    const closes = bracketed.filter((event) => event.tupletMarks.includes("stop"));
+    expect(opens.length).toBeGreaterThan(0);
+    expect(
+      opens.every(
+        (event) =>
+          event.timeModification?.actualNotes === 3 && event.timeModification.normalNotes === 1,
+      ),
+    ).toBe(true);
+    expect(
+      closes.every(
+        (event) =>
+          event.timeModification?.actualNotes === 3 && event.timeModification.normalNotes === 2,
+      ),
+    ).toBe(true);
+    expect(writeMusicXml(projection)).toContain('<tuplet type="start"');
   });
 
   it("keeps non-even triplet rhythm and a clipped final attack semantically notated", () => {
@@ -1347,9 +1608,11 @@ describe("T175 Melody MusicXML part", () => {
         "meter-melody",
         { numerator: 5, denominator: 2 },
         {
-          pattern: "up-down",
+          pitchMotion: "up-down",
           grid: "eighth",
           octaveOffset: 0,
+          rhythm: "even",
+          connection: "retrigger",
         },
       );
       const project = Object.freeze({

@@ -54,7 +54,20 @@ export const MUSICXML_VERSION = "4.0";
 export const MUSICXML_PART_ID = "P1";
 export const MUSICXML_PART_NAME = "Piano";
 export const MUSICXML_MELODY_PART_ID = "P2";
-export const MUSICXML_MAX_DIVISIONS = 1_000_000;
+/**
+ * Upper bound on the exact `divisions` value the exporter will emit.
+ *
+ * `divisions` must be a multiple of every duration denominator in the score (see
+ * `calculateDivisions`), so the number grows with the least common multiple of the subdivision
+ * grid in use. The previous limit of 1_000_000 was reached by plausible tuplet combinations —
+ * sixteenths plus triplet-eighths plus quintuplets already lands at 2400, and mixing several
+ * tuplet families multiplies quickly (e.g. 5·7·9·25 = 7875, and adding a 32nd-note grid gives
+ * 252000). Raising the ceiling keeps those scores exportable exactly instead of refusing them.
+ *
+ * The value stays a safe integer so `value.numerator * divisions` cannot lose precision, and it
+ * is documented by `MusicXmlProjection.attributes.divisions` in the emitted XML.
+ */
+export const MUSICXML_MAX_DIVISIONS = 100_000_000;
 
 export class MusicXmlExportError extends Error {
   readonly code:
@@ -113,6 +126,17 @@ export interface MusicXmlNoteEvent {
   readonly sourceMidi: number;
   readonly role: "upper" | "bass";
   readonly pitch: MusicXmlPitchSpelling & { readonly octave: number };
+  /**
+   * Written note value, decomposed so the bar can always be notated.
+   *
+   * A bar is not necessarily one writable value: five quarter beats in 5/4 are neither a whole note
+   * (4) nor a dotted whole (6), so they must be written as tied notes. `<type>` is therefore
+   * required per written part, not per sounding note — without it notation software cannot tell how
+   * long the bar is and reports the file as corrupted.
+   */
+  readonly type: MusicXmlWrittenNoteType;
+  readonly dots?: 1;
+  readonly timeModification?: MusicXmlMelodyTimeModification;
   readonly ties: readonly ("start" | "stop")[];
   readonly arpeggiate?: MusicXmlArticulation;
 }
@@ -126,6 +150,10 @@ export interface MusicXmlRestEvent {
   readonly duration: number;
   readonly voice: "1" | "2";
   readonly staff: 1 | 2;
+  readonly type: MusicXmlWrittenNoteType;
+  readonly dots?: 1;
+  readonly timeModification?: MusicXmlMelodyTimeModification;
+  readonly ties: readonly ("start" | "stop")[];
 }
 
 export type MusicXmlMeasureEvent =
@@ -366,6 +394,63 @@ function melodyTupletMarks(
   return Object.freeze(marks);
 }
 
+/**
+ * Aligns tuplet brackets with the written values that actually form the tuplet.
+ *
+ * `<time-modification>` comes from decomposing a duration into writable values, while brackets used to
+ * be placed by Melody event index (groups of three on a triplet grid). The two disagree as soon as a
+ * tuplet note is split into tied written parts: the bracket opened on a plain note and the
+ * time-modified notes fell outside it. MuseScore then cannot measure the bar at all — it reported
+ * "Found: 585/384. Expected: 6/4" for a bar whose durations sum exactly.
+ *
+ * A bracket now opens on the first note of a run of time-modified events and closes on the last, per
+ * voice. Only notes can carry a bracket: the writer emits `<tuplet>` inside `<notations>`, which the
+ * rest element does not produce. A run holding fewer than two notes is not a tuplet and gets none.
+ */
+function alignTupletBrackets(events: MusicXmlMelodyMeasureEvent[]): void {
+  const voices = new Map<string, number[]>();
+  events.forEach((event, index) => {
+    if (event.kind !== "note" && event.kind !== "rest") return;
+    const key = `${event.staff}:${event.voice}`;
+    const indices = voices.get(key);
+    if (indices) indices.push(index);
+    else voices.set(key, [index]);
+  });
+
+  for (const indices of voices.values()) {
+    indices.sort((left, right) =>
+      compareRational(events[left]!.onsetBeats, events[right]!.onsetBeats),
+    );
+    let run: number[] = [];
+    const closeRun = () => {
+      const notes = run.filter((index) => events[index]?.kind === "note");
+      const first = notes[0];
+      const last = notes[notes.length - 1];
+      if (first !== undefined && last !== undefined && first !== last) {
+        for (const index of [first, last]) {
+          const event = events[index];
+          if (!event || event.kind !== "note") continue;
+          const marks: ("start" | "stop")[] = [];
+          if (index === first) marks.push("start");
+          if (index === last) marks.push("stop");
+          events[index] = Object.freeze({ ...event, tupletMarks: Object.freeze(marks) });
+        }
+      }
+      run = [];
+    };
+    for (const index of indices) {
+      const event = events[index];
+      const timed =
+        event !== undefined &&
+        (event.kind === "note" || event.kind === "rest") &&
+        event.timeModification !== undefined;
+      if (timed) run.push(index);
+      else closeRun();
+    }
+    closeRun();
+  }
+}
+
 function effectiveMelodyForExport(project: Project) {
   try {
     return createEffectiveMelodyTimeline(project);
@@ -384,21 +469,29 @@ function gcd(a: number, b: number): number {
   return left || 1;
 }
 
-function lcmOrThrow(left: number, right: number): number {
+/**
+ * Combines two denominators into the running `divisions` value, or reports what overflowed.
+ *
+ * `source` names the step or melody note whose denominator forced the failure. The message has to
+ * be actionable: the previous version said only that the limit was exceeded, leaving the user no
+ * way to find the offending step in a long progression.
+ */
+function lcmOrThrow(left: number, right: number, source: string): number {
   const divisor = gcd(left, right);
   const quotient = left / divisor;
-  if (!Number.isSafeInteger(quotient) || quotient > Math.floor(MUSICXML_MAX_DIVISIONS / right)) {
-    throw new MusicXmlExportError(
+  const overflow = () =>
+    new MusicXmlExportError(
       "duration-divisions-overflow",
-      `Exact MusicXML divisions exceed the supported limit of ${MUSICXML_MAX_DIVISIONS}.`,
+      `MusicXML divisions would need to be a multiple of ${quotient * right} to notate ${source} ` +
+        `exactly, which exceeds the supported limit of ${MUSICXML_MAX_DIVISIONS}. ` +
+        `Reduce the tuplet complexity of that step, or use MIDI export instead.`,
     );
+  if (!Number.isSafeInteger(quotient) || quotient > Math.floor(MUSICXML_MAX_DIVISIONS / right)) {
+    throw overflow();
   }
   const result = quotient * right;
   if (!Number.isSafeInteger(result) || result <= 0 || result > MUSICXML_MAX_DIVISIONS) {
-    throw new MusicXmlExportError(
-      "duration-divisions-overflow",
-      `Exact MusicXML divisions exceed the supported limit of ${MUSICXML_MAX_DIVISIONS}.`,
-    );
+    throw overflow();
   }
   return result;
 }
@@ -540,6 +633,7 @@ function projectChord(
     context,
     chord: { ...sourceChord, variant: step.harmonicVariant },
     performance: step.performance,
+    concertTranspositionSemitones: stepTranspositionSemitones(step),
     ...(previousPitches ? { previousPitches } : {}),
     ...(previousBassPitch ? { previousBassPitch } : {}),
   });
@@ -550,20 +644,140 @@ function projectChord(
           context,
           chord: { ...sourceChord, variant: step.harmonicVariant },
           performance: { ...step.performance, register: "auto" },
+          concertTranspositionSemitones: stepTranspositionSemitones(step),
           ...(previousPitches ? { previousPitches } : {}),
           ...(previousBassPitch ? { previousBassPitch } : {}),
         });
 
   return Object.freeze({
     chord,
-    pitches: freezeProjectedPitches(outputRealization, step),
+    pitches: freezeProjectedPitches(
+      project.independentBassEnabled ? outputRealization : { pitches: outputRealization.pitches },
+      step,
+    ),
     contextUpperPitches: contextRealization.pitches,
-    contextBassPitch: contextRealization.bassPitch,
+    contextBassPitch: project.independentBassEnabled ? contextRealization.bassPitch : undefined,
     harmony: harmonyMapping.value,
     dynamicLabel: dynamicMapping.value.label,
     sourceVelocity: dynamicMapping.value.sourceVelocity,
     ...(articulationMapping.value ? { arpeggiate: articulationMapping.value } : {}),
   });
+}
+
+/**
+ * Written values for one Piano note or rest.
+ *
+ * A duration a single written note expresses stays one note, so accepted notation that was already
+ * correct is untouched — a dotted quarter in 7/8 stays one dotted quarter, not a quarter tied to an
+ * eighth, even though it crosses the 2+2+3 grouping. Only a duration no single value expresses —
+ * five quarter beats in 5/4, neither a whole nor a dotted whole — becomes tied notes. Tuplets are not
+ * single values and fall through to the metric decomposition, which writes `<time-modification>`.
+ */
+function pianoWrittenParts(
+  durationBeats: Rational,
+  onsetBeats: Rational,
+  meter: Project["globalTiming"]["meter"],
+): ReturnType<typeof writtenRhythmPartsForDuration> {
+  const single = singleWrittenValue(durationBeats);
+  if (single) {
+    return Object.freeze([
+      Object.freeze({
+        durationBeats,
+        notation: Object.freeze({
+          type: single.type,
+          ...(single.dots ? { dots: single.dots } : {}),
+        }),
+      }),
+    ]);
+  }
+  const tuplet = tupletWrittenValue(durationBeats);
+  if (tuplet) {
+    return Object.freeze([
+      Object.freeze({
+        durationBeats,
+        notation: Object.freeze({
+          type: tuplet.type,
+          timeModification: tuplet.timeModification,
+        }),
+      }),
+    ]);
+  }
+  return writtenRhythmPartsForDuration(durationBeats, onsetBeats, meter);
+}
+
+/** Every duration a single written note expresses, with its dots. */
+const SINGLE_WRITTEN_VALUES: readonly {
+  readonly beats: Rational;
+  readonly type: MusicXmlWrittenNoteType;
+  readonly dots?: 1;
+}[] = Object.freeze(
+  (
+    [
+      ["whole", 4, 1],
+      ["half", 2, 1],
+      ["quarter", 1, 1],
+      ["eighth", 1, 2],
+      ["16th", 1, 4],
+      ["32nd", 1, 8],
+      ["64th", 1, 16],
+    ] as const
+  ).flatMap(([type, numerator, denominator]) =>
+    Object.freeze([
+      Object.freeze({ beats: rational(numerator, denominator), type }),
+      Object.freeze({
+        beats: multiplyRational(rational(numerator, denominator), rational(3, 2)),
+        type,
+        dots: 1 as const,
+      }),
+    ]),
+  ),
+);
+
+function singleWrittenValue(durationBeats: Rational) {
+  return SINGLE_WRITTEN_VALUES.find((value) => compareRational(value.beats, durationBeats) === 0);
+}
+
+/**
+ * Conventional tuplet ratios: `actual` notes in the time of `normal`.
+ *
+ * `normal` stays within 2..4 so ordinary ratios (3:2 triplets, 5:4 quintuplets, 2:3 duplets) are
+ * recognised without misreading a plain five-beat bar as "4 whole notes in the time of 5".
+ */
+const TUPLET_NORMAL_NOTES: readonly number[] = Object.freeze([2, 3, 4]);
+const TUPLET_ACTUAL_LIMIT = 13;
+
+/**
+ * A duration one tuplet note expresses, e.g. a quintuplet that is `1/5` of a beat.
+ *
+ * Without this the metric decomposition writes `1/5` as a dotted 32nd tied to a 1/80 tuplet, which
+ * drags a 16th-note grid into `divisions` (45045 becomes 720720) for music that is a plain
+ * quintuplet. Recognising the ratio keeps the grid as coarse as the music actually needs.
+ */
+function tupletWrittenValue(durationBeats: Rational):
+  | {
+      readonly type: MusicXmlWrittenNoteType;
+      readonly timeModification: MusicXmlMelodyTimeModification;
+    }
+  | undefined {
+  for (const value of SINGLE_WRITTEN_VALUES) {
+    if (value.dots) continue;
+    const ratio = rational(
+      durationBeats.numerator * value.beats.denominator,
+      durationBeats.denominator * value.beats.numerator,
+    );
+    // `1/1` is a plain value and `1/n` is not a conventional tuplet ratio.
+    if (ratio.numerator < 2 || !TUPLET_NORMAL_NOTES.includes(ratio.numerator)) continue;
+    if (ratio.denominator < 2 || ratio.denominator > TUPLET_ACTUAL_LIMIT) continue;
+    return {
+      type: value.type,
+      timeModification: Object.freeze({
+        actualNotes: ratio.denominator,
+        normalNotes: ratio.numerator,
+        normalType: value.type,
+      }),
+    };
+  }
+  return undefined;
 }
 
 function addFragment(
@@ -576,28 +790,41 @@ function addFragment(
   fragmentIndex: number,
   fragmentCount: number,
   emitDynamic: boolean,
+  meter: Project["globalTiming"]["meter"],
 ): void {
   const fragmentDuration = subtractRational(fragmentEnd, fragmentStart);
   const onsetBeats = subtractRational(fragmentStart, measure.startBeats);
-  const duration = durationUnits(fragmentDuration, divisions);
   const isFirstFragment = fragmentIndex === 0;
   const isLastFragment = fragmentIndex === fragmentCount - 1;
+  // Split the fragment into writable note values. A bar is not necessarily a single value — five
+  // quarter beats need a whole tied to a quarter — and every written part carries its own `<type>`.
+  const writtenParts = pianoWrittenParts(fragmentDuration, onsetBeats, meter);
 
   if (!projectedChord) {
-    measure.events.push(
-      ...([1, 2] as const).map((staff): MusicXmlRestEvent =>
-        Object.freeze({
-          kind: "rest",
-          onsetBeats,
-          stepIndex: entry.stepIndex,
-          stepId: entry.step.id,
-          durationBeats: fragmentDuration,
-          duration,
-          voice: staff === 1 ? "1" : "2",
-          staff,
-        }),
-      ),
-    );
+    let restCursor = onsetBeats;
+    for (const part of writtenParts) {
+      for (const staff of [1, 2] as const) {
+        measure.events.push(
+          Object.freeze({
+            kind: "rest",
+            onsetBeats: restCursor,
+            stepIndex: entry.stepIndex,
+            stepId: entry.step.id,
+            durationBeats: part.durationBeats,
+            duration: durationUnits(part.durationBeats, divisions),
+            voice: staff === 1 ? "1" : "2",
+            staff,
+            type: part.notation.type,
+            ...(part.notation.dots ? { dots: part.notation.dots } : {}),
+            ...(part.notation.timeModification
+              ? { timeModification: part.notation.timeModification }
+              : {}),
+            ties: Object.freeze([]),
+          }),
+        );
+      }
+      restCursor = addRational(restCursor, part.durationBeats);
+    }
     measure.durationBeats = addRational(measure.durationBeats, fragmentDuration);
     return;
   }
@@ -626,40 +853,53 @@ function addFragment(
     }
   }
 
-  const ties: ("start" | "stop")[] = [];
-  if (!isFirstFragment) ties.push("stop");
-  if (!isLastFragment) ties.push("start");
+  let noteCursor = onsetBeats;
+  writtenParts.forEach((part, partIndex) => {
+    const isFirstPart = partIndex === 0;
+    const isLastPart = partIndex === writtenParts.length - 1;
+    // A note spanning several written parts is tied; the fragment boundaries tie too.
+    const partTies: ("start" | "stop")[] = [];
+    if (!isFirstFragment || !isFirstPart) partTies.push("stop");
+    if (!isLastFragment || !isLastPart) partTies.push("start");
 
-  let upperPitchIndex = 0;
-  projectedChord.pitches.forEach(({ pitch, role }) => {
-    const staff = role === "upper" ? 1 : 2;
-    const event: MusicXmlNoteEvent = Object.freeze({
-      kind: "note",
-      onsetBeats,
-      stepIndex: entry.stepIndex,
-      stepId: entry.step.id,
-      durationBeats: fragmentDuration,
-      duration,
-      voice: staff === 1 ? "1" : "2",
-      staff,
-      chord: role === "upper" ? upperPitchIndex++ > 0 : false,
-      sourceMidi: pitch.midiNumber,
-      role,
-      // Preserve the accepted Piano DTO/XML semantics exactly. Melody uses
-      // musicXmlPitchForExactPitch below because its octave-offset spelling
-      // must remain concert-pitch accurate, but the legacy Piano part keeps
-      // the stored ExactPitch octave for no-Melody byte compatibility.
-      pitch: Object.freeze({
-        ...mapPitchSpellingToMusicXml(pitch.spelling),
-        octave: pitch.octave,
-      }),
-      ties: Object.freeze([...ties]),
-      // Piano arpeggiation affects upper voices; the independent bass stays on beat.
-      ...(isFirstFragment && role === "upper" && projectedChord.arpeggiate
-        ? { arpeggiate: projectedChord.arpeggiate }
-        : {}),
+    let upperPitchIndex = 0;
+    projectedChord.pitches.forEach(({ pitch, role }) => {
+      const staff = role === "upper" ? 1 : 2;
+      const event: MusicXmlNoteEvent = Object.freeze({
+        kind: "note",
+        onsetBeats: noteCursor,
+        stepIndex: entry.stepIndex,
+        stepId: entry.step.id,
+        durationBeats: part.durationBeats,
+        duration: durationUnits(part.durationBeats, divisions),
+        voice: staff === 1 ? "1" : "2",
+        staff,
+        // Only the first pitch of a written part is a new attack; the rest sustain it.
+        chord: role === "upper" ? upperPitchIndex++ > 0 : false,
+        sourceMidi: pitch.midiNumber,
+        role,
+        // Preserve the accepted Piano DTO/XML semantics exactly. Melody uses
+        // musicXmlPitchForExactPitch below because its octave-offset spelling
+        // must remain concert-pitch accurate, but the legacy Piano part keeps
+        // the stored ExactPitch octave for no-Melody byte compatibility.
+        pitch: Object.freeze({
+          ...mapPitchSpellingToMusicXml(pitch.spelling),
+          octave: pitch.octave,
+        }),
+        type: part.notation.type,
+        ...(part.notation.dots ? { dots: part.notation.dots } : {}),
+        ...(part.notation.timeModification
+          ? { timeModification: part.notation.timeModification }
+          : {}),
+        ties: Object.freeze([...partTies]),
+        // Piano arpeggiation affects upper voices; the independent bass stays on beat.
+        ...(isFirstFragment && isFirstPart && role === "upper" && projectedChord.arpeggiate
+          ? { arpeggiate: projectedChord.arpeggiate }
+          : {}),
+      });
+      measure.events.push(event);
     });
-    measure.events.push(event);
+    noteCursor = addRational(noteCursor, part.durationBeats);
   });
   measure.durationBeats = addRational(measure.durationBeats, fragmentDuration);
 }
@@ -761,11 +1001,9 @@ function addMelodyRawEvent(
         const partTies: ("start" | "stop")[] = [];
         if (!firstPart || !isFirstFragment) partTies.push("stop");
         if (!lastPart || !isLastFragment) partTies.push("start");
+        // Brackets are aligned with the written values once the whole measure is assembled, because a
+        // tuplet can span several raw events and a single event can become several tied parts.
         const tupletMarks: ("start" | "stop")[] = [];
-        if (firstPart && isFirstFragment && rawEvent.tupletMarks.includes("start"))
-          tupletMarks.push("start");
-        if (lastPart && isLastFragment && rawEvent.tupletMarks.includes("stop"))
-          tupletMarks.push("stop");
         measure.events.push(
           Object.freeze({
             kind: "note",
@@ -991,6 +1229,7 @@ function buildMelodyParts(
           partId,
         );
       });
+      for (const measure of measures) alignTupletBrackets(measure.events);
       const metadata = getMelodyInstrument(instrument);
       const midiChannel = 3 + (laneIndex % 14);
       const instrumentEntry = Object.freeze({
@@ -1025,14 +1264,110 @@ function buildMelodyParts(
 function calculateDivisions(project: Project, barLengthBeats: Rational): number {
   let divisions = 1;
   for (const step of project.progression.steps) {
-    divisions = lcmOrThrow(divisions, step.duration.beats.denominator);
-  }
-  for (const note of effectiveMelodyForExport(project))
     divisions = lcmOrThrow(
-      lcmOrThrow(divisions, note.startBeats.denominator),
-      note.durationBeats.denominator,
+      divisions,
+      step.duration.beats.denominator,
+      `step "${step.id}" (duration ${step.duration.beats.numerator}/${step.duration.beats.denominator} beats)`,
     );
-  divisions = lcmOrThrow(divisions, barLengthBeats.denominator);
+  }
+  const meter = project.globalTiming.meter;
+  // The measure layout is needed because the written rhythm of a Melody event depends on where the
+  // event sits inside its measure, not only on its duration.
+  const layout = createProgressionMeasureLayout(project.progression.steps, meter);
+  for (const note of effectiveMelodyForExport(project)) {
+    // `EffectiveMelodyNote` identifies itself by `eventKey` (there is no `id`); `stepIndex` is
+    // zero-based, so step 1 is reported as "step 1".
+    const where = `melody event "${note.eventKey}" on step ${note.stepIndex + 1} ("${note.sourceStepId}")`;
+    divisions = lcmOrThrow(
+      lcmOrThrow(
+        divisions,
+        note.startBeats.denominator,
+        `${where} onset ${note.startBeats.numerator}/${note.startBeats.denominator} beats`,
+      ),
+      note.durationBeats.denominator,
+      `${where} duration ${note.durationBeats.numerator}/${note.durationBeats.denominator} beats`,
+    );
+
+    // A Melody event is *notated* by splitting it at measure boundaries and decomposing each
+    // fragment into writable values (`writtenRhythmPartsForDuration` -> `projectWrittenRhythm`).
+    // That decomposition is context sensitive: the same duration yields different written values
+    // depending on its offset in the measure, and it can introduce denominators absent from the
+    // event's own onset and duration. `1/3` offset inside 7/8, for instance, decomposes `5/4` into
+    // `2/3 + 1/2 + 1/16 + 1/48`. Computing `divisions` from the raw onset and duration alone
+    // therefore rejected perfectly notatable music with "cannot be represented exactly". Mirror the
+    // notator here so every value it will emit is representable.
+    const eventEnd = addRational(note.startBeats, note.durationBeats);
+    for (const measure of layout.measures) {
+      const measureEnd = addRational(measure.startBeats, measure.capacityBeats);
+      if (compareRational(note.startBeats, measureEnd) >= 0) continue;
+      if (compareRational(eventEnd, measure.startBeats) <= 0) continue;
+      const fragmentStart =
+        compareRational(note.startBeats, measure.startBeats) > 0
+          ? note.startBeats
+          : measure.startBeats;
+      const fragmentEnd = compareRational(eventEnd, measureEnd) < 0 ? eventEnd : measureEnd;
+      const fragmentBeats = subtractRational(fragmentEnd, fragmentStart);
+      if (compareRational(fragmentBeats, ZERO) <= 0) continue;
+      for (const part of projectWrittenRhythm(
+        fragmentBeats,
+        subtractRational(fragmentStart, measure.startBeats),
+        meter,
+      )) {
+        divisions = lcmOrThrow(
+          divisions,
+          part.beats.denominator,
+          `${where}, notated as ${part.beats.numerator}/${part.beats.denominator} beats in measure ${measure.number}`,
+        );
+      }
+    }
+  }
+  // The Piano part decomposes each Step fragment into written values the same way, so its parts must
+  // be representable too. A fragment cut by a barline can carry a denominator that neither the Step
+  // duration nor the Melody events have.
+  let stepCursor = ZERO;
+  for (const step of project.progression.steps) {
+    const stepEnd = addRational(stepCursor, step.duration.beats);
+    for (const measure of layout.measures) {
+      const measureEnd = addRational(measure.startBeats, measure.capacityBeats);
+      if (compareRational(stepCursor, measureEnd) >= 0) continue;
+      if (compareRational(stepEnd, measure.startBeats) <= 0) continue;
+      const fragmentStart =
+        compareRational(stepCursor, measure.startBeats) > 0 ? stepCursor : measure.startBeats;
+      const fragmentEnd = compareRational(stepEnd, measureEnd) < 0 ? stepEnd : measureEnd;
+      const fragmentBeats = subtractRational(fragmentEnd, fragmentStart);
+      if (compareRational(fragmentBeats, ZERO) <= 0) continue;
+      // A fragment that is already one written value keeps the duration it always had, so only the
+      // parts introduced by decomposing an un-writable fragment can add a new denominator.
+      if (singleWrittenValue(fragmentBeats)) continue;
+      for (const part of pianoWrittenParts(
+        fragmentBeats,
+        subtractRational(fragmentStart, measure.startBeats),
+        meter,
+      )) {
+        divisions = lcmOrThrow(
+          divisions,
+          part.durationBeats.denominator,
+          `step "${step.id}", notated as ${part.durationBeats.numerator}/${part.durationBeats.denominator} beats in measure ${measure.number}`,
+        );
+      }
+    }
+    stepCursor = stepEnd;
+  }
+  if (
+    compareRational(layout.trailingSilenceBeats, ZERO) > 0 &&
+    !singleWrittenValue(layout.trailingSilenceBeats)
+  ) {
+    divisions = lcmOrThrow(
+      divisions,
+      layout.trailingSilenceBeats.denominator,
+      `the trailing silence of ${layout.trailingSilenceBeats.numerator}/${layout.trailingSilenceBeats.denominator} beats`,
+    );
+  }
+  divisions = lcmOrThrow(
+    divisions,
+    barLengthBeats.denominator,
+    `the ${project.globalTiming.meter.numerator}/${project.globalTiming.meter.denominator} bar length`,
+  );
   return divisions;
 }
 
@@ -1151,6 +1486,7 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
         fragmentIndex,
         fragments.length,
         emitDynamic,
+        meter,
       );
     });
     if (projectedChord) previousDynamicLabel = projectedChord.dynamicLabel;
@@ -1162,20 +1498,32 @@ export function projectProjectToMusicXml(project: Project): MusicXmlProjection {
     if (!finalMeasure)
       throw new MusicXmlExportError("invalid-projection", "Missing final measure.");
     const gapOnset = subtractRational(measureLayout.authoredDurationBeats, finalMeasure.startBeats);
-    finalMeasure.events.push(
-      ...([1, 2] as const).map((staff): MusicXmlRestEvent =>
-        Object.freeze({
-          kind: "rest",
-          onsetBeats: gapOnset,
-          stepIndex: project.progression.steps.length,
-          stepId: "__trailing-measure-gap__",
-          durationBeats: measureLayout.trailingSilenceBeats,
-          duration: durationUnits(measureLayout.trailingSilenceBeats, divisions),
-          voice: staff === 1 ? "1" : "2",
-          staff,
-        }),
-      ),
-    );
+    // A trailing gap also has to be written as writable rests, or the final bar cannot be notated.
+    const gapParts = pianoWrittenParts(measureLayout.trailingSilenceBeats, gapOnset, meter);
+    let gapCursor = gapOnset;
+    for (const part of gapParts) {
+      finalMeasure.events.push(
+        ...([1, 2] as const).map((staff): MusicXmlRestEvent =>
+          Object.freeze({
+            kind: "rest",
+            onsetBeats: gapCursor,
+            stepIndex: project.progression.steps.length,
+            stepId: "__trailing-measure-gap__",
+            durationBeats: part.durationBeats,
+            duration: durationUnits(part.durationBeats, divisions),
+            voice: staff === 1 ? "1" : "2",
+            staff,
+            type: part.notation.type,
+            ...(part.notation.dots ? { dots: part.notation.dots } : {}),
+            ...(part.notation.timeModification
+              ? { timeModification: part.notation.timeModification }
+              : {}),
+            ties: Object.freeze([]),
+          }),
+        ),
+      );
+      gapCursor = addRational(gapCursor, part.durationBeats);
+    }
     finalMeasure.durationBeats = addRational(
       finalMeasure.durationBeats,
       measureLayout.trailingSilenceBeats,

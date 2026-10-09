@@ -31,7 +31,11 @@ export function identityForMatrixFunction(
   throw new RangeError(`Unsupported ${moduleId} function: ${functionId}`);
 }
 
-function templateFor(project: Project, functionId: string, moduleId: HarmonicModuleId = project.activeModule): MatrixCardTemplateState | undefined {
+function templateFor(
+  project: Project,
+  functionId: string,
+  moduleId: HarmonicModuleId = project.activeModule,
+): MatrixCardTemplateState | undefined {
   return project.moduleTemplateStates[moduleId]?.cards[functionId];
 }
 
@@ -85,9 +89,15 @@ export function addMatrixPreview(
   });
   return {
     project: next,
+    // The inverse restores the exact previous Progression rather than issuing
+    // `progression/remove-step`. That command does not delete a Step: it clears a chord in place by
+    // turning it into a rest (delegating to `setSystemRest`). Using it here made Undo of an "add"
+    // leave an empty rest behind instead of removing the Step. A snapshot is what the other
+    // add/append commands use, and it also brings back `selectedStepId` and `loopRegion` exactly as
+    // they were.
     inverse: {
-      type: "progression/remove-step",
-      payload: { stepId: step.id, nowIso: command.payload.nowIso },
+      type: "progression/restore",
+      payload: { progression: project.progression, nowIso: command.payload.nowIso },
     },
   };
 }

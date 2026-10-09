@@ -1,3 +1,5 @@
+import { requireValue } from "../../fixtures/assertions";
+import { requireChord } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import {
@@ -83,8 +85,8 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       expect(result.preset.steps[1]!.harmonicFunction.functionId).toBe("V");
 
       // Verify no performance or variant leakage on preset
-      expect((result.preset.steps[0] as Record<string, unknown>).performance).toBeUndefined();
-      expect((result.preset.steps[0] as Record<string, unknown>).harmonicVariant).toBeUndefined();
+      expect(Reflect.get(requireValue(result.preset.steps[0]), "performance")).toBeUndefined();
+      expect(Reflect.get(requireValue(result.preset.steps[0]), "harmonicVariant")).toBeUndefined();
 
       // Verify project state updated
       expect(result.project.customPresets).toHaveLength(1);
@@ -182,8 +184,8 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       expect(equalRational(restoredPreset.steps[0]!.duration.beats, rational(2, 1))).toBe(true);
 
       // Zero performance or variant leakage
-      expect((restoredPreset.steps[0] as Record<string, unknown>).performance).toBeUndefined();
-      expect((restoredPreset.steps[0] as Record<string, unknown>).harmonicVariant).toBeUndefined();
+      expect(Reflect.get(requireValue(restoredPreset.steps[0]), "performance")).toBeUndefined();
+      expect(Reflect.get(requireValue(restoredPreset.steps[0]), "harmonicVariant")).toBeUndefined();
     });
   });
 
@@ -259,8 +261,12 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
 
       const result = applyPreset(projectWithStep, applyCmd);
       expect(result.project.progression.steps).toHaveLength(2);
-      expect(result.project.progression.steps[0]!.harmonicFunction.functionId).toBe("IV");
-      expect(result.project.progression.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(requireChord(result.project.progression.steps[0]!).harmonicFunction.functionId).toBe(
+        "IV",
+      );
+      expect(requireChord(result.project.progression.steps[1]!).harmonicFunction.functionId).toBe(
+        "V",
+      );
       expect(result.project.progression.selectedStepId).toBeUndefined();
 
       // Undo via dispatcher restores original progression and selection
@@ -286,8 +292,12 @@ describe("T115 & T116 — Preset Commands & Compatibility Contract (US7)", () =>
       const result = applyPreset(projectWithStep, applyCmd);
       expect(result.project.progression.steps).toHaveLength(3);
       expect(result.project.progression.steps[0]!.id).toBe("old-1");
-      expect(result.project.progression.steps[1]!.harmonicFunction.functionId).toBe("IV");
-      expect(result.project.progression.steps[2]!.harmonicFunction.functionId).toBe("V");
+      expect(requireChord(result.project.progression.steps[1]!).harmonicFunction.functionId).toBe(
+        "IV",
+      );
+      expect(requireChord(result.project.progression.steps[2]!).harmonicFunction.functionId).toBe(
+        "V",
+      );
       expect(result.project.progression.selectedStepId).toBe("old-1");
 
       const undone = applyInverseCommand(result.project, result.inverse);

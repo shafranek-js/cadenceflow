@@ -76,7 +76,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
       (candidate) => candidate.id === step.id,
     );
     expect(materialized).toMatchObject({
-      melody: { mode: "authored", sourceRecipe: step.melody.recipe },
+      melody: { mode: "authored" as const, sourceRecipe: step.melody.recipe },
     });
     const after = createEffectiveMelodyTimeline(store.project).filter(
       (note) => note.sourceStepId === step.id,
@@ -204,7 +204,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     });
     expect(
       project.progression.steps[0]?.kind === "rest" &&
-        project.progression.steps[0].authoredMelody?.notes[0]?.duration,
+        project.progression.steps[0]!.authoredMelody?.notes[0]?.duration,
     ).toEqual(storedDuration);
     expect(createMelodyTimeline(project).events).toHaveLength(1);
     const performance = realizeProgressionMelodyPerformance({
@@ -228,7 +228,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
   });
 
   it("moves ownership at an exact Step boundary, preserves pitch/time and resolves destination ID collision atomically", () => {
-    const source: RestStep = Object.freeze({
+    const source: RestStep = Object.freeze<RestStep>({
       ...rest("source"),
       authoredMelody: Object.freeze({
         notes: Object.freeze([
@@ -236,7 +236,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
         ]),
       }),
     });
-    const target: RestStep = Object.freeze({
+    const target: RestStep = Object.freeze<RestStep>({
       ...rest("target"),
       authoredMelody: Object.freeze({
         notes: Object.freeze([
@@ -392,7 +392,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     const authored = Object.freeze({
       ...source,
       melody: snapshotChordMelody({
-        mode: "authored",
+        mode: "authored" as const,
         phrase: {
           notes: [
             { id: "chord-copy-note", pitch, onset: rational(1, 3), duration: rational(2, 3) },
@@ -446,7 +446,7 @@ describe("Piano Roll batch 1 canonical Melody contract", () => {
     });
     expect(
       reordered.progression.steps[1]?.kind === "rest" &&
-        reordered.progression.steps[1].authoredMelody?.notes[0]?.duration,
+        reordered.progression.steps[1]!.authoredMelody?.notes[0]?.duration,
     ).toEqual(rational(2, 3));
   });
 

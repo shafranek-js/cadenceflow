@@ -1390,6 +1390,29 @@ formula, and apply a selected formula to My Progression with an explicit key-swi
   A failure may be documented and triaged, but the release gate MUST NOT be marked complete while
   a required check is failing or its disposition is undecided.
 
+#### Selected chord properties
+
+- **FR-263**: A selected Chord Step MUST expose a contextual `Chord Properties` Inspector in Piano
+  Roll, Staff, and Tablature. It MUST edit only that Step and show the resulting chord symbol,
+  function, and actual chord tones. Rest/no-selection states MUST explain why the controls are
+  unavailable. Matrix Preview/Add Templates, neighboring Steps, duration, linked Melody, stable
+  Step identity, instruments, and unrelated performance settings MUST remain unchanged.
+- **FR-264**: The Inspector MUST provide Type (Triad/7/9/11/13), base quality/seventh, available
+  chord inversions, Options (sus2/sus4, add9/add11/add13, alterations, no3/no5), Secondary
+  (supported V/target or vii°7/target), Borrow From (the seven same-tonic diatonic modes), and
+  Reset. Type changes MUST normalize dependent extensions; added tones MUST remain distinct from
+  extensions. Unsupported combinations and inversions MUST be disabled with an accessible reason.
+  Secondary and Borrow From MUST be mutually exclusive and retain reversible source-function
+  provenance until Reset. Reset MUST restore properties from before the first Chord Properties edit
+  in the current key, preserving stable Step ID, duration, Melody, instruments, dynamics, and all
+  unrelated settings. Each valid action MUST be one history command; semantic no-ops MUST add none.
+- **FR-265**: Chord Properties MUST resolve through canonical harmonic intervals and produce the
+  same supported notes and semantic bass in Piano/audio, Guitar/TAB, Staff, MIDI, MusicXML, and
+  portable project round-trip. Modal and secondary function identity/provenance MUST survive save,
+  reload, Undo, and Redo. Any persisted shape change MUST use one atomic schema migration with
+  codec, JSON Schema, fixtures, and every projection updated together; it MUST NOT alter Matrix
+  template persistence or project-wide playback state.
+
 ### Scope Boundaries
 
 #### Explicitly in v1
@@ -1619,13 +1642,13 @@ and task plan.
   surface at accepted desktop sizes without page-level overflow.
 - **SC-027**: Enabling Suzuki colors changes only visible notehead styling; saved semantic notes, playback,
   MIDI, MusicXML, and non-color accessibility labels remain byte/behavior compatible.
-- **SC-028**: Schema v6 is the current codec and JSON Schema contract; v5 projects migrate through the
-  single v5-to-v6 cutover, and unsupported future schema versions are rejected.
+- **SC-028**: Schema v6 remains a supported codec and JSON Schema migration source; v5 projects migrate
+  through the historical single v5-to-v6 cutover, and unsupported future schema versions are rejected.
 - **SC-029**: In the global All Steps & Measures Inspector, engine/tone selectors are absent while
   instrument, volume, mute, solo, provider state, and Retry remain available; `AudioEnginesInspector`
   contains the Piano/Guitar engine and tone selectors; and clicking `PianoAudioStatus` does not open a
   settings surface. Error/fallback status exposes Retry without becoming a settings control.
-- **SC-030**: Schema v6 migrates v5 fixtures with defaults for absent Piano/Guitar engine and SoundFont
+- **SC-030**: The v6 migration migrates v5 fixtures with defaults for absent Piano/Guitar engine and SoundFont
   tone settings, persists all four fields plus `noteColorMode` through codec, IndexedDB autosave/recovery,
   portable import/export, and Undo/Redo, and rejects future schema versions. The migration is one atomic
   v5-to-v6 cutover with no separate engine/tone version.
@@ -1665,6 +1688,13 @@ and task plan.
   applicable, and produces exact single-entry Undo/Redo. Empty progression, loop/selection
   reanchoring, active branch explanations, all five Progression views and Piano Roll, viewport
   clamping at three sizes in both themes, and portable save/load/history behavior are verified.
+- **SC-044**: In the same selected chord across Piano Roll, Staff, and Tablature, Type/quality,
+  options, inversions/semantic bass, supported secondary targets and all seven borrowed modes change
+  the same canonical notes in audio, Piano, Staff/TAB, MIDI and MusicXML. Source Reset and every
+  edit round-trip through Undo/Redo and schema-11 portable save/reload without altering Step ID,
+  duration, Melody, instruments, neighboring Steps, Matrix Templates, or history on a no-op.
+  Incompatible choices announce the reason; no-selection and Rest remain safe. Light/dark visual
+  acceptance covers 640×360, 1280×720, and 1920×1080 with both the lower keyboard and MIDI panel.
 
 ## Assumptions
 

@@ -1,3 +1,4 @@
+import { omitFields } from "../fixtures/assertions";
 import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -33,13 +34,13 @@ function createInsertionFixture(options: {
     sourceGenerated?.kind !== "chord"
   )
     throw new Error("Rich fixture did not provide its expected chord owners");
-  const first: ChordStep = Object.freeze({
+  const first: ChordStep = Object.freeze<ChordStep>({
     ...sourceFirst,
     id: "step-1",
     transpositionSemitones: 2,
     duration: musicalDuration(rational(6)),
     melody: {
-      mode: "authored",
+      mode: "authored" as const,
       phrase: {
         notes: [
           {
@@ -53,25 +54,27 @@ function createInsertionFixture(options: {
       },
     },
   });
-  const second: ChordStep = Object.freeze({
+  const second: ChordStep = Object.freeze<ChordStep>({
     ...sourceSecond,
     id: "step-2",
     duration: musicalDuration(rational(2)),
   });
-  const generated: ChordStep = Object.freeze({
+  const generated: ChordStep = Object.freeze<ChordStep>({
     ...sourceGenerated,
     id: "step-3",
     duration: musicalDuration(rational(4)),
     melody: {
-      mode: "generated",
+      mode: "generated" as const,
       recipe: snapshotChordMelodyRecipe({
-        pattern: "outside-in",
+        pitchMotion: "outside-in",
         grid: "eighth",
         octaveOffset: 0,
+        rhythm: "even",
+        connection: "retrigger",
       }),
     },
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     id: options.id,
     name: `Measure insertion ${options.id}`,
@@ -79,7 +82,7 @@ function createInsertionFixture(options: {
     presentation: Object.freeze({
       ...project.presentation,
       theme: options.theme ?? "dark",
-      progressionView: options.view ?? "tablature",
+      progressionView: options.view ?? "staff",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
@@ -97,26 +100,25 @@ function createPartialFinalFixture(id: string): Project {
   const { temporaryBranch: _temporaryBranch, ...project } = source;
   const first = source.progression.steps[0];
   if (first?.kind !== "chord") throw new Error("Rich fixture did not provide its first chord");
-  const rest: RestStep = Object.freeze({
+  const rest: RestStep = Object.freeze<RestStep>({
     id: "partial-rest",
     kind: "rest",
     duration: musicalDuration(rational(1, 3)),
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     id,
     name: `Partial final Measure ${id}`,
     globalTiming: globalTiming(100, meter(4, 4)),
-    presentation: Object.freeze({ ...project.presentation, progressionView: "tablature" as const }),
+    presentation: Object.freeze({ ...project.presentation, progressionView: "staff" as const }),
     progression: Object.freeze({
-      ...project.progression,
+      ...omitFields(project.progression, "loopRegion"),
       steps: Object.freeze([
         Object.freeze({ ...first, duration: musicalDuration(rational(4)) }),
         rest,
       ]),
       selectedStepId: first.id,
       sections: Object.freeze([{ id: "last", name: "Last", startStepId: rest.id }]),
-      loopRegion: undefined,
     }),
   });
 }
@@ -130,7 +132,10 @@ async function importPortableProject(page: Page, project: Project): Promise<void
     buffer: Buffer.from(encodePortableProject(project), "utf8"),
   });
   await expect(page.getByTestId("progression-view-btn-tablature")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("project-operation-busy")).toHaveCount(0);
+  const projectMenuToggle = page.getByTestId("project-menu-toggle");
+  if ((await projectMenuToggle.getAttribute("aria-expanded")) === "true")
+    await projectMenuToggle.click();
 }
 
 async function openStudio(page: Page, project: Project): Promise<void> {
@@ -212,8 +217,10 @@ test("keyboard menu insertion after the partial final Measure materializes its o
   await page.keyboard.press("Shift+F10");
   const menu = page.getByRole("menu", { name: "Measure 2 commands" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Insert Measure After 2" })).toBeEnabled();
-  await page.keyboard.press("ArrowDown");
+  const insertMeasure = menu.getByRole("menuitem", { name: "Insert Measure After 2" });
+  await expect(insertMeasure).toBeEnabled();
+  await insertMeasure.focus();
+  await expect(insertMeasure).toBeFocused();
   await page.keyboard.press("Enter");
 
   const exported = await exportPortableProject(page);

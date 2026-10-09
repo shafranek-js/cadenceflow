@@ -11,7 +11,13 @@ import {
   applyPresetToProgression,
 } from "../../../src/domain/progression/presets";
 import { EMPTY_HARMONIC_VARIANT } from "../../../src/domain/harmony/chord";
-import type { ChordStep, RestStep, StepPerformance } from "../../../src/domain/progression/step";
+import { normalizeSongSections } from "../../../src/domain/progression/sections";
+import type {
+  ChordStep,
+  ProgressionStep,
+  RestStep,
+  StepPerformance,
+} from "../../../src/domain/progression/step";
 import { snapshotStepPerformance } from "../../../src/domain/progression/step";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import type { HarmonicContext } from "../../../src/domain/harmony/modules/types";
@@ -82,20 +88,35 @@ function createRichPerformance(overrides?: Partial<StepPerformance>): StepPerfor
     register: 1,
     voicingMode: "manual",
     manualVoicing: Object.freeze([
-      exactPitch(60, "C4"),
-      exactPitch(64, "E4"),
-      exactPitch(67, "G4"),
+      exactPitch(60, { step: "C", alter: 0 }),
+      exactPitch(64, { step: "E", alter: 0 }),
+      exactPitch(67, { step: "G", alter: 0 }),
     ]),
     bass: {
       choice: "custom",
       octaveOffset: -1,
-      customPitch: exactPitch(36, "C2"),
+      customPitch: exactPitch(36, { step: "C", alter: 0 }),
     },
     masterVelocity: 110,
     perNoteVelocityOverrides: Object.freeze({ "60": 120 }),
     dynamicsViewPreference: "midi",
   };
   return snapshotStepPerformance({ ...base, ...overrides });
+}
+
+/**
+ * Functional id of a step, for both stored `PresetStep`s and realized `ProgressionStep`s.
+ *
+ * `ProgressionStep` is `ChordStep | RestStep`, so `harmonicFunction` is not reachable without
+ * narrowing: `RestStep` has no such property, and TypeScript rejects the optional-chain form
+ * because the property exists on no union member. Preset steps carry it directly.
+ */
+function appliedFunctionId(step: ProgressionStep | PresetStep | undefined): string | undefined {
+  if (step === undefined) return undefined;
+  if ("kind" in step) {
+    return step.kind === "chord" ? step.harmonicFunction.functionId : undefined;
+  }
+  return step.harmonicFunction.functionId;
 }
 
 describe("T112 — Functional Presets Contract Suite (US7)", () => {
@@ -126,9 +147,9 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(preset.source).toBe("builtIn");
       expect(preset.description).toBe("Standard cadence");
       expect(preset.steps).toHaveLength(2);
-      expect(preset.steps[0]!.harmonicFunction.functionId).toBe("I");
-      expect(preset.steps[0]!.harmonicFunction.moduleId).toBe("progressions");
-      expect(preset.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(preset.steps[0])).toBe("I");
+      expect(preset.steps[0]?.harmonicFunction.moduleId).toBe("progressions");
+      expect(appliedFunctionId(preset.steps[1])).toBe("V");
 
       // Verify no runtime performance or harmonic variant keys exist on preset or preset steps
       assertNoPerformanceOrVariantLeakage(preset);
@@ -322,9 +343,9 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         expect(customPreset.steps.length).toBe(progression.steps.length);
 
         // Ordered function identities strictly match progression
-        expect(customPreset.steps[0]!.harmonicFunction.functionId).toBe("I");
-        expect(customPreset.steps[1]!.harmonicFunction.functionId).toBe("I");
-        expect(customPreset.steps[2]!.harmonicFunction.functionId).toBe("V");
+        expect(appliedFunctionId(customPreset.steps[0])).toBe("I");
+        expect(appliedFunctionId(customPreset.steps[1])).toBe("I");
+        expect(appliedFunctionId(customPreset.steps[2])).toBe("V");
 
         // Exact durations strictly match progression
         expect(equalRational(customPreset.steps[0]!.duration.beats, rational(2, 1))).toBe(true);
@@ -429,17 +450,17 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       ]);
 
       const cMajorContext: HarmonicContext = {
-        tonic: { semitone: 0 }, // C
+        tonic: 0, // C
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 0, mode: "major" },
       };
 
       const dMajorContext: HarmonicContext = {
-        tonic: { semitone: 2 }, // D
+        tonic: 2, // D
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 2, mode: "major" },
       };
 
       // Realize in C Major
@@ -447,10 +468,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(cResult.kind).toBe("success");
       if (cResult.kind === "success") {
         expect(cResult.steps).toHaveLength(4);
-        expect(cResult.steps[0]!.harmonicFunction.functionId).toBe("I");
-        expect(cResult.steps[1]!.harmonicFunction.functionId).toBe("vi");
-        expect(cResult.steps[2]!.harmonicFunction.functionId).toBe("IV");
-        expect(cResult.steps[3]!.harmonicFunction.functionId).toBe("V");
+        expect(appliedFunctionId(cResult.steps[0])).toBe("I");
+        expect(appliedFunctionId(cResult.steps[1])).toBe("vi");
+        expect(appliedFunctionId(cResult.steps[2])).toBe("IV");
+        expect(appliedFunctionId(cResult.steps[3])).toBe("V");
       }
 
       // Realize in D Major
@@ -458,15 +479,15 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(dResult.kind).toBe("success");
       if (dResult.kind === "success") {
         expect(dResult.steps).toHaveLength(4);
-        expect(dResult.steps[0]!.harmonicFunction.functionId).toBe("I");
-        expect(dResult.steps[1]!.harmonicFunction.functionId).toBe("vi");
-        expect(dResult.steps[2]!.harmonicFunction.functionId).toBe("IV");
-        expect(dResult.steps[3]!.harmonicFunction.functionId).toBe("V");
+        expect(appliedFunctionId(dResult.steps[0])).toBe("I");
+        expect(appliedFunctionId(dResult.steps[1])).toBe("vi");
+        expect(appliedFunctionId(dResult.steps[2])).toBe("IV");
+        expect(appliedFunctionId(dResult.steps[3])).toBe("V");
       }
 
       // Stored preset itself remains completely untouched and reusable
       expect(preset.steps).toHaveLength(4);
-      expect(preset.steps[0]!.harmonicFunction.functionId).toBe("I");
+      expect(appliedFunctionId(preset.steps[0])).toBe("I");
     });
   });
 
@@ -493,26 +514,26 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
 
       // Eb Major (tonic 3, flat key: Eb, Ab, Bb)
       const ebMajorContext: HarmonicContext = {
-        tonic: { semitone: 3 },
+        tonic: 3,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: true },
+        spellingContext: { tonic: 3, mode: "major" },
       };
 
       // G Major (tonic 7, sharp key: G, C, D)
       const gMajorContext: HarmonicContext = {
-        tonic: { semitone: 7 },
+        tonic: 7,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 7, mode: "major" },
       };
 
       // F Major (tonic 5, single flat key: F, Bb, C)
       const fMajorContext: HarmonicContext = {
-        tonic: { semitone: 5 },
+        tonic: 5,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: true },
+        spellingContext: { tonic: 5, mode: "major" },
       };
 
       // Realize in Eb Major
@@ -567,20 +588,20 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       ]);
 
       const cMinorContext: HarmonicContext = {
-        tonic: { semitone: 0 }, // C
+        tonic: 0, // C
         moduleId: "dark-harmony",
         mode: "tonal-minor",
-        spellingContext: { preferFlats: true },
+        spellingContext: { tonic: 0, mode: "tonal-minor" },
       };
 
       const result = realizePresetSteps(minorPreset, cMinorContext);
       expect(result.kind).toBe("success");
       if (result.kind === "success") {
         expect(result.steps).toHaveLength(4);
-        expect(result.steps[0]!.harmonicFunction.functionId).toBe("i");
-        expect(result.steps[1]!.harmonicFunction.functionId).toBe("iv");
-        expect(result.steps[2]!.harmonicFunction.functionId).toBe("V");
-        expect(result.steps[3]!.harmonicFunction.functionId).toBe("i");
+        expect(appliedFunctionId(result.steps[0])).toBe("i");
+        expect(appliedFunctionId(result.steps[1])).toBe("iv");
+        expect(appliedFunctionId(result.steps[2])).toBe("V");
+        expect(appliedFunctionId(result.steps[3])).toBe("i");
       }
     });
   });
@@ -603,10 +624,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       ]);
 
       const incompatibleContext: HarmonicContext = {
-        tonic: { semitone: 0 },
+        tonic: 0,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 0, mode: "major" },
       };
 
       const result = realizePresetSteps(specializedPreset, incompatibleContext);
@@ -618,7 +639,7 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       }
 
       // Stored preset remains unmodified
-      expect(specializedPreset.steps[0]!.harmonicFunction.functionId).toBe("N6");
+      expect(appliedFunctionId(specializedPreset.steps[0])).toBe("N6");
     });
   });
 
@@ -640,10 +661,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
     }
 
     const context: HarmonicContext = {
-      tonic: { semitone: 0 },
+      tonic: 0,
       moduleId: "progressions",
       mode: "major",
-      spellingContext: { preferFlats: false },
+      spellingContext: { tonic: 0, mode: "major" },
     };
 
     it("Replace Progression: replaces all existing steps with preset steps", () => {
@@ -665,8 +686,8 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       const result = applyPresetToProgression(existingProgression, preset, "replace", context);
       expect(result.steps).toHaveLength(2);
       expect(result.steps.some((s) => s.id === "old-1")).toBe(false);
-      expect(result.steps[0]!.harmonicFunction.functionId).toBe("IV");
-      expect(result.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(result.steps[0])).toBe("IV");
+      expect(appliedFunctionId(result.steps[1])).toBe("V");
     });
 
     it("Append to End: keeps existing steps first and appends preset steps to end", () => {
@@ -688,8 +709,8 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       const result = applyPresetToProgression(existingProgression, preset, "append", context);
       expect(result.steps).toHaveLength(3);
       expect(result.steps[0]!.id).toBe("old-1");
-      expect(result.steps[1]!.harmonicFunction.functionId).toBe("IV");
-      expect(result.steps[2]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(result.steps[1])).toBe("IV");
+      expect(appliedFunctionId(result.steps[2])).toBe("V");
     });
 
     it("Insert at Selected Step: inserts preset immediately BEFORE the selected Step, retaining the selected Step and preserving order", () => {
@@ -732,8 +753,8 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
 
       expect(result.steps).toHaveLength(5);
       expect(result.steps[0]!.id).toBe("step-A");
-      expect(result.steps[1]!.harmonicFunction.functionId).toBe("IV"); // Preset X
-      expect(result.steps[2]!.harmonicFunction.functionId).toBe("V"); // Preset Y
+      expect(appliedFunctionId(result.steps[1])).toBe("IV"); // Preset X
+      expect(appliedFunctionId(result.steps[2])).toBe("V"); // Preset Y
       expect(result.steps[3]!.id).toBe("step-Selected-B"); // Selected B retained after inserted preset
       expect(result.steps[4]!.id).toBe("step-C"); // Subsequent C retained in order
 
@@ -784,14 +805,14 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
       expect(insResult.steps).toHaveLength(2);
 
       // All three yield identical functional step ordering
-      expect(repResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
-      expect(repResult.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(repResult.steps[0])).toBe("IV");
+      expect(appliedFunctionId(repResult.steps[1])).toBe("V");
 
-      expect(appResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
-      expect(appResult.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(appResult.steps[0])).toBe("IV");
+      expect(appliedFunctionId(appResult.steps[1])).toBe("V");
 
-      expect(insResult.steps[0]!.harmonicFunction.functionId).toBe("IV");
-      expect(insResult.steps[1]!.harmonicFunction.functionId).toBe("V");
+      expect(appliedFunctionId(insResult.steps[0])).toBe("IV");
+      expect(appliedFunctionId(insResult.steps[1])).toBe("V");
     });
   });
 
@@ -807,10 +828,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         },
       ]);
       const context: HarmonicContext = {
-        tonic: { semitone: 0 },
+        tonic: 0,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 0, mode: "major" },
       };
 
       const firstApply = applyPresetToProgression({ steps: [] }, preset, "replace", context);
@@ -837,10 +858,10 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         },
       ]);
       const context: HarmonicContext = {
-        tonic: { semitone: 0 },
+        tonic: 0,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: false },
+        spellingContext: { tonic: 0, mode: "major" },
       };
 
       const defaultsA: ProjectDefaults = {
@@ -918,8 +939,8 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
         };
 
         // Custom preset retains original harmonic function
-        expect(customPreset.steps[0]!.harmonicFunction.functionId).toBe("I");
-        expect(mutatedProgression.steps[0]!.harmonicFunction.functionId).toBe("V");
+        expect(appliedFunctionId(customPreset.steps[0])).toBe("I");
+        expect(appliedFunctionId(mutatedProgression.steps[0])).toBe("V");
       }
     });
   });
@@ -933,6 +954,127 @@ describe("T112 — Functional Presets Contract Suite (US7)", () => {
 
       // Verifies customPresets property exists on Project
       expect(Array.isArray(project.customPresets)).toBe(true);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // 15. Arrangement state (Song Sections + loop region) across Apply modes
+  // --------------------------------------------------------------------------
+  describe("15. Preset apply preserves arrangement state", () => {
+    const context: HarmonicContext = {
+      tonic: 0,
+      moduleId: "progressions",
+      mode: "major",
+      spellingContext: { tonic: 0, mode: "major" },
+    };
+
+    function preset(): FunctionalPreset {
+      return createFunctionalPreset("p-arrangement", "Arrangement Preset", "builtIn", [
+        {
+          harmonicFunction: { moduleId: "progressions", functionId: "IV", category: "core" },
+          duration: musicalDuration(rational(1, 1)),
+        },
+      ]);
+    }
+
+    function chordStep(id: string, functionId: string): ChordStep {
+      return {
+        id,
+        kind: "chord",
+        harmonicFunction: {
+          moduleId: "progressions",
+          functionId,
+          category: "core",
+        } as ChordStep["harmonicFunction"],
+        harmonicVariant: EMPTY_HARMONIC_VARIANT,
+        duration: musicalDuration(rational(2, 1)),
+        performance: createRichPerformance(),
+        cardView: "harmonic",
+      };
+    }
+
+    function progressionWithArrangement(): Progression {
+      return {
+        steps: [chordStep("keep-a", "I"), chordStep("keep-b", "V")],
+        selectedStepId: "keep-b",
+        sections: [
+          { id: "verse", name: "Verse", startStepId: "keep-a" },
+          { id: "chorus", name: "Chorus", startStepId: "keep-b" },
+        ],
+        loopRegion: { startStepId: "keep-a", endStepId: "keep-b" },
+      };
+    }
+
+    // Regression: every branch used to return `{ steps }` only, so `append` and `insert`
+    // silently discarded the user's Song Sections and loop region even though the original
+    // Steps were all preserved. `normalizeSongSections` spreads its input, so the absent
+    // `sections` field stayed absent and the command layer persisted `[]`.
+    it("keeps Song Sections and the loop region when appending", () => {
+      const result = applyPresetToProgression(
+        progressionWithArrangement(),
+        preset(),
+        "append",
+        context,
+      );
+
+      expect(result.sections?.map((section) => section.id).sort()).toEqual(["chorus", "verse"]);
+      expect(result.loopRegion).toEqual({ startStepId: "keep-a", endStepId: "keep-b" });
+      // The original steps are still present, so the arrangement still resolves.
+      expect(result.steps.some((step) => step.id === "keep-a")).toBe(true);
+      expect(result.steps.some((step) => step.id === "keep-b")).toBe(true);
+    });
+
+    it("keeps Song Sections and the loop region when inserting before the selected step", () => {
+      const result = applyPresetToProgression(
+        progressionWithArrangement(),
+        preset(),
+        "insert",
+        context,
+      );
+
+      expect(result.sections?.map((section) => section.id).sort()).toEqual(["chorus", "verse"]);
+      expect(result.loopRegion).toEqual({ startStepId: "keep-a", endStepId: "keep-b" });
+    });
+
+    it("drops the loop region when replacing, because its steps no longer exist", () => {
+      const result = applyPresetToProgression(
+        progressionWithArrangement(),
+        preset(),
+        "replace",
+        context,
+      );
+
+      // Every previous Step is gone. Keeping the region would leave two dangling step IDs, and
+      // `validateLoopRegion` throws `RangeError` for exactly that, so playback would fail.
+      expect(result.loopRegion).toBeUndefined();
+      expect(result.steps.some((step) => step.id === "keep-a")).toBe(false);
+
+      // Sections are carried so the command layer's `normalizeSongSections` can drop the ones
+      // whose anchor step disappeared, rather than losing the field entirely.
+      const normalized = normalizeSongSections(result);
+      expect(normalized.sections).toEqual([]);
+    });
+
+    it("keeps a loop region that still resolves after replacing", () => {
+      // A region can only survive `replace` if it points at a step the preset itself created,
+      // which cannot happen; this asserts the guard is about resolution, not the mode.
+      const result = applyPresetToProgression(
+        { steps: [chordStep("only", "I")] },
+        preset(),
+        "replace",
+        context,
+      );
+      expect(result.loopRegion).toBeUndefined();
+      expect(result.steps).toHaveLength(1);
+    });
+
+    it("applies the preset into an empty progression without inventing arrangement state", () => {
+      const result = applyPresetToProgression({ steps: [] }, preset(), "replace", context);
+
+      expect(result.steps).toHaveLength(1);
+      expect(result.loopRegion).toBeUndefined();
+      // An empty progression has no sections to carry.
+      expect(result.sections).toBeUndefined();
     });
   });
 });

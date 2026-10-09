@@ -1,9 +1,11 @@
+import { requireValue } from "../../fixtures/assertions";
 import { describe, expect, it } from "vitest";
 import { exactPitch } from "../../../src/domain/harmony/pitch";
 import type { EffectiveMelodyNote } from "../../../src/domain/melody/effectiveTimeline";
 import { createProgressionMeasureLayout } from "../../../src/domain/timing/measureLayout";
 import { rational } from "../../../src/domain/timing/rational";
 import { musicalDuration } from "../../../src/domain/timing/duration";
+import { meter } from "../../../src/domain/timing/meter";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { realizeProgressionStepRealization } from "../../../src/instruments/piano/profile";
@@ -11,8 +13,14 @@ import {
   isPianoRollNoteAuthored,
   pianoRollPlayheadPercent,
   pianoRollDegreeLabel,
+  pianoRollPaletteColor,
   pianoRollPaletteDegrees,
   projectPianoRollChordToneGuide,
+  NOTE_VALUE_SNAPS,
+  PIANO_ROLL_SNAPS,
+  PULSE_SNAPS,
+  pianoRollSnapBeats,
+  pianoRollSnapLabel,
   pianoRollSnapOffsets,
   pianoRollMoveStart,
   pianoRollResolvedGestureIntent,
@@ -27,7 +35,7 @@ const note = (start: [number, number], duration: [number, number]): EffectiveMel
   eventKey: "phrase-local-id",
   eventIndex: 0,
   eventCount: 1,
-  pitch: exactPitch(67),
+  pitch: exactPitch(67, { step: "G", alter: 0 }),
   sourcePitchMidi: 67,
   startBeats: rational(...start),
   durationBeats: rational(...duration),
@@ -66,6 +74,15 @@ describe("Piano Roll measure projection", () => {
     );
   });
   it("shares tonic-relative degree colors and pairs chromatic enharmonics deterministically", () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map(pianoRollPaletteColor)).toEqual([
+      "#f60100",
+      "#fbaf01",
+      "#efe700",
+      "#3ed700",
+      "#3f00ff",
+      "#b100e7",
+      "#f700cd",
+    ]);
     expect(pianoRollPaletteDegrees(0, 0, "progressions")).toEqual([1]);
     expect(pianoRollPaletteDegrees(2, 0, "progressions")).toEqual([2]);
     expect(pianoRollPaletteDegrees(1, 0, "progressions")).toEqual([1, 2]);
@@ -163,7 +180,9 @@ describe("Piano Roll measure projection", () => {
     );
     const realized = realizeProgressionStepRealization(alteredFirst, project.tonic);
     const alteredPitchClasses = new Set(
-      [...realized.pitches, realized.bassPitch].map((pitch) => pitch.pitchClassIdentity),
+      [...realized.pitches, realized.bassPitch].map(
+        (pitch) => requireValue(pitch).pitchClassIdentity,
+      ),
     );
     const nextPitchClasses = new Set(
       [...realizeProgressionStepRealization(secondChord, project.tonic).pitches].map(
@@ -229,9 +248,12 @@ describe("Piano Roll measure projection", () => {
   });
 
   it("projects every display snap, including triplets, on exact Rational beats", () => {
-    expect(pianoRollSnapOffsets(rational(4), "1/1")).toEqual([rational(0), rational(4)]);
-    expect(pianoRollSnapOffsets(rational(4), "1/16")).toHaveLength(17);
-    expect(pianoRollSnapOffsets(rational(4), "1/4 triplet")).toEqual([
+    expect(pianoRollSnapOffsets(rational(4), "1/1", meter(4, 4))).toEqual([
+      rational(0),
+      rational(4),
+    ]);
+    expect(pianoRollSnapOffsets(rational(4), "1/16", meter(4, 4))).toHaveLength(17);
+    expect(pianoRollSnapOffsets(rational(4), "1/4 triplet", meter(4, 4))).toEqual([
       rational(0),
       rational(2, 3),
       rational(4, 3),
@@ -240,19 +262,75 @@ describe("Piano Roll measure projection", () => {
       rational(10, 3),
       rational(4),
     ]);
-    expect(pianoRollSnapOffsets(rational(1), "1/4 triplet", rational(3))).toEqual([
+    expect(pianoRollSnapOffsets(rational(1), "1/4 triplet", meter(4, 4), rational(3))).toEqual([
       rational(1, 3),
       rational(1),
     ]);
-    expect(pianoRollSnapOffsets(rational(4), "1/1 triplet")).toEqual([rational(0), rational(8, 3)]);
-    expect(pianoRollSnapOffsets(rational(4), "1/2 triplet")).toEqual([
+    expect(pianoRollSnapOffsets(rational(4), "1/1 triplet", meter(4, 4))).toEqual([
+      rational(0),
+      rational(8, 3),
+    ]);
+    expect(pianoRollSnapOffsets(rational(4), "1/2 triplet", meter(4, 4))).toEqual([
       rational(0),
       rational(4, 3),
       rational(8, 3),
       rational(4),
     ]);
-    expect(pianoRollSnapOffsets(rational(4), "1/8 triplet")).toHaveLength(13);
-    expect(pianoRollSnapOffsets(rational(4), "1/16 triplet")).toHaveLength(25);
+    expect(pianoRollSnapOffsets(rational(4), "1/8 triplet", meter(4, 4))).toHaveLength(13);
+    expect(pianoRollSnapOffsets(rational(4), "1/16 triplet", meter(4, 4))).toHaveLength(25);
+  });
+
+  it("offers a 32nd-triplet snap fine enough for six cells on an eighth-note pulse", () => {
+    // A 6/8 pulse is an eighth, so one pulse needs a 1/12-of-a-quarter step for six cells. The finest
+    // triplet used to be 1/16 triplet (1/6 of a quarter), which put only three cells on the pulse.
+    expect(pianoRollSnapBeats("1/32 triplet", meter(4, 4))).toEqual(rational(1, 12));
+    expect(pianoRollSnapOffsets(rational(1, 2), "1/32 triplet", meter(4, 4))).toHaveLength(7);
+    expect(pianoRollSnapOffsets(rational(1, 2), "1/16 triplet", meter(4, 4))).toHaveLength(4);
+
+    expect(pianoRollSnapBeats("1/16 triplet", meter(4, 4))).toEqual(rational(1, 6));
+    // A whole 6/8 bar is three quarters: 36 cells at the finer step.
+    expect(pianoRollSnapOffsets(rational(3), "1/32 triplet", meter(4, 4))).toHaveLength(37);
+
+    // The binary 32nd is the same step without the triplet: four cells on an eighth pulse.
+    expect(pianoRollSnapBeats("1/32", meter(4, 4))).toEqual(rational(1, 8));
+    expect(pianoRollSnapOffsets(rational(1, 2), "1/32", meter(4, 4))).toHaveLength(5);
+    expect(pianoRollSnapOffsets(rational(4), "1/32", meter(4, 4))).toHaveLength(33);
+  });
+
+  it("derives cells-per-pulse snaps from the meter, so six cells work in any meter", () => {
+    // The note-value family stops at a fixed finest value, so a /16 meter could only show three cells
+    // on a pulse however small that pulse was. Deriving the step from the pulse makes the count exact
+    // for every meter.
+    const cases: Array<[ReturnType<typeof meter>, ReturnType<typeof rational>]> = [
+      [meter(6, 8), rational(1, 12)],
+      [meter(4, 4), rational(1, 6)],
+      [meter(3, 2), rational(1, 3)],
+      [meter(6, 16), rational(1, 24)],
+      [meter(6, 32), rational(1, 48)],
+    ];
+    for (const [value, expected] of cases) {
+      expect(
+        pianoRollSnapBeats("pulse/6", value),
+        `${value.numerator}/${value.denominator}`,
+      ).toEqual(expected);
+    }
+
+    // A 6/8 bar is three quarters, so 36 cells at six per eighth pulse.
+    expect(pianoRollSnapOffsets(rational(3), "pulse/6", meter(6, 8))).toHaveLength(37);
+    expect(pianoRollSnapBeats("pulse/1", meter(6, 8))).toEqual(rational(1, 2));
+    expect(pianoRollSnapBeats("pulse/3", meter(6, 8))).toEqual(rational(1, 6));
+  });
+
+  it("offers both Snap families together", () => {
+    // Both systems are available so the more convenient one can be chosen later; the control groups
+    // them by optgroup.
+    expect(NOTE_VALUE_SNAPS).toContain("1/32");
+    expect(NOTE_VALUE_SNAPS).toContain("1/16 triplet");
+    expect(PULSE_SNAPS).toEqual(["pulse/1", "pulse/2", "pulse/3", "pulse/4", "pulse/6", "pulse/8"]);
+    expect(PIANO_ROLL_SNAPS).toEqual([...NOTE_VALUE_SNAPS, ...PULSE_SNAPS]);
+    expect(pianoRollSnapLabel("pulse/6")).toBe("6 per beat");
+    expect(pianoRollSnapLabel("pulse/1")).toBe("1 per beat");
+    expect(pianoRollSnapLabel("1/16 triplet")).toBe("1/16 triplet");
   });
 
   it("spells natural minor degrees correctly after tonic transposition", () => {
@@ -306,11 +384,11 @@ describe("Piano Roll measure projection", () => {
   it("keeps authored Rest notes selectable and generated chord notes visually locked", () => {
     const generated = {
       ...createMatrixChordStep(project, "I", "generated"),
-      melody: { mode: "generated", recipe: {} },
+      melody: { mode: "generated" as const, recipe: {} },
     } as unknown as ChordStep;
     const authoredChord = {
       ...createMatrixChordStep(project, "I", "authored"),
-      melody: { mode: "authored", phrase: { notes: [] } },
+      melody: { mode: "authored" as const, phrase: { notes: [] } },
     } as ChordStep;
     const restDuration = musicalDuration(rational(4));
     const authoredRest = {

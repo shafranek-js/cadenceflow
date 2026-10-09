@@ -1,9 +1,10 @@
 import type { HarmonicFunctionCategory, HarmonicFunctionIdentity } from "../harmony/functions";
+import { createEntityId } from "../runtime/ids";
 import type { DurationDisplayHint, MusicalDuration } from "../timing/duration";
 import { musicalDuration } from "../timing/duration";
 import { compareRational, rational } from "../timing/rational";
-import type { Progression } from "./progression";
-import type { ChordStep } from "./step";
+import type { LoopRegion, Progression, SongSection } from "./progression";
+import type { ChordStep, ProgressionStep } from "./step";
 import { snapshotStepPerformance } from "./step";
 import type { HarmonicContext } from "../harmony/modules/types";
 import type { ProjectDefaults } from "../project/defaults";
@@ -284,7 +285,7 @@ export function saveCustomPresetFromProgression(
     });
   }
 
-  const id = options?.id ?? `custom-${crypto.randomUUID()}`;
+  const id = options?.id ?? `custom-${createEntityId()}`;
   const steps: PresetStep[] = progression.steps.map((step) => {
     if (step.kind !== "chord") {
       throw new Error("Only chord steps can be saved into functional presets in v1");
@@ -343,7 +344,7 @@ export function realizePresetSteps(
         realizeChord(sourceFn, tonicNumber);
         realizedSteps.push(
           Object.freeze({
-            id: `step-${crypto.randomUUID()}`,
+            id: `step-${createEntityId()}`,
             kind: "chord",
             harmonicFunction: Object.freeze({ ...sourceFn }),
             harmonicVariant: EMPTY_HARMONIC_VARIANT,
@@ -383,7 +384,7 @@ export function realizePresetSteps(
           realizeChord(resolution.automaticTarget, tonicNumber);
           realizedSteps.push(
             Object.freeze({
-              id: `step-${crypto.randomUUID()}`,
+              id: `step-${createEntityId()}`,
               kind: "chord",
               harmonicFunction: Object.freeze({ ...resolution.automaticTarget }),
               harmonicVariant: EMPTY_HARMONIC_VARIANT,
@@ -440,25 +441,63 @@ export function applyPresetToProgression(
 
   const realizedSteps = realization.steps;
 
+  /**
+   * Carries arrangement state onto the next Progression while dropping what it can no longer
+   * reference.
+   *
+   * Regression context: every branch used to return `{ steps }` only, so applying a preset in
+   * `append` or `insert` mode discarded the user's Song Sections and loop region even though
+   * the original Steps were preserved. The command layer then normalised the missing `sections`
+   * to `[]` (`normalizeSongSections` spreads the input, so an absent field stays absent), losing
+   * the arrangement silently.
+   *
+   * Sections are filtered downstream by `normalizeSongSections`, which already drops any whose
+   * anchor step disappeared. The loop region is not: `validateLoopRegion` throws
+   * `RangeError` when a referenced step is missing, so a region left pointing at a replaced
+   * step would fail during playback. It is therefore only carried when both endpoints survive.
+   */
+  const carryArrangementState = (
+    steps: readonly ProgressionStep[],
+  ): { readonly sections?: readonly SongSection[]; readonly loopRegion?: LoopRegion } => {
+    const survivingIds = new Set(steps.map((step) => step.id));
+    const region = progression.loopRegion;
+    const loopSurvives =
+      region !== undefined &&
+      survivingIds.has(region.startStepId) &&
+      survivingIds.has(region.endStepId);
+    return Object.freeze({
+      ...(progression.sections !== undefined ? { sections: progression.sections } : {}),
+      ...(loopSurvives ? { loopRegion: region } : {}),
+    });
+  };
+
   if (progression.steps.length === 0) {
     return Object.freeze({
       steps: Object.freeze([...realizedSteps]),
+      ...carryArrangementState(realizedSteps),
     });
   }
 
   switch (mode) {
-    case "replace":
+    case "replace": {
+      // Every previous Step is gone, so only state that still resolves is kept.
+      const replaced = Object.freeze([...realizedSteps]);
       return Object.freeze({
-        steps: Object.freeze([...realizedSteps]),
+        steps: replaced,
+        ...carryArrangementState(replaced),
       });
+    }
 
-    case "append":
+    case "append": {
+      const appended = Object.freeze([...progression.steps, ...realizedSteps]);
       return Object.freeze({
-        steps: Object.freeze([...progression.steps, ...realizedSteps]),
+        steps: appended,
         ...(progression.selectedStepId !== undefined
           ? { selectedStepId: progression.selectedStepId }
           : {}),
+        ...carryArrangementState(appended),
       });
+    }
 
     case "insert": {
       if (!progression.selectedStepId) {
@@ -474,9 +513,11 @@ export function applyPresetToProgression(
       }
       const before = progression.steps.slice(0, selectedIndex);
       const after = progression.steps.slice(selectedIndex);
+      const inserted = Object.freeze([...before, ...realizedSteps, ...after]);
       return Object.freeze({
-        steps: Object.freeze([...before, ...realizedSteps, ...after]),
+        steps: inserted,
         selectedStepId: progression.selectedStepId,
+        ...carryArrangementState(inserted),
       });
     }
 

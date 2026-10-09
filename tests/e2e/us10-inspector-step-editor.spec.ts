@@ -4,13 +4,17 @@ import {
   ensurePreviewHarmonyVisible,
   ensureRecommendationContextVisible,
 } from "./test-helpers/global-settings";
-import { setLayoutMeasuresPerSystem } from "./test-helpers/progression-settings";
+import {
+  setLayoutMeasuresPerSystem,
+  setProgressionView,
+} from "./test-helpers/progression-settings";
 
 async function waitForStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("project-menu-toggle")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "Harmonic Matrix" })).toBeVisible();
   await expect(page.getByRole("region", { name: "My Progression" })).toBeVisible();
+  await setProgressionView(page, "staff");
 }
 
 async function addChord(page: Page, functionId: string): Promise<void> {
@@ -21,11 +25,7 @@ async function addChord(page: Page, functionId: string): Promise<void> {
 }
 
 async function selectFirstStep(page: Page): Promise<void> {
-  await page
-    .locator('[data-testid="progression-step"]')
-    .first()
-    .getByRole("button", { name: /Select progression step 1:/ })
-    .click();
+  await page.locator(".measure-staff-event-select").first().click();
   await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
 }
 
@@ -107,11 +107,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       "Step-specific controls live here. Progression settings are grouped below.",
     );
 
-    await page
-      .locator('[data-testid="progression-step"]')
-      .first()
-      .getByRole("button", { name: /Select progression step 1:/ })
-      .click();
+    await page.locator(".measure-staff-event-select").first().click();
     await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
   });
 
@@ -121,10 +117,14 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await addChord(page, "I");
     await selectFirstStep(page);
 
-    const step = page.locator('[data-testid="progression-step"]').first();
+    const step = page.locator(".measure-staff-event-select").first();
     const undo = page.getByRole("button", { name: "Undo", exact: true });
-    const selectedBefore = await step.getAttribute("data-selected");
+    const selectedBefore = await step.getAttribute("aria-pressed");
     const undoBefore = await undo.isEnabled();
+    const chordProperties = page.getByTestId("chord-properties-inspector");
+    await expect(chordProperties).toBeVisible();
+    await expect(chordProperties.getByTestId("chord-properties-bass")).toBeDisabled();
+    await expect(chordProperties).toContainText("Independent bass voice is off");
     for (const selector of [
       "details.register-disclosure",
       "details.articulation-disclosure",
@@ -147,15 +147,26 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     await expect(perNote).toBeVisible();
     const openBefore = await perNote.evaluate((element) => (element as HTMLDetailsElement).open);
     await perNote.locator("summary").click();
-    expect(await step.getAttribute("data-selected")).toBe(selectedBefore);
+    expect(await step.getAttribute("aria-pressed")).toBe(selectedBefore);
     expect(await undo.isEnabled()).toBe(undoBefore);
     if (openBefore) await perNote.locator("summary").click();
 
-    const bass = page.locator("details.bass-disclosure");
-    await expect(bass).toBeVisible();
-    await expect(bass).toHaveAttribute("open", "");
-    await bass.locator("summary").click();
-    await expect(bass).not.toHaveAttribute("open", "");
+    const progressionSettings = page
+      .getByTestId("step-performance-inspector")
+      .getByTestId("selected-progression-settings");
+    await expect(progressionSettings).toBeVisible();
+    const settingsWasOpen = await progressionSettings.evaluate(
+      (element) => (element as HTMLDetailsElement).open,
+    );
+    await progressionSettings.locator(":scope > summary").click();
+    expect(await step.getAttribute("aria-pressed")).toBe(selectedBefore);
+    expect(await undo.isEnabled()).toBe(undoBefore);
+    await progressionSettings.locator(":scope > summary").click();
+    expect(await step.getAttribute("aria-pressed")).toBe(selectedBefore);
+    expect(await undo.isEnabled()).toBe(undoBefore);
+    expect(
+      await progressionSettings.evaluate((element) => (element as HTMLDetailsElement).open),
+    ).toBe(settingsWasOpen);
 
     const firstRow = page.locator(".per-note-velocity-row").first();
     await expect(firstRow).toContainText("Inherits Master");
@@ -197,10 +208,11 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     );
 
     await template.getByRole("button", { name: "Articulation: Arp Up" }).click();
-    const progressionCount = await page.locator('[data-testid="progression-step"]').count();
+    const progressionSteps = page.locator(".measure-staff-event-select");
+    const progressionCount = await progressionSteps.count();
     await matrixCard.locator(".chord-main").click({ modifiers: ["Alt"] });
     await expect(template).toContainText("Inheriting defaults");
-    await expect(page.locator('[data-testid="progression-step"]')).toHaveCount(progressionCount);
+    await expect(progressionSteps).toHaveCount(progressionCount);
   });
 
   test("keeps recommendation language semantic outside Expert mode", async ({ page }) => {
@@ -255,13 +267,20 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
           const matrix = document.querySelector<HTMLElement>(".studio-matrix-area");
           const inspector = document.querySelector<HTMLElement>(".piano-performance-inspector");
           const progression = document.querySelector<HTMLElement>(".progression-strip");
-          const selectedStep = document.querySelector<HTMLElement>(".selected-step-stack");
+          const selectedStep = document.querySelector<HTMLElement>(
+            '.selected-step-stack[aria-label="Selected step"]',
+          );
           if (!stack || !matrix || !inspector || !progression || !selectedStep) {
             throw new Error("Inspector or selected-step layout is missing");
           }
-          const activeMeasure = document.querySelector<HTMLElement>(
-            ".progression-measure-card[data-has-selected-step='true']",
+          const selectedStaffEvent = document.querySelector<HTMLElement>(
+            ".score-system .measure-staff-event.is-selected",
           );
+          const activeMeasure =
+            selectedStaffEvent?.closest<HTMLElement>(".score-system") ??
+            document.querySelector<HTMLElement>(
+              ".progression-measure-card[data-has-selected-step='true']",
+            );
           const matrixRect = matrix.getBoundingClientRect();
           const progressionRect = progression.getBoundingClientRect();
           const selectedStepRect = selectedStep.getBoundingClientRect();
@@ -296,68 +315,25 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
     });
   }
 
-  test("dynamically aligns Selected Step inspector with the active Harmonic measure", async ({
-    page,
-  }) => {
+  test("keeps the Selected Step inspector synchronized with Staff events", async ({ page }) => {
     await waitForStudio(page);
     await addChord(page, "I");
     await addChord(page, "IV");
     await addChord(page, "V");
 
-    const measures = page.getByTestId("progression-measure");
-    await expect(measures).toHaveCount(3);
-
-    const steps = page.getByTestId("progression-step");
+    const steps = page.locator(".measure-staff-event-select");
     await expect(steps).toHaveCount(3);
-
-    const getAlignment = async (measureIndex: number) =>
-      page.evaluate((index) => {
-        const selectedStack = document.querySelector<HTMLElement>(".selected-step-stack");
-        const targetMeasure = document.querySelectorAll<HTMLElement>(".progression-measure-card")[
-          index
-        ];
-        const strip = document.querySelector<HTMLElement>(".progression-strip");
-        if (!selectedStack || !targetMeasure || !strip) throw new Error("Elements missing");
-        const stackRect = selectedStack.getBoundingClientRect();
-        const measureRect = targetMeasure.getBoundingClientRect();
-        const stripRect = strip.getBoundingClientRect();
-        return {
-          diffTop: Math.abs(stackRect.top - measureRect.top),
-          stripOffset: stackRect.top - stripRect.top,
-        };
-      }, measureIndex);
-
-    await steps
-      .nth(0)
-      .getByRole("button", { name: /Select progression step/ })
-      .click();
-    await expect(page.getByTestId("step-performance-inspector")).toBeVisible();
-    const first = await getAlignment(0);
-    expect(first.diffTop).toBeLessThanOrEqual(2);
-
-    await steps
-      .nth(1)
-      .getByRole("button", { name: /Select progression step/ })
-      .click();
-    const second = await getAlignment(1);
-    expect(second.diffTop).toBeLessThanOrEqual(2);
-    expect(second.stripOffset).toBeGreaterThan(first.stripOffset + 40);
-
-    await steps
-      .nth(2)
-      .getByRole("button", { name: /Select progression step/ })
-      .click();
-    const third = await getAlignment(2);
-    expect(third.diffTop).toBeLessThanOrEqual(2);
-    expect(third.stripOffset).toBeGreaterThan(second.stripOffset + 40);
-
-    await steps
-      .nth(0)
-      .getByRole("button", { name: /Select progression step/ })
-      .click();
-    const firstReturn = await getAlignment(0);
-    expect(firstReturn.diffTop).toBeLessThanOrEqual(2);
-    expect(Math.abs(firstReturn.stripOffset - first.stripOffset)).toBeLessThanOrEqual(2);
+    const inspector = page.getByTestId("step-performance-inspector");
+    for (const [index, label] of ["I", "IV", "V"].entries()) {
+      await steps.nth(index).click();
+      await expect(steps.nth(index)).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        inspector.getByRole("heading", { name: `Step Performance: ${label}` }),
+      ).toBeVisible();
+    }
+    const selectedEvents = page.locator(".measure-staff-event.is-selected");
+    await expect(selectedEvents).toHaveCount(1);
+    await expect(page.getByTestId("progression-score-systems")).toBeVisible();
   });
 
   for (const viewport of [
@@ -372,7 +348,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       await addChord(page, "I");
       await addChord(page, "IV");
       await addChord(page, "V");
-      await expect(page.getByTestId("progression-measure")).toHaveCount(3);
+      await expect(page.locator(".measure-staff-event-select")).toHaveCount(3);
       await page.getByLabel("Progression Card View").selectOption("staff");
       await setLayoutMeasuresPerSystem(page, 1);
 
@@ -383,7 +359,9 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
 
       const readStaffAlignment = async (target: Locator) =>
         target.evaluate((element) => {
-          const selectedStack = document.querySelector<HTMLElement>(".selected-step-stack");
+          const selectedStack = document.querySelector<HTMLElement>(
+            '.selected-step-stack[aria-label="Selected step"]',
+          );
           const system = element.closest<HTMLElement>(".score-system");
           if (!selectedStack || !system)
             throw new Error("Selected Staff target or inspector missing");
@@ -404,6 +382,9 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
         await target.click();
         await expect(target).toHaveAttribute("aria-pressed", "true");
         await expect(selectedStack.getByTestId("step-performance-inspector")).toBeVisible();
+        await expect
+          .poll(async () => (await readStaffAlignment(target)).diffTop)
+          .toBeLessThanOrEqual(2);
         const alignment = await readStaffAlignment(target);
         expect(alignment.systemIndex).toBe(String(systemIndex));
         expect(alignment.diffTop).toBeLessThanOrEqual(2);
@@ -416,10 +397,16 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
         const target = continuationTarget.last();
         await target.click();
         await expect(target).toHaveAttribute("aria-pressed", "true");
+        await expect
+          .poll(async () => (await readStaffAlignment(target)).diffTop)
+          .toBeLessThanOrEqual(2);
         const alignment = await readStaffAlignment(target);
         expect(alignment.diffTop).toBeLessThanOrEqual(2);
         await selectedStack.focus();
         await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+        await expect
+          .poll(async () => (await readStaffAlignment(target)).diffTop)
+          .toBeLessThanOrEqual(2);
         const afterResize = await readStaffAlignment(target);
         expect(afterResize.diffTop).toBeLessThanOrEqual(2);
       }
@@ -428,6 +415,9 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
       if (await melodyTarget.count()) {
         await melodyTarget.click();
         await expect(melodyTarget).toHaveAttribute("aria-pressed", "true");
+        await expect
+          .poll(async () => (await readStaffAlignment(melodyTarget)).diffTop)
+          .toBeLessThanOrEqual(2);
         const alignment = await readStaffAlignment(melodyTarget);
         expect(alignment.diffTop).toBeLessThanOrEqual(2);
       }
@@ -436,6 +426,9 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
         .locator('.score-system[data-system-index="0"] .measure-staff-event-select')
         .first();
       await firstTarget.click();
+      await expect
+        .poll(async () => (await readStaffAlignment(firstTarget)).diffTop)
+        .toBeLessThanOrEqual(2);
       const firstReturn = await readStaffAlignment(firstTarget);
       expect(firstReturn.systemIndex).toBe("0");
       expect(firstReturn.diffTop).toBeLessThanOrEqual(2);
@@ -509,13 +502,14 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
 
     // 2. Add card I to progression
     await addChord(page, "I");
-    const step1 = page.getByTestId("progression-step").nth(0);
-    await expect(step1).toContainText("2");
+    const steps = page.locator(".measure-staff-event-select");
+    const step1 = steps.nth(0);
+    await expect(step1).toHaveAttribute("aria-label", /2 beats/);
 
     // 3. Add card V to progression
     await addChord(page, "V");
-    const step2 = page.getByTestId("progression-step").nth(1);
-    await expect(step2).toContainText("2");
+    const step2 = steps.nth(1);
+    await expect(step2).toHaveAttribute("aria-label", /2 beats/);
 
     // 4. Dismiss card selection to return to Global Template inspector
     await page.keyboard.press("Escape");
@@ -529,7 +523,7 @@ test.describe("US10 Batch 3 — Inspector and Step Editor", () => {
 
     // 6. Add card IV to progression -> should now be back to default 4 beats
     await addChord(page, "IV");
-    const step3 = page.getByTestId("progression-step").nth(2);
-    await expect(step3).toContainText("4");
+    const step3 = steps.nth(2);
+    await expect(step3).toHaveAttribute("aria-label", /4 beats/);
   });
 });

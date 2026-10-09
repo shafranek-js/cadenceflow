@@ -1,6 +1,11 @@
 import { PianoRollChordCards } from "./PianoRollChordCards";
 import type { ChordCardVisibility } from "./chordCardPreferences";
 import {
+  PIANO_ROLL_ZOOM_MAX,
+  PIANO_ROLL_ZOOM_MIN,
+  PIANO_ROLL_ZOOM_STEP,
+} from "./pianoRollPreferences";
+import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -15,6 +20,7 @@ import {
 } from "react";
 import { exactPitch, type ExactPitch } from "../../domain/harmony/pitch";
 import type { AuthoredMelodyEdit } from "../../app/commands/authoredMelodyTransaction";
+import { isMeterPulse } from "../../domain/timing/meter";
 import { rational } from "../../domain/timing/rational";
 import type { Project } from "../../domain/project/project";
 import type { ChordMelodyRecipe } from "../../domain/melody/types";
@@ -48,7 +54,7 @@ import {
   stepTranspositionSemitones,
 } from "../../domain/progression/transposition";
 import { getSuzukiNoteColor, getSuzukiNoteStroke } from "../../notation/suzukiColors";
-import { modeForModule } from "../../domain/harmony/functions";
+import { harmonicFunctionLabel, modeForModule } from "../../domain/harmony/functions";
 import {
   isPianoRollNoteAuthored,
   pianoRollDegreeLabel,
@@ -58,6 +64,9 @@ import {
   projectPianoRollScaleChordToneGuide,
   pianoRollMoveStart,
   pianoRollResolvedGestureIntent,
+  NOTE_VALUE_SNAPS,
+  PULSE_SNAPS,
+  pianoRollSnapLabel,
   pianoRollSnapBeats,
   pianoRollSnapOffsets,
   projectPianoRollNoteFragment,
@@ -402,20 +411,20 @@ export function PianoRollToolbar({
           value={snap}
           onChange={(e) => onSnapChange(e.target.value)}
         >
-          {[
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16",
-            "1/1 triplet",
-            "1/2 triplet",
-            "1/4 triplet",
-            "1/8 triplet",
-            "1/16 triplet",
-          ].map((value) => (
-            <option key={value}>{value}</option>
-          ))}
+          <optgroup label="Note value">
+            {NOTE_VALUE_SNAPS.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Cells per beat">
+            {PULSE_SNAPS.map((value) => (
+              <option key={value} value={value}>
+                {pianoRollSnapLabel(value)}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </label>
       <label>
@@ -423,9 +432,9 @@ export function PianoRollToolbar({
         <input
           aria-label="Horizontal zoom"
           type="range"
-          min="70"
-          max="180"
-          step="10"
+          min={PIANO_ROLL_ZOOM_MIN}
+          max={PIANO_ROLL_ZOOM_MAX}
+          step={PIANO_ROLL_ZOOM_STEP}
           value={zoom}
           onChange={(e) => onZoomChange(Number(e.target.value))}
         />
@@ -477,6 +486,7 @@ export function PianoRollMeasure({
   layout,
   measure,
   systemIndex,
+  isCurrentContext = false,
   selectedStepId,
   selectedChordStepIds,
   selectedNoteKey,
@@ -507,6 +517,10 @@ export function PianoRollMeasure({
   onAuditionMeasure,
   onOpenMeasureMenu,
   onDeleteMeasureFromButton,
+  onMeasureDragStart,
+  draggingMeasureIndex,
+  measureDropBefore,
+  measureDropAfter,
   onAuditionChord,
   onOpenMelodyMenu,
   onAuditionNote,
@@ -523,6 +537,7 @@ export function PianoRollMeasure({
   readonly layout: ProgressionMeasureLayout;
   readonly measure: ProgressionMeasure;
   readonly systemIndex?: number;
+  readonly isCurrentContext?: boolean;
   readonly selectedStepId?: string;
   readonly selectedChordStepIds?: ReadonlySet<string>;
   readonly selectedNoteKey?: string | undefined;
@@ -573,6 +588,18 @@ export function PianoRollMeasure({
     position: { readonly x: number; readonly y: number },
   ) => void;
   readonly onDeleteMeasureFromButton?: (measureIndex: number, invoker: HTMLElement) => void;
+  /**
+   * Starts a click-and-drag of the whole Measure. Bound to the Measure header, which is the only
+   * part of the card that is not the note grid, so dragging never competes with note editing,
+   * marquee selection or the resize handles.
+   */
+  readonly onMeasureDragStart?: (measureIndex: number, event: PointerEvent<HTMLElement>) => void;
+  /** Measure currently being dragged, for the "lifted" visual state. */
+  readonly draggingMeasureIndex?: number | null;
+  /** The dragged Measure would be inserted immediately before this one. */
+  readonly measureDropBefore?: boolean;
+  /** The dragged Measure would be appended immediately after this one. */
+  readonly measureDropAfter?: boolean;
   readonly onAuditionChord?: (stepId: string) => void;
   readonly onOpenMelodyMenu?: (
     stepId: string,
@@ -600,8 +627,8 @@ export function PianoRollMeasure({
 }) {
   const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
   const gridOffsets = useMemo(
-    () => pianoRollSnapOffsets(layout.barLengthBeats, snap, measure.startBeats),
-    [layout.barLengthBeats, measure.startBeats, snap],
+    () => pianoRollSnapOffsets(layout.barLengthBeats, snap, layout.meter, measure.startBeats),
+    [layout.barLengthBeats, layout.meter, measure.startBeats, snap],
   );
   const noteGesture = useSyncExternalStore(
     subscribePianoRollSession,
@@ -665,6 +692,21 @@ export function PianoRollMeasure({
   const rowCount = pitchGeometry.unitCount;
   const pitchRows = pianoRollPitchRows(minPitch, maxPitch, pitchGeometry);
   const pitchCount = pitchRows.length;
+  const pitchAtGridPointer = (event: {
+    readonly currentTarget: HTMLDivElement;
+    readonly target: EventTarget | null;
+    readonly clientX: number;
+    readonly clientY: number;
+  }) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const pointerTarget = document.elementFromPoint(event.clientX, event.clientY);
+    const row = (pointerTarget ?? target)?.closest<HTMLElement>(".piano-roll-row");
+    const rowPitch = Number(row?.dataset.pitchMidi);
+    if (row && event.currentTarget.contains(row) && Number.isInteger(rowPitch)) return rowPitch;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const y = Math.max(0, Math.min(0.999999, (event.clientY - rect.top) / rect.height));
+    return pitchGeometry.pitchAtYFraction(y);
+  };
   const [focusPitch, setFocusPitch] = useState(60);
   const activeStepStart =
     layout.measures
@@ -699,6 +741,7 @@ export function PianoRollMeasure({
     baseline: string;
   } | null>(null);
   const ignoreNextEmptyGridClick = useRef(false);
+  const pointerInteraction = useRef(false);
   const pendingNoteGesture = useRef<{
     pointerId: number;
     x: number;
@@ -789,21 +832,7 @@ export function PianoRollMeasure({
     const spelling = names[((midi % 12) + 12) % 12]!;
     return exactPitch(midi, spelling);
   };
-  const durationForSnap = (): Rational => {
-    const values: Record<string, Rational> = {
-      "1/1": rational(4),
-      "1/2": rational(2),
-      "1/4": rational(1),
-      "1/8": rational(1, 2),
-      "1/16": rational(1, 4),
-      "1/1 triplet": rational(8, 3),
-      "1/2 triplet": rational(4, 3),
-      "1/4 triplet": rational(2, 3),
-      "1/8 triplet": rational(1, 3),
-      "1/16 triplet": rational(1, 6),
-    };
-    return values[snap] ?? rational(1, 2);
-  };
+  const durationForSnap = (): Rational => pianoRollSnapBeats(snap, layout.meter);
   const deleteSelection = (fallbackIdentity?: { sourceStepId: string; eventKey: string }) => {
     const selectedNotes = notes.filter((note) =>
       selectedNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
@@ -938,6 +967,7 @@ export function PianoRollMeasure({
       (target !== event.currentTarget && !event.currentTarget.contains(target))
     )
       return;
+    event.preventDefault();
     onActiveMeasureChange?.(measure.measureIndex, systemIndex);
     marqueeStart.current = {
       pointerId: event.pointerId,
@@ -1005,7 +1035,6 @@ export function PianoRollMeasure({
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const x = pianoRollTimelineFraction(event.clientX, rect);
-    const y = Math.max(0, Math.min(0.999999, (event.clientY - rect.top) / rect.height));
     const rawStart = addRational(
       measure.startBeats,
       rational(Math.round(x * rationalToNumber(layout.barLengthBeats) * 96), 96),
@@ -1015,7 +1044,7 @@ export function PianoRollMeasure({
       snapUnit,
       rational(Math.round(rationalToNumber(rawStart) / rationalToNumber(snapUnit))),
     );
-    const pitch = pitchGeometry.pitchAtYFraction(y);
+    const pitch = pitchAtGridPointer(event);
     const id = crypto.randomUUID();
     onApplyMelodyEdits?.([
       {
@@ -1062,7 +1091,9 @@ export function PianoRollMeasure({
           const pitchClasses = new Set(
             [
               ...realization.pitches.map((pitch) => pitch.pitchClassIdentity),
-              ...(realization.bassPitch ? [realization.bassPitch.pitchClassIdentity] : []),
+              ...(project.independentBassEnabled && realization.bassPitch
+                ? [realization.bassPitch.pitchClassIdentity]
+                : []),
             ].map((pitchClass) => ((pitchClass % 12) + 12) % 12),
           );
           return [[item.stepId, pitchClasses] as const];
@@ -1288,7 +1319,6 @@ export function PianoRollMeasure({
     event: PointerEvent<HTMLButtonElement>,
     note: (typeof notes)[number],
   ) => {
-    onActiveMeasureChange?.(measure.measureIndex, systemIndex);
     const rect = event.currentTarget.getBoundingClientRect();
     const hitWidth = pianoRollResizeHitWidth(rect.width);
     const mode =
@@ -1370,6 +1400,22 @@ export function PianoRollMeasure({
     }
     if (clientY < 28) window.scrollBy({ top: -16, behavior: "instant" });
     else if (clientY > window.innerHeight - 28) window.scrollBy({ top: 16, behavior: "instant" });
+  };
+  const activateMeasureAtBeat = (startBeats: Rational) => {
+    const destinationMeasure = layout.measures.find(
+      (candidate) =>
+        compareRational(startBeats, candidate.startBeats) >= 0 &&
+        compareRational(startBeats, candidate.endBeats) < 0,
+    );
+    if (!destinationMeasure) return;
+    const measureElement = document.querySelector<HTMLElement>(
+      `[data-testid="piano-roll-measure"][data-measure-index="${destinationMeasure.measureIndex}"]`,
+    );
+    const destinationSystemIndex = Number(measureElement?.dataset.systemIndex);
+    onActiveMeasureChange?.(
+      destinationMeasure.measureIndex,
+      Number.isInteger(destinationSystemIndex) ? destinationSystemIndex : systemIndex,
+    );
   };
   const updateNoteGesture = (event: PointerEvent<HTMLElement>) => {
     const activeGesture = getPianoRollGesture();
@@ -1569,6 +1615,7 @@ export function PianoRollMeasure({
       committedNote.pitch.midiNumber !== activeGesture.originalNote.pitch.midiNumber ||
       compareRational(committedNote.startBeats, activeGesture.originalNote.startBeats) !== 0 ||
       compareRational(committedNote.durationBeats, activeGesture.originalNote.durationBeats) !== 0;
+    let committedSuccessfully = false;
     if (!cancel && changed && activeGesture.baseline === project.updatedAt) {
       try {
         if (activeGesture.mode === "move") {
@@ -1590,12 +1637,15 @@ export function PianoRollMeasure({
             throw new Error("Melody editing is unavailable in this Piano Roll.");
           const error = onApplyMelodyEdits(plan.edits, [], activeGesture.baseline);
           if (error) throw new Error(error);
+          committedSuccessfully = true;
           onReplaceNoteSelection?.(plan.selection);
           const active = plan.selection[0];
           if (active) onNoteSelect?.(active.sourceStepId, active.eventKey, systemIndex);
           setEditorMessage(null);
         } else {
-          const error = onApplyMelodyEdits?.(
+          if (!onApplyMelodyEdits)
+            throw new Error("Melody editing is unavailable in this Piano Roll.");
+          const error = onApplyMelodyEdits(
             [
               {
                 type: "upsert",
@@ -1607,6 +1657,7 @@ export function PianoRollMeasure({
             activeGesture.baseline,
           );
           if (error) throw new Error(error);
+          committedSuccessfully = true;
           let cursor = rational(0);
           let destination = project.progression.steps[0];
           for (const step of project.progression.steps) {
@@ -1647,14 +1698,23 @@ export function PianoRollMeasure({
       }
     }
     setPianoRollGesture(null);
+    if (committedSuccessfully) activateMeasureAtBeat(committedNote.startBeats);
   };
   return (
     <section
-      className="piano-roll-measure"
       data-measure-index={measure.measureIndex}
       data-system-index={systemIndex}
       data-testid="piano-roll-measure"
-      aria-label={`Measure ${measure.number}`}
+      aria-label={`Measure ${measure.number}${isCurrentContext ? ", current context" : ""}`}
+      aria-current={isCurrentContext ? "location" : undefined}
+      data-current-context={isCurrentContext ? "true" : undefined}
+      data-measure-drop-before={measureDropBefore ? "true" : undefined}
+      data-measure-drop-after={measureDropAfter ? "true" : undefined}
+      className={`piano-roll-measure${isCurrentContext ? " is-current-context" : ""}${
+        draggingMeasureIndex === measure.measureIndex ? " is-measure-dragging" : ""
+      }${measureDropBefore ? " is-measure-drop-before" : ""}${
+        measureDropAfter ? " is-measure-drop-after" : ""
+      }`}
       style={{
         flex: `${rationalToNumber(measure.capacityBeats)} 1 0%`,
         minWidth: `${Math.max(150, (250 * zoom) / 100)}px`,
@@ -1663,8 +1723,17 @@ export function PianoRollMeasure({
       <header
         className="piano-roll-measure-header"
         tabIndex={0}
+        data-measure-dragging={draggingMeasureIndex === measure.measureIndex ? "true" : undefined}
         aria-label={`Measure ${measure.number}. Set Ctrl+A selection scope to this Measure.`}
         aria-haspopup="menu"
+        onPointerDown={(event) => {
+          // Buttons inside the header keep their own behaviour: the audition button, the Select
+          // control, the "..." menu and the delete button must not start a drag.
+          if (event.button !== 0) return;
+          const target = event.target;
+          if (target instanceof Element && target.closest("button, [data-no-drag]")) return;
+          onMeasureDragStart?.(measure.measureIndex, event);
+        }}
         onFocus={(event) => {
           if (event.target === event.currentTarget)
             onActiveMeasureChange?.(measure.measureIndex, systemIndex);
@@ -1819,16 +1888,19 @@ export function PianoRollMeasure({
             measure.startBeats,
             rational(Math.round(x * rationalToNumber(layout.barLengthBeats) * 96), 96),
           );
-          const startBeats = snapMidiCursor(rawStartBeats, pianoRollSnapBeats(snap));
-          const y = Math.max(0, Math.min(0.999999, (event.clientY - rect.top) / rect.height));
+          const startBeats = snapMidiCursor(rawStartBeats, pianoRollSnapBeats(snap, layout.meter));
           onEmptyCellCursor?.({
             startBeats,
-            pitch: pitchSpelling(pitchGeometry.pitchAtYFraction(y)),
+            pitch: pitchSpelling(pitchAtGridPointer(event)),
           });
         }}
         onFocusCapture={(event) => {
+          if (pointerInteraction.current) return;
+          if (event.target !== event.currentTarget) {
+            onActiveMeasureChange?.(measure.measureIndex, systemIndex);
+            return;
+          }
           onActiveMeasureChange?.(measure.measureIndex, systemIndex);
-          if (event.target !== event.currentTarget) return;
           setKeyboardGridFocused(true);
           setKeyboardStartBeats(activeStepStart);
           setFocusPitch((current) => Math.max(minPitch, Math.min(maxPitch, current)));
@@ -1839,10 +1911,14 @@ export function PianoRollMeasure({
             event.currentTarget.contains(event.relatedTarget)
           )
             return;
+          pointerInteraction.current = false;
           setKeyboardGridFocused(false);
         }}
         onDoubleClick={(event) => {
           if (!(event.target as HTMLElement).closest("button.piano-roll-note")) createAt(event);
+        }}
+        onPointerDownCapture={() => {
+          pointerInteraction.current = true;
         }}
         onPointerDown={beginMarquee}
         onPointerMove={(event) => {
@@ -1957,6 +2033,7 @@ export function PianoRollMeasure({
             pendingNoteGesture.current = null;
           finishNoteGesture(event, false);
           finishMarquee(event, true);
+          pointerInteraction.current = false;
         }}
         onPointerCancel={(event) => {
           setHoveredNoteEdge(null);
@@ -1964,6 +2041,7 @@ export function PianoRollMeasure({
             pendingNoteGesture.current = null;
           finishNoteGesture(event, true);
           finishMarquee(event, false);
+          pointerInteraction.current = false;
         }}
         onLostPointerCapture={(event) => {
           setHoveredNoteEdge(null);
@@ -1972,6 +2050,7 @@ export function PianoRollMeasure({
           if (pendingNoteGesture.current?.pointerId === event.pointerId)
             pendingNoteGesture.current = null;
           if (marqueeStart.current?.pointerId === event.pointerId) finishMarquee(event, false);
+          pointerInteraction.current = false;
         }}
         onPointerLeave={() => {
           if (!getPianoRollGesture()) setHoveredNoteEdge(null);
@@ -2124,7 +2203,7 @@ export function PianoRollMeasure({
             const x = (rationalToNumber(offset) / rationalToNumber(layout.barLengthBeats)) * 100;
             return (
               <line
-                className={`piano-roll-snap-line ${compareRational(offset, rational(0)) === 0 ? "is-bar-line" : offset.denominator === 1 ? "is-beat-line" : "is-subdivision-line"}`}
+                className={`piano-roll-snap-line ${compareRational(offset, rational(0)) === 0 ? "is-bar-line" : isMeterPulse(offset, layout.meter) ? "is-beat-line" : "is-subdivision-line"}`}
                 data-grid-offset={`${offset.numerator}/${offset.denominator}`}
                 key={`snap-${i}`}
                 x1={x}
@@ -2526,7 +2605,7 @@ export function PianoRollMeasure({
             const kind =
               compareRational(offset, rational(0)) === 0
                 ? "bar"
-                : offset.denominator === 1
+                : isMeterPulse(offset, layout.meter)
                   ? "beat"
                   : "subdivision";
             return (
@@ -2547,7 +2626,7 @@ export function PianoRollMeasure({
             const kind =
               compareRational(offset, rational(0)) === 0
                 ? "bar"
-                : offset.denominator === 1
+                : isMeterPulse(offset, layout.meter)
                   ? "beat"
                   : "subdivision";
             return (
@@ -2588,11 +2667,14 @@ export function PianoRollMeasure({
               ? formatChordSymbol(
                   withEffectiveBass(
                     realizeProgressionStepChord(step, project.tonic),
-                    realizeProgressionStepRealization(step, project.tonic).bassPitch,
+                    project.independentBassEnabled
+                      ? realizeProgressionStepRealization(step, project.tonic).bassPitch
+                      : realizeProgressionStepRealization(step, project.tonic).pitches[0],
                   ),
                 )
               : "Rest";
-          const functionName = step.kind === "chord" ? step.harmonicFunction.functionId : "";
+          const functionName =
+            step.kind === "chord" ? harmonicFunctionLabel(step.harmonicFunction) : "";
           const isSelectedChord = !selectedNoteKey && selectedStepId === step.id;
           const hasLeftBoundary = isSelectedChord && step.kind === "chord" && item.startsHere;
           const hasRightBoundary =

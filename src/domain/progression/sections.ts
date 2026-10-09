@@ -13,12 +13,30 @@ export function orderSongSections(progression: Progression): readonly SongSectio
   );
 }
 
+/**
+ * Returns the Progression with Song Sections ordered canonically and any section whose
+ * `startStepId` no longer exists removed.
+ *
+ * Returns the **same object** when there is nothing to change. That identity matters: commands use
+ * this to build their forward and inverse states, and an undo whose inverse re-allocates an
+ * equal-but-distinct Progression breaks referential equality (`restored.progression ===
+ * originalProgression`) and defeats memoisation in the UI even though the value is unchanged.
+ */
 export function normalizeSongSections(progression: Progression): Progression {
   const stepIds = new Set(progression.steps.map((step) => step.id));
-  const sections = orderSongSections(progression).filter((section) =>
-    stepIds.has(section.startStepId),
+  const existing = progression.sections ?? [];
+  const sections = Object.freeze(
+    orderSongSections(progression).filter((section) => stepIds.has(section.startStepId)),
   );
-  return Object.freeze({ ...progression, sections: Object.freeze(sections) });
+  // Already in canonical order, with nothing filtered out and nothing added: nothing to do.
+  if (
+    progression.sections !== undefined &&
+    sections.length === existing.length &&
+    sections.every((section, index) => section === existing[index])
+  ) {
+    return progression;
+  }
+  return Object.freeze({ ...progression, sections });
 }
 
 export function validateSongSections(progression: Progression): void {

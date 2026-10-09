@@ -32,7 +32,7 @@
   --text: #f0f2f5;
   --text-muted: #9ba3b0;
   --text-disabled: #6d7582;
-  --border: rgba(255, 255, 255, 0.10);
+  --border: rgba(255, 255, 255, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.05);
   --border-strong: rgba(255, 255, 255, 0.22);
   --border-disabled: rgba(255, 255, 255, 0.04);

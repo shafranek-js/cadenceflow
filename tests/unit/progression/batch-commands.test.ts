@@ -17,7 +17,7 @@ const T0 = "2026-09-11T12:00:00.000Z";
 const T1 = "2026-09-11T12:00:01.000Z";
 
 function withSteps(project: Project, steps: readonly ChordStep[]): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze([...steps]) }),
   });

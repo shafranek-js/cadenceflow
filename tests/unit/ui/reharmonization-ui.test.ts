@@ -87,12 +87,16 @@ describe("Reharmonization UI — Inspector and Context Menu", () => {
     expect(viCard?.textContent).toContain("Swap to Relative Minor (vi)");
     expect(viCard?.textContent).toContain("Why it works");
 
-    const v7InsertCard = container.querySelector('[data-testid="reharmonization-card-I-insert-V7"]');
+    const v7InsertCard = container.querySelector(
+      '[data-testid="reharmonization-card-I-insert-V7"]',
+    );
     expect(v7InsertCard).not.toBeNull();
     expect(v7InsertCard?.textContent).toContain("G7");
     expect(v7InsertCard?.textContent).toContain("Insert Before");
 
-    const subV7Card = container.querySelector('[data-testid="reharmonization-card-I-insert-subV7"]');
+    const subV7Card = container.querySelector(
+      '[data-testid="reharmonization-card-I-insert-subV7"]',
+    );
     expect(subV7Card).not.toBeNull();
     expect(subV7Card?.textContent).toContain("Db7");
     expect(subV7Card?.textContent).toContain("Tritone Sub");
@@ -202,5 +206,53 @@ describe("Reharmonization UI — Inspector and Context Menu", () => {
 
     unmount();
     invoker.remove();
+  });
+
+  it("folds the step performance sections through the shared disclosure toggle", () => {
+    window.localStorage.clear();
+    const step = makeChordStep("I");
+
+    const { container, unmount } = mountToDom(
+      el(PianoPerformanceInspector, {
+        step,
+        tonic: 0,
+        context: {
+          tonic: 0,
+          mode: "major",
+          moduleId: "progressions",
+          spellingContext: { tonic: 0, mode: "major" },
+        },
+        onPerformanceChange: vi.fn(),
+        onOpenVoicingEditor: vi.fn(),
+      }),
+    );
+
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[data-testid="step-performance-disclosure-btn"]',
+    );
+    expect(toggle?.tagName).toBe("BUTTON");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".reharmonization-disclosure")).not.toBeNull();
+
+    act(() => {
+      toggle?.click();
+    });
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.querySelector(".reharmonization-disclosure")).toBeNull();
+    expect(
+      window.localStorage.getItem("cadenceflow.ui.step-performance-inspector-disclosure-open"),
+    ).toBe("false");
+    expect(container.querySelector("h3")?.textContent).toContain("Step Performance");
+
+    act(() => {
+      toggle?.click();
+    });
+
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".reharmonization-disclosure")).not.toBeNull();
+
+    unmount();
+    window.localStorage.clear();
   });
 });

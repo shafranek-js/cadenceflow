@@ -25,17 +25,17 @@ function duplicateFixture(options: {
   readonly view?: Project["presentation"]["progressionView"];
 }): Project {
   const template = createRichProjectFixture();
-  const before: ChordStep = Object.freeze({
+  const before: ChordStep = Object.freeze<ChordStep>({
     ...createMatrixChordStep(template, "I", "duplicate-before"),
     duration: musicalDuration(rational(4)),
   });
-  const copiedChord: ChordStep = Object.freeze({
+  const copiedChord: ChordStep = Object.freeze<ChordStep>({
     ...createMatrixChordStep(template, "V", "duplicate-source-chord"),
     duration: musicalDuration(rational(2)),
     transpositionSemitones: 2,
     melodyInstrumentOverride: "flute",
     melody: {
-      mode: "authored",
+      mode: "authored" as const,
       phrase: {
         notes: [
           {
@@ -49,7 +49,7 @@ function duplicateFixture(options: {
       },
     },
   });
-  const copiedRest: RestStep = Object.freeze({
+  const copiedRest: RestStep = Object.freeze<RestStep>({
     id: "duplicate-source-rest",
     kind: "rest",
     duration: musicalDuration(rational(2)),
@@ -64,13 +64,13 @@ function duplicateFixture(options: {
       ],
     },
   });
-  const last: ChordStep = Object.freeze({
+  const last: ChordStep = Object.freeze<ChordStep>({
     ...createMatrixChordStep(template, "IV", "duplicate-last"),
     duration: musicalDuration(rational(4)),
   });
 
   const { temporaryBranch: _temporaryBranch, ...project } = template;
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     id: options.id,
     name: `Measure duplication ${options.id}`,
@@ -78,7 +78,7 @@ function duplicateFixture(options: {
     presentation: Object.freeze({
       ...project.presentation,
       theme: options.theme ?? "light",
-      progressionView: options.view ?? "tablature",
+      progressionView: options.view ?? "staff",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({

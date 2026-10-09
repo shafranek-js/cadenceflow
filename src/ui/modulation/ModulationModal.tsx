@@ -10,7 +10,6 @@ import {
 } from "../../domain/harmony/modulation";
 import type { PitchClassIdentity } from "../../domain/harmony/pitch";
 import type { Project } from "../../domain/project/project";
-import { defaultTonicSpelling, formatPitchSpelling } from "../../domain/harmony/spelling";
 import { useModalFocus } from "../common/useModalFocus";
 import { Icon } from "../common/Icon";
 
@@ -113,7 +112,9 @@ export function ModulationModal({
         <div className="modal-header modulation-header">
           <div className="modulation-title-group">
             <h2 id="modulation-modal-title" className="modulation-title">
-              <span className="modulation-title-icon" aria-hidden="true">🧭</span>
+              <span className="modulation-title-icon" aria-hidden="true">
+                🧭
+              </span>
               Modulation Master & Key Transitions
             </h2>
             <div className="modulation-current-key-badge">
@@ -271,18 +272,27 @@ export function ModulationModal({
             )}
           </div>
 
-          <label className="switch-key-checkbox-label" title="Sets project active key and mode to target upon inserting the bridge">
+          <label
+            className="switch-key-checkbox-label"
+            title="Sets project active key and mode to target upon inserting the bridge"
+          >
             <input
               type="checkbox"
               checked={switchKey}
               onChange={(e) => setSwitchKey(e.target.checked)}
             />
-            <span>Update project key to <strong>{targetKeyName}</strong></span>
+            <span>
+              Update project key to <strong>{targetKeyName}</strong>
+            </span>
           </label>
         </div>
 
         {/* Pathways List */}
-        <div className="modulation-paths-container" tabIndex={0} aria-label="Available Modulation Pathways">
+        <div
+          className="modulation-paths-container"
+          tabIndex={0}
+          aria-label="Available Modulation Pathways"
+        >
           {filteredPaths.length === 0 ? (
             <div className="modulation-empty-state">
               <p>
@@ -341,7 +351,9 @@ export function ModulationModal({
 
                   {/* Why it works rationale */}
                   <div className="mod-rationale-box">
-                    <span className="rationale-icon" aria-hidden="true">💡</span>
+                    <span className="rationale-icon" aria-hidden="true">
+                      💡
+                    </span>
                     <p className="rationale-text">{path.description}</p>
                   </div>
 
@@ -350,7 +362,9 @@ export function ModulationModal({
                     <button
                       type="button"
                       className={`mod-audition-btn ${isAuditioning ? "is-playing" : ""}`}
-                      aria-label={isAuditioning ? `Stop auditioning ${path.name}` : `Audition ${path.name}`}
+                      aria-label={
+                        isAuditioning ? `Stop auditioning ${path.name}` : `Audition ${path.name}`
+                      }
                       onClick={() => {
                         if (isAuditioning) {
                           onStopAudition();
@@ -374,7 +388,9 @@ export function ModulationModal({
                       }}
                     >
                       <span>Insert Bridge</span>
-                      <span className="btn-arrow" aria-hidden="true">→</span>
+                      <span className="btn-arrow" aria-hidden="true">
+                        →
+                      </span>
                     </button>
                   </div>
                 </article>

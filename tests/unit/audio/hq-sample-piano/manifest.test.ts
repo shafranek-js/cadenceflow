@@ -152,8 +152,8 @@ describe("T091 — HQ Piano Manifest & Pitch/Velocity Resolution", () => {
 
     // Verify each of the 30 key regions has exact key bounds
     expect(SALAMANDER_KEY_REGIONS).toHaveLength(30);
-    expect(SALAMANDER_KEY_REGIONS[0].keyMin).toBe(21);
-    expect(SALAMANDER_KEY_REGIONS[29].keyMax).toBe(108);
+    expect(SALAMANDER_KEY_REGIONS[0]!.keyMin).toBe(21);
+    expect(SALAMANDER_KEY_REGIONS[29]!.keyMax).toBe(108);
 
     // Total keys covered = 88
     let totalKeys = 0;

@@ -1,3 +1,4 @@
+import { omitFields } from "../fixtures/assertions";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import type { Project } from "../../src/domain/project/project";
@@ -25,7 +26,7 @@ function createMeasureFixture(options: {
     ...step,
     duration: musicalDuration(rational(options.crossingFirstStep && index === 0 ? 8 : 4)),
   }));
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     id: options.id,
     name: `T215 ${options.id}`,
@@ -33,22 +34,21 @@ function createMeasureFixture(options: {
     presentation: Object.freeze({
       ...source.presentation,
       theme: options.theme ?? "dark",
-      progressionView: options.view ?? "tablature",
+      progressionView: options.view ?? "staff",
       measuresPerSystem: 2,
     }),
     progression: Object.freeze({
-      ...progression,
+      ...omitFields(progression, "loopRegion"),
       steps: Object.freeze(steps),
       selectedStepId: "step-1",
       sections: Object.freeze([]),
-      loopRegion: undefined,
     }),
   });
 }
 
 function createActiveBranchFixture(theme: "dark" | "light" = "dark"): Project {
   const source = createRichProjectFixture();
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...source,
     id: `t215-active-branch-${theme}`,
     name: `T215 active branch ${theme}`,
@@ -74,9 +74,11 @@ function createActiveBranchFixture(theme: "dark" | "light" = "dark"): Project {
 function createPortableNoteFixture(): Project {
   const source = createMeasureFixture({ id: "t215-portable-note" });
   const generatedRecipe = snapshotChordMelodyRecipe({
-    pattern: "outside-in",
+    pitchMotion: "outside-in",
     grid: "quarter",
     octaveOffset: 0,
+    rhythm: "even",
+    connection: "retrigger",
   });
   const steps = source.progression.steps.map((step, index) => {
     if (index === 0 && step.kind === "chord") {
@@ -105,7 +107,7 @@ function createPortableNoteFixture(): Project {
     }
     return step;
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...source,
     progression: Object.freeze({
       ...source.progression,
@@ -125,7 +127,7 @@ function createInstrumentConflictFixture(): Project {
     if (index === 0 && step.kind === "chord") {
       return {
         ...step,
-        melodyInstrumentOverride: "violin",
+        melodyInstrumentOverride: "violin" as const,
         melody: {
           mode: "authored" as const,
           phrase: {
@@ -146,7 +148,7 @@ function createInstrumentConflictFixture(): Project {
         id: step.id,
         kind: "rest" as const,
         duration: musicalDuration(rational(4)),
-        melodyInstrumentOverride: "flute",
+        melodyInstrumentOverride: "flute" as const,
         authoredMelody: {
           notes: [
             {
@@ -161,7 +163,7 @@ function createInstrumentConflictFixture(): Project {
     }
     return step;
   });
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...source,
     progression: Object.freeze({ ...source.progression, steps: Object.freeze(steps) }),
   });
@@ -279,9 +281,7 @@ test("measure header actions target the displayed Measure and preserve one-step 
   await expect(page.getByLabel("Loop start step").first()).toHaveValue("step-3");
 });
 
-test("measure menu is available from Harmonic, Piano, Guitar, Piano Roll, Staff, and Tablature views", async ({
-  page,
-}) => {
+test("measure menu is available from Piano Roll, Staff, and Tablature views", async ({ page }) => {
   await openStudio(page, createMeasureFixture({ id: "t215-views" }));
 
   for (const view of ["piano-roll", "staff", "tablature"] as const) {
@@ -290,13 +290,8 @@ test("measure menu is available from Harmonic, Piano, Guitar, Piano Roll, Staff,
     await expect(trigger).toBeVisible();
     if (view === "piano-roll") {
       await page.locator(".piano-roll-measure-header").nth(1).click({ button: "right" });
-    } else if (view === "staff" || view === "tablature") {
-      await trigger.click({ button: "right" });
     } else {
-      await page
-        .locator("[data-measure-context-trigger][data-measure-index]")
-        .nth(1)
-        .click({ button: "right" });
+      await trigger.click({ button: "right" });
     }
     const menu = page.getByRole("menu", { name: "Measure 2 commands" });
     await expect(menu).toBeVisible();

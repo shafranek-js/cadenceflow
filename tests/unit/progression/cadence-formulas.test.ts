@@ -1,15 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
   CADENCE_FORMULAS,
-  getCadenceFormulas,
   getCadenceFormulaById,
   getFormulasForModule,
   getFormulasForGenre,
   getQuickStartersForModule,
 } from "../../../src/domain/progression/cadenceFormulas";
-import { realizePresetSteps, applyPresetToProgression } from "../../../src/domain/progression/presets";
+import {
+  realizePresetSteps,
+  applyPresetToProgression,
+} from "../../../src/domain/progression/presets";
 import type { HarmonicContext } from "../../../src/domain/harmony/modules/types";
 import type { Progression } from "../../../src/domain/progression/progression";
+import type { ProgressionStep } from "../../../src/domain/progression/step";
+
+/**
+ * Functional id of a realized step.
+ *
+ * `ProgressionStep` is `ChordStep | RestStep`, and `harmonicFunction` exists only on the chord arm,
+ * so the property is not reachable without narrowing — `steps[0]?.harmonicFunction` still fails
+ * because the property must exist on some union member.
+ */
+function appliedFunctionId(step: ProgressionStep | undefined): string | undefined {
+  return step?.kind === "chord" ? step.harmonicFunction.functionId : undefined;
+}
 
 // Forbidden keys for performance and harmonic-variant leakage assertions
 const FORBIDDEN_PRESET_KEYS = [
@@ -142,15 +156,20 @@ describe("Cadence Formulas & Quick Starters Domain Contract", () => {
 
     for (const tonicPc of testTonics) {
       const context: HarmonicContext = {
-        tonic: { semitone: tonicPc },
+        tonic: tonicPc,
         moduleId: "progressions",
         mode: "major",
-        spellingContext: { preferFlats: tonicPc === 5 || tonicPc === 8 },
+        spellingContext: {
+          tonic: tonicPc,
+          mode: "major",
+        },
       };
 
       for (const formula of majorFormulas) {
         const result = realizePresetSteps(formula, context);
-        expect(result.kind, `Formula ${formula.name} failed realization in tonic ${tonicPc}`).toBe("success");
+        expect(result.kind, `Formula ${formula.name} failed realization in tonic ${tonicPc}`).toBe(
+          "success",
+        );
         if (result.kind === "success") {
           expect(result.steps).toHaveLength(formula.steps.length);
           for (const step of result.steps) {
@@ -168,15 +187,21 @@ describe("Cadence Formulas & Quick Starters Domain Contract", () => {
 
     for (const tonicPc of testTonics) {
       const context: HarmonicContext = {
-        tonic: { semitone: tonicPc },
+        tonic: tonicPc,
         moduleId: "dark-harmony",
         mode: "tonal-minor",
-        spellingContext: { preferFlats: tonicPc === 0 || tonicPc === 2 },
+        spellingContext: {
+          tonic: tonicPc,
+          mode: "tonal-minor",
+        },
       };
 
       for (const formula of darkFormulas) {
         const result = realizePresetSteps(formula, context);
-        expect(result.kind, `Formula ${formula.name} failed realization in dark tonic ${tonicPc}`).toBe("success");
+        expect(
+          result.kind,
+          `Formula ${formula.name} failed realization in dark tonic ${tonicPc}`,
+        ).toBe("success");
         if (result.kind === "success") {
           expect(result.steps).toHaveLength(formula.steps.length);
           for (const step of result.steps) {
@@ -191,20 +216,20 @@ describe("Cadence Formulas & Quick Starters Domain Contract", () => {
   it("applies a formula cleanly to an empty progression", () => {
     const gospel = getCadenceFormulaById("formula-gospel-lift")!;
     const context: HarmonicContext = {
-      tonic: { semitone: 0 },
+      tonic: 0,
       moduleId: "progressions",
       mode: "major",
-      spellingContext: { preferFlats: false },
+      spellingContext: { tonic: 0, mode: "major" },
     };
 
     const emptyProgression: Progression = { steps: [] };
     const applied = applyPresetToProgression(emptyProgression, gospel, "replace", context);
 
     expect(applied.steps).toHaveLength(5);
-    expect(applied.steps[0]?.harmonicFunction.functionId).toBe("I");
-    expect(applied.steps[1]?.harmonicFunction.functionId).toBe("V7/IV");
-    expect(applied.steps[2]?.harmonicFunction.functionId).toBe("IV");
-    expect(applied.steps[3]?.harmonicFunction.functionId).toBe("iv");
-    expect(applied.steps[4]?.harmonicFunction.functionId).toBe("I");
+    expect(appliedFunctionId(applied.steps[0])).toBe("I");
+    expect(appliedFunctionId(applied.steps[1])).toBe("V7/IV");
+    expect(appliedFunctionId(applied.steps[2])).toBe("IV");
+    expect(appliedFunctionId(applied.steps[3])).toBe("iv");
+    expect(appliedFunctionId(applied.steps[4])).toBe("I");
   });
 });

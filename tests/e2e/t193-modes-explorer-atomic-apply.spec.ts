@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setProgressionView } from "./test-helpers/progression-settings";
 
 const acceptanceModes = [
   { width: 1280, height: 720, theme: "light" },
@@ -17,6 +18,7 @@ for (const acceptance of acceptanceModes) {
       sessionStorage.clear();
     });
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await setProgressionView(page, "staff");
 
     const openExplorer = page.getByTestId("matrix-modes-trigger");
     await expect(openExplorer).toBeVisible({ timeout: 30_000 });
@@ -43,7 +45,7 @@ for (const acceptance of acceptanceModes) {
     await expect(dialog.getByRole("alert")).toContainText("Switch the project key");
     await expect(dialog.getByRole("alert")).toContainText("B♭ major");
     await expect(applyButton).toBeFocused();
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
 
     const overflowBeforeApply = await page.evaluate(() => {
       const modal = document.querySelector<HTMLElement>(".modes-explorer-modal");
@@ -63,7 +65,7 @@ for (const acceptance of acceptanceModes) {
     await expect(dialog).toBeHidden();
     await expect(openExplorer).toBeFocused();
 
-    const stepButtons = page.locator(".progression-step-select-button[data-step-id]");
+    const stepButtons = page.locator(".measure-staff-event-select[data-step-id]");
     await expect(stepButtons).toHaveCount(3);
     const appliedStepIds = await stepButtons.evaluateAll((buttons) =>
       buttons.map((button) => button.getAttribute("data-step-id")),
@@ -78,7 +80,7 @@ for (const acceptance of acceptanceModes) {
     await expect(openExplorer).toBeFocused();
 
     await page.keyboard.press("Control+Z");
-    await expect(page.getByTestId("progression-step")).toHaveCount(0);
+    await expect(page.locator(".measure-staff-event-select")).toHaveCount(0);
     await expect(page.locator(".tonic-selector button[aria-pressed='true']")).toHaveAccessibleName(
       "Set key C",
     );

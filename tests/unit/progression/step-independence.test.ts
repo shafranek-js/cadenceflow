@@ -22,7 +22,7 @@ const T0 = "2026-09-04T12:00:00.000Z";
 const T1 = "2026-09-04T12:00:01.000Z";
 
 function withSteps(project: Project, steps: readonly ChordStep[]): Project {
-  return Object.freeze({
+  return Object.freeze<Project>({
     ...project,
     progression: Object.freeze({ ...project.progression, steps: Object.freeze([...steps]) }),
   });
@@ -79,7 +79,7 @@ describe("US3 progression-step independence", () => {
     expect(beforeDefaultsChange.performance.masterVelocity).toBe(80);
     expect(beforeDefaultsChange.performance.articulation).toBe("arp-down");
 
-    const changedDefaults: Project = Object.freeze({
+    const changedDefaults: Project = Object.freeze<Project>({
       ...project,
       defaults: Object.freeze({
         piano: Object.freeze({
@@ -131,7 +131,7 @@ describe("US3 progression-step independence", () => {
     let project = createDefaultProject("p", "US3", T0);
     const first = createMatrixChordStep(project, "I", "first");
     const secondBase = createMatrixChordStep(project, "V", "second");
-    const second: ChordStep = Object.freeze({
+    const second: ChordStep = Object.freeze<ChordStep>({
       ...secondBase,
       performance: Object.freeze({
         ...secondBase.performance,

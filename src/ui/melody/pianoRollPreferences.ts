@@ -1,3 +1,4 @@
+import { PIANO_ROLL_SNAPS } from "./pianoRollProjection";
 import type { PianoRollColorMode } from "./PianoRollView";
 
 export interface PianoRollPreferences {
@@ -25,6 +26,21 @@ export const DEFAULT_PIANO_ROLL_PREFERENCES: PianoRollPreferences = {
 };
 
 const STORAGE_KEY = "cadenceflow.pianoRollPreferences";
+
+/**
+ * Horizontal zoom bounds, shared by the control and preference validation.
+ *
+ * They used to be written out in both places, so widening the slider alone would have made every zoom
+ * above the old ceiling silently revert to the default on reload.
+ *
+ * The value is a percentage of the base Measure width: at 100 % a Measure is at least 250 px, at 400 %
+ * at least 1000 px (and the row scrolls). Below the point where that minimum exceeds the row's natural
+ * share, Measures simply stretch to fill, so a low value stays visually neutral.
+ */
+export const PIANO_ROLL_ZOOM_MIN = 70;
+export const PIANO_ROLL_ZOOM_MAX = 400;
+export const PIANO_ROLL_ZOOM_STEP = 10;
+
 const COLOR_MODES: readonly PianoRollColorMode[] = [
   "hookpad",
   "project",
@@ -32,18 +48,6 @@ const COLOR_MODES: readonly PianoRollColorMode[] = [
   "suzuki",
   "harmonic-role",
 ];
-const SNAPS = [
-  "1/1",
-  "1/2",
-  "1/4",
-  "1/8",
-  "1/16",
-  "1/1 triplet",
-  "1/2 triplet",
-  "1/4 triplet",
-  "1/8 triplet",
-  "1/16 triplet",
-] as const;
 
 export function validatePianoRollPreferences(value: unknown): PianoRollPreferences {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -73,12 +77,12 @@ export function validatePianoRollPreferences(value: unknown): PianoRollPreferenc
     zoom:
       typeof zoom === "number" &&
       Number.isFinite(zoom) &&
-      zoom >= 70 &&
-      zoom <= 180 &&
-      zoom % 10 === 0
+      zoom >= PIANO_ROLL_ZOOM_MIN &&
+      zoom <= PIANO_ROLL_ZOOM_MAX &&
+      zoom % PIANO_ROLL_ZOOM_STEP === 0
         ? zoom
         : DEFAULT_PIANO_ROLL_PREFERENCES.zoom,
-    snap: SNAPS.includes(candidate.snap as (typeof SNAPS)[number])
+    snap: PIANO_ROLL_SNAPS.includes(candidate.snap as string)
       ? (candidate.snap as string)
       : DEFAULT_PIANO_ROLL_PREFERENCES.snap,
     pitchRange:
