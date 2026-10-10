@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { matrixCardOverrideCount, type Project } from "../../domain/project/project";
 import type { TransportStore } from "../transport/transportStore";
 import type { CardViewId } from "../../domain/progression/step";
@@ -26,6 +26,10 @@ import {
 import { canShiftPerformanceOctave, type StaffOctaveDirection } from "../staff/staffOctave";
 import { isAppShortcutProtectedTarget } from "../studio/focusManagement";
 import { createHarmonicNoteRoleContext } from "../../domain/harmony/noteRoles";
+import { useInspectorDisclosure } from "../inspector/useInspectorDisclosure";
+import { Icon } from "../common/Icon";
+
+const MATRIX_DISCLOSURE_STORAGE_KEY = "cadenceflow.harmonicMatrix.open";
 
 function cardKey(identity: HarmonicFunctionIdentity): string {
   return identity.functionId;
@@ -88,10 +92,44 @@ export function HarmonicMatrix({
   );
   const workbenchRef = useRef<HTMLDivElement>(null);
   const focusModeToggleRef = useRef<HTMLButtonElement>(null);
+  const collapseToggleRef = useRef<HTMLButtonElement>(null);
+  const expandToggleRef = useRef<HTMLButtonElement>(null);
+  const focusDisclosureButtonAfterToggleRef = useRef(false);
+  const matrixContentId = `harmonic-matrix-content-${useId()}`;
+  const matrixDisclosure = useInspectorDisclosure(MATRIX_DISCLOSURE_STORAGE_KEY);
   const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [transportStepIndex, setTransportStepIndex] = useState(
     () => transportStore?.getState().currentStepIndex ?? null,
+  );
+
+  useEffect(() => {
+    if (!focusDisclosureButtonAfterToggleRef.current) return;
+    focusDisclosureButtonAfterToggleRef.current = false;
+    (matrixDisclosure.isOpen ? collapseToggleRef : expandToggleRef).current?.focus();
+  }, [matrixDisclosure.isOpen]);
+
+  const toggleMatrixDisclosure = () => {
+    focusDisclosureButtonAfterToggleRef.current = true;
+    if (matrixDisclosure.isOpen && isFocusMode) setIsFocusMode(false);
+    matrixDisclosure.toggle();
+  };
+
+  const disclosureButton = (expanded: boolean, ref: React.RefObject<HTMLButtonElement | null>) => (
+    <button
+      ref={ref}
+      type="button"
+      className="matrix-disclosure-toggle"
+      data-testid={expanded ? "matrix-collapse-toggle" : "matrix-expand-toggle"}
+      aria-label={`${expanded ? "Collapse" : "Expand"} Harmonic Matrix`}
+      aria-expanded={expanded}
+      aria-controls={matrixContentId}
+      title={`${expanded ? "Collapse" : "Expand"} Harmonic Matrix`}
+      onClick={toggleMatrixDisclosure}
+    >
+      <Icon name="disclosure" className={expanded ? "is-expanded" : ""} />
+      <span>{expanded ? "Collapse" : "Expand"}</span>
+    </button>
   );
 
   useEffect(() => {
@@ -323,7 +361,7 @@ export function HarmonicMatrix({
 
   return (
     <section
-      className="matrix-panel"
+      className={`matrix-panel${matrixDisclosure.isOpen ? "" : " is-collapsed"}`}
       aria-label="Harmonic Matrix"
       data-module={project.activeModule}
       data-topology-columns={String(module.topology.columnCount)}
@@ -331,179 +369,192 @@ export function HarmonicMatrix({
       onClick={handleBackgroundClick}
       onKeyDown={handleKeyDown}
     >
-      <header className="matrix-toolbar" onContextMenu={handleToolbarContextMenu}>
-        <ModuleSelector value={project.activeModule} onChange={onModuleChange} />
-        <TonicSelector
-          tonic={project.tonic}
-          mode={modeForModule(project.activeModule)}
-          onChange={onTonicChange}
-        />
-        <div className="matrix-toolbar-actions">
-          {onOpenPresets && (
-            <button
-              type="button"
-              className="matrix-formulas-btn"
-              onClick={onOpenPresets}
-              data-testid="matrix-formulas-trigger"
-              title="Open Presets & Cadence Formulas"
-              aria-label="Open Presets and Cadence Formulas"
-            >
-              <span className="btn-bolt" aria-hidden="true">
-                ⚡
-              </span>
-              <span className="btn-label">Formulas</span>
-            </button>
-          )}
-          {onOpenModesExplorer && (
-            <button
-              type="button"
-              className="matrix-formulas-btn matrix-modes-btn"
-              onClick={onOpenModesExplorer}
-              data-testid="matrix-modes-trigger"
-              title="Open Scales & Modes Explorer"
-              aria-label="Open Scales and Modes Explorer"
-            >
-              <span className="btn-icon" aria-hidden="true">
-                🎼
-              </span>
-              <span className="btn-label">Modes</span>
-            </button>
-          )}
-          {onOpenQuickChord ? (
-            <button
-              type="button"
-              className="matrix-formulas-btn matrix-quick-chord-btn"
-              onClick={onOpenQuickChord}
-              data-testid="matrix-quick-chord-trigger"
-              title="Open Quick Chord / Command Palette (Ctrl/Cmd+K)"
-              aria-label="Open Quick Chord and Command Palette"
-            >
-              <span className="btn-icon" aria-hidden="true">
-                ⌘
-              </span>
-              <span className="btn-label">Quick Chord</span>
-            </button>
-          ) : null}
-          {onOpenAlternatives ? (
-            <button
-              type="button"
-              className="matrix-formulas-btn matrix-alternatives-btn"
-              onClick={onOpenAlternatives}
-              disabled={!canOpenAlternatives}
-              data-testid="matrix-explore-alternative"
-              title={
-                canOpenAlternatives
-                  ? "Explore deterministic alternatives for the selected Step"
-                  : "Select a chord Step to explore alternatives"
-              }
-              aria-label="Explore alternatives for selected Step"
-            >
-              <span className="btn-icon" aria-hidden="true">
-                ✦
-              </span>
-              <span className="btn-label">Alternatives</span>
-            </button>
-          ) : null}
-          <button
-            ref={focusModeToggleRef}
-            type="button"
-            className="matrix-focus-toggle"
-            data-testid="matrix-focus-toggle"
-            aria-label={isFocusMode ? "Exit Matrix Focus Mode" : "Enter Matrix Focus Mode"}
-            aria-pressed={isFocusMode}
-            title={isFocusMode ? "Exit Focus Mode (Escape)" : "Focus on the Harmonic Matrix"}
-            onClick={() => setIsFocusMode((current) => !current)}
-          >
-            {isFocusMode ? "Exit Focus" : "Focus"}
-          </button>
-          <ViewModeToggle
-            currentView={project.presentation.globalMatrixCardView}
-            onChangeView={(view) => {
-              if (view !== "piano-roll") onGlobalView(view);
-            }}
-            selectAriaLabel="Global Card View"
-            testIdPrefix="matrix-view"
-            availableViews={["harmonic", "piano", "staff", "guitar"]}
+      {!matrixDisclosure.isOpen ? (
+        <header className="matrix-collapsed-header">
+          <h2>Harmonic Matrix</h2>
+          {disclosureButton(false, expandToggleRef)}
+        </header>
+      ) : null}
+      <div id={matrixContentId} hidden={!matrixDisclosure.isOpen}>
+        <header className="matrix-toolbar" onContextMenu={handleToolbarContextMenu}>
+          <ModuleSelector value={project.activeModule} onChange={onModuleChange} />
+          <TonicSelector
+            tonic={project.tonic}
+            mode={modeForModule(project.activeModule)}
+            onChange={onTonicChange}
           />
-        </div>
-      </header>
-      <div className="matrix-workbench" ref={workbenchRef}>
-        <MatrixResolutionArrows
-          containerRef={workbenchRef}
-          sourceFunctionId={activeSourceFunctionId}
-          targetFunctionId={targetFunctionId}
-          targetSymbol={targetSymbol}
-          enabled={project.presentation.resolutionArrows !== false}
-        />
-        <div className="matrix-grid matrix-spatial-board">
-          {module.layers.map((layer) => {
-            const baselineEntries = module.topology.cards.filter(
-              (entry) => entry.layerId === layer.id && entry.baseline,
-            );
-            const nonBaselineEntries = module.topology.cards.filter(
-              (entry) => entry.layerId === layer.id && !entry.baseline,
-            );
-            const isProgressionsSecondaryDominants =
-              project.activeModule === "progressions" && layer.id === "secondary-dominants";
-            const isDarkSecondaryDiminished =
-              project.activeModule === "dark-harmony" && layer.id === "secondary-diminished";
-            const contextualEntries = isDarkSecondaryDiminished
-              ? contextualFunctionIds
-                  .map((identity) =>
-                    topologyEntryForFunction(project.activeModule, identity.functionId),
-                  )
-                  .filter((entry): entry is MatrixCardTopologyEntry => entry !== undefined)
-              : [];
-            const occupiedColumns = new Set(baselineEntries.map((entry) => entry.position.column));
-            const inlineContextualEntries = contextualEntries.filter(
-              (entry) => !occupiedColumns.has(entry.position.column),
-            );
-            const contextualSidecarEntries = contextualEntries.filter((entry) =>
-              occupiedColumns.has(entry.position.column),
-            );
-            const sidecarEntries = isProgressionsSecondaryDominants
-              ? nonBaselineEntries
-              : contextualSidecarEntries;
-            const sidecarLabel = isProgressionsSecondaryDominants
-              ? "Tritone substitution"
-              : "Contextual diminished";
-            return (
-              <FunctionalLayer
-                key={layer.id}
-                label={layer.label}
-                zone={getZoneForLayer(layer.id)}
-                {...(layer.zoneLabel ? { zoneLabel: layer.zoneLabel } : {})}
-                {...(sidecarEntries.length > 0
-                  ? {
-                      sidecar: {
-                        label: sidecarLabel,
-                        testId: isProgressionsSecondaryDominants
-                          ? "matrix-sidecar-subV7"
-                          : "matrix-sidecar-contextual-diminished",
-                        children: sidecarEntries.map((entry) =>
-                          renderCard(entry.identity, undefined, entry, {
-                            contextual: isDarkSecondaryDiminished,
-                            ...(isProgressionsSecondaryDominants
-                              ? { accessibleDescription: "Tritone substitute resolving to I" }
-                              : {
-                                  accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
-                                }),
-                          }),
-                        ),
-                      },
-                    }
-                  : {})}
+          <div className="matrix-toolbar-actions">
+            {onOpenPresets && (
+              <button
+                type="button"
+                className="matrix-formulas-btn"
+                onClick={onOpenPresets}
+                data-testid="matrix-formulas-trigger"
+                title="Open Presets & Cadence Formulas"
+                aria-label="Open Presets and Cadence Formulas"
               >
-                {baselineEntries.map((entry) => renderCard(entry.identity, entry.position, entry))}
-                {inlineContextualEntries.map((entry) =>
-                  renderCard(entry.identity, entry.position, entry, {
-                    contextual: true,
-                    accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
-                  }),
-                )}
-              </FunctionalLayer>
-            );
-          })}
+                <span className="btn-bolt" aria-hidden="true">
+                  ⚡
+                </span>
+                <span className="btn-label">Formulas</span>
+              </button>
+            )}
+            {onOpenModesExplorer && (
+              <button
+                type="button"
+                className="matrix-formulas-btn matrix-modes-btn"
+                onClick={onOpenModesExplorer}
+                data-testid="matrix-modes-trigger"
+                title="Open Scales & Modes Explorer"
+                aria-label="Open Scales and Modes Explorer"
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  🎼
+                </span>
+                <span className="btn-label">Modes</span>
+              </button>
+            )}
+            {onOpenQuickChord ? (
+              <button
+                type="button"
+                className="matrix-formulas-btn matrix-quick-chord-btn"
+                onClick={onOpenQuickChord}
+                data-testid="matrix-quick-chord-trigger"
+                title="Open Quick Chord / Command Palette (Ctrl/Cmd+K)"
+                aria-label="Open Quick Chord and Command Palette"
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  ⌘
+                </span>
+                <span className="btn-label">Quick Chord</span>
+              </button>
+            ) : null}
+            {onOpenAlternatives ? (
+              <button
+                type="button"
+                className="matrix-formulas-btn matrix-alternatives-btn"
+                onClick={onOpenAlternatives}
+                disabled={!canOpenAlternatives}
+                data-testid="matrix-explore-alternative"
+                title={
+                  canOpenAlternatives
+                    ? "Explore deterministic alternatives for the selected Step"
+                    : "Select a chord Step to explore alternatives"
+                }
+                aria-label="Explore alternatives for selected Step"
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="btn-label">Alternatives</span>
+              </button>
+            ) : null}
+            <button
+              ref={focusModeToggleRef}
+              type="button"
+              className="matrix-focus-toggle"
+              data-testid="matrix-focus-toggle"
+              aria-label={isFocusMode ? "Exit Matrix Focus Mode" : "Enter Matrix Focus Mode"}
+              aria-pressed={isFocusMode}
+              title={isFocusMode ? "Exit Focus Mode (Escape)" : "Focus on the Harmonic Matrix"}
+              onClick={() => setIsFocusMode((current) => !current)}
+            >
+              {isFocusMode ? "Exit Focus" : "Focus"}
+            </button>
+            <ViewModeToggle
+              currentView={project.presentation.globalMatrixCardView}
+              onChangeView={(view) => {
+                if (view !== "piano-roll") onGlobalView(view);
+              }}
+              selectAriaLabel="Global Card View"
+              testIdPrefix="matrix-view"
+              availableViews={["harmonic", "piano", "staff", "guitar"]}
+            />
+            {disclosureButton(true, collapseToggleRef)}
+          </div>
+        </header>
+        <div className="matrix-workbench" ref={workbenchRef}>
+          <MatrixResolutionArrows
+            containerRef={workbenchRef}
+            sourceFunctionId={activeSourceFunctionId}
+            targetFunctionId={targetFunctionId}
+            targetSymbol={targetSymbol}
+            enabled={project.presentation.resolutionArrows !== false}
+          />
+          <div className="matrix-grid matrix-spatial-board">
+            {module.layers.map((layer) => {
+              const baselineEntries = module.topology.cards.filter(
+                (entry) => entry.layerId === layer.id && entry.baseline,
+              );
+              const nonBaselineEntries = module.topology.cards.filter(
+                (entry) => entry.layerId === layer.id && !entry.baseline,
+              );
+              const isProgressionsSecondaryDominants =
+                project.activeModule === "progressions" && layer.id === "secondary-dominants";
+              const isDarkSecondaryDiminished =
+                project.activeModule === "dark-harmony" && layer.id === "secondary-diminished";
+              const contextualEntries = isDarkSecondaryDiminished
+                ? contextualFunctionIds
+                    .map((identity) =>
+                      topologyEntryForFunction(project.activeModule, identity.functionId),
+                    )
+                    .filter((entry): entry is MatrixCardTopologyEntry => entry !== undefined)
+                : [];
+              const occupiedColumns = new Set(
+                baselineEntries.map((entry) => entry.position.column),
+              );
+              const inlineContextualEntries = contextualEntries.filter(
+                (entry) => !occupiedColumns.has(entry.position.column),
+              );
+              const contextualSidecarEntries = contextualEntries.filter((entry) =>
+                occupiedColumns.has(entry.position.column),
+              );
+              const sidecarEntries = isProgressionsSecondaryDominants
+                ? nonBaselineEntries
+                : contextualSidecarEntries;
+              const sidecarLabel = isProgressionsSecondaryDominants
+                ? "Tritone substitution"
+                : "Contextual diminished";
+              return (
+                <FunctionalLayer
+                  key={layer.id}
+                  label={layer.label}
+                  zone={getZoneForLayer(layer.id)}
+                  {...(layer.zoneLabel ? { zoneLabel: layer.zoneLabel } : {})}
+                  {...(sidecarEntries.length > 0
+                    ? {
+                        sidecar: {
+                          label: sidecarLabel,
+                          testId: isProgressionsSecondaryDominants
+                            ? "matrix-sidecar-subV7"
+                            : "matrix-sidecar-contextual-diminished",
+                          children: sidecarEntries.map((entry) =>
+                            renderCard(entry.identity, undefined, entry, {
+                              contextual: isDarkSecondaryDiminished,
+                              ...(isProgressionsSecondaryDominants
+                                ? { accessibleDescription: "Tritone substitute resolving to I" }
+                                : {
+                                    accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
+                                  }),
+                            }),
+                          ),
+                        },
+                      }
+                    : {})}
+                >
+                  {baselineEntries.map((entry) =>
+                    renderCard(entry.identity, entry.position, entry),
+                  )}
+                  {inlineContextualEntries.map((entry) =>
+                    renderCard(entry.identity, entry.position, entry, {
+                      contextual: true,
+                      accessibleDescription: `Contextual diminished resolving to ${entry.targetId ?? entry.identity.targetId ?? entry.identity.targetFunctionId ?? "target"}`,
+                    }),
+                  )}
+                </FunctionalLayer>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

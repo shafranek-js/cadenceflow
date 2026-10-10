@@ -3657,6 +3657,11 @@ export function ProgressionTrack({
                   pitchRange={pianoRollPitchRange}
                   onPitchRangeChange={setPianoRollPitchRange}
                   colorMode={pianoRollColorMode}
+                  effectiveColorMode={
+                    pianoRollColorMode === "project"
+                      ? project.presentation.noteColorMode
+                      : pianoRollColorMode
+                  }
                   onColorModeChange={setPianoRollColorMode}
                   guidesEnabled={pianoRollGuidesEnabled}
                   onGuidesEnabledChange={setPianoRollGuidesEnabled}

@@ -9,6 +9,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -19,6 +20,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { exactPitch, type ExactPitch } from "../../domain/harmony/pitch";
 import type { AuthoredMelodyEdit } from "../../app/commands/authoredMelodyTransaction";
 import { isMeterPulse } from "../../domain/timing/meter";
@@ -396,6 +398,7 @@ export interface PianoRollToolbarProps {
   readonly pitchRange: number;
   readonly onPitchRangeChange: (range: number) => void;
   readonly colorMode: PianoRollColorMode;
+  readonly effectiveColorMode: Exclude<PianoRollColorMode, "project">;
   readonly onColorModeChange: (mode: PianoRollColorMode) => void;
   readonly guidesEnabled: boolean;
   readonly onGuidesEnabledChange: (enabled: boolean) => void;
@@ -471,6 +474,7 @@ export function PianoRollToolbar({
   pitchRange,
   onPitchRangeChange,
   colorMode,
+  effectiveColorMode,
   onColorModeChange,
   guidesEnabled,
   onGuidesEnabledChange,
@@ -479,6 +483,68 @@ export function PianoRollToolbar({
   selectionScopeLabel = "Progression",
   instrumentVisibilityControls,
 }: PianoRollToolbarProps) {
+  const [roleHelpOpen, setRoleHelpOpen] = useState(false);
+  const [roleHelpPosition, setRoleHelpPosition] = useState({ left: 12, top: 12 });
+  const roleHelpControlRef = useRef<HTMLSpanElement>(null);
+  const roleHelpButtonRef = useRef<HTMLButtonElement>(null);
+  const roleHelpPopoverRef = useRef<HTMLElement>(null);
+  const roleHelpId = `piano-roll-harmonic-role-help-${useId().replaceAll(":", "")}`;
+
+  useEffect(() => {
+    if (effectiveColorMode !== "harmonic-role") setRoleHelpOpen(false);
+  }, [effectiveColorMode]);
+
+  useEffect(() => {
+    if (!roleHelpOpen) return;
+    const closeOnOutsidePointer = (event: Event) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !roleHelpControlRef.current?.contains(target) &&
+        !roleHelpPopoverRef.current?.contains(target)
+      )
+        setRoleHelpOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setRoleHelpOpen(false);
+      window.requestAnimationFrame(() => roleHelpButtonRef.current?.focus());
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [roleHelpOpen]);
+
+  useLayoutEffect(() => {
+    if (!roleHelpOpen) return;
+    const placePopover = () => {
+      const anchor = roleHelpControlRef.current?.getBoundingClientRect();
+      const popover = roleHelpPopoverRef.current;
+      if (!anchor || !popover) return;
+      const width = Math.min(popover.getBoundingClientRect().width || 320, window.innerWidth - 24);
+      const height = Math.min(popover.getBoundingClientRect().height, window.innerHeight - 24);
+      const left = Math.max(12, Math.min(window.innerWidth - width - 12, anchor.left));
+      const below = anchor.bottom + 6;
+      const top =
+        below + height <= window.innerHeight - 12 ? below : Math.max(12, anchor.top - height - 6);
+      setRoleHelpPosition((current) =>
+        current.left === left && current.top === top ? current : { left, top },
+      );
+    };
+    placePopover();
+    window.addEventListener("resize", placePopover);
+    window.addEventListener("scroll", placePopover, true);
+    return () => {
+      window.removeEventListener("resize", placePopover);
+      window.removeEventListener("scroll", placePopover, true);
+    };
+  }, [roleHelpOpen]);
+
   return (
     <div
       className="piano-roll-toolbar"
@@ -549,20 +615,89 @@ export function PianoRollToolbar({
           <option value={2}>Extend two octaves</option>
         </select>
       </label>
-      <label>
-        Note colors{" "}
-        <select
-          aria-label="Piano Roll note colors"
-          value={colorMode}
-          onChange={(event) => onColorModeChange(event.target.value as PianoRollColorMode)}
-        >
-          <option value="hookpad">Scale degrees</option>
-          <option value="project">Project setting</option>
-          <option value="standard">Standard</option>
-          <option value="suzuki">Suzuki</option>
-          <option value="harmonic-role">Harmonic roles</option>
-        </select>
-      </label>
+      <span ref={roleHelpControlRef} className="piano-roll-note-color-control">
+        <label>
+          Note colors{" "}
+          <select
+            aria-label="Piano Roll note colors"
+            value={colorMode}
+            onChange={(event) => {
+              setRoleHelpOpen(false);
+              onColorModeChange(event.target.value as PianoRollColorMode);
+            }}
+          >
+            <option value="hookpad">Scale degrees</option>
+            <option value="project">Project setting</option>
+            <option value="standard">Standard</option>
+            <option value="suzuki">Suzuki</option>
+            <option value="harmonic-role">Harmonic roles</option>
+          </select>
+        </label>
+        {effectiveColorMode === "harmonic-role" ? (
+          <>
+            <button
+              ref={roleHelpButtonRef}
+              type="button"
+              className="piano-roll-harmonic-role-help-button"
+              aria-label="Harmonic roles color guide"
+              aria-controls={roleHelpId}
+              aria-expanded={roleHelpOpen}
+              aria-describedby={roleHelpOpen ? roleHelpId : undefined}
+              title="Explain Harmonic roles note colors"
+              onClick={() => setRoleHelpOpen((open) => !open)}
+              data-testid="piano-roll-harmonic-role-help-button"
+            >
+              i
+            </button>
+            {typeof document !== "undefined"
+              ? createPortal(
+                  <aside
+                    ref={roleHelpPopoverRef}
+                    className="piano-roll-harmonic-role-help"
+                    id={roleHelpId}
+                    hidden={!roleHelpOpen}
+                    role="note"
+                    aria-label="Harmonic roles color guide"
+                    data-testid="piano-roll-harmonic-role-help"
+                    style={roleHelpPosition}
+                  >
+                    <ul>
+                      <li className="role-root">
+                        <span aria-hidden="true" />
+                        <span>
+                          <strong>Red:</strong> current chord root
+                        </span>
+                      </li>
+                      <li className="role-chord-tone">
+                        <span aria-hidden="true" />
+                        <span>
+                          <strong>Blue:</strong> other tones in the current chord
+                        </span>
+                      </li>
+                      <li className="role-scale-tone">
+                        <span aria-hidden="true" />
+                        <span>
+                          <strong>Green:</strong> current-scale tones outside the chord
+                        </span>
+                      </li>
+                      <li className="role-altered">
+                        <span aria-hidden="true" />
+                        <span>
+                          <strong>Purple:</strong> notes outside both the chord and scale
+                        </span>
+                      </li>
+                    </ul>
+                    <p>
+                      Roles are evaluated against the chord active at that point in the progression,
+                      so the same pitch can change color as the harmony changes.
+                    </p>
+                  </aside>,
+                  document.body,
+                )
+              : null}
+          </>
+        ) : null}
+      </span>
       <button
         type="button"
         aria-label="Guides"

@@ -2076,6 +2076,86 @@ button.piano-roll-note > span {
   min-height: 24px;
   padding: 2px 6px;
 }
+.piano-roll-harmonic-role-help {
+  position: fixed;
+  z-index: 1200;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(260px, calc(100vh - 24px));
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.18));
+  border-radius: 7px;
+  box-shadow: 0 5px 18px rgb(16 24 40 / 24%);
+  background: var(--surface, #fff);
+  color: var(--text, #17202a);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  white-space: normal;
+}
+.piano-roll-harmonic-role-help ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.piano-roll-harmonic-role-help li {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+}
+.piano-roll-harmonic-role-help li > span:first-child {
+  width: 10px;
+  height: 10px;
+  margin-top: 2px;
+  border: 1px solid color-mix(in srgb, var(--role-help-swatch) 70%, var(--text));
+  border-radius: 3px;
+  background: var(--role-help-swatch);
+}
+.piano-roll-harmonic-role-help .role-root {
+  --role-help-swatch: #b6472d;
+}
+.piano-roll-harmonic-role-help .role-chord-tone {
+  --role-help-swatch: #245da0;
+}
+.piano-roll-harmonic-role-help .role-scale-tone {
+  --role-help-swatch: #1e7158;
+}
+.piano-roll-harmonic-role-help .role-altered {
+  --role-help-swatch: #74418f;
+}
+.piano-roll-harmonic-role-help p {
+  margin: 8px 0 0;
+  color: var(--text-muted, #405269);
+}
+.piano-roll-note-color-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.piano-roll-toolbar .piano-roll-harmonic-role-help-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  min-width: 25px;
+  min-height: 25px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  line-height: 1;
+}
+.piano-roll-toolbar .piano-roll-harmonic-role-help-button[aria-expanded="true"] {
+  border-color: var(--score-focus);
+  background: color-mix(in srgb, var(--score-focus) 16%, var(--score-paper));
+}
 .progression-step-cards[data-view="piano-roll"] .piano-roll-selection-scope {
   flex: 0 0 auto;
   color: var(--score-muted-ink);
