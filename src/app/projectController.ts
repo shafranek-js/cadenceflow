@@ -387,6 +387,36 @@ export class ProjectController {
     }
     return this.openPreparedPortableProject(result, result.diagnostics.length > 0);
   }
+  /** Score import constructs and validates a new project before any session mutation. */
+  async openImportedScoreProject(project: Project): Promise<Project> {
+    const decoded = decodePortableProjectWithDiagnostics(encodePortableProject(project));
+    if (decoded.diagnostics.length)
+      throw new ProjectOperationError("The imported score did not pass project validation.");
+    return this.runExclusive(async () => {
+      const imported = copyProjectWithIdentity(
+        decoded.project,
+        await this.nextAvailableId(),
+        decoded.project.name,
+      );
+      await this.prepareIdentityReplacement();
+      if (this.repo.saveNewActiveProject) await this.repo.saveNewActiveProject(imported);
+      else {
+        const previousId = await this.repo.getLastActiveProjectId();
+        try {
+          await this.repo.saveProject(imported);
+          await this.repo.setLastActiveProjectId(imported.id);
+        } catch (error) {
+          await this.repo.deleteProject(imported.id);
+          if (previousId) await this.repo.setLastActiveProjectId(previousId);
+          else await this.repo.clearLastActiveProjectId();
+          throw error;
+        }
+      }
+      this.assertActive();
+      this.store.replaceLoadedProject(imported);
+      return imported;
+    });
+  }
 
   /** Caller must present diagnostics before invoking activation of this immutable snapshot. */
   async openPreparedPortableProject(

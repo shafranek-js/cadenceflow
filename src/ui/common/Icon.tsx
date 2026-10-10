@@ -1,4 +1,8 @@
 export type IconName =
+  | "piano-chord"
+  | "guitar-chord"
+  | "guitar-fretboard"
+  | "keyboard"
   | "add"
   | "alternative"
   | "best"
@@ -26,6 +30,13 @@ export type IconName =
   | "undo";
 
 const PATHS: Readonly<Record<IconName, string>> = {
+  "piano-chord":
+    "M1 6h14v9H1zM4.5 6v9M8 6v9M11.5 6v9M3.8 6v5h1.4V6M7.3 6v5h1.4V6M10.8 6v5h1.4V6M3 2h1M7.5 2h1M12 2h1",
+  "guitar-chord":
+    "M2 2h12M2 6h12M2 10h12M2 14h12M2 2v12M5 2v12M8 2v12M11 2v12M14 2v12M4 4h2M7 8h2M10 12h2",
+  "guitar-fretboard":
+    "M1 3h14M1 5h14M1 7h14M1 9h14M1 11h14M1 13h14M3 2v12M6 2v12M9 2v12M12 2v12M5 4h2M8 8h2M11 12h2",
+  keyboard: "M1 3h14v10H1zM4.5 3v10M8 3v10M11.5 3v10M3.8 3v6h1.4V3M7.3 3v6h1.4V3M10.8 3v6h1.4V3",
   add: "M8 2v12M2 8h12",
   alternative:
     "M2.5 8c1.5-4 5.5-5.5 11-3.5M10.5 2.5l3 2-3 2M13.5 8c-1.5 4-5.5 5.5-11 3.5M5.5 13.5l-3-2 3-2",

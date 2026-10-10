@@ -7,6 +7,14 @@ import {
 } from "../../src/persistence/portableProject";
 import { compositionKeyboardRange } from "../../src/ui/piano/playbackKeyboardModel";
 import { exactPitch } from "../../src/domain/harmony/pitch";
+import { createMatrixChordStep } from "../../src/app/commands/matrixCommands";
+import { resolveGuitarTabEntry } from "../../src/domain/instruments/guitar/tablature";
+import { withGuitarStepBass } from "../../src/domain/instruments/guitar/voicings";
+import { realizeProgressionStepChord } from "../../src/domain/progression/transposition";
+import { KEYBOARD_STORAGE_KEY } from "../../src/ui/piano/playbackKeyboardModel";
+import { snapshotAuthoredMelodyPhrase, snapshotChordMelody } from "../../src/domain/melody/types";
+import { musicalDuration } from "../../src/domain/timing/duration";
+import { rational } from "../../src/domain/timing/rational";
 import { createPianoRollSystemChordFixture } from "../fixtures/piano-roll-system-chord.fixture";
 
 async function setup(
@@ -39,6 +47,11 @@ async function portable(page: Page) {
   const path = await (await pending).path();
   return readFile(path!, "utf8");
 }
+function withoutUpdatedAt(portableProject: string): string {
+  const project = JSON.parse(portableProject) as Record<string, unknown>;
+  delete project.updatedAt;
+  return JSON.stringify(project);
+}
 test("keyboard is global, persistent, accessible and leaves Project and scrolling unchanged", async ({
   page,
 }) => {
@@ -50,12 +63,18 @@ test("keyboard is global, persistent, accessible and leaves Project and scrollin
   await setup(page);
   const buttons = page.getByRole("button", { name: "Show keyboard", exact: true });
   await expect(page.getByRole("region", { name: "Playback piano keyboard" })).toHaveCount(0);
+  await expect(buttons).toHaveCount(1);
+  await expect(
+    page
+      .getByTestId("piano-roll-toolbar")
+      .getByRole("button", { name: "Show keyboard", exact: true }),
+  ).toHaveCount(1);
   const before = await portable(page);
   await buttons.first().scrollIntoViewIfNeeded();
   const readScroll = () =>
     page.locator(".studio-grid").evaluate((el) => {
       const button = [...el.querySelectorAll("button")].find(
-        (candidate) => candidate.textContent?.trim() === "Show keyboard",
+        (candidate) => candidate.getAttribute("aria-label") === "Show keyboard",
       );
       return {
         scrollTop: el.scrollTop,
@@ -771,4 +790,364 @@ test("independent bass toggle persists and chord preview follows the enabled voi
       async () => (await activePitches()).filter((pitch) => enabledUpper.includes(pitch)).length,
     )
     .toBeGreaterThan(0);
+});
+
+test("playback guitar toggles with current chord context and keeps navigation local", async ({
+  page,
+}, testInfo) => {
+  const source = createPianoRollSystemChordFixture("playback-guitar-fretboard-fixture");
+  const first = source.progression.steps.find((step) => step.id === "chord-a");
+  const originalSecond = source.progression.steps.find((step) => step.id === "chord-b");
+  if (first?.kind !== "chord" || originalSecond?.kind !== "chord") {
+    throw new Error("The playback guitar fixture needs its first two chord steps.");
+  }
+  if (first.melody?.mode !== "authored") {
+    throw new Error("The playback guitar fixture needs an authored cross-system Melody note.");
+  }
+  const extendedFirst = {
+    ...first,
+    melody: snapshotChordMelody({
+      mode: "authored",
+      phrase: snapshotAuthoredMelodyPhrase({
+        notes: first.melody.phrase.notes.map((note) =>
+          note.id === "cross-system-carry" ? { ...note, duration: rational(8) } : note,
+        ),
+      }),
+    }),
+  };
+  const differentFunction = createMatrixChordStep(source, "V", originalSecond.id);
+  const second = {
+    ...originalSecond,
+    duration: musicalDuration(rational(16)),
+    harmonicFunction: differentFunction.harmonicFunction,
+    harmonicVariant: differentFunction.harmonicVariant,
+  };
+  const fixture: Project = {
+    ...source,
+    progression: {
+      ...source.progression,
+      steps: source.progression.steps.map((step) =>
+        step.id === extendedFirst.id ? extendedFirst : step.id === second.id ? second : step,
+      ),
+    },
+  };
+  const expectedContext = resolveGuitarTabEntry(
+    withGuitarStepBass(realizeProgressionStepChord(second, fixture.tonic), second, "concert"),
+  ).voicing.chordSymbol;
+
+  await setup(page, fixture);
+  await page.getByLabel("Tempo in BPM").fill("30");
+  const beforePortableProject = await portable(page);
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  const playbackControls = page.getByRole("group", { name: "Progression playback controls" });
+  await expect(playbackControls.getByRole("status")).toHaveText(/Playing \(Step 2\)/, {
+    timeout: 12_000,
+  });
+
+  const showFretboard = page.getByRole("button", {
+    name: "Show the playback guitar fretboard below the workspace.",
+    exact: true,
+  });
+  await showFretboard.click();
+  await expect(showFretboard).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".playback-guitar-context-label")).toHaveText(
+    `${expectedContext} · chord-shape context`,
+  );
+  await expect
+    .poll(() => page.locator('.playback-guitar-marker[data-role="chord"]').count())
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() => page.locator('.playback-guitar-marker[data-role="melody"]').count())
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate((key) => {
+        const value = JSON.parse(localStorage.getItem(key) ?? "null") as {
+          guitarFretboardVisible?: boolean;
+        } | null;
+        return value?.guitarFretboardVisible;
+      }, KEYBOARD_STORAGE_KEY),
+    )
+    .toBe(true);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const guitarResizeHandle = page.getByRole("separator", {
+    name: "Resize playback guitar fretboard",
+  });
+  await expect(guitarResizeHandle).toBeVisible();
+  const preferredGuitarHeight = Number(await guitarResizeHandle.getAttribute("aria-valuenow"));
+  expect(preferredGuitarHeight / 900).toBeGreaterThanOrEqual(0.3);
+  expect(preferredGuitarHeight / 900).toBeLessThanOrEqual(0.37);
+  const guitarOnlySize = await page.evaluate(() => {
+    const scroll = document.querySelector<HTMLElement>(".playback-guitar-scroll")!;
+    const svg = document.querySelector<SVGSVGElement>(".playback-guitar-svg")!;
+    const bounds = svg.getBoundingClientRect();
+    return { scrollWidth: scroll.clientWidth, svgWidth: bounds.width, svgHeight: bounds.height };
+  });
+  expect(guitarOnlySize.svgWidth).toBeGreaterThanOrEqual(guitarOnlySize.scrollWidth * 0.95);
+  expect(guitarOnlySize.svgHeight).toBeGreaterThan(0);
+  await page.screenshot({
+    path: testInfo.outputPath("playback-guitar-only-one-third-1280x900.png"),
+  });
+
+  const handleBounds = await guitarResizeHandle.boundingBox();
+  if (!handleBounds) throw new Error("The playback guitar resize separator is not laid out.");
+  await page.mouse.move(handleBounds.x + handleBounds.width / 2, handleBounds.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(handleBounds.x + handleBounds.width / 2, handleBounds.y + 104, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await guitarResizeHandle.getAttribute("aria-valuenow")))
+    .toBeLessThan(preferredGuitarHeight - 50);
+  await expect
+    .poll(() =>
+      page.locator(".playback-guitar-svg").evaluate((svg) => svg.getBoundingClientRect().width),
+    )
+    .toBeLessThan(guitarOnlySize.svgWidth * 0.95);
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-only-resized-1280x900.png") });
+
+  await guitarResizeHandle.focus();
+  await page.keyboard.press("Home");
+  const minimumDockHeight = Number(await guitarResizeHandle.getAttribute("aria-valuemin"));
+  await expect
+    .poll(async () => Number(await guitarResizeHandle.getAttribute("aria-valuenow")))
+    .toBe(minimumDockHeight);
+  await page.keyboard.press("End");
+  const maximumDockHeight = Number(await guitarResizeHandle.getAttribute("aria-valuemax"));
+  await expect
+    .poll(async () => Number(await guitarResizeHandle.getAttribute("aria-valuenow")))
+    .toBe(maximumDockHeight);
+  await page.keyboard.press("Home");
+  for (
+    let index = 0;
+    index < Math.floor((preferredGuitarHeight - minimumDockHeight) / 24);
+    index += 1
+  ) {
+    await page.keyboard.press("ArrowUp");
+  }
+  const restoredGuitarHeight = Number(await guitarResizeHandle.getAttribute("aria-valuenow"));
+  expect(Math.abs(restoredGuitarHeight - preferredGuitarHeight)).toBeLessThan(24);
+
+  await guitarResizeHandle.focus();
+  await page.keyboard.press("ArrowUp");
+  const independentGuitarHeight = Number(await guitarResizeHandle.getAttribute("aria-valuenow"));
+  expect(independentGuitarHeight).toBeGreaterThan(restoredGuitarHeight);
+
+  await page.getByRole("button", { name: "Show keyboard", exact: true }).first().click();
+  await expect(page.getByTestId("playback-instrument-dock")).toHaveClass(
+    /has-keyboard.*has-guitar/,
+  );
+  const pianoResizeHandle = page.getByRole("separator", {
+    name: "Resize playback piano keyboard",
+  });
+  await expect(pianoResizeHandle).toBeVisible();
+  const pianoDefaultHeight = Number(await pianoResizeHandle.getAttribute("aria-valuenow"));
+  await pianoResizeHandle.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  const independentPianoHeight = Number(await pianoResizeHandle.getAttribute("aria-valuenow"));
+  expect(independentPianoHeight).toBeLessThan(pianoDefaultHeight);
+  await expect
+    .poll(async () => Number(await guitarResizeHandle.getAttribute("aria-valuenow")))
+    .toBe(independentGuitarHeight);
+  const bothPanelGeometry = await page.evaluate(() => {
+    const piano = document.querySelector('[data-testid="playback-piano-panel"]')!;
+    const guitar = document.querySelector('[data-testid="playback-guitar-panel"]')!;
+    const dock = document.querySelector(".playback-instrument-dock-shell")!;
+    const rects = [piano.getBoundingClientRect(), guitar.getBoundingClientRect()];
+    return {
+      pianoHeight: rects[0]!.height,
+      guitarHeight: rects[1]!.height,
+      pianoBottom: rects[0]!.bottom,
+      guitarBottom: rects[1]!.bottom,
+      sharedHeight: dock.getBoundingClientRect().height,
+    };
+  });
+  expect(bothPanelGeometry.pianoHeight).toBeLessThan(bothPanelGeometry.guitarHeight);
+  expect(Math.abs(bothPanelGeometry.pianoBottom - bothPanelGeometry.guitarBottom)).toBeLessThan(1);
+  expect(bothPanelGeometry.sharedHeight).toBeGreaterThanOrEqual(bothPanelGeometry.guitarHeight - 1);
+  const separateRatios = await page.evaluate((key) => {
+    const value = JSON.parse(localStorage.getItem(key) ?? "null") as {
+      pianoDockHeightRatio?: number;
+      guitarDockHeightRatio?: number;
+    } | null;
+    return value;
+  }, KEYBOARD_STORAGE_KEY);
+  expect(separateRatios?.guitarDockHeightRatio).toBeCloseTo(independentGuitarHeight / 900, 2);
+  expect(separateRatios?.pianoDockHeightRatio).toBeCloseTo(independentPianoHeight / 900, 2);
+
+  await showFretboard.click();
+  await expect(page.getByTestId("playback-guitar-panel")).toHaveCount(0);
+  const pianoOnlyHeight = await page
+    .getByTestId("playback-piano-panel")
+    .evaluate((panel) => panel.getBoundingClientRect().height);
+  expect(pianoOnlyHeight).toBeCloseTo(independentPianoHeight, 0);
+  await showFretboard.click();
+  await expect(page.getByTestId("playback-guitar-panel")).toBeVisible();
+  await page.getByRole("button", { name: "Show keyboard", exact: true }).first().click();
+  await expect(page.getByTestId("playback-piano-panel")).toHaveCount(0);
+  await expect
+    .poll(async () => Number(await guitarResizeHandle.getAttribute("aria-valuenow")))
+    .toBe(independentGuitarHeight);
+  const guitarRestoredFromPreference = await page
+    .getByTestId("playback-guitar-panel")
+    .evaluate((panel) => panel.getBoundingClientRect().height);
+  expect(guitarRestoredFromPreference).toBeCloseTo(independentGuitarHeight, 0);
+  await page.getByRole("button", { name: "Show keyboard", exact: true }).first().click();
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-both-resized-1280x900.png") });
+  await page.getByRole("button", { name: "Light theme", exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-active-light.png") });
+  await page.getByRole("button", { name: "Dark theme", exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-active-dark.png") });
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-both-docks-640x360.png") });
+  const shortViewportGeometry = await page.evaluate(() => {
+    const grid = document.querySelector(".studio-grid")!;
+    const dock = document.querySelector('[data-testid="playback-instrument-dock"]')!;
+    const dockShell = document.querySelector(".playback-instrument-dock-shell")!;
+    const separator = document.querySelector('[data-testid="playback-guitar-resize-handle"]')!;
+    const transport = document.querySelector(".studio-transport")!;
+    const status = document.querySelector(".app-status-bar")!;
+    const header = document.querySelector(".app-header")!;
+    const headerRect = header.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    const dockShellRect = dockShell.getBoundingClientRect();
+    const transportRect = transport.getBoundingClientRect();
+    const statusRect = status.getBoundingClientRect();
+    const geometry = {
+      workspaceHeight: grid.getBoundingClientRect().height,
+      headerHeight: headerRect.height,
+      transportHeight: transportRect.height,
+      dockTop: dockShellRect.top,
+      dockHeight: dockShellRect.height,
+      instrumentHeight: dockRect.height,
+      resizeHandleHeight: separator.getBoundingClientRect().height,
+      dockBottom: dockRect.bottom,
+      statusTop: statusRect.top,
+      statusBottom: statusRect.bottom,
+      guitarScrollHeight:
+        document.querySelector<HTMLElement>(".playback-guitar-scroll")!.clientHeight,
+      guitarRenderedStringCount: document.querySelectorAll(".playback-guitar-string").length,
+      availableWorkspaceBudget:
+        innerHeight -
+        headerRect.height -
+        transportRect.height -
+        dockShellRect.height -
+        statusRect.height,
+      viewportHeight: innerHeight,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+    };
+    console.log("T218_640x360_GEOMETRY", JSON.stringify(geometry));
+    return geometry;
+  });
+  expect(
+    shortViewportGeometry.workspaceHeight,
+    JSON.stringify(shortViewportGeometry),
+  ).toBeGreaterThan(100);
+  expect(shortViewportGeometry.guitarScrollHeight).toBeGreaterThanOrEqual(40);
+  expect(shortViewportGeometry.guitarRenderedStringCount).toBe(6);
+  await testInfo.attach("playback-guitar-640x360-geometry.json", {
+    body: JSON.stringify(shortViewportGeometry, null, 2),
+    contentType: "application/json",
+  });
+  expect(shortViewportGeometry.dockBottom).toBeLessThanOrEqual(shortViewportGeometry.statusTop + 1);
+  expect(shortViewportGeometry.statusBottom).toBeLessThanOrEqual(
+    shortViewportGeometry.viewportHeight + 1,
+  );
+  expect(shortViewportGeometry.documentWidth).toBeLessThanOrEqual(
+    shortViewportGeometry.viewportWidth,
+  );
+  const appHeader = page.locator(".app-header");
+  await appHeader.focus();
+  await expect(appHeader).toBeFocused();
+  await page.keyboard.press("End");
+  await expect.poll(() => appHeader.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await page.keyboard.press("Home");
+  const compactDock = page.getByRole("region", { name: "Playback piano keyboard" });
+  await compactDock.focus();
+  await expect(compactDock).toBeFocused();
+  await page.keyboard.press("End");
+  await expect.poll(() => compactDock.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await page.keyboard.press("Home");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("playback-guitar-both-docks-390x844.png") });
+  const geometry = await page.evaluate(() => {
+    const dock = document.querySelector('[data-testid="playback-instrument-dock"]')!;
+    const status = document.querySelector(".app-status-bar")!;
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+      dockBottom: dock.getBoundingClientRect().bottom,
+      statusTop: status.getBoundingClientRect().top,
+    };
+  });
+  expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.dockBottom).toBeLessThanOrEqual(geometry.statusTop + 1);
+
+  const fretboardScroll = page.getByRole("group", {
+    name: /Guitar fretboard, frets zero through twenty-four/,
+  });
+  await fretboardScroll.focus();
+  const maxHorizontalScroll = await fretboardScroll.evaluate(
+    (element) => element.scrollWidth - element.clientWidth,
+  );
+  expect(maxHorizontalScroll).toBeGreaterThan(0);
+  await page.keyboard.press("End");
+  await expect
+    .poll(() => fretboardScroll.evaluate((element) => element.scrollLeft))
+    .toBe(maxHorizontalScroll);
+  await page.keyboard.press("Home");
+  await expect.poll(() => fretboardScroll.evaluate((element) => element.scrollLeft)).toBe(0);
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(page.locator("[data-testid='playback-guitar-live-markers'] > g")).toHaveCount(0);
+  await page.getByRole("button", { name: "Close playback guitar fretboard" }).click();
+  await expect(showFretboard).toHaveAttribute("aria-pressed", "false");
+  const persistedDockHeightRatios = await page.evaluate((key) => {
+    const value = JSON.parse(localStorage.getItem(key) ?? "null") as {
+      guitarDockHeightRatio?: number;
+      pianoDockHeightRatio?: number;
+    } | null;
+    return value;
+  }, KEYBOARD_STORAGE_KEY);
+  expect(persistedDockHeightRatios?.guitarDockHeightRatio).toBeCloseTo(
+    independentGuitarHeight / 900,
+    2,
+  );
+  expect(persistedDockHeightRatios?.pianoDockHeightRatio).toBeCloseTo(
+    independentPianoHeight / 900,
+    2,
+  );
+  await showFretboard.click();
+  await page.reload();
+  await expect(page.getByTestId("playback-guitar-fretboard")).toBeVisible();
+  await expect(showFretboard).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) =>
+          (JSON.parse(localStorage.getItem(key) ?? "null") as { guitarDockHeightRatio?: number })
+            ?.guitarDockHeightRatio,
+        KEYBOARD_STORAGE_KEY,
+      ),
+    )
+    .toBeCloseTo(independentGuitarHeight / 900, 2);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) =>
+          (JSON.parse(localStorage.getItem(key) ?? "null") as { pianoDockHeightRatio?: number })
+            ?.pianoDockHeightRatio,
+        KEYBOARD_STORAGE_KEY,
+      ),
+    )
+    .toBeCloseTo(independentPianoHeight / 900, 2);
+  expect(withoutUpdatedAt(await portable(page))).toBe(withoutUpdatedAt(beforePortableProject));
 });

@@ -1,9 +1,20 @@
 import { RecoveredProjectDialog } from "../ui/projects/RecoveredProjectDialog";
+import { ScoreFileImport } from "../ui/projects/ScoreFileImport";
+import { createImportedProject } from "../import/importedProject";
+import type { ImportedScore, ImportedInstrument } from "../import/scoreFile";
 import {
   decodePortableProjectWithDiagnostics,
   type PortableProjectDecodeResult,
 } from "../persistence/portableProject";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { AppStore } from "./appStore";
 import { setIndependentBassEnabled } from "./commands/projectCommands";
 import {
@@ -108,6 +119,7 @@ import {
   type VoiceLeadingStrategy,
 } from "../domain/progression/voiceLeadingOptimizer";
 import { ProgressionTransportControls } from "../ui/progression/ProgressionTransportControls";
+import { PlaybackFollowCoordinator } from "../ui/transport/playbackFollowCoordinator";
 import {
   ProgressionTrack,
   type PianoRollSelectionKeyEvent,
@@ -140,6 +152,8 @@ import { PianoAudioStatus } from "../ui/header/PianoAudioStatus";
 import { HqSamplePianoProvider } from "../audio/hq-sample-piano/provider";
 import { PlaybackKeyboard } from "../ui/piano/PlaybackKeyboard";
 import { KeyboardPreviewStore } from "../ui/piano/keyboardPreviewStore";
+import { PlaybackGuitarFretboard } from "../ui/guitar/PlaybackGuitarFretboard";
+import { PlaybackDockResizeHandle } from "../ui/studio/PlaybackDockResizeHandle";
 import {
   compositionKeyboardRange,
   readKeyboardPreferences,
@@ -170,7 +184,11 @@ import { pitchToConcertFrame, pitchToSourceFrame } from "../domain/progression/t
 import { PlaybackSupportControls, TempoControls } from "../ui/transport/TransportBar";
 import { HistoryControls } from "../ui/transport/HistoryControls";
 import { getPianoRollGesture, setPianoRollGesture } from "../ui/melody/pianoRollSession";
-import { TransportStore, type TransportState } from "../ui/transport/transportStore";
+import {
+  isPlaybackPositionOnlyTransportUpdate,
+  TransportStore,
+  type TransportState,
+} from "../ui/transport/transportStore";
 import { isAppShortcutProtectedTarget } from "../ui/studio/focusManagement";
 import {
   INITIAL_LOOP_STATE,
@@ -536,7 +554,25 @@ export function App() {
   const [isFingeringLegendOpen, setIsFingeringLegendOpen] = useState(false);
 
   const transportStore = useMemo(() => new TransportStore(), []);
+  const playbackFollowCoordinator = useMemo(() => new PlaybackFollowCoordinator(), []);
+  useEffect(() => {
+    playbackFollowCoordinator.reset();
+  }, [playbackFollowCoordinator, projectSessionKey]);
+  useEffect(() => () => playbackFollowCoordinator.dispose(), [playbackFollowCoordinator]);
   const [transportState, setTransportState] = useState<TransportState>(transportStore.getState());
+  const latestTransportStateRef = useRef(transportStore.getState());
+  const playbackFollowSessionIdRef = useRef(transportState.sessionId);
+  useEffect(() => {
+    const nextSessionId = transportState.sessionId;
+    if (
+      transportState.status === "stopped" ||
+      (nextSessionId !== null && nextSessionId !== playbackFollowSessionIdRef.current)
+    ) {
+      playbackFollowCoordinator.reset();
+    }
+    playbackFollowSessionIdRef.current = nextSessionId;
+  }, [playbackFollowCoordinator, transportState.sessionId, transportState.status]);
+  const progressionViewRef = useRef(project.presentation.progressionView);
   const [keyboardAutoRange, setKeyboardAutoRange] = useState(() =>
     compositionKeyboardRange(project),
   );
@@ -1132,9 +1168,26 @@ export function App() {
     });
   }, [loadPersistedOpenProjectTabs, projectController, store]);
 
+  useLayoutEffect(() => {
+    progressionViewRef.current = project.presentation.progressionView;
+    const latestState = transportStore.getState();
+    latestTransportStateRef.current = latestState;
+    setTransportState(latestState);
+  }, [project.presentation.progressionView, transportStore]);
+
   useEffect(() => {
     return transportStore.subscribe(() => {
-      setTransportState(transportStore.getState());
+      const previousState = latestTransportStateRef.current;
+      const nextState = transportStore.getState();
+      latestTransportStateRef.current = nextState;
+      if (
+        progressionViewRef.current === "piano-roll" &&
+        isPlaybackPositionOnlyTransportUpdate(previousState, nextState)
+      ) {
+        return;
+      }
+
+      setTransportState(nextState);
     });
   }, [transportStore]);
 
@@ -2402,9 +2455,9 @@ export function App() {
       clearTimeout(modAuditionStopTimerRef.current);
       modAuditionStopTimerRef.current = null;
     }
-    getPreviewAuditionController()?.stop();
+    previewAuditionControllerRef.current?.stop();
     setAuditioningModPathId(null);
-  }, [getPreviewAuditionController]);
+  }, []);
 
   const handleAuditionModulationPath = useCallback(
     (path: ModulationPath) => {
@@ -2541,9 +2594,9 @@ export function App() {
       clearTimeout(modesAuditionStopTimerRef.current);
       modesAuditionStopTimerRef.current = null;
     }
-    getPreviewAuditionController()?.stop();
-    getGuitarPreviewAuditionController()?.stop();
-  }, [getGuitarPreviewAuditionController, getPreviewAuditionController]);
+    previewAuditionControllerRef.current?.stop();
+    guitarPreviewAuditionControllerRef.current?.stop();
+  }, []);
 
   const handleAuditionScaleNotes = useCallback(
     (pitches: readonly { midiNumber: number }[], instrument?: "piano" | "guitar") => {
@@ -4152,6 +4205,7 @@ export function App() {
     closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
+    playbackFollowCoordinator.reset();
     // Resume before starting so the scheduler's first events land in a running context
     // rather than being batched against a frozen clock.
     await resumeSharedAudioContext();
@@ -4188,6 +4242,7 @@ export function App() {
     closeProgressionStepEditors();
     const controller = getPlaybackController();
     if (!controller) return;
+    playbackFollowCoordinator.reset();
     await resumeSharedAudioContext();
     controller.playFromHere(stepId, {
       steps: project.progression.steps,
@@ -4228,6 +4283,21 @@ export function App() {
     previewAuditionControllerRef.current?.stop();
     melodyPreviewAuditionControllerRef.current?.stop();
     playbackControllerRef.current?.stop();
+    playbackFollowCoordinator.reset();
+  };
+
+  const handleStopAndRewind = () => {
+    clearPianoRollAuditionPlayhead();
+    clearStepPreviewHighlights();
+    stopMelodyPreview();
+    stopKeyboardPreview();
+    stopAuditioningModes();
+    stopAuditioningModulation();
+    previewAuditionControllerRef.current?.stop();
+    guitarPreviewAuditionControllerRef.current?.stop();
+    playbackControllerRef.current?.stop();
+    transportStore.rewindToStart();
+    playbackFollowCoordinator.rewindToStart();
   };
 
   /**
@@ -4555,6 +4625,15 @@ export function App() {
       setProjectError(formatProjectOperationError(error));
       throw error;
     }
+  };
+  const handleImportScore = async (
+    score: ImportedScore,
+    instrument: ImportedInstrument,
+    filename: string,
+  ) => {
+    const imported = createImportedProject(score, instrument, filename, crypto.randomUUID());
+    openTabsUserChangedRef.current = true;
+    await runProjectAction(() => projectController.openImportedScoreProject(imported));
   };
   const handleCloseProjectTab = (id: string) => {
     if (openProjectIds.length <= 1) return;
@@ -5298,16 +5377,80 @@ export function App() {
       ) : null}
       <StudioWorkspace
         bottomPanel={
-          keyboardPreferences.visible && project.presentation.progressionView === "piano-roll" ? (
-            <PlaybackKeyboard
-              transport={transportStore}
-              previewStore={keyboardPreviewStore}
-              autoRange={keyboardAutoRange}
-              preferences={keyboardPreferences}
-              onChange={setKeyboardPreferences}
-              onAudition={auditionKeyboardKey}
-              onStopPreview={stopKeyboardPreview}
-            />
+          project.presentation.progressionView === "piano-roll" &&
+          (keyboardPreferences.visible || keyboardPreferences.guitarFretboardVisible) ? (
+            <div className="playback-instrument-dock-shell">
+              <div
+                className={`playback-instrument-dock${keyboardPreferences.visible ? " has-keyboard" : ""}${keyboardPreferences.guitarFretboardVisible ? " has-guitar" : ""}`}
+                data-testid="playback-instrument-dock"
+                role="region"
+                aria-label="Playback instruments. Scroll vertically when space is limited."
+                tabIndex={0}
+                data-playback-follow-ignore="true"
+              >
+                {keyboardPreferences.visible ? (
+                  <section
+                    className="playback-instrument-panel playback-instrument-panel--piano"
+                    style={
+                      {
+                        "--playback-panel-height": `${keyboardPreferences.pianoDockHeightRatio * 100}dvh`,
+                      } as CSSProperties
+                    }
+                    data-testid="playback-piano-panel"
+                  >
+                    <PlaybackDockResizeHandle
+                      panel="piano"
+                      label="Resize playback piano keyboard"
+                      preferredHeightRatio={keyboardPreferences.pianoDockHeightRatio}
+                      onPreferredHeightRatioChange={(pianoDockHeightRatio) =>
+                        setKeyboardPreferences((current) => ({ ...current, pianoDockHeightRatio }))
+                      }
+                    />
+                    <PlaybackKeyboard
+                      transport={transportStore}
+                      previewStore={keyboardPreviewStore}
+                      autoRange={keyboardAutoRange}
+                      preferences={keyboardPreferences}
+                      onChange={setKeyboardPreferences}
+                      onAudition={auditionKeyboardKey}
+                      onStopPreview={stopKeyboardPreview}
+                    />
+                  </section>
+                ) : null}
+                {keyboardPreferences.guitarFretboardVisible ? (
+                  <section
+                    className="playback-instrument-panel playback-instrument-panel--guitar"
+                    style={
+                      {
+                        "--playback-panel-height": `${keyboardPreferences.guitarDockHeightRatio * 100}dvh`,
+                      } as CSSProperties
+                    }
+                    data-testid="playback-guitar-panel"
+                  >
+                    <PlaybackDockResizeHandle
+                      panel="guitar"
+                      label="Resize playback guitar fretboard"
+                      preferredHeightRatio={keyboardPreferences.guitarDockHeightRatio}
+                      onPreferredHeightRatioChange={(guitarDockHeightRatio) =>
+                        setKeyboardPreferences((current) => ({ ...current, guitarDockHeightRatio }))
+                      }
+                    />
+                    <PlaybackGuitarFretboard
+                      transport={transportStore}
+                      previewStore={keyboardPreviewStore}
+                      steps={project.progression.steps}
+                      tonic={project.tonic}
+                      onClose={() =>
+                        setKeyboardPreferences((current) => ({
+                          ...current,
+                          guitarFretboardVisible: false,
+                        }))
+                      }
+                    />
+                  </section>
+                ) : null}
+              </div>
+            </div>
           ) : null
         }
         sidePanelMode={project.presentation.sidePanelMode ?? "fixed"}
@@ -5344,6 +5487,7 @@ export function App() {
                         onSaveProjectAs={handleSaveProjectAs}
                         onOpenProjectFile={handleOpenProjectFile}
                       />
+                      <ScoreFileImport busy={projectBusy} onImport={handleImportScore} />
                     </ProjectManager>
                   }
                   exportMenu={
@@ -5391,6 +5535,37 @@ export function App() {
                 {globalSettingsVisibility.showThemeControl ? (
                   <ThemeControl value={project.presentation.theme} onChange={changeTheme} />
                 ) : null}
+                <div className="app-header-playback-cluster">
+                  <ProgressionTransportControls
+                    selectedStepId={project.progression.selectedStepId}
+                    transportStore={transportStore}
+                    playbackFollowCoordinator={playbackFollowCoordinator}
+                    onPlay={() => void handlePlay()}
+                    onPlayFromHere={(stepId) => void handlePlayFromHere(stepId)}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onStop={handleStop}
+                    canRewind={project.progression.steps.length > 0}
+                    onStopAndRewind={handleStopAndRewind}
+                  />
+                  <nav className="progression-playback-nav" aria-label="Playback Transport">
+                    <div className="transport-timing" role="group" aria-label="Timing Controls">
+                      <TempoControls
+                        tempoBpm={project.globalTiming.tempoBpm}
+                        onSetTempo={changeTempo}
+                        className="progression-heading-tempo"
+                      />
+                      <PlaybackSupportControls
+                        loopState={loopState}
+                        metronomeEnabled={metronomeEnabled}
+                        countInEnabled={countInEnabled}
+                        onSetLoopMode={handleSetLoopMode}
+                        onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
+                        onToggleCountIn={() => setCountInEnabled((v) => !v)}
+                      />
+                    </div>
+                  </nav>
+                </div>
                 {globalSettingsVisibility.showExpertiseControl ? (
                   <ExpertiseModeControl
                     value={project.presentation.expertiseMode}
@@ -5509,6 +5684,7 @@ export function App() {
             project={project}
             {...(activePreviewId ? { previewFunctionId: activePreviewId } : {})}
             playingFunctionId={currentPlayingFunctionId}
+            transportStore={transportStore}
             recommendations={recommendations}
             contextualFunctionIds={contextualFunctions}
             onPreview={preview}
@@ -5909,34 +6085,6 @@ export function App() {
             >
               <div className="progression-title-group">
                 <h2>My Progression</h2>
-                <div className="progression-heading-transport-cluster">
-                  <ProgressionTransportControls
-                    selectedStepId={project.progression.selectedStepId}
-                    transportState={transportState}
-                    onPlay={() => void handlePlay()}
-                    onPlayFromHere={(stepId) => void handlePlayFromHere(stepId)}
-                    onPause={handlePause}
-                    onResume={handleResume}
-                    onStop={handleStop}
-                  />
-                  <nav className="progression-playback-nav" aria-label="Playback Transport">
-                    <div className="transport-timing" role="group" aria-label="Timing Controls">
-                      <TempoControls
-                        tempoBpm={project.globalTiming.tempoBpm}
-                        onSetTempo={changeTempo}
-                        className="progression-heading-tempo"
-                      />
-                      <PlaybackSupportControls
-                        loopState={loopState}
-                        metronomeEnabled={metronomeEnabled}
-                        countInEnabled={countInEnabled}
-                        onSetLoopMode={handleSetLoopMode}
-                        onToggleMetronome={() => setMetronomeEnabled((v) => !v)}
-                        onToggleCountIn={() => setCountInEnabled((v) => !v)}
-                      />
-                    </div>
-                  </nav>
-                </div>
               </div>
               <div className="progression-heading-actions">
                 {project.presentation.progressionView === "piano-roll" &&
@@ -6007,9 +6155,18 @@ export function App() {
               </div>
             </div>
             <ProgressionTrack
+              transportStore={transportStore}
+              playbackFollowCoordinator={playbackFollowCoordinator}
               keyboardVisible={keyboardPreferences.visible}
               onToggleKeyboard={() =>
                 setKeyboardPreferences((current) => ({ ...current, visible: !current.visible }))
+              }
+              guitarFretboardVisible={keyboardPreferences.guitarFretboardVisible}
+              onToggleGuitarFretboard={() =>
+                setKeyboardPreferences((current) => ({
+                  ...current,
+                  guitarFretboardVisible: !current.guitarFretboardVisible,
+                }))
               }
               project={project}
               pianoRollSelectionScopeResetVersion={pianoRollSelectionScopeResetVersion}

@@ -6,6 +6,7 @@ import {
   PIANO_ROLL_ZOOM_STEP,
 } from "./pianoRollPreferences";
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -37,17 +38,15 @@ import {
   subtractRational,
   type Rational,
 } from "../../domain/timing/rational";
-import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
+import type { EffectiveMelodyNote } from "../../domain/melody/effectiveTimeline";
+import type { PianoRollNoteRenderMetadata } from "./pianoRollNoteRenderMetadata";
 import { formatChordSymbol } from "../../domain/harmony/chord";
 import { withEffectiveBass } from "../../domain/progression/effectiveChord";
 import { type LabelHierarchyMode } from "../progression/labelHierarchy";
 import { Icon } from "../common/Icon";
 import { ProgressionChordLabel } from "../progression/ProgressionChordLabel";
 import { StepTranspositionBadge } from "../progression/StepTranspositionBadge";
-import {
-  createHarmonicNoteRoleContext,
-  classifyHarmonicNoteRole,
-} from "../../domain/harmony/noteRoles";
+import { classifyHarmonicNoteRole } from "../../domain/harmony/noteRoles";
 import { realizeProgressionStepRealization } from "../../instruments/piano/profile";
 import {
   realizeProgressionStepChord,
@@ -56,7 +55,6 @@ import {
 import { getSuzukiNoteColor, getSuzukiNoteStroke } from "../../notation/suzukiColors";
 import { harmonicFunctionLabel, modeForModule } from "../../domain/harmony/functions";
 import {
-  isPianoRollNoteAuthored,
   pianoRollDegreeLabel,
   pianoRollPaletteColor,
   pianoRollPaletteDegrees,
@@ -126,6 +124,108 @@ function paletteStyle(degrees: readonly number[]): CSSProperties {
     "--piano-roll-palette-pair": degrees.length > 1 ? "1" : "0",
   } as CSSProperties;
 }
+
+const PianoRollPitchRows = memo(function PianoRollPitchRows({
+  pitchRows,
+  pitchGeometry,
+  measure,
+  tonic,
+  activeModule,
+  diatonicSteps,
+  guidesEnabled,
+  gridMode,
+  guidePitchClassesByStep,
+}: {
+  readonly pitchRows: readonly number[];
+  readonly pitchGeometry: ReturnType<typeof createPianoRollPitchGeometry>;
+  readonly measure: ProgressionMeasure;
+  readonly tonic: Project["tonic"];
+  readonly activeModule: Project["activeModule"];
+  readonly diatonicSteps: readonly number[];
+  readonly guidesEnabled: boolean;
+  readonly gridMode: GridMode;
+  readonly guidePitchClassesByStep: ReadonlyMap<string, ReadonlySet<number>>;
+}) {
+  return (
+    <>
+      {pitchRows.map((midi) => {
+        const rowStart = pitchGeometry.rowStart(midi);
+        const pc = midi % 12;
+        const inScale = diatonicSteps.includes((pc - tonic + 12) % 12);
+        const paletteDegrees = pianoRollPaletteDegrees(pc, tonic, activeModule);
+        const degreeStyle = paletteStyle(paletteDegrees);
+        const guideItems = guidesEnabled
+          ? gridMode === "degrees"
+            ? projectPianoRollScaleChordToneGuide(measure, pc, guidePitchClassesByStep)
+            : projectPianoRollChordToneGuide(measure, pc, guidePitchClassesByStep).map(
+                ({ item, chordTone }) => ({
+                  item,
+                  neutral: true,
+                  tones: chordTone ? [{ pitchClass: pc, half: null }] : [],
+                }),
+              )
+          : [];
+        return (
+          <div
+            key={midi}
+            className={`piano-roll-row ${pc % 12 === 0 ? "is-octave" : ""} ${inScale ? "is-scale" : "is-accidental"} ${[1, 3, 6, 8, 10].includes(pc) ? "is-black-key" : "is-white-key"}`}
+            data-pitch-midi={midi}
+            data-palette-degrees={paletteDegrees.join("-")}
+            style={{ gridRow: `${rowStart + 1} / span 1`, ...degreeStyle }}
+          >
+            {guidesEnabled ? (
+              <span className="piano-roll-guide-layer" aria-hidden="true">
+                {guideItems.map(({ item, tones }, index) => {
+                  const hasHarmony = item.kind === "step" && item.step.kind === "chord";
+                  return (
+                    <span
+                      key={`${item.kind}-${index}`}
+                      className="piano-roll-guide-step"
+                      style={{ flex: `${rationalToNumber(item.durationBeats)} 1 0` }}
+                    >
+                      <i
+                        className={`piano-roll-guide-segment is-neutral ${hasHarmony ? "" : "is-no-harmony"}`.trim()}
+                        data-testid="piano-roll-guide-neutral"
+                        {...(item.kind === "step" ? { "data-source-step-id": item.stepId } : {})}
+                        data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
+                        data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
+                        data-pitch-class={((midi % 12) + 12) % 12}
+                        data-palette-degrees={paletteDegrees.join("-")}
+                      />
+                      {tones.map((tone, toneIndex) => {
+                        const toneDegrees = pianoRollPaletteDegrees(
+                          tone.pitchClass,
+                          tonic,
+                          activeModule,
+                        );
+                        return (
+                          <i
+                            key={`${tone.pitchClass}-${tone.half ?? "full"}-${toneIndex}`}
+                            className={`piano-roll-guide-segment is-chord-tone${tone.half ? ` is-${tone.half}-half` : ""}`}
+                            data-testid="piano-roll-guide-tone"
+                            {...(item.kind === "step"
+                              ? { "data-source-step-id": item.stepId }
+                              : {})}
+                            data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
+                            data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
+                            data-pitch-class={tone.pitchClass}
+                            data-guide-half={tone.half ?? "full"}
+                            data-palette-degrees={toneDegrees.join("-")}
+                            style={paletteStyle(toneDegrees)}
+                          />
+                        );
+                      })}
+                    </span>
+                  );
+                })}
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+    </>
+  );
+});
 function pianoRollTimelineFraction(clientX: number, rect: DOMRect): number {
   return Math.max(0, Math.min(0.999999, (clientX - rect.left) / Math.max(1, rect.width)));
 }
@@ -178,21 +278,23 @@ function formatPitchScaleLabel(
 
 export function PianoRollSystemPitchGutter({
   project,
+  effectiveNotes,
   gridMode,
   pitchRange,
   pitchExpansion,
   systemIndex,
 }: {
   readonly project: Project;
+  readonly effectiveNotes: readonly EffectiveMelodyNote[];
   readonly gridMode: GridMode;
   readonly pitchRange: number;
   readonly pitchExpansion: number;
   readonly systemIndex: number;
 }) {
-  const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
+  const notes = effectiveNotes;
   const tonic = project.tonic;
   const pitchMode = modeForModule(project.activeModule) === "major" ? "major" : "minor";
-  const pitchValues = notes.map((note) => note.pitch.midiNumber);
+  const pitchValues = useMemo(() => notes.map((note) => note.pitch.midiNumber), [notes]);
   const bounds =
     gridMode === "degrees"
       ? derivePianoRollScalePitchBounds(pitchValues, tonic, pitchMode, pitchRange, pitchExpansion)
@@ -297,63 +399,56 @@ export interface PianoRollToolbarProps {
   readonly onColorModeChange: (mode: PianoRollColorMode) => void;
   readonly guidesEnabled: boolean;
   readonly onGuidesEnabledChange: (enabled: boolean) => void;
+  readonly noteLabelsEnabled: boolean;
+  readonly onNoteLabelsEnabledChange: (enabled: boolean) => void;
   readonly selectionScopeLabel?: string;
+  readonly instrumentVisibilityControls?: React.ReactNode;
 }
 
 function PianoRollPlayhead({
   measure,
-  stepStart,
-  startedAt,
-  playing,
   tempoBpm,
   audition,
   onAuditionFinished,
 }: {
   measure: ProgressionMeasure;
-  stepStart: Rational | null;
-  startedAt?: number | null | undefined;
-  playing: boolean;
   tempoBpm: number;
-  audition?: {
+  audition: {
     readonly requestId: number;
     readonly startBeat: number;
     readonly endBeat: number;
     readonly startedAt: number;
     readonly clockNow: () => number;
-  } | null;
+  };
   onAuditionFinished?: ((requestId: number) => void) | undefined;
 }) {
-  const [frameTime, setFrameTime] = useState<number | null>(null);
+  const [, setFrameTime] = useState<number | null>(null);
   useEffect(() => {
-    if (!audition && (!playing || stepStart === null || startedAt == null)) return;
+    const start = rationalToNumber(measure.startBeats);
+    const end = rationalToNumber(measure.endBeats);
+    if (audition.startBeat >= end || audition.endBeat <= start) return;
     let raf = 0;
     const tick = () => {
       const frameNow = performance.now();
       setFrameTime(frameNow);
-      if (audition) {
-        const elapsedSeconds = Math.max(0, audition.clockNow() - audition.startedAt);
-        const beat = audition.startBeat + (elapsedSeconds * Math.max(1, tempoBpm)) / 60;
-        if (beat >= audition.endBeat) {
-          onAuditionFinished?.(audition.requestId);
-          return;
-        }
+      const elapsedSeconds = Math.max(0, audition.clockNow() - audition.startedAt);
+      const beat = audition.startBeat + (elapsedSeconds * Math.max(1, tempoBpm)) / 60;
+      if (beat >= audition.endBeat) {
+        onAuditionFinished?.(audition.requestId);
+        return;
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, stepStart, startedAt, audition, onAuditionFinished, tempoBpm]);
-  if (!audition && (!playing || stepStart === null || startedAt == null)) return null;
-  const baseBeat = audition?.startBeat ?? (stepStart ? rationalToNumber(stepStart) : null);
-  const baseTime = audition?.startedAt ?? startedAt;
-  if (baseBeat === null || baseTime == null) return null;
-  const elapsedMs = audition
-    ? Math.max(0, (audition.clockNow() - audition.startedAt) * 1000)
-    : Math.max(0, (frameTime ?? baseTime) - baseTime);
-  const beat = baseBeat + (elapsedMs * Math.max(1, tempoBpm)) / 60_000;
+  }, [audition, measure, onAuditionFinished, tempoBpm]);
+  const beat =
+    audition.startBeat +
+    (Math.max(0, (audition.clockNow() - audition.startedAt) * 1000) * Math.max(1, tempoBpm)) /
+      60_000;
   const start = rationalToNumber(measure.startBeats);
   const end = rationalToNumber(measure.endBeats);
-  if (beat < start || beat > end || (audition && beat >= audition.endBeat)) return null;
+  if (beat < start || beat >= end || beat >= audition.endBeat) return null;
   const left = ((beat - start) / (end - start)) * 100;
   return (
     <div
@@ -361,7 +456,7 @@ function PianoRollPlayhead({
       style={{ left: `${left}%` }}
       data-testid="piano-roll-playhead"
       data-current-beat={beat.toFixed(4)}
-      data-audition-end-beat={audition?.endBeat}
+      data-audition-end-beat={audition.endBeat}
     />
   );
 }
@@ -379,7 +474,10 @@ export function PianoRollToolbar({
   onColorModeChange,
   guidesEnabled,
   onGuidesEnabledChange,
+  noteLabelsEnabled,
+  onNoteLabelsEnabledChange,
   selectionScopeLabel = "Progression",
+  instrumentVisibilityControls,
 }: PianoRollToolbarProps) {
   return (
     <div
@@ -474,6 +572,15 @@ export function PianoRollToolbar({
       >
         Guides
       </button>
+      <button
+        type="button"
+        aria-pressed={noteLabelsEnabled}
+        title="Show or hide note names in Piano Roll"
+        onClick={() => onNoteLabelsEnabledChange(!noteLabelsEnabled)}
+      >
+        Note labels
+      </button>
+      {instrumentVisibilityControls}
       <span className="piano-roll-selection-scope" data-testid="piano-roll-selection-scope">
         Ctrl/Cmd+A: {selectionScopeLabel}
       </span>
@@ -481,8 +588,10 @@ export function PianoRollToolbar({
   );
 }
 
-export function PianoRollMeasure({
+function PianoRollMeasureView({
   project,
+  effectiveNotes,
+  noteRenderMetadata,
   layout,
   measure,
   systemIndex,
@@ -491,15 +600,13 @@ export function PianoRollMeasure({
   selectedChordStepIds,
   selectedNoteKey,
   selectedNoteIdentities,
+  getSelectedNoteIdentities,
   onNoteSelectionChange,
   onReplaceNoteSelection,
   onClearNoteSelection,
   onActiveMeasureChange,
   onSelectMeasureNotes,
-  selectionScopeLabel,
   playingStepId,
-  activeEventStartedAt,
-  transportPlaying,
   labelMode,
   chordCardVisibility = { piano: false, guitar: false },
   onSelectStep,
@@ -529,11 +636,14 @@ export function PianoRollMeasure({
   colorMode,
   guidesEnabled,
   inspectorRequest,
+  noteLabelsEnabled = true,
   emptyCursor,
   midiCursor,
   onEmptyCellCursor,
 }: {
   readonly project: Project;
+  readonly effectiveNotes: readonly EffectiveMelodyNote[];
+  readonly noteRenderMetadata: PianoRollNoteRenderMetadata;
   readonly layout: ProgressionMeasureLayout;
   readonly measure: ProgressionMeasure;
   readonly systemIndex?: number;
@@ -542,17 +652,16 @@ export function PianoRollMeasure({
   readonly selectedChordStepIds?: ReadonlySet<string>;
   readonly selectedNoteKey?: string | undefined;
   readonly selectedNoteIdentities: ReadonlySet<string>;
+  /** Stable accessor for cross-measure selection actions without rerendering every Measure. */
+  readonly getSelectedNoteIdentities: () => ReadonlySet<string>;
   readonly onNoteSelectionChange: (stepId: string, eventKey: string, additive: boolean) => void;
   readonly onReplaceNoteSelection?: (
     identities: readonly { readonly sourceStepId: string; readonly eventKey: string }[],
   ) => void;
   readonly onClearNoteSelection: () => void;
   readonly onActiveMeasureChange?: (measureIndex: number, systemIndex?: number) => void;
-  readonly onSelectMeasureNotes: () => void;
-  readonly selectionScopeLabel: string;
+  readonly onSelectMeasureNotes: (measureIndex: number) => void;
   readonly playingStepId?: string | null;
-  readonly activeEventStartedAt?: number | null | undefined;
-  readonly transportPlaying?: boolean | undefined;
   readonly chordCardVisibility?: ChordCardVisibility;
   readonly labelMode: LabelHierarchyMode;
   readonly onSelectStep: (stepId: string) => void;
@@ -618,6 +727,7 @@ export function PianoRollMeasure({
   readonly colorMode: PianoRollColorMode;
   readonly guidesEnabled: boolean;
   readonly inspectorRequest?: PianoRollInspectorRequest | null | undefined;
+  readonly noteLabelsEnabled?: boolean;
   readonly onEmptyCellCursor?: (cursor: {
     readonly startBeats: Rational;
     readonly pitch: ExactPitch;
@@ -625,72 +735,96 @@ export function PianoRollMeasure({
   readonly emptyCursor?: { readonly startBeats: Rational; readonly pitch: ExactPitch } | null;
   readonly midiCursor?: Rational | null;
 }) {
-  const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
+  const notes = effectiveNotes;
   const gridOffsets = useMemo(
     () => pianoRollSnapOffsets(layout.barLengthBeats, snap, layout.meter, measure.startBeats),
     [layout.barLengthBeats, layout.meter, measure.startBeats, snap],
   );
+  const measureElementRef = useRef<HTMLElement | null>(null);
   const noteGesture = useSyncExternalStore(
     subscribePianoRollSession,
     getPianoRollGesture,
     () => null,
   );
-  const groupPreviews = new Map(
-    noteGesture?.groupNotes?.map((entry) => [
-      pianoRollNoteIdentity(entry.sourceStepId, entry.eventKey),
-      entry.note,
-    ]) ?? [],
+  const groupPreviews = useMemo(
+    () =>
+      new Map(
+        noteGesture?.groupNotes?.map((entry) => [
+          pianoRollNoteIdentity(entry.sourceStepId, entry.eventKey),
+          entry.note,
+        ]) ?? [],
+      ),
+    [noteGesture?.groupNotes],
   );
-  const renderNotes = notes.map((note) => {
-    const preview = groupPreviews.get(pianoRollNoteIdentity(note.sourceStepId, note.eventKey));
-    if (preview)
-      return {
-        ...note,
-        pitch: preview.pitch,
-        startBeats: preview.startBeats,
-        durationBeats: preview.durationBeats,
-      };
-    return noteGesture?.sourceStepId === note.sourceStepId && noteGesture.note.id === note.eventKey
-      ? {
-          ...note,
-          pitch: noteGesture.note.pitch,
-          startBeats: noteGesture.note.startBeats,
-          durationBeats: noteGesture.note.durationBeats,
-        }
-      : note;
-  });
-  const visibleNotes = renderNotes.flatMap((note) => {
-    const fragment = projectPianoRollNoteFragment(note, measure, layout.barLengthBeats);
-    return fragment ? [{ ...note, fragment }] : [];
-  });
-  const sectionBoundaries = new Map(
-    project.progression.steps.map((step) => [
-      step.id,
-      project.progression.sections
-        ?.filter((section) => section.startStepId === step.id)
-        .map((section) => section.name) ?? [],
-    ]),
+  const renderNotes = useMemo(
+    () =>
+      notes.map((note) => {
+        const preview = groupPreviews.get(pianoRollNoteIdentity(note.sourceStepId, note.eventKey));
+        if (preview)
+          return {
+            ...note,
+            pitch: preview.pitch,
+            startBeats: preview.startBeats,
+            durationBeats: preview.durationBeats,
+          };
+        return noteGesture?.sourceStepId === note.sourceStepId &&
+          noteGesture.note.id === note.eventKey
+          ? {
+              ...note,
+              pitch: noteGesture.note.pitch,
+              startBeats: noteGesture.note.startBeats,
+              durationBeats: noteGesture.note.durationBeats,
+            }
+          : note;
+      }),
+    [groupPreviews, noteGesture, notes],
+  );
+  const visibleNotes = useMemo(
+    () =>
+      renderNotes.flatMap((note) => {
+        const fragment = projectPianoRollNoteFragment(note, measure, layout.barLengthBeats);
+        return fragment ? [{ ...note, fragment }] : [];
+      }),
+    [layout.barLengthBeats, measure, renderNotes],
+  );
+  const sectionBoundaries = useMemo(
+    () =>
+      new Map(
+        project.progression.steps.map((step) => [
+          step.id,
+          project.progression.sections
+            ?.filter((section) => section.startStepId === step.id)
+            .map((section) => section.name) ?? [],
+        ]),
+      ),
+    [project.progression.sections, project.progression.steps],
   );
   const tonic = project.tonic;
   const pitchMode = modeForModule(project.activeModule) === "major" ? "major" : "minor";
-  const pitchValues = notes.map((note) => note.pitch.midiNumber);
+  const pitchValues = useMemo(() => notes.map((note) => note.pitch.midiNumber), [notes]);
   const deriveBounds = (gestureOctaves: number) =>
     gridMode === "degrees"
       ? derivePianoRollScalePitchBounds(pitchValues, tonic, pitchMode, pitchRange, gestureOctaves)
       : derivePianoRollPitchBounds(pitchValues, tonic, pitchRange, gestureOctaves);
-  const basePitchBounds = deriveBounds(0);
-  const pitchBounds = deriveBounds(pitchExpansion);
+  const basePitchBounds = useMemo(
+    () => deriveBounds(0),
+    [gridMode, pitchMode, pitchRange, pitchValues, tonic],
+  );
+  const pitchBounds = useMemo(
+    () => deriveBounds(pitchExpansion),
+    [gridMode, pitchExpansion, pitchMode, pitchRange, pitchValues, tonic],
+  );
   const minPitch = pitchBounds.min;
   const maxPitch = pitchBounds.max;
-  const pitchGeometry = createPianoRollPitchGeometry(
-    minPitch,
-    maxPitch,
-    tonic,
-    pitchMode,
-    gridMode,
+  const pitchGeometry = useMemo(
+    () => createPianoRollPitchGeometry(minPitch, maxPitch, tonic, pitchMode, gridMode),
+    [gridMode, maxPitch, minPitch, pitchMode, tonic],
   );
   const rowCount = pitchGeometry.unitCount;
-  const pitchRows = pianoRollPitchRows(minPitch, maxPitch, pitchGeometry);
+  const pitchRows = useMemo(
+    () => pianoRollPitchRows(minPitch, maxPitch, pitchGeometry),
+    [maxPitch, minPitch, pitchGeometry],
+  );
   const pitchCount = pitchRows.length;
   const pitchAtGridPointer = (event: {
     readonly currentTarget: HTMLDivElement;
@@ -708,10 +842,13 @@ export function PianoRollMeasure({
     return pitchGeometry.pitchAtYFraction(y);
   };
   const [focusPitch, setFocusPitch] = useState(60);
-  const activeStepStart =
-    layout.measures
-      .flatMap((candidate) => candidate.fragments)
-      .find((fragment) => fragment.stepId === selectedStepId)?.startBeats ?? measure.startBeats;
+  const activeStepStart = useMemo(
+    () =>
+      layout.measures
+        .flatMap((candidate) => candidate.fragments)
+        .find((fragment) => fragment.stepId === selectedStepId)?.startBeats ?? measure.startBeats,
+    [layout.measures, measure.startBeats, selectedStepId],
+  );
   const [keyboardStartBeats, setKeyboardStartBeats] = useState<Rational | null>(null);
   const [keyboardGridFocused, setKeyboardGridFocused] = useState(false);
   const keyboardCellStart = keyboardStartBeats ?? activeStepStart;
@@ -834,8 +971,9 @@ export function PianoRollMeasure({
   };
   const durationForSnap = (): Rational => pianoRollSnapBeats(snap, layout.meter);
   const deleteSelection = (fallbackIdentity?: { sourceStepId: string; eventKey: string }) => {
+    const selectedIdentities = getSelectedNoteIdentities();
     const selectedNotes = notes.filter((note) =>
-      selectedNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+      selectedIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
     );
     const notesToDelete =
       selectedNotes.length || !fallbackIdentity
@@ -883,8 +1021,9 @@ export function PianoRollMeasure({
     }
   };
   const copySelection = (duplicate: boolean) => {
+    const selectedIdentities = getSelectedNoteIdentities();
     const selectedNotes = notes.filter((note) =>
-      selectedNoteIdentities.has(JSON.stringify([note.sourceStepId, note.eventKey])),
+      selectedIdentities.has(JSON.stringify([note.sourceStepId, note.eventKey])),
     );
     if (!selectedNotes.length) return;
     const start = selectedNotes.reduce(
@@ -933,11 +1072,12 @@ export function PianoRollMeasure({
     deltaStart: Rational,
   ): boolean => {
     const identity = pianoRollNoteIdentity(activeNote.sourceStepId, activeNote.eventKey);
-    if (!selectedNoteIdentities.has(identity) || selectedNoteIdentities.size < 2) return false;
+    const selectedIdentities = getSelectedNoteIdentities();
+    if (!selectedIdentities.has(identity) || selectedIdentities.size < 2) return false;
     const selected = notes.filter((note) =>
-      selectedNoteIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
+      selectedIdentities.has(pianoRollNoteIdentity(note.sourceStepId, note.eventKey)),
     );
-    if (selected.length !== selectedNoteIdentities.size) {
+    if (selected.length !== selectedIdentities.size) {
       setEditorMessage("A selected note is no longer available. Select the current notes again.");
       return true;
     }
@@ -1056,50 +1196,49 @@ export function PianoRollMeasure({
   const diatonicSteps = modeForModule(project.activeModule) === "major" ? MAJOR_STEPS : MINOR_STEPS;
   const displayColorMode = colorMode === "project" ? project.presentation.noteColorMode : colorMode;
   const hookpadColors = displayColorMode === "hookpad";
-  const sectionLabels = measure.items.flatMap((item) =>
-    item.kind === "step" && item.startsHere
-      ? (() => {
-          const names = sectionBoundaries.get(item.stepId) ?? [];
-          return names.length
-            ? [
-                {
-                  name: names.join(" · "),
-                  left:
-                    (rationalToNumber(subtractRational(item.startBeats, measure.startBeats)) /
-                      rationalToNumber(layout.barLengthBeats)) *
-                    100,
-                },
-              ]
-            : [];
-        })()
-      : [],
+  const sectionLabels = useMemo(
+    () =>
+      measure.items.flatMap((item) =>
+        item.kind === "step" && item.startsHere
+          ? (() => {
+              const names = sectionBoundaries.get(item.stepId) ?? [];
+              return names.length
+                ? [
+                    {
+                      name: names.join(" · "),
+                      left:
+                        (rationalToNumber(subtractRational(item.startBeats, measure.startBeats)) /
+                          rationalToNumber(layout.barLengthBeats)) *
+                        100,
+                    },
+                  ]
+                : [];
+            })()
+          : [],
+      ),
+    [layout.barLengthBeats, measure.items, measure.startBeats, sectionBoundaries],
   );
-  const playingStepStart = (() => {
-    if (!transportPlaying || !playingStepId) return null;
-    let start = rational(0);
-    for (const step of project.progression.steps) {
-      if (step.id === playingStepId) return start;
-      start = addRational(start, step.duration.beats);
-    }
-    return null;
-  })();
-  const guidePitchClassesByStep = guidesEnabled
-    ? new Map(
-        measure.items.flatMap((item) => {
-          if (item.kind !== "step" || item.step.kind !== "chord") return [];
-          const realization = realizeProgressionStepRealization(item.step, tonic);
-          const pitchClasses = new Set(
-            [
-              ...realization.pitches.map((pitch) => pitch.pitchClassIdentity),
-              ...(project.independentBassEnabled && realization.bassPitch
-                ? [realization.bassPitch.pitchClassIdentity]
-                : []),
-            ].map((pitchClass) => ((pitchClass % 12) + 12) % 12),
-          );
-          return [[item.stepId, pitchClasses] as const];
-        }),
-      )
-    : new Map<string, ReadonlySet<number>>();
+  const guidePitchClassesByStep = useMemo<ReadonlyMap<string, ReadonlySet<number>>>(
+    () =>
+      guidesEnabled
+        ? new Map(
+            measure.items.flatMap((item) => {
+              if (item.kind !== "step" || item.step.kind !== "chord") return [];
+              const realization = realizeProgressionStepRealization(item.step, tonic);
+              const pitchClasses = new Set(
+                [
+                  ...realization.pitches.map((pitch) => pitch.pitchClassIdentity),
+                  ...(project.independentBassEnabled && realization.bassPitch
+                    ? [realization.bassPitch.pitchClassIdentity]
+                    : []),
+                ].map((pitchClass) => ((pitchClass % 12) + 12) % 12),
+              );
+              return [[item.stepId, pitchClasses] as const];
+            }),
+          )
+        : new Map<string, ReadonlySet<number>>(),
+    [guidesEnabled, measure.items, project.independentBassEnabled, tonic],
+  );
   const selectedPair = selectedNoteKey ? (JSON.parse(selectedNoteKey) as [string, string]) : null;
   const inspectorNote = selectedPair
     ? notes.find(
@@ -1343,11 +1482,12 @@ export function PianoRollMeasure({
       ),
     );
     const identity = pianoRollNoteIdentity(note.sourceStepId, note.eventKey);
+    const selectedIdentities = getSelectedNoteIdentities();
     const groupNotes =
-      mode === "move" && selectedNoteIdentities.has(identity) && selectedNoteIdentities.size > 1
+      mode === "move" && selectedIdentities.has(identity) && selectedIdentities.size > 1
         ? notes
             .filter((candidate) =>
-              selectedNoteIdentities.has(
+              selectedIdentities.has(
                 pianoRollNoteIdentity(candidate.sourceStepId, candidate.eventKey),
               ),
             )
@@ -1702,6 +1842,7 @@ export function PianoRollMeasure({
   };
   return (
     <section
+      ref={measureElementRef}
       data-measure-index={measure.measureIndex}
       data-system-index={systemIndex}
       data-testid="piano-roll-measure"
@@ -1795,8 +1936,7 @@ export function PianoRollMeasure({
           accessibleName={`Select effective Melody notes in Measure ${measure.number}`}
           title={`Select Melody notes in Measure ${measure.number}`}
           testId={`piano-roll-select-measure-notes-${measure.measureIndex}`}
-          selectionScopeLabel={selectionScopeLabel}
-          onSelect={onSelectMeasureNotes}
+          onSelect={() => onSelectMeasureNotes(measure.measureIndex)}
         >
           Select
         </PianoRollSelectionAction>
@@ -2214,80 +2354,17 @@ export function PianoRollMeasure({
             );
           })}
         </svg>
-        {pitchRows.map((midi) => {
-          const rowStart = pitchGeometry.rowStart(midi);
-          const pc = midi % 12;
-          const inScale = diatonicSteps.includes((pc - tonic + 12) % 12);
-          const paletteDegrees = pianoRollPaletteDegrees(pc, tonic, project.activeModule);
-          const degreeStyle = paletteStyle(paletteDegrees);
-          const guideItems = guidesEnabled
-            ? gridMode === "degrees"
-              ? projectPianoRollScaleChordToneGuide(measure, pc, guidePitchClassesByStep)
-              : projectPianoRollChordToneGuide(measure, pc, guidePitchClassesByStep).map(
-                  ({ item, chordTone }) => ({
-                    item,
-                    neutral: true,
-                    tones: chordTone ? [{ pitchClass: pc, half: null }] : [],
-                  }),
-                )
-            : [];
-          return (
-            <div
-              key={midi}
-              className={`piano-roll-row ${pc % 12 === 0 ? "is-octave" : ""} ${inScale ? "is-scale" : "is-accidental"} ${[1, 3, 6, 8, 10].includes(pc) ? "is-black-key" : "is-white-key"}`}
-              data-pitch-midi={midi}
-              data-palette-degrees={paletteDegrees.join("-")}
-              style={{ gridRow: `${rowStart + 1} / span 1`, ...degreeStyle }}
-            >
-              {guidesEnabled ? (
-                <span className="piano-roll-guide-layer" aria-hidden="true">
-                  {guideItems.map(({ item, tones }, index) => {
-                    const hasHarmony = item.kind === "step" && item.step.kind === "chord";
-                    return (
-                      <span
-                        key={`${item.kind}-${index}`}
-                        className="piano-roll-guide-step"
-                        style={{ flex: `${rationalToNumber(item.durationBeats)} 1 0` }}
-                      >
-                        <i
-                          className={`piano-roll-guide-segment is-neutral ${hasHarmony ? "" : "is-no-harmony"}`.trim()}
-                          data-testid="piano-roll-guide-neutral"
-                          {...(item.kind === "step" ? { "data-source-step-id": item.stepId } : {})}
-                          data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
-                          data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
-                          data-pitch-class={((midi % 12) + 12) % 12}
-                          data-palette-degrees={paletteDegrees.join("-")}
-                        />
-                        {tones.map((tone, toneIndex) => (
-                          <i
-                            key={`${tone.pitchClass}-${tone.half ?? "full"}-${toneIndex}`}
-                            className={`piano-roll-guide-segment is-chord-tone${tone.half ? ` is-${tone.half}-half` : ""}`}
-                            data-testid="piano-roll-guide-tone"
-                            {...(item.kind === "step"
-                              ? { "data-source-step-id": item.stepId }
-                              : {})}
-                            data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
-                            data-duration-beats={`${item.durationBeats.numerator}/${item.durationBeats.denominator}`}
-                            data-pitch-class={tone.pitchClass}
-                            data-guide-half={tone.half ?? "full"}
-                            data-palette-degrees={pianoRollPaletteDegrees(
-                              tone.pitchClass,
-                              tonic,
-                              project.activeModule,
-                            ).join("-")}
-                            style={paletteStyle(
-                              pianoRollPaletteDegrees(tone.pitchClass, tonic, project.activeModule),
-                            )}
-                          />
-                        ))}
-                      </span>
-                    );
-                  })}
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
+        <PianoRollPitchRows
+          pitchRows={pitchRows}
+          pitchGeometry={pitchGeometry}
+          measure={measure}
+          tonic={tonic}
+          activeModule={project.activeModule}
+          diatonicSteps={diatonicSteps}
+          guidesEnabled={guidesEnabled}
+          gridMode={gridMode}
+          guidePitchClassesByStep={guidePitchClassesByStep}
+        />
         <div className="piano-roll-note-layer" data-testid="piano-roll-note-layer">
           {midiCursor &&
           compareRational(midiCursor, measure.startBeats) >= 0 &&
@@ -2328,15 +2405,22 @@ export function PianoRollMeasure({
               }}
             />
           ) : null}
-          <PianoRollPlayhead
-            measure={measure}
-            stepStart={playingStepStart}
-            startedAt={activeEventStartedAt}
-            playing={Boolean(transportPlaying)}
-            tempoBpm={project.globalTiming.tempoBpm}
-            audition={auditionPlayhead ?? null}
-            onAuditionFinished={onAuditionFinished}
+          <i
+            className="piano-roll-playhead"
+            data-piano-roll-playhead-marker
+            data-measure-start-beats={`${measure.startBeats.numerator}/${measure.startBeats.denominator}`}
+            data-measure-end-beats={`${measure.endBeats.numerator}/${measure.endBeats.denominator}`}
+            aria-hidden="true"
+            style={{ display: "none" }}
           />
+          {auditionPlayhead ? (
+            <PianoRollPlayhead
+              measure={measure}
+              tempoBpm={project.globalTiming.tempoBpm}
+              audition={auditionPlayhead}
+              onAuditionFinished={onAuditionFinished}
+            />
+          ) : null}
           {measure.items.map((item, i) =>
             item.kind === "step" ? (
               <i
@@ -2368,36 +2452,13 @@ export function PianoRollMeasure({
             const width = previewFragment.widthPercent;
             const rowStart = pitchGeometry.rowStart(previewNote.pitch.midiNumber);
             const rowSpan = pitchGeometry.rowSpan(previewNote.pitch.midiNumber);
-            const step = project.progression.steps.find(
-              (candidate) => candidate.id === note.sourceStepId,
-            );
-            const authored = isPianoRollNoteAuthored(step);
-            const stepIndex = step
-              ? project.progression.steps.findIndex((candidate) => candidate.id === step.id)
-              : -1;
-            const nextStep = project.progression.steps
-              .slice(stepIndex + 1)
-              .find((candidate) => candidate.kind === "chord");
+            const stepMetadata = noteRenderMetadata.get(note.sourceStepId);
+            const authored = stepMetadata?.authored ?? false;
+            const rolePitchClass = previewNote.pitch.pitchClassIdentity;
             const role =
-              step?.kind === "chord"
-                ? classifyHarmonicNoteRole(
-                    note.pitch.pitchClassIdentity,
-                    createHarmonicNoteRoleContext({
-                      tonic: project.tonic,
-                      moduleId: project.activeModule,
-                      rootPitchClass: realizeProgressionStepChord(step, project.tonic)
-                        .rootPitchClass,
-                      chordPitches: realizeProgressionStepRealization(step, project.tonic).pitches,
-                      ...(nextStep?.kind === "chord"
-                        ? {
-                            nextChordPitches: realizeProgressionStepRealization(
-                              nextStep,
-                              project.tonic,
-                            ).pitches,
-                          }
-                        : {}),
-                    }),
-                  )
+              displayColorMode === "harmonic-role" && stepMetadata?.roleContext
+                ? (stepMetadata.rolesByPitchClass.get(rolePitchClass) ??
+                  classifyHarmonicNoteRole(rolePitchClass, stepMetadata.roleContext))
                 : undefined;
             const suzukiColor =
               displayColorMode === "suzuki"
@@ -2408,7 +2469,7 @@ export function PianoRollMeasure({
               tonic,
               project.activeModule,
             );
-            const noteIdentity = JSON.stringify([note.sourceStepId, note.eventKey]);
+            const noteIdentity = pianoRollNoteIdentity(note.sourceStepId, note.eventKey);
             const isSelectedNote =
               selectedNoteKey === noteIdentity || selectedNoteIdentities.has(noteIdentity);
             const hoverEdge =
@@ -2416,7 +2477,7 @@ export function PianoRollMeasure({
             const activeResize =
               isDragging &&
               (noteGesture.mode === "resize-left" || noteGesture.mode === "resize-right");
-            const noteClassName = `piano-roll-note ${hookpadColors ? "is-hookpad-palette" : ""} ${role && displayColorMode === "harmonic-role" ? `role-${role.primary} ${role.targetNext ? "is-target-next" : ""}` : ""} ${isSelectedNote ? "is-selected" : ""} ${playingStepId === note.sourceStepId ? "is-playing" : ""} ${!authored ? "is-generated" : ""} ${note.fragment.continuesFromPrevious ? "is-continuation" : ""} ${hoverEdge === "left" ? "is-resize-edge-left" : ""} ${hoverEdge === "right" ? "is-resize-edge-right" : ""} ${hoverEdge === "body" ? "is-move-body" : ""} ${activeResize ? "is-gesture-resizing" : ""}`;
+            const noteClassName = `piano-roll-note ${hookpadColors ? "is-hookpad-palette" : ""} ${role && displayColorMode === "harmonic-role" ? `role-${role.primary} ${role.targetNext ? "is-target-next" : ""}` : ""} ${isSelectedNote ? "is-selected" : ""} ${!authored ? "is-generated" : ""} ${note.fragment.continuesFromPrevious ? "is-continuation" : ""} ${hoverEdge === "left" ? "is-resize-edge-left" : ""} ${hoverEdge === "right" ? "is-resize-edge-right" : ""} ${hoverEdge === "body" ? "is-move-body" : ""} ${activeResize ? "is-gesture-resizing" : ""}`;
             const noteStyle: CSSProperties = {
               left: `${left}%`,
               width: `${Math.max(width, 0.7)}%`,
@@ -2581,7 +2642,12 @@ export function PianoRollMeasure({
                     }
                   }}
                 >
-                  <span>{pitchLabel}</span>
+                  <span
+                    hidden={!noteLabelsEnabled}
+                    style={{ "--piano-roll-label-length": pitchLabel.length } as CSSProperties}
+                  >
+                    {pitchLabel}
+                  </span>
                 </button>
               </span>
             );
@@ -2676,6 +2742,8 @@ export function PianoRollMeasure({
           const functionName =
             step.kind === "chord" ? harmonicFunctionLabel(step.harmonicFunction) : "";
           const isSelectedChord = !selectedNoteKey && selectedStepId === step.id;
+          const wholeStepStartBeats = subtractRational(item.startBeats, item.offsetInStepBeats);
+          const wholeStepEndBeats = addRational(wholeStepStartBeats, step.duration.beats);
           const hasLeftBoundary = isSelectedChord && step.kind === "chord" && item.startsHere;
           const hasRightBoundary =
             isSelectedChord && step.kind === "chord" && !item.continuesToNext;
@@ -2692,6 +2760,7 @@ export function PianoRollMeasure({
                 className={`piano-roll-chord ${chordPaletteDegrees ? "is-hookpad-palette" : ""} ${!selectedNoteKey && (selectedChordStepIds?.size ? selectedChordStepIds.has(step.id) : selectedStepId === step.id) ? "is-selected" : ""} ${playingStepId === step.id ? "is-playing" : ""} ${step.kind === "rest" ? "is-rest" : ""}`}
                 data-testid="piano-roll-chord"
                 data-source-step-id={step.id}
+                data-source-step-index={item.stepIndex}
                 {...(chordPaletteDegrees
                   ? {
                       "data-palette-degrees": chordPaletteDegrees.join("-"),
@@ -2702,6 +2771,8 @@ export function PianoRollMeasure({
                     }
                   : { style: { flex: "1 1 0" } })}
                 data-start-beats={`${item.startBeats.numerator}/${item.startBeats.denominator}`}
+                data-step-start-beats={`${wholeStepStartBeats.numerator}/${wholeStepStartBeats.denominator}`}
+                data-step-end-beats={`${wholeStepEndBeats.numerator}/${wholeStepEndBeats.denominator}`}
                 onClick={(event) => {
                   onClearNoteSelection();
                   if (onHarmonySelected) onHarmonySelected(step.id, systemIndex, event.shiftKey);
@@ -2960,3 +3031,5 @@ export function PianoRollMeasure({
     </section>
   );
 }
+
+export const PianoRollMeasure = memo(PianoRollMeasureView);

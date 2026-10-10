@@ -317,7 +317,13 @@ export function StudioWorkspace({
       className={`app-shell${bottomPanel ? " has-bottom-panel" : ""}`}
       aria-label="CadenceFlow Studio"
     >
-      <header className="app-header" aria-label="Project and application controls">
+      <header
+        className="app-header"
+        aria-label="Project and application controls"
+        aria-description="Scroll vertically when space is limited."
+        tabIndex={0}
+        data-playback-follow-ignore="true"
+      >
         {header}
         <button
           ref={midiSettingsEntryRef}
@@ -352,6 +358,7 @@ export function StudioWorkspace({
         <aside
           ref={inspectorStackRef}
           className="inspector-stack"
+          data-playback-follow-nested-scroll
           aria-label="Inspector"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}

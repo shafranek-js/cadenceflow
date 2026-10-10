@@ -555,9 +555,7 @@
   background: color-mix(in srgb, var(--focus-ring, #3578c8) 13%, var(--score-paper));
 }
 
-.score-system-measure-actions button[data-current-context="true"],
-.measure-staff-event[data-current-context="true"],
-.measure-staff-gap[data-current-context="true"] {
+.score-system-measure-actions button[data-current-context="true"] {
   outline: 2px solid var(--focus-ring, #3578c8);
   outline-offset: 1px;
   border-radius: 4px;
@@ -1732,8 +1730,14 @@ button.piano-roll-note.is-resize-edge-right {
   cursor: grabbing !important;
 }
 svg.piano-roll-note {
-  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
   pointer-events: none;
+}
+.piano-roll-grid.is-hookpad-palette svg.piano-roll-note.is-hookpad-palette {
+  display: none;
 }
 svg.piano-roll-note rect {
   fill: color-mix(
@@ -1757,12 +1761,19 @@ svg.piano-roll-note.is-playing rect {
   stroke-width: 2;
 }
 button.piano-roll-note {
+  container-type: inline-size;
+  padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--score-ink);
   cursor: grab !important;
 }
 button.piano-roll-note > span {
+  display: block;
+  max-width: 100%;
+  font-size: min(11px, calc(140cqi / var(--piano-roll-label-length, 2)));
+  line-height: 1.25;
+  white-space: nowrap;
   color: var(--score-ink);
 }
 .piano-roll-note.is-selected {
@@ -2185,20 +2196,17 @@ button.piano-roll-note > span {
   display: inline-block;
   max-width: 100%;
   overflow: hidden;
-  padding: 0 2px;
+  padding: 0;
   border-radius: 2px;
   background: rgb(255 255 255 / 88%);
   color: #111827;
-  font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
   text-overflow: clip;
   white-space: nowrap;
 }
-@container (max-width: 30px) {
-  .piano-roll-grid.is-hookpad-palette button.piano-roll-note.is-hookpad-palette > span {
-    display: none;
-  }
+button.piano-roll-note > span[hidden] {
+  display: none !important;
 }
 .piano-roll-grid.is-hookpad-palette
   button.piano-roll-note.is-hookpad-palette[data-palette-degrees*="-"] {
@@ -3165,9 +3173,9 @@ button.piano-roll-note > span {
   position: absolute;
   z-index: 4;
   box-sizing: border-box;
-  border: 2px solid var(--focus-ring, #3578c8);
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--score-paper) 70%, transparent);
+  /* Keep current-measure context accessible without an editing selection frame. */
+  border: 0;
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -5397,13 +5405,25 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   border-right-color: var(--border-subtle);
 }
 
-.progression-heading-transport-cluster {
+.app-header-playback-cluster {
   display: flex;
-  align-items: center;
   flex: 0 1 auto;
+  align-items: center;
+  max-width: 100%;
   min-width: 0;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.app-header-playback-cluster .progression-transport-controls {
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+  gap: 4px;
+}
+
+.app-header-playback-cluster .transport-status-badge {
+  white-space: normal;
 }
 
 .progression-playback-nav,
@@ -5411,9 +5431,10 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   display: flex;
   align-items: center;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
-.progression-heading-transport-cluster .progression-heading-tempo {
+.app-header-playback-cluster .progression-heading-tempo {
   width: max-content;
   min-height: 0;
   padding-right: 0;
@@ -5422,11 +5443,18 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   border-left: 1px solid var(--border-subtle);
 }
 
+.app-header-playback-cluster .progression-heading-support-controls {
+  gap: 4px;
+  padding-left: var(--space-2);
+}
+
 .progression-heading-support-controls {
   display: flex;
   flex: 0 1 auto;
   align-items: center;
   min-width: 0;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: var(--space-2);
   padding-left: var(--space-3);
   border-left: 1px solid var(--border-subtle);
@@ -5506,6 +5534,15 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   justify-content: center;
 }
 
+.progression-transport-controls .transport-stop-rewind-icons {
+  gap: 1px;
+}
+
+.progression-transport-controls .transport-stop-rewind-icons .ui-icon {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
 .progression-transport-controls .transport-btn-label {
   position: absolute;
   width: 1px;
@@ -5521,6 +5558,24 @@ button.score-system-status-tag.hand-legend-trigger:hover {
 
 .progression-transport-controls .transport-status-badge {
   margin-left: var(--space-1);
+}
+
+.progression-transport-controls .transport-button.transport-follow-resume {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 0 10px;
+}
+
+.progression-transport-controls .transport-follow-resume .transport-btn-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
 }
 
 /* On wide progression panels timing and support controls share one row. */
@@ -6793,9 +6848,8 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   margin: 0;
 }
 
-/* Keep Piano Roll's title, transport, and tempo intact when the global action
-   row competes for width. The shared actions keep their own order and wrap as
-   whole controls below the title group when the heading cannot fit one line. */
+/* Keep Piano Roll's title and shared progression actions intact when the global
+   action row competes for width. */
 .progression-heading-piano-roll {
   display: flex;
   flex-wrap: wrap;
@@ -6810,18 +6864,6 @@ button.score-system-status-tag.hand-legend-trigger:hover {
   flex-wrap: nowrap;
 }
 
-.progression-heading-piano-roll .progression-heading-transport-cluster {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  min-width: max-content;
-}
-
-.progression-heading-piano-roll .progression-heading-tempo,
-.progression-heading-piano-roll .progression-heading-support-controls {
-  flex: 0 0 auto;
-  min-width: max-content;
-}
-
 .progression-heading-piano-roll > .progression-heading-actions {
   flex: 1 1 max-content;
   min-width: min(100%, 20rem);
@@ -6829,6 +6871,17 @@ button.score-system-status-tag.hand-legend-trigger:hover {
 }
 
 @media (max-width: 760px) {
+  .app-header-playback-cluster {
+    flex: 1 1 100%;
+    gap: 4px;
+  }
+
+  .app-header-playback-cluster .progression-heading-tempo {
+    width: auto;
+    max-width: 100%;
+    flex: 0 1 auto;
+  }
+
   .progression-heading-piano-roll {
     align-items: flex-start;
   }
@@ -6837,19 +6890,6 @@ button.score-system-status-tag.hand-legend-trigger:hover {
     flex: 1 1 100%;
     min-width: 0;
     flex-wrap: wrap;
-  }
-
-  .progression-heading-piano-roll .progression-heading-transport-cluster {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .progression-heading-piano-roll .progression-transport-controls,
-  .progression-heading-piano-roll .progression-playback-nav {
-    flex: 0 0 auto;
-    min-width: max-content;
   }
 
   .progression-heading-piano-roll > .progression-heading-actions {
@@ -6872,4 +6912,21 @@ button.score-system-status-tag.hand-legend-trigger:hover {
 .app-status-bar:has(.midi-status-compact) {
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.piano-roll-toolbar .piano-roll-visibility-toggles button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.piano-roll-toolbar .piano-roll-visibility-toggles .ui-icon {
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  pointer-events: none;
 }

@@ -34,6 +34,8 @@ export interface ProjectRepository {
   /** Atomically deletes the active record, switches its pointer, and writes a fresh fallback if needed. */
   replaceActiveProject?(activeId: string, replacement: Project): Promise<void>;
   saveProject(project: Project): Promise<void>;
+  /** Persists a newly imported project and its active pointer in one transaction. */
+  saveNewActiveProject?(project: Project): Promise<void>;
   deleteProject(id: string): Promise<void>;
   getLastActiveProjectId(): Promise<string | null>;
   setLastActiveProjectId(id: string): Promise<void>;
@@ -116,6 +118,23 @@ export class DexieProjectRepository implements ProjectRepository {
       if (activeMeta && activeMeta.value === id) {
         await this.db.metadata.delete("lastActiveProjectId");
       }
+    });
+  }
+  async saveNewActiveProject(project: Project): Promise<void> {
+    const payload = encodePortableProject(project);
+    await this.db.transaction("rw", [this.db.projects, this.db.metadata], async () => {
+      if (await this.db.projects.get(project.id))
+        throw new Error("An imported project must have a new identity.");
+      await this.db.projects.add({
+        id: project.id,
+        name: project.name,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        schemaVersion: project.schemaVersion,
+        revision: 1,
+        payload,
+      });
+      await this.db.metadata.put({ key: "lastActiveProjectId", value: project.id });
     });
   }
 

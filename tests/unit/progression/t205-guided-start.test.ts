@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
 
 const el = React.createElement;
 
@@ -18,6 +19,7 @@ function renderTrack(overrides: Record<string, unknown> = {}) {
     root.render(
       el(ProgressionTrack, {
         project,
+        transportStore: new TransportStore(),
         onSelectStep: vi.fn(),
         onEditPerformance: vi.fn(),
         onSetStepDuration: vi.fn(),

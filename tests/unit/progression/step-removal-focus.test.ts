@@ -9,6 +9,7 @@ import { createDefaultProject } from "../../../src/domain/project/factory";
 import { musicalDuration } from "../../../src/domain/timing/duration";
 import { rational } from "../../../src/domain/timing/rational";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -74,6 +75,7 @@ function renderHarness(): Harness {
     useEffect(() => store.subscribe(() => force((value) => value + 1)), []);
     return createElement(ProgressionTrack, {
       project: store.project,
+      transportStore: new TransportStore(),
       onSelectStep: () => undefined,
       onClearSelection: () => undefined,
       onEditPerformance: () => undefined,

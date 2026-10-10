@@ -3,23 +3,46 @@ import { getHarmonicModule } from "../../domain/harmony/moduleRegistry";
 import { realizeProgressionAudioEvents } from "../../audio/eventRealizer";
 import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
 import type { KeyboardScheduledNote } from "../transport/transportStore";
+import {
+  DEFAULT_PLAYBACK_DOCK_HEIGHT_RATIO,
+  DEFAULT_PLAYBACK_PIANO_DOCK_HEIGHT_RATIO,
+  normalizePlaybackDockHeightRatio,
+} from "../studio/playbackDockSizing";
 
 export interface KeyboardPreferences {
   readonly visible: boolean;
+  readonly guitarFretboardVisible: boolean;
+  readonly pianoDockHeightRatio: number;
+  readonly guitarDockHeightRatio: number;
   readonly range: "auto" | "88";
   readonly parts: "all" | "melody";
 }
 export const KEYBOARD_STORAGE_KEY = "cadenceflow.playbackKeyboard";
 export const DEFAULT_KEYBOARD_PREFERENCES: KeyboardPreferences = {
   visible: false,
+  guitarFretboardVisible: false,
+  pianoDockHeightRatio: DEFAULT_PLAYBACK_PIANO_DOCK_HEIGHT_RATIO,
+  guitarDockHeightRatio: DEFAULT_PLAYBACK_DOCK_HEIGHT_RATIO,
   range: "auto",
   parts: "all",
 };
 export function readKeyboardPreferences(): KeyboardPreferences {
   try {
     const value = JSON.parse(localStorage.getItem(KEYBOARD_STORAGE_KEY) ?? "null");
+    const legacyDockRatio = value?.dockHeightRatio;
     return {
       visible: value?.visible === true,
+      // Missing values are the backwards-compatible default for existing keyboard preferences.
+      guitarFretboardVisible: value?.guitarFretboardVisible === true,
+      // Migrate the earlier shared dock size once, then persist independent instrument sizes.
+      pianoDockHeightRatio: normalizePlaybackDockHeightRatio(
+        value?.pianoDockHeightRatio ?? legacyDockRatio,
+        DEFAULT_PLAYBACK_PIANO_DOCK_HEIGHT_RATIO,
+      ),
+      guitarDockHeightRatio: normalizePlaybackDockHeightRatio(
+        value?.guitarDockHeightRatio ?? legacyDockRatio,
+        DEFAULT_PLAYBACK_DOCK_HEIGHT_RATIO,
+      ),
       range: value?.range === "88" ? "88" : "auto",
       parts: value?.parts === "melody" ? "melody" : "all",
     };
@@ -34,6 +57,7 @@ export function saveKeyboardPreferences(value: KeyboardPreferences): void {
     /* Storage is optional. */
   }
 }
+
 export function autoKeyboardRange(pitches: readonly number[]): readonly [number, number] {
   if (!pitches.length) return [48, 71];
   let start = Math.max(0, Math.floor(Math.min(...pitches) / 12) * 12);

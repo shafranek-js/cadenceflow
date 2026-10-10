@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { AuthoredMelodyEdit } from "../../app/commands/authoredMelodyTransaction";
 import { exactPitch } from "../../domain/harmony/pitch";
 import { modeForModule } from "../../domain/harmony/functions";
-import { createEffectiveMelodyTimeline } from "../../domain/melody/effectiveTimeline";
+import type { EffectiveMelodyNote } from "../../domain/melody/effectiveTimeline";
 import type { Project } from "../../domain/project/project";
 import { compareRational, multiplyRational, rational } from "../../domain/timing/rational";
 import type { ScoreSystem } from "../../notation/scoreSystemProjection";
@@ -53,6 +53,7 @@ function selectedIdentity(note: { sourceStepId: string; eventKey: string }) {
 
 export function PianoRollSystemNotePanel({
   project,
+  effectiveNotes,
   system,
   selectedNoteIdentities,
   activeNoteIdentity,
@@ -60,6 +61,7 @@ export function PianoRollSystemNotePanel({
   onApply,
 }: {
   readonly project: Project;
+  readonly effectiveNotes: readonly EffectiveMelodyNote[];
   readonly system: ScoreSystem;
   readonly selectedNoteIdentities: ReadonlySet<string>;
   readonly activeNoteIdentity: string | null;
@@ -74,7 +76,7 @@ export function PianoRollSystemNotePanel({
   );
   const [triplet, setTripletState] = useState(() => readPianoRollPreferences().prospectiveTriplet);
   const [message, setMessage] = useState("");
-  const notes = useMemo(() => createEffectiveMelodyTimeline(project), [project]);
+  const notes = effectiveNotes;
   const first = system.measures[0]?.measure;
   const last = system.measures.at(-1)?.measure;
   const start = first?.startBeats;

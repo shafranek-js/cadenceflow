@@ -1,18 +1,23 @@
-import type { TransportState } from "../transport/transportStore";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import type { TransportStore } from "../transport/transportStore";
+import type { PlaybackFollowCoordinator } from "../transport/playbackFollowCoordinator";
 import { Icon } from "../common/Icon";
 
 export interface ProgressionTransportControlsProps {
   readonly selectedStepId?: string | undefined;
-  readonly transportState: TransportState;
+  readonly transportStore: TransportStore;
+  readonly playbackFollowCoordinator: PlaybackFollowCoordinator;
   readonly onPlay: () => void;
   readonly onPlayFromHere: (stepId: string) => void;
   readonly onPause: () => void;
   readonly onResume: () => void;
   readonly onStop: () => void;
+  readonly canRewind: boolean;
+  readonly onStopAndRewind: () => void;
 }
 
 /**
- * Playback controls owned by My Progression.
+ * Playback controls owned by the application header.
  *
  * The callbacks and transport state are still supplied by App, so moving the
  * controls changes their ownership and layout without introducing a second
@@ -20,16 +25,33 @@ export interface ProgressionTransportControlsProps {
  */
 export function ProgressionTransportControls({
   selectedStepId,
-  transportState,
+  transportStore,
+  playbackFollowCoordinator,
   onPlay,
   onPlayFromHere,
   onPause,
   onResume,
   onStop,
+  canRewind,
+  onStopAndRewind,
 }: ProgressionTransportControlsProps) {
+  const [transportState, setTransportState] = useState(() => transportStore.getState());
+  useEffect(
+    () =>
+      transportStore.subscribe(() => {
+        const next = transportStore.getState();
+        setTransportState((current) => (current === next ? current : next));
+      }),
+    [transportStore],
+  );
   const isPlaying = transportState.status === "playing";
   const isPaused = transportState.status === "paused";
   const isStopped = transportState.status === "stopped";
+  const isFollowingPlayback = useSyncExternalStore(
+    playbackFollowCoordinator.subscribe,
+    playbackFollowCoordinator.getSnapshot,
+    playbackFollowCoordinator.getSnapshot,
+  );
 
   return (
     <div
@@ -106,6 +128,33 @@ export function ProgressionTransportControls({
         </span>
         <span className="transport-btn-label">Stop</span>
       </button>
+
+      <button
+        type="button"
+        className="transport-button transport-stop-rewind"
+        onClick={onStopAndRewind}
+        disabled={!canRewind}
+        aria-label="Stop and rewind to start"
+        title="Stop and rewind to start"
+      >
+        <span className="transport-btn-icon transport-stop-rewind-icons" aria-hidden="true">
+          <Icon name="stop" />
+          <Icon name="move-left" />
+        </span>
+        <span className="transport-btn-label">Stop and rewind to start</span>
+      </button>
+
+      {!isStopped && !isFollowingPlayback ? (
+        <button
+          type="button"
+          className="transport-button transport-follow-resume"
+          onClick={() => playbackFollowCoordinator.resume()}
+          aria-label="Resume follow"
+          title="Center the playback cursor and resume automatic follow"
+        >
+          <span className="transport-btn-label">Resume follow</span>
+        </button>
+      ) : null}
 
       <div
         role="status"

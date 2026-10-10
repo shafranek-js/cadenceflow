@@ -5,6 +5,8 @@ import {
   activeKeyboardPitches,
   autoKeyboardRange,
   compositionKeyboardRange,
+  DEFAULT_KEYBOARD_PREFERENCES,
+  KEYBOARD_STORAGE_KEY,
   detectRearticulations,
   keyboardHandForRole,
   readKeyboardPreferences,
@@ -105,8 +107,33 @@ describe("Playback keyboard range and scheduled voices", () => {
       getItem: (key: string) => data.get(key) ?? null,
       setItem: (key: string, value: string) => data.set(key, value),
     });
-    saveKeyboardPreferences({ visible: true, range: "88", parts: "melody" });
-    expect(readKeyboardPreferences()).toEqual({ visible: true, range: "88", parts: "melody" });
+    data.set(KEYBOARD_STORAGE_KEY, JSON.stringify({ visible: true, range: "88", parts: "melody" }));
+    expect(readKeyboardPreferences()).toEqual({
+      visible: true,
+      guitarFretboardVisible: false,
+      pianoDockHeightRatio: 0.13,
+      guitarDockHeightRatio: 1 / 3,
+      range: "88",
+      parts: "melody",
+    });
+    saveKeyboardPreferences({
+      visible: true,
+      guitarFretboardVisible: true,
+      pianoDockHeightRatio: 0.42,
+      guitarDockHeightRatio: 0.37,
+      range: "88",
+      parts: "melody",
+    });
+    expect(readKeyboardPreferences()).toEqual({
+      visible: true,
+      guitarFretboardVisible: true,
+      pianoDockHeightRatio: 0.42,
+      guitarDockHeightRatio: 0.37,
+      range: "88",
+      parts: "melody",
+    });
+    data.set(KEYBOARD_STORAGE_KEY, "not valid JSON");
+    expect(readKeyboardPreferences()).toEqual(DEFAULT_KEYBOARD_PREFERENCES);
     vi.stubGlobal("localStorage", {
       getItem: () => {
         throw Error("blocked");
@@ -115,10 +142,45 @@ describe("Playback keyboard range and scheduled voices", () => {
         throw Error("blocked");
       },
     });
-    expect(readKeyboardPreferences()).toEqual({ visible: false, range: "auto", parts: "all" });
+    expect(readKeyboardPreferences()).toEqual({
+      visible: false,
+      guitarFretboardVisible: false,
+      pianoDockHeightRatio: 0.13,
+      guitarDockHeightRatio: 1 / 3,
+      range: "auto",
+      parts: "all",
+    });
     expect(() =>
-      saveKeyboardPreferences({ visible: true, range: "auto", parts: "all" }),
+      saveKeyboardPreferences({
+        visible: true,
+        guitarFretboardVisible: false,
+        pianoDockHeightRatio: 0.13,
+        guitarDockHeightRatio: 1 / 3,
+        range: "auto",
+        parts: "all",
+      }),
     ).not.toThrow();
+  });
+
+  it("migrates the former shared panel size into separate local preferences", () => {
+    const data = new Map<string, string>([
+      [KEYBOARD_STORAGE_KEY, JSON.stringify({ visible: true, dockHeightRatio: 0.42 })],
+    ]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => data.set(key, value),
+    });
+    const migrated = readKeyboardPreferences();
+    expect(migrated.pianoDockHeightRatio).toBe(0.42);
+    expect(migrated.guitarDockHeightRatio).toBe(0.42);
+    saveKeyboardPreferences({ ...migrated, pianoDockHeightRatio: 0.31 });
+    const persisted = JSON.parse(data.get(KEYBOARD_STORAGE_KEY) ?? "null") as Record<
+      string,
+      unknown
+    >;
+    expect(persisted).toMatchObject({ pianoDockHeightRatio: 0.31, guitarDockHeightRatio: 0.42 });
+    expect(persisted).not.toHaveProperty("dockHeightRatio");
+    expect(readKeyboardPreferences().guitarDockHeightRatio).toBe(0.42);
   });
 });
 

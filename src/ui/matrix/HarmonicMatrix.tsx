@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { matrixCardOverrideCount, type Project } from "../../domain/project/project";
+import type { TransportStore } from "../transport/transportStore";
 import type { CardViewId } from "../../domain/progression/step";
 import {
   modeForModule,
@@ -34,6 +35,7 @@ export function HarmonicMatrix({
   project,
   previewFunctionId,
   playingFunctionId,
+  transportStore,
   recommendations,
   contextualFunctionIds,
   onPreview,
@@ -56,6 +58,7 @@ export function HarmonicMatrix({
   readonly project: Project;
   readonly previewFunctionId?: string;
   readonly playingFunctionId?: string | undefined;
+  readonly transportStore?: TransportStore;
   readonly recommendations: RecommendationResult | null;
   readonly contextualFunctionIds: readonly HarmonicFunctionIdentity[];
   readonly onPreview: (functionId: string) => void;
@@ -87,8 +90,26 @@ export function HarmonicMatrix({
   const focusModeToggleRef = useRef<HTMLButtonElement>(null);
   const [hoveredFunctionId, setHoveredFunctionId] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [transportStepIndex, setTransportStepIndex] = useState(
+    () => transportStore?.getState().currentStepIndex ?? null,
+  );
+
+  useEffect(() => {
+    if (!transportStore) return;
+    setTransportStepIndex(transportStore.getState().currentStepIndex);
+    return transportStore.subscribe(() => {
+      const nextIndex = transportStore.getState().currentStepIndex;
+      setTransportStepIndex((current) => (current === nextIndex ? current : nextIndex));
+    });
+  }, [transportStore]);
 
   const previousHarmonicContext = resolvePreviousHarmonicContext(project);
+  const transportStep =
+    transportStepIndex === null ? undefined : project.progression.steps[transportStepIndex];
+  const activePlayingFunctionId =
+    transportStep?.kind === "chord"
+      ? transportStep.harmonicFunction.functionId
+      : (playingFunctionId ?? undefined);
 
   const addCardThroughExistingRoute = (functionId: string) => {
     onPreview(functionId);
@@ -197,7 +218,7 @@ export function HarmonicMatrix({
         guitarChordOrientation={project.presentation.guitarChordOrientation ?? "horizontal"}
         guitarChordColorMode={project.presentation.guitarChordColorMode ?? "chord-roles"}
         selected={previewFunctionId === identity.functionId}
-        playing={playingFunctionId === identity.functionId}
+        playing={activePlayingFunctionId === identity.functionId}
         contextual={options?.contextual}
         {...(accessibleDescription ? { accessibleDescription } : {})}
         customizedCount={matrixCardOverrideCount(template)}

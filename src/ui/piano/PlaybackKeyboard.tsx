@@ -152,6 +152,8 @@ export function PlaybackKeyboard({
     <section
       className="playback-keyboard"
       aria-label="Playback piano keyboard"
+      tabIndex={0}
+      data-playback-follow-ignore="true"
       // A concise announcement of what is sounding, so the two-colour cue is not sight-only and a
       // separately struck repeated note is reported rather than silently merged.
       aria-live="off"

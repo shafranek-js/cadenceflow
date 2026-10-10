@@ -6,6 +6,7 @@ import { AppStore } from "../../../src/app/appStore";
 import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands";
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -62,6 +63,7 @@ function renderHarness(refusal?: string): Harness {
     useEffect(() => store.subscribe(() => force((value) => value + 1)), []);
     return createElement(ProgressionTrack, {
       project: store.project,
+      transportStore: new TransportStore(),
       onSelectStep: () => undefined,
       onClearSelection: () => undefined,
       onEditPerformance: () => undefined,

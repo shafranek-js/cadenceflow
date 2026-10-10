@@ -8,6 +8,7 @@ export interface PianoRollPreferences {
   readonly prospectiveTriplet: boolean;
   readonly colorMode: PianoRollColorMode;
   readonly guidesEnabled: boolean;
+  readonly noteLabelsEnabled: boolean;
   readonly zoom: number;
   readonly snap: string;
   readonly pitchRange: number;
@@ -20,6 +21,7 @@ export const DEFAULT_PIANO_ROLL_PREFERENCES: PianoRollPreferences = {
   prospectiveTriplet: false,
   colorMode: "hookpad",
   guidesEnabled: false,
+  noteLabelsEnabled: true,
   zoom: 100,
   snap: "1/8",
   pitchRange: 0,
@@ -74,6 +76,10 @@ export function validatePianoRollPreferences(value: unknown): PianoRollPreferenc
       typeof candidate.guidesEnabled === "boolean"
         ? candidate.guidesEnabled
         : DEFAULT_PIANO_ROLL_PREFERENCES.guidesEnabled,
+    noteLabelsEnabled:
+      typeof candidate.noteLabelsEnabled === "boolean"
+        ? candidate.noteLabelsEnabled
+        : DEFAULT_PIANO_ROLL_PREFERENCES.noteLabelsEnabled,
     zoom:
       typeof zoom === "number" &&
       Number.isFinite(zoom) &&

@@ -1,11 +1,41 @@
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
+
+export const PianoRollSelectionScopeContext = createContext("Progression");
+
+function PianoRollSelectionHelpDescription({
+  accessibleName,
+  selectionScopeLabel,
+}: {
+  readonly accessibleName: string;
+  readonly selectionScopeLabel?: string | undefined;
+}) {
+  const contextualScopeLabel = useContext(PianoRollSelectionScopeContext);
+  const scopeLabel = selectionScopeLabel ?? contextualScopeLabel;
+  return (
+    <span>
+      <strong>{accessibleName}</strong>. This selects effective Melody notes only in that target. It
+      leaves the Ctrl/Cmd+A scope ({scopeLabel}), selection history, MIDI cursor and playback
+      unchanged. Shift-click adds notes; drag empty grid to box-select. Arrows move selected notes;
+      Alt or Shift+←/→ moves them in time. Ctrl/Cmd+C copies, X cuts, V pastes and D duplicates.
+      Delete removes; Enter/Space auditions.
+    </span>
+  );
+}
 
 interface PianoRollSelectionActionProps {
   readonly accessibleName: string;
   readonly title: string;
   readonly testId: string;
-  readonly selectionScopeLabel: string;
+  readonly selectionScopeLabel?: string | undefined;
   readonly onSelect: () => void;
   readonly children: ReactNode;
 }
@@ -152,14 +182,10 @@ export function PianoRollSelectionAction({
                   scheduleHelpClose();
               }}
             >
-              <span>
-                <strong>{accessibleName}</strong>. This selects effective Melody notes only in that
-                target. It leaves the Ctrl/Cmd+A scope ({selectionScopeLabel}), selection history,
-                MIDI cursor and playback unchanged. Shift-click adds notes; drag empty grid to
-                box-select. Arrows move selected notes; Alt or Shift+←/→ moves them in time.
-                Ctrl/Cmd+C copies, X cuts, V pastes and D duplicates. Delete removes; Enter/Space
-                auditions.
-              </span>
+              <PianoRollSelectionHelpDescription
+                accessibleName={accessibleName}
+                selectionScopeLabel={selectionScopeLabel}
+              />
               <button
                 type="button"
                 aria-label="Dismiss Piano Roll selection help"

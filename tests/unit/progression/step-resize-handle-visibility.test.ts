@@ -7,6 +7,7 @@ import { createMatrixChordStep } from "../../../src/app/commands/matrixCommands"
 import { createDefaultProject } from "../../../src/domain/project/factory";
 import type { ProgressionView } from "../../../src/domain/project/project";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,6 +32,7 @@ function renderTrack(view: ProgressionView) {
     root.render(
       createElement(ProgressionTrack, {
         project: store.project,
+        transportStore: new TransportStore(),
         onSelectStep: () => undefined,
         onClearSelection: () => undefined,
         onEditPerformance: () => undefined,

@@ -164,6 +164,7 @@ export function PianoRollChordCards({
                   style={{ flex }}
                   className={`piano-roll-instrument-card ${selectedStepIds.has(step.id) ? "is-selected" : ""} ${playingStepId === step.id ? "is-playing" : ""}`}
                   data-source-step-id={step.id}
+                  data-source-step-index={item.stepIndex}
                   aria-label={`${kind === "piano" ? "Piano" : "Guitar"} chord ${chordLabel}, ${harmonicFunctionLabel(step.harmonicFunction)}, measure ${measure.number}`}
                   aria-pressed={selectedStepIds.has(step.id)}
                   onClick={(event) => {

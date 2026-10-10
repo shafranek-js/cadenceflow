@@ -41,6 +41,29 @@ export interface TransportState {
   readonly error: string | null;
 }
 
+export function isPlaybackPositionOnlyTransportUpdate(
+  previous: TransportState,
+  next: TransportState,
+): boolean {
+  const playbackPositionChanged =
+    previous.currentStepIndex !== next.currentStepIndex ||
+    previous.currentStepStartedAt !== next.currentStepStartedAt ||
+    previous.activeMelodyEventKey !== next.activeMelodyEventKey ||
+    previous.activeEventStartedAt !== next.activeEventStartedAt ||
+    previous.pausedPositionSeconds !== next.pausedPositionSeconds ||
+    previous.playbackClockSnapshot !== next.playbackClockSnapshot;
+
+  return (
+    playbackPositionChanged &&
+    previous.status === next.status &&
+    previous.sessionId === next.sessionId &&
+    previous.startingStepIndex === next.startingStepIndex &&
+    previous.loopAwareResetTarget === next.loopAwareResetTarget &&
+    previous.playMode === next.playMode &&
+    previous.error === next.error
+  );
+}
+
 export interface PlayOptions {
   readonly stepCount: number;
   readonly loopStartStepIndex?: number;
@@ -290,6 +313,28 @@ export class TransportStore {
       pausedPositionSeconds: null,
       playbackClockSnapshot: null,
       loopAwareResetTarget: this.#state.loopAwareResetTarget,
+      playMode: "from-start",
+      error: this.#state.error,
+    });
+    this.emit();
+  }
+
+  /** Stop playback and reset its transient target to the absolute project start. */
+  rewindToStart(): void {
+    this.keyboardNotes = [];
+    this.keyboardSession = null;
+    this.keyboardClock = null;
+    this.#state = Object.freeze({
+      status: "stopped",
+      sessionId: null,
+      startingStepIndex: 0,
+      currentStepIndex: null,
+      activeMelodyEventKey: null,
+      activeEventStartedAt: null,
+      currentStepStartedAt: null,
+      pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
+      loopAwareResetTarget: 0,
       playMode: "from-start",
       error: this.#state.error,
     });

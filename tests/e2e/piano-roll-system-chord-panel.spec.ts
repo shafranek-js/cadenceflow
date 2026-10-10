@@ -354,13 +354,20 @@ test("Piano Roll instrument cards are global, persistent, selectable and fit sho
   });
   const pianoButtons = page.getByRole("button", { name: "Show piano chord", exact: true });
   const guitarButtons = page.getByRole("button", { name: "Show guitar chord", exact: true });
+  await expect(
+    page
+      .getByTestId("piano-roll-toolbar")
+      .getByRole("button", { name: "Show piano chord", exact: true }),
+  ).toHaveCount(1);
+  await expect(guitarButtons).toHaveCount(1);
+  await expect(pianoButtons.first().locator("svg")).toHaveAttribute("aria-hidden", "true");
   await expect(pianoButtons.first()).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".piano-roll-instrument-card")).toHaveCount(0);
   const before = await readFile(await exportProjectFilePath(page), "utf8");
   await pianoButtons.first().click();
   await expect(page.getByTestId("piano-roll-piano-cards").first()).toBeVisible();
   await expect(page.getByTestId("piano-roll-guitar-cards")).toHaveCount(0);
-  await expect(pianoButtons).toHaveCount(3);
+  await expect(pianoButtons).toHaveCount(1);
   for (const button of await pianoButtons.all())
     await expect(button).toHaveAttribute("aria-pressed", "true");
   await guitarButtons.first().click();

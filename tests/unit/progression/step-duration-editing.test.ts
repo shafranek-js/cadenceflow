@@ -27,6 +27,7 @@ import {
 import { StepDurationControl } from "../../../src/ui/progression/StepDurationControl";
 import { ProgressionStepCard } from "../../../src/ui/progression/ProgressionStepCard";
 import { ProgressionTrack } from "../../../src/ui/progression/ProgressionTrack";
+import { TransportStore } from "../../../src/ui/transport/transportStore";
 import { TransportBar } from "../../../src/ui/transport/TransportBar";
 import type { LoopState } from "../../../src/ui/transport/loopState";
 
@@ -608,6 +609,7 @@ describe("Progression Step Duration Direct Editing (US6/US3 Corrective UX)", () 
         root.render(
           createElement(ProgressionTrack, {
             project,
+            transportStore: new TransportStore(),
             onSelectStep: vi.fn(),
             onEditPerformance: vi.fn(),
             onSetStepDuration: vi.fn(),

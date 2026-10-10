@@ -1,7 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { TransportStore } from "../../../src/ui/transport/transportStore";
+import {
+  isPlaybackPositionOnlyTransportUpdate,
+  TransportStore,
+} from "../../../src/ui/transport/transportStore";
 
 describe("T105 — Transport State Machine", () => {
+  it("identifies position-only updates without hiding transport status or errors", () => {
+    const store = new TransportStore();
+    store.play({ stepCount: 4 });
+    const previous = store.getState();
+
+    store.setActiveMelodyEventKey("note-1");
+    const highlight = store.getState();
+    expect(isPlaybackPositionOnlyTransportUpdate(previous, highlight)).toBe(true);
+
+    store.setCurrentStepIndex(1);
+    const changedStep = store.getState();
+    expect(isPlaybackPositionOnlyTransportUpdate(highlight, changedStep)).toBe(true);
+
+    store.setError("audio unavailable");
+    expect(isPlaybackPositionOnlyTransportUpdate(changedStep, store.getState())).toBe(false);
+
+    store.pause();
+    expect(isPlaybackPositionOnlyTransportUpdate(changedStep, store.getState())).toBe(false);
+  });
+
   it("starts in 'stopped' state with clean initial parameters", () => {
     const store = new TransportStore();
     const state = store.getState();
@@ -99,6 +122,27 @@ describe("T105 — Transport State Machine", () => {
     // Second stop
     store.stop();
     expect(store.getState().status).toBe("stopped");
+  });
+
+  it("rewinds transient transport state to the absolute start without carrying a loop target", () => {
+    const store = new TransportStore();
+    store.playFromHere({ stepTarget: 3, stepCount: 4 });
+    store.setCurrentStepIndex(3);
+    store.pause(5.25);
+
+    store.rewindToStart();
+
+    expect(store.getState()).toMatchObject({
+      status: "stopped",
+      sessionId: null,
+      startingStepIndex: 0,
+      currentStepIndex: null,
+      activeMelodyEventKey: null,
+      pausedPositionSeconds: null,
+      playbackClockSnapshot: null,
+      loopAwareResetTarget: 0,
+      playMode: "from-start",
+    });
   });
 
   it("playFromHere() starts exactly at the requested step boundary", () => {

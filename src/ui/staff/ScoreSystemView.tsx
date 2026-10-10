@@ -29,6 +29,7 @@ import { withGuitarStepBass } from "../../domain/instruments/guitar/voicings";
 import { formatPitchSpelling } from "../../domain/harmony/spelling";
 import type { Project } from "../../domain/project/project";
 import type { PlaybackClockSnapshot } from "../transport/transportStore";
+import type { PlaybackFollowCoordinator } from "../transport/playbackFollowCoordinator";
 import { formatMusicalDuration, musicalDuration } from "../../domain/timing/duration";
 import type {
   ProgressionMeasure,
@@ -481,6 +482,7 @@ interface ScoreSystemCanvasProps {
   readonly playingStepId: string | undefined;
   readonly activeMelodyEventKey: string | null | undefined;
   readonly playbackClockSnapshot?: PlaybackClockSnapshot | null | undefined;
+  readonly playbackFollowCoordinator?: PlaybackFollowCoordinator | undefined;
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
   readonly onReorder: (stepId: string, targetIndex: number) => void;
@@ -569,6 +571,7 @@ function ScoreSystemCanvas({
   playingStepId,
   activeMelodyEventKey,
   playbackClockSnapshot,
+  playbackFollowCoordinator,
   onSelectStep,
   onEditPerformance,
   onReorder,
@@ -987,7 +990,6 @@ function ScoreSystemCanvas({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const activeMeasureRef = useRef<HTMLDivElement | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
-  const wasPlaybackVisibleRef = useRef(false);
 
   useEffect(() => {
     const snapshot = playbackClockSnapshot;
@@ -1000,7 +1002,6 @@ function ScoreSystemCanvas({
     const canvas = canvasRef.current;
     if (!isNotationView || !snapshot || !activeMeasure || !playhead || !canvas) {
       hideOverlay();
-      wasPlaybackVisibleRef.current = false;
       return;
     }
 
@@ -1034,7 +1035,6 @@ function ScoreSystemCanvas({
       return { element, keys, originalFilter: element.style.filter };
     });
     let activeSourceSignature = "";
-    let lastMeasureIndex: number | null = null;
     let frameId = 0;
     const clearSourceHighlights = () => {
       sourceNoteElements.forEach(({ element, originalFilter }) => {
@@ -1046,8 +1046,6 @@ function ScoreSystemCanvas({
       hideOverlay();
       clearSourceHighlights();
       activeSourceSignature = "";
-      lastMeasureIndex = null;
-      wasPlaybackVisibleRef.current = false;
     };
 
     const tick = (frameNow: number) => {
@@ -1102,23 +1100,19 @@ function ScoreSystemCanvas({
       playhead.style.display = "block";
       playhead.style.transform = `translateX(${x}px)`;
 
-      if (!wasPlaybackVisibleRef.current) {
-        cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      const card = cardRef.current;
+      const scrollContainer = scrollContainerRef.current;
+      const content = scrollContainer?.firstElementChild;
+      if (playbackFollowCoordinator && card && scrollContainer && content instanceof HTMLElement) {
+        playbackFollowCoordinator.reportPosition({
+          systemIndex: system.index,
+          viewKey: project.presentation.progressionView,
+          targetElement: card,
+          scrollContainer,
+          contentElement: content,
+          horizontalOffsetRatio: x / Math.max(displayWidthPx, 1),
+        });
       }
-      if (lastMeasureIndex !== projectedMeasure.measureIndex && system.horizontallyScrollable) {
-        const container = scrollContainerRef.current;
-        if (
-          container &&
-          (x > container.scrollLeft + container.clientWidth - 100 || x < container.scrollLeft + 40)
-        ) {
-          container.scrollTo({
-            left: Math.max(0, x - container.clientWidth / 3),
-            behavior: "smooth",
-          });
-        }
-      }
-      wasPlaybackVisibleRef.current = true;
-      lastMeasureIndex = projectedMeasure.measureIndex;
 
       const activeSourceKeys = sourceEvents
         .filter((event) => beat >= event.start && beat < event.end)
@@ -1145,13 +1139,13 @@ function ScoreSystemCanvas({
       cancelAnimationFrame(frameId);
       hideOverlay();
       clearSourceHighlights();
-      wasPlaybackVisibleRef.current = false;
     };
   }, [
     displayWidthPx,
     inputs,
     isNotationView,
     layout.barLengthBeats,
+    playbackFollowCoordinator,
     playbackClockSnapshot,
     showBass,
     system,
@@ -1939,6 +1933,9 @@ function ScoreSystemCanvas({
                 }`}
                 data-testid="score-system-measures-row"
                 data-system-index={system.index}
+                {...(hasPianoRollMeasureSlots
+                  ? { "data-system-measure-capacity": pianoRollMeasureCapacity }
+                  : {})}
                 style={{
                   width: hasPianoRollMeasureSlots
                     ? `${pianoRollSystemWidthPx}px`
@@ -2042,6 +2039,7 @@ export interface ScoreSystemViewProps {
   readonly playingStepId: string | undefined;
   readonly activeMelodyEventKey: string | null | undefined;
   readonly playbackClockSnapshot?: PlaybackClockSnapshot | null | undefined;
+  readonly playbackFollowCoordinator?: PlaybackFollowCoordinator | undefined;
   readonly measureItemsForMeasure: (measure: ProgressionMeasure) => readonly MeasureStaffItem[];
   readonly onSelectStep: (stepId: string) => void;
   readonly onEditPerformance: (stepId: string, performance: Partial<StepPerformance>) => void;
@@ -2125,6 +2123,7 @@ export const ScoreSystemView = memo(function ScoreSystemView({
   playingStepId,
   activeMelodyEventKey,
   playbackClockSnapshot,
+  playbackFollowCoordinator,
   measureItemsForMeasure,
   onSelectStep,
   onEditPerformance,
@@ -2536,6 +2535,7 @@ export const ScoreSystemView = memo(function ScoreSystemView({
                   playingStepId={playingStepId}
                   activeMelodyEventKey={activeMelodyEventKey}
                   playbackClockSnapshot={playbackClockSnapshot}
+                  playbackFollowCoordinator={playbackFollowCoordinator}
                   onSelectStep={onSelectStep}
                   onEditPerformance={onEditPerformance}
                   onReorder={onReorder}
